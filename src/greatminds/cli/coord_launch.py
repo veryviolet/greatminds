@@ -69,16 +69,27 @@ def load_coord_yaml(cfg_path: Path) -> dict:
 def resolve_launcher() -> str:
     """Return the absolute path to ``greatminds-start-agent`` or die.
 
-    IDE-target tasks reference this command verbatim, so it must be on PATH
-    at coord-launch time too (we resolve it now to give a clear error rather
-    than letting VS Code's task runner fail opaquely later).
+    Lookup order:
+      1. Sibling of the current Python entry-point (same venv) — robust
+         when the user invokes us by full path without sourcing the venv.
+      2. PATH lookup via ``shutil.which`` (pipx / system install).
+
+    IDE-target tasks reference this command verbatim, so we resolve it
+    now to give a clear error rather than letting VS Code's task runner
+    fail opaquely later.
     """
+    # Don't ``.resolve()``: sys.executable in a uv-managed venv is a symlink
+    # to the underlying Python interpreter; resolving it would skip past the
+    # venv's bin dir entirely.
+    sibling = Path(sys.executable).parent / "greatminds-start-agent"
+    if sibling.is_file():
+        return str(sibling)
     p = shutil.which("greatminds-start-agent")
-    if p is None:
-        die(1, "greatminds-start-agent not on PATH. "
-               "Install greatminds (pip/pipx) first.")
-        raise SystemExit
-    return p
+    if p is not None:
+        return p
+    die(1, f"greatminds-start-agent not found next to {sys.executable} "
+           "and not on PATH. Install greatminds (pip/pipx) first.")
+    raise SystemExit
 
 
 def emit_vscode(project_dir: Path, cfg: dict, *, ide_label: str) -> None:

@@ -1,0 +1,66 @@
+name: publish to PyPI
+
+# Trusted Publishing (OIDC) — no long-lived API tokens stored anywhere.
+# Requires a one-time setup on PyPI side:
+#   pypi.org -> Manage -> Account -> Publishing -> Add a new publisher
+#     owner:       veryviolet
+#     repository:  greatminds
+#     workflow:    publish.yml
+#     environment: pypi
+#
+# After that, pushing any vX.Y.Z tag triggers this workflow and publishes
+# the matching wheel + sdist to https://pypi.org/project/greatminds/.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  id-token: write   # required for OIDC trust exchange
+
+jobs:
+  build-and-publish:
+    name: build + publish to PyPI
+    runs-on: ubuntu-latest
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: set up python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: install uv
+        run: pip install --quiet uv
+
+      - name: verify tag matches package version
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -e
+          tag="${REF_NAME#v}"
+          ver="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')"
+          if [ "$tag" != "$ver" ]; then
+            echo "::error::tag does not match pyproject version"
+            exit 1
+          fi
+
+      - name: build wheel + sdist
+        run: uv build
+
+      - name: smoke install + every entry-point --help
+        run: |
+          set -e
+          uv venv .venv-test --python 3.13 --seed
+          .venv-test/bin/pip install --quiet dist/*.whl
+          for bin in .venv-test/bin/greatminds-*; do
+            "$bin" --help > /dev/null
+          done
+
+      - name: publish to PyPI via OIDC
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/

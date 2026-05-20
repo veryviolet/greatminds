@@ -71,20 +71,33 @@ def main(argv: list[str] | None = None) -> int:
 
     # Locate the launcher command.
     # 1. Project-local override: <project>/bin/start_agent (legacy shim).
-    # 2. greatminds-start-agent installed in PATH (preferred — pip/pipx install).
+    # 2. greatminds-start-agent sibling of *this* entry-point. Both binaries
+    #    live in the same venv's bin/ dir; this is reliable even when the
+    #    user invokes us by full path without sourcing the venv (PATH may
+    #    not contain .venv/bin).
+    # 3. greatminds-start-agent anywhere on PATH (e.g. pipx, system install).
     project_start = project_dir / "bin" / "start_agent"
     if project_start.is_file():
         start_cmd = str(project_start)
     else:
-        on_path = shutil.which("greatminds-start-agent")
-        if on_path:
-            start_cmd = on_path
+        # Don't ``.resolve()`` — sys.executable in a uv-managed venv is a
+        # symlink to the underlying Python interpreter (e.g.
+        # ~/.local/share/uv/python/.../bin/python3.13). Resolving it would
+        # send us to the interpreter's bin dir, not the venv's.
+        sibling = Path(sys.executable).parent / "greatminds-start-agent"
+        if sibling.is_file():
+            start_cmd = str(sibling)
         else:
-            die(1,
-                "no launcher found: neither <project>/bin/start_agent nor "
-                "greatminds-start-agent on PATH. "
-                "Install greatminds (pip/pipx) or provide a project shim.")
-            return 1  # unreachable
+            on_path = shutil.which("greatminds-start-agent")
+            if on_path:
+                start_cmd = on_path
+            else:
+                die(1,
+                    "no launcher found: <project>/bin/start_agent missing, "
+                    "no greatminds-start-agent next to "
+                    f"{sys.executable}, none on PATH. "
+                    "Install greatminds (pip/pipx) or provide a project shim.")
+                return 1  # unreachable
 
     # Existing session?
     cp = tmux("has-session", "-t", session)
@@ -144,7 +157,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  detach:   Ctrl+B d")
     print(f"  switch:   Ctrl+B <num>   or   Ctrl+B w (interactive list)")
     print()
-    print("each agent window has 'bin/start_agent <ROLE> <tool>' pre-typed.")
+    print(f"each agent window has '{Path(start_cmd).name} <ROLE> <tool>' pre-typed.")
     print("review, tweak tool if needed, press Enter to start.")
     return 0
 

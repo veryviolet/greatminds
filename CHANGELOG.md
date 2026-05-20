@@ -4,6 +4,22 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 0.1.1 — 2026-05-20
+
+### Fixed
+
+- `greatminds-coord-launch` and `greatminds-coord-tmux` now find a
+  sibling `greatminds-start-agent` in the same venv via
+  ``Path(sys.executable).parent`` BEFORE falling back to ``shutil.which``.
+  Previously they relied on PATH only, which broke when the user invoked
+  the binary by full path (e.g. ``./.venv/bin/greatminds-coord-launch``)
+  without sourcing the venv. Also: ``.resolve()`` is intentionally NOT
+  called on ``sys.executable`` because uv-managed venvs symlink it to the
+  underlying Python install — resolving would skip past the venv's bin
+  dir entirely.
+- "each agent window has 'bin/start_agent <ROLE> <tool>' pre-typed"
+  message updated to print the actual resolved launcher name.
+
 ## 0.1.0 — 2026-05-20
 
 First public release.
