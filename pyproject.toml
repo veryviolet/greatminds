@@ -52,7 +52,7 @@ greatminds-notify-journal = "greatminds.cli.notify_from_journal:main"
 greatminds-coord-init   = "greatminds.cli.coord_init:main"
 greatminds-pty-launch   = "greatminds.cli.pty_launch:main"
 greatminds-coordd       = "greatminds.cli.coordd:main"
-# greatminds-start-agent  = "greatminds.cli.start_agent:main"
+greatminds-start-agent  = "greatminds.cli.start_agent:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/greatminds"]
