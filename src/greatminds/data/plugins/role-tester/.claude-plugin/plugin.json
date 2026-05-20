@@ -1,0 +1,7 @@
+{
+  "name": "role-tester",
+  "version": "0.1.0",
+  "description": "TESTER role skills: probe craft, API/DB probes, UI visual verification.",
+  "author": { "name": "Guardora coordination", "email": "support@guardora.ai" },
+  "keywords": ["coordination", "role-tester"]
+}

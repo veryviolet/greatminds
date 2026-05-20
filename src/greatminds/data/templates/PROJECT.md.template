@@ -1,0 +1,75 @@
+# PROJECT.md — project-specific coordination context
+
+This file is read by every agent at the start of each tick. Keep it
+**short and high-signal**: anything an agent must know to do its job
+without re-discovering. Token catalog is in PROJECT_VARIABLES.md (canon).
+
+## Identity
+
+| Token | Value |
+|---|---|
+| `<PROJECT_NAME>` | _set this_ |
+| `<PROJECT_ROOT>` | `/opt/...` |
+| `<COORDINATION_DIR>` | `<PROJECT_ROOT>/coordination` |
+| `<DEFAULT_BRANCH>` | `main` |
+| `<COMMIT_PREFIX_PRODUCT>` | e.g. `feat(####):` |
+| `<COMMIT_PREFIX_FEATURE>` | e.g. `feat(####):` |
+
+## Stand
+
+| Token | Value |
+|---|---|
+| `<STAND_DESCRIPTION>` | one-liner: stack, hosts, what's where |
+| `<STAND_PROFILES>` | which `coord/schema.yaml` profiles are valid here |
+| `<STAND_REMOTE_HOSTS>` | comma-list of remote-stand hosts (or `local` only) |
+| `<STAND_REMOTE_SYNC>` | how STAND-KEEPER syncs code to remote (rsync / push / N/A) |
+| `<STAND_REBUILD_CMD>` | exact command used for `request_type: rebuild` |
+| `<STAND_GPU_CHECK_CMD>` | exact command for `request_type: gpu_check` |
+| `<STAND_BRINGUP_RUNBOOK>` | path to bringup runbook (or "N/A") |
+
+## URLs / endpoints
+
+| Token | Value |
+|---|---|
+| `<BACKEND_URLS>` | base URLs TESTER / EXPLORER curl from |
+| `<UI_DEV_URLS>` | Vite/UI URLs for scenario C |
+| `<UI_LOGIN_FLOW>` | how to authenticate from CLI (one-liner) |
+
+## Tests
+
+| Token | Value |
+|---|---|
+| `<TEST_PATHS_BACKEND>` | dirs TESTER runs (e.g. `tests/backend`) |
+| `<TEST_PATHS_UI>` | dirs / commands for UI tests |
+| `<HEADLESS_BROWSER_RUNNER>` | playwright/cypress runner command |
+
+## Docs
+
+| Token | Value |
+|---|---|
+| `<DOCS_STACK>` | mkdocs / sphinx / plain md |
+
+## Notes
+
+Free-form context that doesn't fit a token. Keep it short — every agent
+reads this on every tick.
+
+## Canon MCP environment
+
+These env-var tokens are referenced by `mcp/canon.json` and by skill
+Bash blocks. Real values live in `coordination/PROJECT.env`
+(gitignored). The values below are documentation only — copy the
+template via `coord-init` and fill in real values in
+`coordination/PROJECT.env`.
+
+| Token                  | Source       | Example                                  |
+|------------------------|--------------|------------------------------------------|
+| `<COORD_POSTGRES_DSN>` | PROJECT.env  | `postgresql://user:pass@host:5432/db`    |
+| `<STAND_HOST_A>`       | PROJECT.env  | `host-a.example.com`                     |
+| `<STAND_HOST_B>`       | PROJECT.env  | `host-b.example.com`                     |
+| `<STAND_URL_A>`        | PROJECT.env  | `https://host-a.example.com/api/v1`      |
+| `<STAND_URL_B>`        | PROJECT.env  | `https://host-b.example.com/api/v1`      |
+| `<PROJECT_ROOT>`       | env (start_agent exports automatically) | `/opt/your_project` |
+
+Skill bodies reference these as `${TOKEN}` in shell blocks and by
+plain backtick identifiers in prose (e.g. \`STAND_HOST_A\`).

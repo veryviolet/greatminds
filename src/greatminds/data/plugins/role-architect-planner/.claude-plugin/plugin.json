@@ -1,0 +1,7 @@
+{
+  "name": "role-architect-planner",
+  "version": "0.1.0",
+  "description": "ARCHITECT-PLANNER role skills: ADR templates, trade-off framework, task decomposition.",
+  "author": { "name": "Guardora coordination", "email": "support@guardora.ai" },
+  "keywords": ["coordination", "role-architect"]
+}

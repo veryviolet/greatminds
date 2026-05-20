@@ -1,0 +1,618 @@
+# Coordination pipeline schema
+#
+# Machine-readable source of truth for queues, roles, transitions, and stand
+# profiles. Read by bin/ scripts (render-role, gate_check, wake_check, watchdog,
+# lint-tokens) and by humans cross-referencing COORDINATE.md prose.
+#
+# Invariants in COORDINATE.md must match what's encoded here. If they drift,
+# the schema is normative — fix the prose, not the schema.
+
+version: 1
+
+# ---------------------------------------------------------------------------
+# Queues
+#
+# Each queue is a directory under coordination/. Field meanings:
+#
+#   owner    — role responsible for the queue's content AND the single
+#              role that claims from it (moves files out). Location =
+#              ownership; ambiguity by content fields (scope, etc.) was
+#              removed in the R8 refactor.
+#   writers  — roles allowed to write into the queue (own files + add
+#              blocks to files they own).
+#   kind     — `active` (normal hand-off point), `parking` (waiting on
+#              dependencies, e.g. feature_blocked), or `terminal` (end
+#              state, e.g. verified / archive).
+#
+# Authoritative source for OUTGOING moves is the `transitions:` table
+# (the `by:` field there names the role allowed to perform each move).
+# ---------------------------------------------------------------------------
+queues:
+  feature_inbox:
+    owner: ARCHITECT-PLANNER
+    writers: [ARCHITECT-PLANNER, EXPLORER]
+    kind: active
+    description: Unplanned product work and bug reports from EXPLORER.
+  feature_plan:
+    owner: ARCHITECT-PLANNER
+    writers: [ARCHITECT-PLANNER]
+    kind: active
+    description: |
+      Planned work, owned by ARCHITECT-PLANNER. PLANNER reviews plans
+      here and routes to feature_dev / feature_ui_dev / feature_docs
+      based on scope. Implementers do NOT claim from feature_plan.
+  feature_blocked:
+    owner: ARCHITECT-REVIEWER
+    writers: [DEVELOPER, UI-DEVELOPER, TECHNICAL-WRITER, TESTER, READER, ARCHITECT-REVIEWER]
+    kind: parking
+    description: Tasks waiting on explicit dependencies. Wake-up by ARCHITECT-REVIEWER.
+  feature_dev:
+    owner: DEVELOPER
+    writers: [DEVELOPER]
+    kind: active
+    description: Backend implementation.
+  feature_ui_dev:
+    owner: UI-DEVELOPER
+    writers: [UI-DEVELOPER]
+    kind: active
+    description: UI implementation.
+  feature_docs:
+    owner: TECHNICAL-WRITER
+    writers: [TECHNICAL-WRITER]
+    kind: active
+    description: Documentation implementation.
+  feature_test:
+    owner: TESTER
+    writers: [DEVELOPER, UI-DEVELOPER, TESTER]
+    kind: active
+    description: Code ready for test; TESTER moves out.
+  feature_docs_review:
+    owner: READER
+    writers: [TECHNICAL-WRITER, READER]
+    kind: active
+    description: Docs ready for reader review.
+  feature_review:
+    owner: ARCHITECT-REVIEWER
+    writers: [TESTER, READER, ARCHITECT-REVIEWER]
+    kind: active
+    description: Final review queue; ARCHITECT-REVIEWER approves or hands back.
+  verified:
+    owner: ARCHITECT-REVIEWER
+    writers: [ARCHITECT-REVIEWER]
+    kind: terminal
+    description: Approved and committed product work.
+  archive:
+    owner: ARCHITECT-PLANNER
+    writers: [ARCHITECT-PLANNER, ARCHITECT-REVIEWER]
+    kind: terminal
+    description: Duplicate, abandoned, superseded, or triaged-away product work.
+  user_feedback:
+    owner: ARCHITECT-PLANNER
+    writers: [USER]
+    kind: active
+    description: Product feedback awaiting triage.
+  review_sessions:
+    owner: EXPLORER
+    writers: [ARCHITECT-PLANNER, EXPLORER]
+    kind: active
+    description: |
+      Scenario B review sessions. EXPLORER owns and claims: iterates
+      live-stand exploration, files bugs as feature_inbox entries.
+      ARCHITECT-PLANNER writes the initial session file (target,
+      scenarios, stand_target) but does NOT claim from this queue.
+  stand_requests:
+    owner: STAND-KEEPER
+    writers: [ARCHITECT-PLANNER, ARCHITECT-REVIEWER, DEVELOPER, UI-DEVELOPER, TESTER, EXPLORER]
+    kind: active
+    description: Stand operation requests; only STAND-KEEPER moves.
+  stand_wip:
+    owner: STAND-KEEPER
+    writers: [STAND-KEEPER]
+    kind: active
+    description: Stand operation in progress.
+  stand_done:
+    owner: STAND-KEEPER
+    writers: [STAND-KEEPER]
+    kind: terminal
+    description: Completed stand operations; readiness evidence.
+  bot_inbox:
+    owner: BOT-DEVELOPER
+    writers: [BOT-USER]
+    kind: active
+    description: Bot behavior issue awaiting fix.
+  bot_wip:
+    owner: BOT-DEVELOPER
+    writers: [BOT-DEVELOPER]
+    kind: active
+    description: Bot issue in progress.
+  bot_done:
+    owner: BOT-USER
+    writers: [BOT-DEVELOPER]
+    kind: active
+    description: Bot fix ready for retest.
+  bot_verified:
+    owner: BOT-USER
+    writers: [BOT-USER]
+    kind: terminal
+    description: Bot issue verified.
+  bot_archive:
+    owner: BOT-USER
+    writers: [BOT-USER, BOT-DEVELOPER]
+    kind: terminal
+    description: Archived bot issue.
+
+# ---------------------------------------------------------------------------
+# Roles
+#
+# Each role lists its category, launch modes, heartbeat filename, and the
+# queues it may claim from. Roles with `launch_modes` containing `chat` may be
+# started without a /loop body for interactive use.
+# ---------------------------------------------------------------------------
+roles:
+  ARCHITECT-PLANNER:
+    category: product
+    launch_modes: [chat, loop]
+    heartbeat: heartbeat.architect-planner
+    claims_from: [user_feedback, feature_inbox, feature_plan]
+    description: |
+      Intake triage, planning (writes plan block, sets stand_required),
+      and per-scope routing from feature_plan to feature_dev /
+      feature_ui_dev / feature_docs. Interactive chat partner for the
+      user. Writes to review_sessions but does not claim from it —
+      EXPLORER owns review-session iteration.
+  ARCHITECT-REVIEWER:
+    category: product
+    launch_modes: [loop]
+    heartbeat: heartbeat.architect-reviewer
+    claims_from: [feature_review, feature_blocked]
+    description: |
+      Final review with stand-evidence verification (via bin/gate_check
+      result in tests block), commit, push if policy allows. Owns
+      feature_blocked wake-up: runs bin/wake_check at start of each tick.
+  DEVELOPER:
+    category: product
+    launch_modes: [loop]
+    heartbeat: heartbeat.developer
+    claims_from: [feature_dev]
+    description: |
+      Backend/product-code implementation. Picks up from feature_dev/
+      (placed there by ARCHITECT-PLANNER routing scope:backend tasks).
+  UI-DEVELOPER:
+    category: product
+    launch_modes: [loop, chat]
+    heartbeat: heartbeat.ui-developer
+    heartbeat_fast: heartbeat.ui-developer.fast
+    claims_from: [feature_ui_dev]
+    description: |
+      UI implementation. Two modes:
+      - loop: pipeline mode, claims from feature_ui_dev (placed there by
+        ARCHITECT-PLANNER routing scope:ui tasks); writes implementation
+        block; hands off to feature_test.
+      - chat: scenario C (UI rapid iteration with Vite HMR). Does NOT
+        claim from feature_ui_dev; touches heartbeat.ui-developer.fast
+        instead of the pipeline heartbeat to avoid contention.
+  TECHNICAL-WRITER:
+    category: product
+    launch_modes: [loop]
+    heartbeat: heartbeat.technical-writer
+    claims_from: [feature_docs]
+    description: |
+      Documentation implementation. Picks up from feature_docs/
+      (placed there by ARCHITECT-PLANNER routing scope:docs tasks).
+  TESTER:
+    category: product
+    launch_modes: [loop]
+    heartbeat: heartbeat.tester
+    claims_from: [feature_test]
+    description: |
+      Tests code on a deployed stand. Before mv to feature_review must
+      run bin/gate_check and record the result in the tests block.
+  READER:
+    category: product
+    launch_modes: [loop]
+    heartbeat: heartbeat.reader
+    claims_from: [feature_docs_review]
+    description: Reads docs as a fresh user; validates clarity and accuracy.
+  EXPLORER:
+    category: product
+    launch_modes: [loop]
+    heartbeat: heartbeat.explorer
+    claims_from: [review_sessions]
+    description: |
+      Uses the live system on the stand as a real user (scenario B).
+      Files bugs as plan_kind: bugfix tasks in feature_inbox.
+  STAND-KEEPER:
+    category: service
+    launch_modes: [loop]
+    heartbeat: heartbeat.stand-keeper
+    claims_from: [stand_requests]
+    profiles: [full-deploy, vite-dev]
+    description: |
+      Owns stand state and stand.status. Supports two profiles:
+      - full-deploy: backend deploy on remote stand (scenarios A, B).
+      - vite-dev: backend + Vite dev server with HMR (scenario C).
+  USER:
+    category: entry
+    launch_modes: [chat]
+    heartbeat: heartbeat.user
+    claims_from: []
+    description: |
+      Writes user_feedback or initiates ARCHITECT-PLANNER chat. Never
+      creates implementation tasks directly.
+  MAINTAINER:
+    category: system
+    launch_modes: [chat]
+    heartbeat: heartbeat.maintainer
+    claims_from: []
+    description: |
+      System operator. Handles infrastructure work the product pipeline
+      cannot self-heal: agent restart, dead-pid recovery, bin/* and
+      schema.yaml maintenance, cutover orchestration, USER chat partner
+      for infra topics. Receives asks at inbox/maintainer/ from coordd
+      (dead pids, stand-blocked escalation) and from product agents
+      when their issue is structural/schema rather than product.
+      Does NOT claim from any product queue; does NOT triage user_feedback
+      or write plans (that is ARCHITECT-PLANNER's job).
+  BOT-USER:
+    category: bot
+    launch_modes: [loop]
+    heartbeat: heartbeat.bot-user
+    claims_from: [bot_done, bot_verified]
+    description: Bot stream entry; not touched in this refactor.
+  BOT-DEVELOPER:
+    category: bot
+    launch_modes: [loop]
+    heartbeat: heartbeat.bot-developer
+    claims_from: [bot_inbox]
+    description: Bot stream implementer; not touched in this refactor.
+
+# ---------------------------------------------------------------------------
+# Transitions
+#
+# Allowed file moves between queues. The `by` field names the only role
+# permitted to perform the move. `requires` lists evidence that must be
+# present in the task file (front-matter fields or appended blocks) before
+# the move is legal.
+# ---------------------------------------------------------------------------
+transitions:
+  # NOTE on `requires:` — this field is DOCUMENTARY (bin/task does not
+  # parse it; gating lives in bin/task require_target_readiness /
+  # validate_block). Names here must match the real block kind: the
+  # triage block kind is `triage`, not `architect_triage_block`.
+  - from: user_feedback
+    to: feature_inbox
+    by: ARCHITECT-PLANNER
+    requires: [triage_block]
+  - from: user_feedback
+    to: archive
+    by: ARCHITECT-PLANNER
+    requires: [triage_block]
+  # PLANNER may archive any task in its own intake/draft area when USER
+  # decides not to pursue it (split, deprecated, duplicate, withdrawn).
+  - from: feature_inbox
+    to: archive
+    by: ARCHITECT-PLANNER
+    requires: []
+  - from: feature_plan
+    to: archive
+    by: ARCHITECT-PLANNER
+    requires: []
+  - from: review_sessions
+    to: archive
+    by: ARCHITECT-PLANNER
+    requires: []
+  # F: EXPLORER may self-close its own review session when the review
+  # campaign is complete (instead of only signalling PLANNER via inbox).
+  - from: review_sessions
+    to: archive
+    by: EXPLORER
+    requires: []
+  # Supersession/consolidation is recurrent: when PLANNER rules that a
+  # task is absorbed by another (e.g. 0397 folded into 0396), the
+  # superseded task sits in an implementer queue with nowhere to go.
+  # PLANNER may archive it directly out of the per-scope queues.
+  - from: feature_dev
+    to: archive
+    by: ARCHITECT-PLANNER
+    requires: []
+  - from: feature_ui_dev
+    to: archive
+    by: ARCHITECT-PLANNER
+    requires: []
+  - from: feature_docs
+    to: archive
+    by: ARCHITECT-PLANNER
+    requires: []
+  - from: feature_test
+    to: archive
+    by: ARCHITECT-PLANNER
+    requires: []
+  - from: feature_review
+    to: archive
+    by: ARCHITECT-PLANNER
+    requires: []
+  # REVIEWER may archive blocked tasks that USER decides not to unblock
+  # (dependency was retracted, task obsoleted, etc).
+  - from: feature_blocked
+    to: archive
+    by: ARCHITECT-REVIEWER
+    requires: []
+  # MAINTAINER may archive completed stand evidence to keep the
+  # stand_done queue scannable.
+  - from: stand_done
+    to: archive
+    by: MAINTAINER
+    requires: []
+  # Entering feature_plan needs a triage block (the plan block is
+  # written IN feature_plan, then it routes OUT to a per-scope queue).
+  - from: feature_inbox
+    to: feature_plan
+    by: ARCHITECT-PLANNER
+    requires: [triage_block]
+  # ARCHITECT-PLANNER routes from feature_plan into per-scope queues.
+  # Location = ownership: once in feature_dev/ it is DEVELOPER's; once
+  # in feature_ui_dev/ it is UI-DEVELOPER's; once in feature_docs/ it
+  # is TECHNICAL-WRITER's. No claim_filter, no content lookup.
+  - from: feature_plan
+    to: feature_dev
+    by: ARCHITECT-PLANNER
+    requires: [plan_block, scope_backend]
+  - from: feature_plan
+    to: feature_ui_dev
+    by: ARCHITECT-PLANNER
+    requires: [plan_block, scope_ui]
+  - from: feature_plan
+    to: feature_docs
+    by: ARCHITECT-PLANNER
+    requires: [plan_block, scope_docs]
+  # Independent READER audit: a `kind: docs` task marked audit-only
+  # (plan.audit_only: true) is routed straight to READER's queue, with
+  # NO prior TECHNICAL-WRITER write. READER audits reality-vs-docs and
+  # records findings in a reader_review block; the audit then flows the
+  # normal feature_docs_review exits (→ feature_review, or back so
+  # PLANNER spawns a WRITER fix task from the findings).
+  - from: feature_plan
+    to: feature_docs_review
+    by: ARCHITECT-PLANNER
+    requires: [plan_block, scope_docs, plan.audit_only]
+  - from: feature_dev
+    to: feature_test
+    by: DEVELOPER
+    requires: [implementation_block]
+  - from: feature_ui_dev
+    to: feature_test
+    by: UI-DEVELOPER
+    requires: [implementation_block]
+  - from: feature_docs
+    to: feature_docs_review
+    by: TECHNICAL-WRITER
+    requires: [implementation_block]
+  - from: feature_test
+    to: feature_review
+    by: TESTER
+    requires: [tests_block, gate_check_pass_if_stand_required]
+  - from: feature_test
+    to: feature_dev
+    by: TESTER
+    requires: [tests_block_fail_or_partial, scope_backend]
+  - from: feature_test
+    to: feature_ui_dev
+    by: TESTER
+    requires: [tests_block_fail_or_partial, scope_ui]
+  - from: feature_docs_review
+    to: feature_review
+    by: READER
+    requires: [reader_block_pass]
+  - from: feature_docs_review
+    to: feature_docs
+    by: READER
+    requires: [reader_block_fail_or_partial]
+  - from: feature_review
+    to: verified
+    by: ARCHITECT-REVIEWER
+    requires: [review_block_approved, gate_check_pass_if_stand_required]
+  - from: feature_review
+    to: feature_dev
+    by: ARCHITECT-REVIEWER
+    requires: [review_block_changes_requested, scope_backend]
+  - from: feature_review
+    to: feature_ui_dev
+    by: ARCHITECT-REVIEWER
+    requires: [review_block_changes_requested, scope_ui]
+  - from: feature_review
+    to: feature_docs
+    by: ARCHITECT-REVIEWER
+    requires: [review_block_changes_requested, scope_docs]
+  - from: any_active_queue
+    to: feature_blocked
+    by: current_owner
+    requires: [blocked_block_with_dependencies_and_resume_to]
+  - from: feature_blocked
+    to: any_resume_to_queue
+    by: ARCHITECT-REVIEWER
+    requires: [all_dependencies_exist_per_wake_check]
+  - from: stand_requests
+    to: stand_wip
+    by: STAND-KEEPER
+    requires: []
+  # D: a stale/obsolete/withdrawn stand request can be cancelled by
+  # ARCHITECT-PLANNER instead of forcing STAND-KEEPER to process it.
+  - from: stand_requests
+    to: archive
+    by: ARCHITECT-PLANNER
+    requires: []
+  - from: stand_wip
+    to: stand_done
+    by: STAND-KEEPER
+    requires: [stand_result_block, evidence_for_if_related_product_task]
+
+# ---------------------------------------------------------------------------
+# Task front-matter requirements
+#
+# Required fields when a task enters a given state (queue). Schema validators
+# may read this to lint task files. Inline `*_TEMPLATE.md` snippets in
+# templates/coordination/<queue>/_TEMPLATE.md show concrete YAML shape.
+# ---------------------------------------------------------------------------
+task_kinds:
+  product:
+    required_initial_fields:
+      - id
+      - stream            # product
+      - kind              # feature | bugfix | docs | ops | research
+      - scope             # backend | ui | docs | stand | research
+      - reporter
+      - opened_at
+      - priority
+      - title
+    plan_block_required_fields:
+      - written_by
+      - written_at
+      - base_commit
+      - assignee_role
+      - stand_required    # true | false
+      - stand_reason
+      - plan_kind         # full | bugfix   (new in this refactor)
+      - mode              # A | B | C       (new in this refactor)
+      - ready_for_implementation
+    implementation_block_required_fields:
+      - closed_by
+      - closed_at
+      - base_commit
+      - files
+      - ready_for_test
+    tests_block_required_fields:
+      - closed_by
+      - closed_at
+      - base_commit
+      - test_files
+      - test_command
+      - test_result
+      - stand_evidence
+      - gate_check_result  # new: pass | fail | missing | n/a
+      - gate_check_at      # new: ISO timestamp of bin/gate_check run
+      - gate_check_commit  # new: commit checked against stand evidence
+      - ready_for_review
+    reader_block_required_fields:
+      - reviewed_by
+      - reviewed_at
+      - outcome
+      - docs_checked
+      - stand_checked
+      - command_or_flow
+      - ready_for_architect
+    review_block_required_fields:
+      - reviewed_by
+      - reviewed_at
+      - outcome
+      - commit
+    blocked_block_required_fields:
+      - blocked_by
+      - blocked_at
+      - reason
+      - dependencies      # list of "<queue>/<task-id>.md"
+      - resume_to         # queue name from this schema
+  stand_request:
+    required_initial_fields:
+      - id
+      - stream            # stand
+      - reporter
+      - opened_at
+      - priority
+      - request_type
+      - target
+      - evidence_for      # new: list of product task ids this request will provide evidence for (may be empty for stand-only ops)
+    stand_result_block_required_fields:
+      - closed_by
+      - closed_at
+      - result
+      - stand_status
+      - hosts
+      - commit
+      - profile
+      - related_product_task
+      - commands
+      - evidence
+      - follow_up
+  review_session:
+    required_initial_fields:
+      - id
+      - stream            # review_session
+      - opened_by
+      - opened_at
+      - target_functionality
+      - scenarios         # list of exploration scenarios
+      - stand_target      # host/profile/commit expected
+      - mode              # B (scenario B)
+
+# ---------------------------------------------------------------------------
+# Stand profiles
+#
+# Profiles STAND-KEEPER supports. Project-specific commands/URLs live in the
+# installed PROJECT.md; here we describe what each profile means.
+# ---------------------------------------------------------------------------
+stand_profiles:
+  full-deploy:
+    description: |
+      Full backend deployment on the target hosts. Used by scenarios A and B.
+      Stand readiness includes service health checks and bootstrap. Triggered
+      by stand_requests with request_type in [deploy, restart, rebuild, smoke,
+      remote_sync, gpu_check, teardown].
+    used_by_scenarios: [A, B]
+  vite-dev:
+    description: |
+      Backend deployed + Vite UI dev server with HMR. Used by scenario C
+      (UI rapid iteration). STAND-KEEPER ensures Vite stays up; UI changes
+      reload via HMR, no per-change redeploy.
+    used_by_scenarios: [C]
+
+# ---------------------------------------------------------------------------
+# Scenarios
+#
+# Three top-level modes of operation. Each task carries `plan.mode: A|B|C`.
+# Scenarios are described in prose in COORDINATE.md §6; here only the
+# machine-readable mapping to roles and queues.
+# ---------------------------------------------------------------------------
+scenarios:
+  A:
+    label: feature_or_refactor
+    description: Standard product pipeline with parallel backend/ui/docs work.
+    active_roles: [ARCHITECT-PLANNER, ARCHITECT-REVIEWER, DEVELOPER, UI-DEVELOPER, TECHNICAL-WRITER, TESTER, READER, STAND-KEEPER]
+    stand_profile: full-deploy
+  B:
+    label: intensive_review
+    description: Review session with EXPLORER on live stand; bug→fast-fix loop.
+    active_roles: [ARCHITECT-PLANNER, ARCHITECT-REVIEWER, EXPLORER, DEVELOPER, UI-DEVELOPER, TESTER, STAND-KEEPER]
+    stand_profile: full-deploy
+  C:
+    label: ui_rapid_iteration
+    description: Direct chat with UI-DEVELOPER on a Vite-HMR stand.
+    active_roles: [UI-DEVELOPER, STAND-KEEPER]
+    stand_profile: vite-dev
+    notes: |
+      UI-DEVELOPER runs in chat mode (heartbeat.ui-developer.fast). Does not
+      claim from feature_plan/feature_ui_dev. Optional session-summary task
+      may be filed in feature_review at end of session for audit.
+
+# ---------------------------------------------------------------------------
+# Watchdog thresholds
+#
+# Read by bin/watchdog. Times in seconds.
+# ---------------------------------------------------------------------------
+watchdog:
+  heartbeat_stale_seconds: 600          # 10 min
+  intent_orphan_seconds: 300            # 5 min
+  task_stale_in_active_queue_seconds: 86400   # 24 h
+  task_stale_in_review_queue_seconds: 43200   # 12 h
+
+# ---------------------------------------------------------------------------
+# Filesystem layout
+#
+# Paths relative to <COORDINATION_DIR>. Used by bin/ scripts to locate
+# artifacts.
+# ---------------------------------------------------------------------------
+layout:
+  journal: journal.ndjson
+  intent_dir: intent/
+  inbox_dir: inbox/
+  heartbeat_glob: 'heartbeat.*'
+  stand_status: stand.status

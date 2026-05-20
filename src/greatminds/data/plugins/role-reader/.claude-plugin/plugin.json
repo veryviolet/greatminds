@@ -1,0 +1,7 @@
+{
+  "name": "role-reader",
+  "version": "0.1.0",
+  "description": "READER role skills: fresh-user perspective, reality-vs-docs audit, reader-review block craft, audit-path discipline.",
+  "author": { "name": "Guardora coordination", "email": "support@guardora.ai" },
+  "keywords": ["coordination", "role-reader"]
+}

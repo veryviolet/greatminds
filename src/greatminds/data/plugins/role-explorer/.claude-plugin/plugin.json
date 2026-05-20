@@ -1,0 +1,7 @@
+{
+  "name": "role-explorer",
+  "version": "0.1.0",
+  "description": "EXPLORER role skills: exploratory probing, bug-as-mini-task, re-verify loop.",
+  "author": { "name": "Guardora coordination", "email": "support@guardora.ai" },
+  "keywords": ["coordination", "role-explorer"]
+}

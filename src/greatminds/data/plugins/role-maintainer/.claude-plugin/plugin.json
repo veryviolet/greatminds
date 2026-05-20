@@ -1,0 +1,7 @@
+{
+  "name": "role-maintainer",
+  "version": "0.1.0",
+  "description": "MAINTAINER role skills: agent lifecycle and diagnostics, canon sync and cutover, MAINTAINER-vs-PLANNER routing, infra surface separation.",
+  "author": { "name": "Guardora coordination", "email": "support@guardora.ai" },
+  "keywords": ["coordination", "role-maintainer"]
+}

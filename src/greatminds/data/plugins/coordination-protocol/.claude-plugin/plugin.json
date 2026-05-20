@@ -1,0 +1,7 @@
+{
+  "name": "coordination-protocol",
+  "version": "0.1.0",
+  "description": "Universal R8 coordination-protocol skills (FSM mechanics, plan/impl block protocols, stand workflow, blocked-deps, inbox/escalation). Loaded by every role.",
+  "author": { "name": "Guardora coordination", "email": "support@guardora.ai" },
+  "keywords": ["coordination", "coordination-protocol"]
+}

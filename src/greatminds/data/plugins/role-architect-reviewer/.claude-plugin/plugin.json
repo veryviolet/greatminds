@@ -1,0 +1,7 @@
+{
+  "name": "role-architect-reviewer",
+  "version": "0.1.0",
+  "description": "ARCHITECT-REVIEWER role skills: evidence-chain verification, architectural review, review block craft, commit-and-push protocol, wake-and-unblock.",
+  "author": { "name": "Guardora coordination", "email": "support@guardora.ai" },
+  "keywords": ["coordination", "role-architect-reviewer"]
+}
