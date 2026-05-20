@@ -35,7 +35,7 @@ Issues = "https://github.com/veryviolet/greatminds/issues"
 
 [project.scripts]
 # Wired up incrementally — each script ported from /opt/coordination/bin/* in its own commit.
-# greatminds-task         = "greatminds.cli.task:main"
+greatminds-task         = "greatminds.cli.task:main"
 # greatminds-inbox        = "greatminds.cli.inbox:main"
 # greatminds-stand        = "greatminds.cli.stand:main"
 # greatminds-plan         = "greatminds.cli.plan:main"
