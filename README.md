@@ -48,10 +48,3 @@ pip install greatminds   # not yet published — first release pending
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
-
-## History
-
-`greatminds` is the public, packaged form of the coordination protocol developed
-in `gitverse.ru/veryviolet/coordination`. Pre-0.1.0 development history (92
-commits, R8 FSM design, role splits, plugin layering, MCP integration) is
-archived there.

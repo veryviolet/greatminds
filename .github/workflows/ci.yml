@@ -1,0 +1,72 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-smoke:
+    name: build wheel + smoke-test entry-points
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: set up python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: install uv
+        run: pip install --quiet uv
+
+      - name: build wheel + sdist
+        run: uv build
+
+      - name: install wheel into clean venv
+        run: |
+          uv venv .venv-test --python ${{ matrix.python-version }} --seed
+          .venv-test/bin/pip install --quiet dist/*.whl
+
+      - name: smoke — every entry-point has --help
+        run: |
+          set -e
+          for bin in .venv-test/bin/greatminds-*; do
+            name="$(basename "$bin")"
+            echo "── $name ──"
+            "$bin" --help > /dev/null
+          done
+
+      - name: smoke — importlib.resources resolves packaged data
+        run: |
+          .venv-test/bin/python - <<'PY'
+          from importlib.resources import files
+          data = files("greatminds.data")
+          for needed in [
+              "schema.yaml",
+              "command_START.yaml",
+              "COORDINATE.md",
+              "roles/DEVELOPER.md",
+              "plugins/coordination-protocol/.claude-plugin/plugin.json",
+              "mcp/canon.json",
+              "templates/PROJECT.md.template",
+          ]:
+              assert data.joinpath(needed).is_file(), needed
+          print("data resolves OK")
+          PY
+
+      - name: smoke — coord-init scaffolds a fresh project
+        run: |
+          .venv-test/bin/greatminds-coord-init --project-dir /tmp/gm_ci_test
+          test -d /tmp/gm_ci_test/coordination/feature_inbox
+          test -f /tmp/gm_ci_test/schema.yaml
+          test -f /tmp/gm_ci_test/COORDINATE.md
+          test -f /tmp/gm_ci_test/coordination/PROJECT.md

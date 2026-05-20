@@ -171,6 +171,15 @@ def proxy_loop(master_fd: int, stop_event: threading.Event) -> None:
 
 
 def main() -> int:
+    """Entry point — wired up as ``greatminds-pty-launch`` in pyproject.toml.
+
+    Not an argparse CLI: argv[1] is ROLE, argv[2] is the binary to exec
+    (e.g. ``claude``), and argv[3:] are its args. ``--help`` / ``-h``
+    print the one-line usage and exit 0 so CI smoke tests pass.
+    """
+    if len(sys.argv) >= 2 and sys.argv[1] in ("--help", "-h", "help"):
+        usage()
+        return 0
     if len(sys.argv) < 3:
         usage()
         return 2
