@@ -46,13 +46,13 @@ greatminds-gate-check   = "greatminds.cli.gate_check:main"
 greatminds-wake-check   = "greatminds.cli.wake_check:main"
 greatminds-watchdog     = "greatminds.cli.watchdog:main"
 greatminds-intent-clean = "greatminds.cli.intent_clean:main"
+greatminds-coord-tmux   = "greatminds.cli.coord_tmux:main"
+greatminds-stop-decide  = "greatminds.cli.stop_decide:main"
+greatminds-notify-journal = "greatminds.cli.notify_from_journal:main"
+greatminds-coord-init   = "greatminds.cli.coord_init:main"
+greatminds-pty-launch   = "greatminds.cli.pty_launch:main"
 # greatminds-coordd       = "greatminds.cli.coordd:main"
 # greatminds-start-agent  = "greatminds.cli.start_agent:main"
-# greatminds-coord-tmux   = "greatminds.cli.coord_tmux:main"
-# greatminds-stop-decide  = "greatminds.cli.stop_decide:main"
-# greatminds-notify-journal = "greatminds.cli.notify_from_journal:main"
-# greatminds-coord-init   = "greatminds.cli.coord_init:main"
-# greatminds-pty-launch   = "greatminds.cli.pty_launch:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/greatminds"]
