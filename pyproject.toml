@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "greatminds"
+version = "0.1.0.dev0"
+description = "File-based multi-agent coordination protocol — per-role queues, layered plugin set for Claude Code, profile-v2 for OpenAI Codex"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Kirill Groshenkov", email = "kir.groshenkov@gmail.com" }]
+keywords = ["multi-agent", "coordination", "claude-code", "codex", "agents", "workflow"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development",
+  "Topic :: Software Development :: Libraries",
+]
+dependencies = [
+  "pyyaml>=6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/veryviolet/greatminds"
+Repository = "https://github.com/veryviolet/greatminds"
+Issues = "https://github.com/veryviolet/greatminds/issues"
+
+[project.scripts]
+# Wired up incrementally — each script ported from /opt/coordination/bin/* in its own commit.
+# greatminds-task         = "greatminds.cli.task:main"
+# greatminds-inbox        = "greatminds.cli.inbox:main"
+# greatminds-stand        = "greatminds.cli.stand:main"
+# greatminds-plan         = "greatminds.cli.plan:main"
+# greatminds-coordd       = "greatminds.cli.coordd:main"
+# greatminds-start-agent  = "greatminds.cli.start_agent:main"
+# greatminds-coord-tmux   = "greatminds.cli.coord_tmux:main"
+# greatminds-render-role  = "greatminds.cli.render_role:main"
+# greatminds-gate-check   = "greatminds.cli.gate_check:main"
+# greatminds-wake-check   = "greatminds.cli.wake_check:main"
+# greatminds-watchdog     = "greatminds.cli.watchdog:main"
+# greatminds-lint-tokens  = "greatminds.cli.lint_tokens:main"
+# greatminds-stop-decide  = "greatminds.cli.stop_decide:main"
+# greatminds-notify-journal = "greatminds.cli.notify_from_journal:main"
+# greatminds-coord-init   = "greatminds.cli.coord_init:main"
+# greatminds-migrate-task = "greatminds.cli.migrate_task:main"
+# greatminds-intent-clean = "greatminds.cli.intent_clean:main"
+# greatminds-pty-launch   = "greatminds.cli.pty_launch:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/greatminds"]
+
+[tool.hatch.build.targets.wheel.force-include]
+# Package data (plugins, mcp configs, codex profiles, templates, role docs, schema)
+# lives under src/greatminds/data/ and is shipped with the wheel verbatim.
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/greatminds",
+  "LICENSE",
+  "README.md",
+  "pyproject.toml",
+]
