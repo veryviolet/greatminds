@@ -23,7 +23,7 @@ greatminds inbox send MAINTAINER --kind ask \
 greatminds inbox send ARCHITECT-PLANNER --kind info \
   --about "<subject>" --body "<body>"
 
-# List your inbox (uses $COORD_ROLE)
+# List your inbox (uses $GREATMINDS_ROLE)
 greatminds inbox list
 
 # Ack a message after reading + acting (renames wake-… to processed-…)

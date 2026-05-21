@@ -9,12 +9,12 @@ Two responsibilities, run every <interval> seconds:
      monotonically.)
   2. Scan coordination/inbox/<role>/ for new files. For each new file,
      find the role's active TTY from coordination/.agent_registry/<role>.json
-     and write "проверь inbox и продолжай тик\n" to that TTY. The sleeping
+     and write "check inbox and continue your tick\n" to that TTY. The sleeping
      agent wakes, reads the inbox, and continues the tick.
 
 If the daemon is NOT running, nothing changes — agents still work via
 ScheduleWakeup polling, just with the old multi-minute latency. The daemon
-is purely additive ("нашлепка"): killing it never breaks the pipeline.
+is purely additive (a "side-load"): killing it never breaks the pipeline.
 
 The daemon never moves task files, never edits queues, never decides on
 state. Its only side effects are:
@@ -51,7 +51,7 @@ except ImportError:
 # big chunk and don't treat a trailing CR as the Enter key press. Writing
 # the text first, then a brief sleep, then a single `\r` makes the Enter
 # look like a discrete keypress.
-WAKE_TEXT = "проверь inbox и продолжай тик"
+WAKE_TEXT = "check inbox and continue your tick"
 WAKE_ENTER = "\r\n"
 WAKE_GAP_SECONDS = 0.35
 REGISTRY_DIR = ".agent_registry"
@@ -63,7 +63,7 @@ REGISTRY_DIR = ".agent_registry"
 # backoff (self-wake), and real work arrives via inbox-file push, so
 # the heartbeat kick is redundant in normal operation — and it was
 # actively harmful: it nudged idle agents minute-after-minute when
-# nothing was happening, and injected "продолжай тик" into the middle
+# nothing was happening, and injected "continue your tick" into the middle
 # of a human's interactive chat with ARCHITECT-PLANNER. Opt in only if
 # you specifically need the rate-limit-stuck recovery: COORDD_STALE_KICK=1.
 STALE_KICK_ENABLED = os.environ.get("COORDD_STALE_KICK", "0") == "1"
@@ -79,7 +79,7 @@ KICK_MIN_INTERVAL_SEC    = float(os.environ.get("COORDD_KICK_MIN_INTERVAL_SEC", 
 # so a busy loop-mode agent always has heartbeat <10s old.
 PUSH_FRESH_GUARD_SEC     = float(os.environ.get("COORDD_PUSH_FRESH_GUARD_SEC",      "60"))
 # Chat-driven roles are paced by a human, not by ticks. coordd must
-# NEVER inject keystrokes ("проверь inbox и продолжай тик") into their
+# NEVER inject keystrokes ("check inbox and continue your tick") into their
 # pty — that corrupts the live conversation. This applies to BOTH the
 # stale-kick AND the inbox-file push: the inbox message is still written
 # to disk and the chat agent reads it in its own flow; coordd just does

@@ -77,7 +77,12 @@ def _copy_if_missing(src: Path, dst: Path, force: bool = False) -> str:
               default=None, help="project root (default: cwd)")
 @click.option("--force", is_flag=True,
               help="overwrite coord.yaml and PROJECT.md if present")
-def setup(project_dir: Path | None, force: bool) -> None:
+@click.option("--lang", "lang", default="en", metavar="CODE",
+              help="user-facing language for agents (chat replies, console "
+                   "status, errors). ISO code: en, ru, zh, es, fr, ja, etc. "
+                   "Internal artifacts (task fields, journal, code) stay "
+                   "English regardless. Default: en.")
+def setup(project_dir: Path | None, force: bool, lang: str) -> None:
     project_dir = (project_dir or Path.cwd()).resolve()
     project_dir.mkdir(parents=True, exist_ok=True)
     canon = find_canon_dir()
@@ -104,6 +109,22 @@ def setup(project_dir: Path | None, force: bool) -> None:
     header("\ncoordination/ (runtime state):")
     info(f"  dir: {_ensure_dir(coord)}")
     info(f"  PROJECT.md: {_copy_if_missing(canon / 'templates' / 'PROJECT.md.template', coord / 'PROJECT.md', force)}")
+    # Substitute the <GREATMINDS_LANG> token in PROJECT.md to the requested
+    # value (default `en`). The template ships with `| `<GREATMINDS_LANG>` | `en` |`
+    # so we rewrite that row's value column. Always apply this — language
+    # is a project-level decision, not a "first install only" thing.
+    project_md = coord / "PROJECT.md"
+    if project_md.is_file():
+        text = project_md.read_text(encoding="utf-8")
+        import re
+        new_text, n = re.subn(
+            r"(`<GREATMINDS_LANG>`\s*\|\s*)`[^`]*`",
+            rf"\1`{lang}`",
+            text,
+        )
+        if n:
+            project_md.write_text(new_text, encoding="utf-8")
+            info(f"  GREATMINDS_LANG: {lang}")
 
     gi = coord / ".gitignore"
     if not gi.is_file() or force:
@@ -194,7 +215,7 @@ def setup(project_dir: Path | None, force: bool) -> None:
             "# Claude/codex/cursor so MCP servers resolve ${VAR}.\n"
             "\n"
             "#PROJECT_ROOT=/opt/your_project\n"
-            "COORD_POSTGRES_DSN=\n"
+            "GREATMINDS_POSTGRES_DSN=\n"
             "STAND_HOST_A=\n"
             "STAND_HOST_B=\n"
             "STAND_URL_A=\n"
@@ -219,7 +240,7 @@ def setup(project_dir: Path | None, force: bool) -> None:
             '      "matcher": "",\n'
             '      "hooks": [{{\n'
             '        "type": "command",\n'
-            '        "command": "greatminds stop-decide \\"${{COORD_ROLE:-UNKNOWN}}\\" --host claude --project-dir {proj}"\n'
+            '        "command": "greatminds stop-decide \\"${{GREATMINDS_ROLE:-UNKNOWN}}\\" --host claude --project-dir {proj}"\n'
             '      }}]\n'
             '    }}]\n'
             '  }}\n'

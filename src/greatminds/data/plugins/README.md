@@ -13,7 +13,7 @@ system. Each plugin lives in its own directory with the standard layout:
   mechanics, plan/impl block protocols, stand workflow, blocked-deps,
   inbox/escalation).
 - `role-<name>/` — per-role skills, loaded only when an agent runs as
-  that `COORD_ROLE`.
+  that `GREATMINDS_ROLE`.
 
 Loading is driven by `greatminds start-agent`, which passes `--plugin-dir` per
 session in the order: canon protocol → canon role → project overrides

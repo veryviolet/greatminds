@@ -16,7 +16,7 @@ Subcommands:
   show   print one message
   ack    mark a message processed (renames to processed-<orig>)
 
-Caller role from $COORD_ROLE (no --as override). The script touches
+Caller role from $GREATMINDS_ROLE (no --as override). The script touches
 the caller's heartbeat and appends a journal entry on every successful
 send.
 """

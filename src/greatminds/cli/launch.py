@@ -21,7 +21,7 @@ Reads ``<project>/coord.yaml``, detects the project's Python env via
                            IDE reads ``.vscode/`` verbatim); prints
                            ``cursor`` as the open command.
 
-Env auto-detection lesенka:
+Env auto-detection ladder:
   pixi.toml | uv.lock | poetry.lock | environment.yml | .venv/bin/activate
   → fallback to ``$VIRTUAL_ENV`` / ``$CONDA_DEFAULT_ENV`` from parent shell
   → system PATH only (e.g. pipx).
@@ -134,10 +134,10 @@ def _emit_tmux(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
             err(f"tmux session/window create failed: {cp.stderr.strip()}")
             raise click.exceptions.Exit(1)
 
-        # 1. COORD_ROLE export — so hooks and scripts identify the window.
+        # 1. GREATMINDS_ROLE export — so hooks and scripts identify the window.
         if role:
             _tmux("send-keys", "-t", f"{session}:{name}",
-                  f"export COORD_ROLE={role}", "Enter")
+                  f"export GREATMINDS_ROLE={role}", "Enter")
         # 2. Activate the project's Python env so PATH has greatminds.
         if setup.activation:
             _tmux("send-keys", "-t", f"{session}:{name}",
@@ -185,7 +185,7 @@ def _emit_vscode(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
                 "command": "${env:SHELL}",
                 "options": {
                     "cwd": "${workspaceFolder}",
-                    "env": {"COORD_PROJECT_DIR": "${workspaceFolder}"},
+                    "env": {"GREATMINDS_PROJECT_DIR": "${workspaceFolder}"},
                 },
                 "presentation": {
                     "echo": True, "reveal": "always", "panel": "dedicated",
@@ -214,8 +214,8 @@ def _emit_vscode(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
             "options": {
                 "cwd": "${workspaceFolder}",
                 "env": {
-                    "COORD_PROJECT_DIR": "${workspaceFolder}",
-                    "COORD_ROLE": role,
+                    "GREATMINDS_PROJECT_DIR": "${workspaceFolder}",
+                    "GREATMINDS_ROLE": role,
                 },
             },
             "presentation": {

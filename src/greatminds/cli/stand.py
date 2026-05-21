@@ -12,7 +12,7 @@ Two subcommands:
             stand_wip/, then mv to stand_done/. STAND-KEEPER only.
             validates result/stand_status/profile enums.
 
-Caller role from $COORD_ROLE (no --as override).
+Caller role from $GREATMINDS_ROLE (no --as override).
 """
 
 from __future__ import annotations
@@ -99,7 +99,7 @@ def cmd_request(args: argparse.Namespace) -> int:
 def cmd_result(args: argparse.Namespace) -> int:
     coord = find_coord_dir()
     # caller must be STAND-KEEPER (enforced by bin/task too, double check here)
-    role = (os.environ.get("COORD_ROLE") or "").upper()
+    role = (os.environ.get("GREATMINDS_ROLE") or "").upper()
     if role != "STAND-KEEPER":
         die(3, "only STAND-KEEPER may produce stand_result")
 

@@ -4,6 +4,41 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.1.0 — 2026-05-21
+
+**Breaking** — canon docs translated to English; env-var namespace
+renamed `COORD_*` → `GREATMINDS_*`; new `--lang` option for `greatminds
+setup` controls the user-facing language each agent uses while keeping
+internal artefacts (task files, journal, code) English.
+
+### Breaking
+
+- All `COORD_*` env vars renamed to `GREATMINDS_*`:
+  - `COORD_PROJECT_DIR` → `GREATMINDS_PROJECT_DIR`
+  - `COORD_CANON_DIR` → `GREATMINDS_CANON_DIR`
+  - `COORD_ROLE` → `GREATMINDS_ROLE`
+  - `COORD_FORCE` → `GREATMINDS_FORCE`
+  - `COORD_FRESH` → `GREATMINDS_FRESH`
+  - `COORD_REGISTRY_TOOL` → `GREATMINDS_REGISTRY_TOOL`
+  - `COORD_START_AGENT_SAFE|NOTITLE|NOPTY` → `GREATMINDS_START_AGENT_*`
+  - `COORD_CURSOR_MEM_MAX|MEM_HIGH|CPU|MODEL` → `GREATMINDS_CURSOR_*`
+  - `COORD_POSTGRES_DSN` → `GREATMINDS_POSTGRES_DSN`
+- Canon docs (`COORDINATE.md`, `command_START.yaml`) translated from
+  Russian to English. Pre-1.1.0 versions on PyPI (0.1.0, 0.1.1, 1.0.0)
+  shipped Russian-only canon by mistake — yank them in favour of 1.1.0+.
+
+### Added
+
+- `greatminds setup --lang <code>` flag — records the agent
+  user-facing language in `PROJECT.md` as `<GREATMINDS_LANG>`. Any
+  language a chat model speaks works (`en`, `ru`, `zh`, `es`, `fr`,
+  `ja`, etc.). Default: `en`.
+- Common preamble in `command_START.yaml` instructs every agent to
+  communicate with the USER in `<GREATMINDS_LANG>` while keeping
+  internal artefacts (task YAML fields, journal entries, commit
+  messages, file paths, inbox messages between roles, code) English
+  regardless.
+
 ## 1.0.0 — 2026-05-21
 
 **Breaking release** — the 19 separate ``greatminds-*`` entry-points

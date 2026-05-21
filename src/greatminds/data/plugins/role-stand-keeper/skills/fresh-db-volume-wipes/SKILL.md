@@ -19,7 +19,7 @@ A destructive op is authorised when ALL of:
    precise language.
 2. SK's `<project>/.claude/settings.local.json` has the relevant Bash
    permissions in `permissions.allow` and / or in `autoMode.allow`.
-3. `COORD_ROLE=STAND-KEEPER` is set (you're acting as SK).
+3. `GREATMINDS_ROLE=STAND-KEEPER` is set (you're acting as SK).
 
 If all three are true: **do not** open an AskUserQuestion modal. Execute.
 This is per-precedent (the 0185-related feedback): SK halting for
@@ -88,7 +88,7 @@ If the stand_request just wants "fresh data" but is OK keeping the
 schema:
 
 ```bash
-psql "${COORD_POSTGRES_DSN}" -c "
+psql "${GREATMINDS_POSTGRES_DSN}" -c "
   TRUNCATE TABLE items, users, sessions RESTART IDENTITY CASCADE;
 "
 ```
@@ -138,7 +138,7 @@ Sometimes the request wants narrower scope: "wipe items table only,
 keep users". Then TRUNCATE the specific tables:
 
 ```bash
-psql "${COORD_POSTGRES_DSN}" -c "TRUNCATE TABLE items RESTART IDENTITY CASCADE;"
+psql "${GREATMINDS_POSTGRES_DSN}" -c "TRUNCATE TABLE items RESTART IDENTITY CASCADE;"
 ```
 
 Record narrowly in `wiped:`: "items table (rows + sequences); users
@@ -153,4 +153,4 @@ need and asking whether to add it to the request scope. Do NOT
 freelance.
 
 **Tokens used:** STAND_HOST_A, STAND_HOST_B, STAND_URL_A, STAND_URL_B,
-COORD_POSTGRES_DSN (PROJECT.env), PROJECT_ROOT (start_agent export).
+GREATMINDS_POSTGRES_DSN (PROJECT.env), PROJECT_ROOT (start_agent export).

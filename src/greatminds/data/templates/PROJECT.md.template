@@ -14,6 +14,16 @@ without re-discovering. Token catalog is in PROJECT_VARIABLES.md (canon).
 | `<DEFAULT_BRANCH>` | `main` |
 | `<COMMIT_PREFIX_PRODUCT>` | e.g. `feat(####):` |
 | `<COMMIT_PREFIX_FEATURE>` | e.g. `feat(####):` |
+| `<GREATMINDS_LANG>` | `en` |
+
+The `<GREATMINDS_LANG>` token controls the language each agent uses
+when chatting with the USER and when printing user-facing status /
+summaries / error messages in the console. Internal artifacts (task
+YAML fields, journal entries, commit messages, file paths, inbox
+messages between roles, code) stay English regardless. Set via
+`greatminds setup --lang <iso-code>`; any language a chat model
+(claude / codex / cursor) speaks works — `en`, `ru`, `zh`, `es`, `fr`,
+`ja`, etc.
 
 ## Stand
 
@@ -64,7 +74,7 @@ template via `coord-init` and fill in real values in
 
 | Token                  | Source       | Example                                  |
 |------------------------|--------------|------------------------------------------|
-| `<COORD_POSTGRES_DSN>` | PROJECT.env  | `postgresql://user:pass@host:5432/db`    |
+| `<GREATMINDS_POSTGRES_DSN>` | PROJECT.env  | `postgresql://user:pass@host:5432/db`    |
 | `<STAND_HOST_A>`       | PROJECT.env  | `host-a.example.com`                     |
 | `<STAND_HOST_B>`       | PROJECT.env  | `host-b.example.com`                     |
 | `<STAND_URL_A>`        | PROJECT.env  | `https://host-a.example.com/api/v1`      |

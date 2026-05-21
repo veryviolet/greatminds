@@ -187,8 +187,8 @@ def pty_launch(role: str, exec_binary: str, tool_args: tuple[str, ...]) -> None:
     # ``systemd-run``, which is useless in the registry (and hides that
     # this is really a cursor agent — coordd needs the logical tool to
     # pick the right wake/submit sequence). start_agent exports
-    # COORD_REGISTRY_TOOL with the logical name; prefer it.
-    tool = os.environ.get("COORD_REGISTRY_TOOL") or exec_binary
+    # GREATMINDS_REGISTRY_TOOL with the logical name; prefer it.
+    tool = os.environ.get("GREATMINDS_REGISTRY_TOOL") or exec_binary
     tool_args = list(tool_args)
 
     pid, master_fd = pty.fork()

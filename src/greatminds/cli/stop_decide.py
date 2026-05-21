@@ -97,7 +97,7 @@ def stop_decide(role: str, host: str, project_dir: Path | None,
         click.echo("{}")
         return
 
-    msg = f"продолжай тик: inbox/{role.lower()}/ has {len(inbox_msgs)} new wake message(s)"
+    msg = f"continue your tick: inbox/{role.lower()}/ has {len(inbox_msgs)} new wake message(s)"
     if host == "claude":
         click.echo(json.dumps({
             "decision": "block",

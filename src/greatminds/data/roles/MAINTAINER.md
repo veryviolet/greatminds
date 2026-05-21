@@ -71,7 +71,7 @@ There is no /loop body. MAINTAINER is chat-mode. Two distinct cases:
 **Fresh operator session** (no prior context to keep):
 
 ```bash
-COORD_ROLE=MAINTAINER claude
+GREATMINDS_ROLE=MAINTAINER claude
 ```
 
 reads `MAINTAINER.md`, `COORDINATE.md`, `schema.yaml`, and

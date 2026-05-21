@@ -10,7 +10,7 @@ Atomic 4-step chain:
 The chain stops at the first failing step and prints exactly where it
 stopped and what to do — never a silent partial failure.
 
-Only ``ARCHITECT-PLANNER`` may run this command (the COORD_ROLE env
+Only ``ARCHITECT-PLANNER`` may run this command (the GREATMINDS_ROLE env
 var is enforced; refusing other roles up-front avoids ambiguity).
 """
 
@@ -80,9 +80,9 @@ def plan(id: str, scope: str, assignee_role: str, base_commit: str,
          plan_kind: str, mode: str, stand_required: str, stand_reason: str,
          body: str | None, body_file: str | None, triage: str | None,
          stop_at: str | None, audit_only: bool) -> None:
-    role = (os.environ.get("COORD_ROLE") or "").upper()
+    role = (os.environ.get("GREATMINDS_ROLE") or "").upper()
     if role != "ARCHITECT-PLANNER":
-        _die(3, f"only ARCHITECT-PLANNER may use greatminds plan (COORD_ROLE={role!r})")
+        _die(3, f"only ARCHITECT-PLANNER may use greatminds plan (GREATMINDS_ROLE={role!r})")
 
     if audit_only and scope != "docs":
         _die(1, "--audit-only requires --scope docs (it is the READER audit path)")

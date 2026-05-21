@@ -82,7 +82,7 @@ secrets) which `greatminds start-agent` sources before launching each Claude age
 
 | Token                  | Meaning                                                                  | Example                                  |
 |------------------------|--------------------------------------------------------------------------|------------------------------------------|
-| `<COORD_POSTGRES_DSN>` | Postgres DSN (with credentials) consumed by the postgres MCP server.     | `postgresql://user:pass@host:5432/db`    |
+| `<GREATMINDS_POSTGRES_DSN>` | Postgres DSN (with credentials) consumed by the postgres MCP server.     | `postgresql://user:pass@host:5432/db`    |
 | `<STAND_HOST_A>`       | Hostname of the first stand host (alpha node), if the project has a stand. | `lattice-a.example.com`                |
 | `<STAND_HOST_B>`       | Hostname of the second stand host (beta), for peer-pair setups.          | `lattice-b.example.com`                  |
 | `<STAND_URL_A>`        | REST API base URL for the first stand host.                              | `https://lattice-a.example.com/api/v1`   |

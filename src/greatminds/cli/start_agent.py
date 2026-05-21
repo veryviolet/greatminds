@@ -17,22 +17,22 @@ TOOL
 
 What it does:
 
-1. Resolve project root from ``$COORD_PROJECT_DIR`` (or cwd).
+1. Resolve project root from ``$GREATMINDS_PROJECT_DIR`` (or cwd).
 2. Resolve canon (packaged ``greatminds.data``) via ``find_canon_dir``.
-3. Export ``COORD_ROLE``, ``PROJECT_ROOT`` and source the optional
+3. Export ``GREATMINDS_ROLE``, ``PROJECT_ROOT`` and source the optional
    ``$PROJECT/coordination/PROJECT.env`` (gitignored secrets file).
 4. Manage the per-role registry under
    ``$PROJECT/coordination/.agent_registry/<role>.{json,session-id}``:
-   refuse to start if another agent is alive (unless ``COORD_FORCE=1``);
+   refuse to start if another agent is alive (unless ``GREATMINDS_FORCE=1``);
    reuse the persistent session UUID for ``--resume`` semantics;
-   rotate the UUID when ``COORD_FRESH=1``.
+   rotate the UUID when ``GREATMINDS_FRESH=1``.
 5. Render the bootstrap prompt via
    ``python -m greatminds.cli.render_role``. On resume, replace it with
-   a short "продолжай тик" nudge so the tool doesn't re-ingest the
+   a short "continue your tick" nudge so the tool doesn't re-ingest the
    giant role spec.
 6. Strip leading ``/loop`` for chat mode.
 7. Set the terminal title (OSC 0) unless
-   ``COORD_START_AGENT_NOTITLE=1``.
+   ``GREATMINDS_START_AGENT_NOTITLE=1``.
 8. Per-tool branching:
 
    ``claude``
@@ -52,12 +52,12 @@ What it does:
    ``cursor``
        Wrapped in ``systemd-run --user --scope`` with memory/CPU caps
        (cursor-agent leaks memory in long sessions). Sets
-       ``COORD_REGISTRY_TOOL=cursor`` so ``pty-launch`` records the
+       ``GREATMINDS_REGISTRY_TOOL=cursor`` so ``pty-launch`` records the
        logical tool, not ``systemd-run``.
 
 Optional ``greatminds-pty-launch`` wraps the tool process in a pty we
 control plus a unix socket so ``coordd`` can inject keystrokes from
-outside the terminal emulator. Disabled via ``COORD_START_AGENT_NOPTY=1``.
+outside the terminal emulator. Disabled via ``GREATMINDS_START_AGENT_NOPTY=1``.
 """
 
 from __future__ import annotations
@@ -159,7 +159,7 @@ def tty_path() -> str:
 
 def discover_codex_session(role: str) -> str:
     """Find the most recent ``~/.codex/sessions/.../rollout-*.jsonl`` whose
-    head contains ``"Ты <ROLE> agent"`` — that's the bootstrap-intro phrase
+    head contains ``"You are <ROLE> agent"`` — that's the bootstrap-intro phrase
     we send on first launch, so any file containing it belongs to this role.
 
     Returns the rollout's session UUID (extracted from the filename), or an
@@ -168,7 +168,7 @@ def discover_codex_session(role: str) -> str:
     root = Path.home() / ".codex" / "sessions"
     if not root.is_dir():
         return ""
-    needle = f"Ты {role} agent".encode("utf-8")
+    needle = f"You are {role} agent".encode("utf-8")
     name_re = re.compile(r"rollout-[0-9T-]+-([0-9a-f-]+)\.jsonl$")
     best_mtime = 0.0
     best_sid = ""
@@ -201,7 +201,7 @@ def discover_codex_session(role: str) -> str:
 
 
 def _yolo_args(tool: str) -> list[str]:
-    if os.environ.get("COORD_START_AGENT_SAFE", "0") == "1":
+    if os.environ.get("GREATMINDS_START_AGENT_SAFE", "0") == "1":
         return []
     return {
         "claude": ["--permission-mode", "auto"],
@@ -220,7 +220,7 @@ def build_claude_argv(
     prompt: str,
 ) -> list[str]:
     """Compose ``claude --name R --session-id|--resume X [plugins] [mcp] -- PROMPT``."""
-    # Plugin dirs are kebab-case. COORD_ROLE in this project is already
+    # Plugin dirs are kebab-case. GREATMINDS_ROLE in this project is already
     # kebab-case (e.g. ARCHITECT-PLANNER, UI-DEVELOPER), so just lowercase.
     role_plugin_suffix = role.lower().replace("_", "-")
     plugin_dirs = [canon_dir / "plugins" / "coordination-protocol"]
@@ -306,7 +306,7 @@ def build_cursor_argv(
     long-session leaks OOM-kill only itself, not the host.
     """
     yolo = _yolo_args("cursor")
-    cursor_model = os.environ.get("COORD_CURSOR_MODEL", "composer-2.5-fast")
+    cursor_model = os.environ.get("GREATMINDS_CURSOR_MODEL", "composer-2.5-fast")
     if session_new:
         cursor_args = ["--model", cursor_model, *yolo]
     else:
@@ -314,13 +314,13 @@ def build_cursor_argv(
 
     # pty-launch sees argv[2]=systemd-run; tell it the logical tool so the
     # registry says cursor (coordd picks the cursor submit sequence).
-    os.environ["COORD_REGISTRY_TOOL"] = "cursor"
+    os.environ["GREATMINDS_REGISTRY_TOOL"] = "cursor"
 
     sdr = [
         "systemd-run", "--user", "--scope", "--quiet", "--collect",
-        "-p", f"MemoryHigh={os.environ.get('COORD_CURSOR_MEM_HIGH', '3G')}",
-        "-p", f"MemoryMax={os.environ.get('COORD_CURSOR_MEM_MAX', '4G')}",
-        "-p", f"CPUQuota={os.environ.get('COORD_CURSOR_CPU', '300%')}",
+        "-p", f"MemoryHigh={os.environ.get('GREATMINDS_CURSOR_MEM_HIGH', '3G')}",
+        "-p", f"MemoryMax={os.environ.get('GREATMINDS_CURSOR_MEM_MAX', '4G')}",
+        "-p", f"CPUQuota={os.environ.get('GREATMINDS_CURSOR_CPU', '300%')}",
     ]
     return [*sdr, "cursor-agent", *cursor_args, *extra, prompt]
 
@@ -346,11 +346,11 @@ import click
 @click.argument("extra", nargs=-1, type=click.UNPROCESSED)
 def start_agent(role: str, tool: str, mode: str, extra: tuple[str, ...]) -> None:
     extra = list(extra)
-    project_dir = Path(os.environ.get("COORD_PROJECT_DIR") or os.getcwd()).resolve()
+    project_dir = Path(os.environ.get("GREATMINDS_PROJECT_DIR") or os.getcwd()).resolve()
     canon_dir = find_canon_dir()
 
     # Export role identity so hooks (Stop / PostToolUse / …) can pick it up.
-    os.environ["COORD_ROLE"] = role
+    os.environ["GREATMINDS_ROLE"] = role
     # Export PROJECT_ROOT so MCP servers (e.g. git ${PROJECT_ROOT}) resolve
     # project-relative paths via env-var substitution.
     os.environ["PROJECT_ROOT"] = str(project_dir)
@@ -364,26 +364,26 @@ def start_agent(role: str, tool: str, mode: str, extra: tuple[str, ...]) -> None
     registry_dir.mkdir(parents=True, exist_ok=True)
     registry_file = registry_dir / f"{role_lower}.json"
 
-    # Refuse to start if another agent is alive — unless COORD_FORCE=1.
+    # Refuse to start if another agent is alive — unless GREATMINDS_FORCE=1.
     if registry_file.is_file() and registry_file.stat().st_size > 0:
         try:
             old = json.loads(registry_file.read_text(encoding="utf-8"))
             old_pid = old.get("pid")
             if isinstance(old_pid, int) and pid_alive(old_pid):
-                if os.environ.get("COORD_FORCE", "0") != "1":
+                if os.environ.get("GREATMINDS_FORCE", "0") != "1":
                     sys.stderr.write(
                         f"error: {role} is already running (pid {old_pid}).\n"
                         f"Close that terminal or run:  kill {old_pid}\n"
-                        f"Then re-run this command. (COORD_FORCE=1 to override.)\n"
+                        f"Then re-run this command. (GREATMINDS_FORCE=1 to override.)\n"
                     )
                     return 1
-                sys.stderr.write("  COORD_FORCE=1 set — proceeding anyway. Tool may still error.\n")
+                sys.stderr.write("  GREATMINDS_FORCE=1 set — proceeding anyway. Tool may still error.\n")
         except (OSError, json.JSONDecodeError):
             pass
 
     # Persistent session id per role. First start → new UUID; subsequent
     # starts → reuse (so the tool can --resume the same conversation).
-    # COORD_FRESH=1 rotates the UUID unconditionally.
+    # GREATMINDS_FRESH=1 rotates the UUID unconditionally.
     session_file = registry_dir / f"{role_lower}.session-id"
     session_new = True
     if session_file.is_file() and session_file.stat().st_size > 0:
@@ -392,7 +392,7 @@ def start_agent(role: str, tool: str, mode: str, extra: tuple[str, ...]) -> None
     else:
         session_id = str(uuid.uuid4())
         session_file.write_text(session_id + "\n", encoding="utf-8")
-    if os.environ.get("COORD_FRESH", "0") == "1":
+    if os.environ.get("GREATMINDS_FRESH", "0") == "1":
         session_id = str(uuid.uuid4())
         session_file.write_text(session_id + "\n", encoding="utf-8")
         session_new = True
@@ -423,16 +423,16 @@ def start_agent(role: str, tool: str, mode: str, extra: tuple[str, ...]) -> None
     # Render the bootstrap prompt — on resume, replace with a short nudge.
     prompt = render_prompt(role, project_dir)
     if not session_new:
-        prompt = f"продолжай тик в роли {role} — контракт ты уже знаешь"
+        prompt = f"continue your tick as {role} — you already know the contract"
     if mode == "chat" and prompt.startswith("/loop "):
         prompt = prompt[len("/loop "):]
 
     # Terminal title.
-    if os.environ.get("COORD_START_AGENT_NOTITLE", "0") != "1":
+    if os.environ.get("GREATMINDS_START_AGENT_NOTITLE", "0") != "1":
         set_terminal_title(role)
 
     # pty-launch wrapper — exposes a unix socket that coordd writes to.
-    use_pty = os.environ.get("COORD_START_AGENT_NOPTY", "0") != "1"
+    use_pty = os.environ.get("GREATMINDS_START_AGENT_NOPTY", "0") != "1"
     pty_bin = shutil.which("greatminds-pty-launch") if use_pty else None
     if use_pty and pty_bin is None:
         # No PTY wrapper available — fall back to direct exec. coordd

@@ -74,7 +74,7 @@ ssh "${STAND_HOST_A}" "docker compose exec postgres pg_isready -U postgres"
 # Otherwise: DB itself unhealthy.
 
 # From the app's perspective:
-ssh "${STAND_HOST_A}" "docker compose exec app psql ${COORD_POSTGRES_DSN} -c 'SELECT 1'"
+ssh "${STAND_HOST_A}" "docker compose exec app psql ${GREATMINDS_POSTGRES_DSN} -c 'SELECT 1'"
 ```
 
 If DB up but app can't connect: usually wrong DSN (env var mismatch),
@@ -179,5 +179,5 @@ tried, where it failed, and what's blocking unblock.
   to a data-corruption cause. Wipes are destructive; do them when
   authorised and when they actually address the diagnosed cause.
 
-**Tokens used:** STAND_HOST_A, STAND_HOST_B, STAND_URL_A, COORD_POSTGRES_DSN
+**Tokens used:** STAND_HOST_A, STAND_HOST_B, STAND_URL_A, GREATMINDS_POSTGRES_DSN
 (PROJECT.env), PROJECT_ROOT (start_agent export).

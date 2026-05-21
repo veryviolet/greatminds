@@ -11,7 +11,7 @@ NEVER edit task files directly. Use this script. It enforces:
   * atomic intent → mv → del-intent → journal-append (no half-states);
   * heartbeat side-effect on every successful invocation.
 
-Caller role is taken strictly from $COORD_ROLE (set per tmux window).
+Caller role is taken strictly from $GREATMINDS_ROLE (set per tmux window).
 There is no --as override: lying about role is not a feature.
 
 Subcommands:
