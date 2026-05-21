@@ -40,7 +40,7 @@ jobs:
         run: |
           set -e
           .venv-test/bin/greatminds --help > /dev/null
-          subs="$(.venv-test/bin/greatminds --help | awk '/^Commands:/{f=1;next} f && /^[ ]+[a-z]/{print $1}')"
+          subs="$(.venv-test/bin/python -c 'from greatminds.cli.main import cli; print(" ".join(sorted(cli.commands)))')"
           for sub in $subs; do
             echo "-- greatminds $sub --help --"
             .venv-test/bin/greatminds "$sub" --help > /dev/null

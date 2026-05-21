@@ -57,7 +57,7 @@ jobs:
           uv venv .venv-test --python 3.13 --seed
           .venv-test/bin/pip install --quiet dist/*.whl
           .venv-test/bin/greatminds --help > /dev/null
-          subs="$(.venv-test/bin/greatminds --help | awk '/^Commands:/{f=1;next} f && /^[ ]+[a-z]/{print $1}')"
+          subs="$(.venv-test/bin/python -c 'from greatminds.cli.main import cli; print(" ".join(sorted(cli.commands)))')"
           for sub in $subs; do
             .venv-test/bin/greatminds "$sub" --help > /dev/null
           done
