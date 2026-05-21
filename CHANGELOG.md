@@ -4,6 +4,82 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.1.2 — 2026-05-21
+
+Bug-fix release. Three regressions found in 1.1.0 real-world use, plus a
+critical wake-up channel regression introduced silently by the 1.0.0
+umbrella-console-script migration. No new features.
+
+### Fixed
+
+- **`task append-block --body-file` option missing.** Dropped during the
+  argparse→click conversion. The plan orchestrator and several agent
+  prompts still passed it, breaking the orchestrator. Restored.
+- **`coerce_value` blanket-split every `--field` value on commas**, so
+  any prose value (e.g. `stand_reason="POST /node, then GET /health"`)
+  was silently turned into a YAML list, and downstream validators
+  choked. Now only fields explicitly in `LIST_FIELDS` are split on
+  commas; all other fields stay strings even if they contain commas or
+  colons.
+- **click `multiple=True` did not accept argparse-style space-separated
+  values** (`--hosts X Y` failed with "Got unexpected extra argument
+  (Y)"). New `_split_multivalue` callback supports both forms:
+  `--hosts X --hosts Y` (repeated flag, idiomatic click) AND
+  `--hosts X,Y` (one flag, comma-separated). `stand request` uses it
+  consistently.
+- **`greatminds-pty-launch` console-script never existed in 1.0.0
+  umbrella migration** — `pyproject.toml` only declares `greatminds`,
+  so `shutil.which("greatminds-pty-launch")` always returned `None`,
+  silently disabling pty wrapping. Result: every agent since 1.0.0
+  ran without the pty wrapper → no `input_sock` in `.agent_registry/
+  <role>.json` → coordd fell back to writing /dev/pts (slave side =
+  display output, NOT input) → wake keystrokes never reached agents,
+  who only ticked on their own ScheduleWakeup timer. start_agent now
+  invokes pty_launch via `python -m greatminds.cli.pty_launch` (same
+  pattern as render-role).
+- **`pty_launch.write_registry` was overwriting `session_id`** put
+  there by start_agent's pre-pty registry write. Now it MERGES on top
+  of any existing record so session_id (and any other downstream key)
+  survives the pid/sock enrichment.
+- **click strips `--` from variadic args in `pty_launch`'s click
+  signature**, breaking claude's `--mcp-config <file> -- PROMPT`
+  contract (claude's variadic `--mcp-config` consumes the prompt as a
+  config file). The `python -m greatminds.cli.pty_launch` direct-exec
+  path now bypasses click for argv parsing so `--` survives into the
+  child's argv. The umbrella `greatminds pty-launch` subcommand path
+  goes through click and remains affected — but that path is only
+  used for diagnostics, not by start_agent.
+
+### Changed (internal — no behavioural change for users)
+
+- Full click-native CLI rewrite per the `guardora_vfl` reference
+  pattern. Dropped:
+  * 9 `SimpleNamespace` shims that wrapped legacy `cmd_X(args:
+    argparse.Namespace)` handlers from the argparse era.
+  * 5 `import argparse` statements (`task.py`, `inbox.py`, `stand.py`,
+    `coordd.py`, `start_agent.py`).
+  * `die(code, msg)` global helper — replaced with direct
+    `raise GreatMindsError(msg, exit_code=N)` at every callsite. One
+    exception class total (`GreatMindsError(click.ClickException)`),
+    no subclass hierarchy.
+- Inter-module subprocess calls between `stand.py` / `plan.py` and
+  `task.py` replaced with direct Python function imports:
+  `create_task()`, `move_task()`, `append_block()`. These are the
+  library API; the click handlers are thin wrappers calling them,
+  matching vfl's `create_node()` / `create_project()` pattern.
+
+### Added
+
+- `tests/test_task_field_coercion.py` — pytest regression suite
+  covering all three 1.1.0 bugs (20 tests, all passing). Tests:
+  `stand_reason` with commas/colons stays string; LIST_FIELDS still
+  split; `--body-file` works; `--body @PATH` works;
+  hosts comma-separated AND repeated-flag forms.
+- `core/errors.py` — single `GreatMindsError(click.ClickException)`
+  type. Callers pass exit code at the raise site:
+  `raise GreatMindsError("bad value", exit_code=2)`.
+- CI: pytest runs against the installed wheel after the smoke loop.
+
 ## 1.1.0 — 2026-05-21
 
 **Breaking** — canon docs translated to English; env-var namespace

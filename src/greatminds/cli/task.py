@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""bin/task — single entry point for all task-file operations in coordination/.
+"""greatminds task — single entry point for all task-file operations.
 
-NEVER edit task files directly. Use this script. It enforces:
+NEVER edit task files by hand. Use this CLI. It enforces:
 
   * strict YAML structure (no markdown, no free-form blocks);
   * required fields per stream and per block kind (validated against
@@ -11,49 +11,50 @@ NEVER edit task files directly. Use this script. It enforces:
   * atomic intent → mv → del-intent → journal-append (no half-states);
   * heartbeat side-effect on every successful invocation.
 
-Caller role is taken strictly from $GREATMINDS_ROLE (set per tmux window).
-There is no --as override: lying about role is not a feature.
+Caller role is taken strictly from ``$GREATMINDS_ROLE`` (set per tmux
+window). There is no ``--as`` override: lying about role is not a feature.
 
 Subcommands:
-  new          create a new task (initial intake)
-  mv           move task between queues
-  append-block <kind>  append a typed block to an existing task
-  show         pretty-print a task (file path or id)
-  list         list tasks in a queue
-  validate     run validation on a task file
-  paths        print resolved coordination paths
+  new           create a new task (intake)
+  mv            move task between queues
+  append-block  append a typed block to an existing task
+  show          pretty-print a task by id
+  list          list tasks in a queue
+  validate      validate a task file
+  paths         print resolved coordination paths
 
-Exit codes:
-   0  ok
-   1  user/usage error (missing arg, bad enum, etc.)
+Exit codes (raised via :class:`GreatMindsError`, surfaced by click):
+   1  usage / generic
    2  validation failure
-   3  permission denied (caller role not allowed for this transition)
-   4  fs/atomicity failure (intent/mv/journal)
+   3  permission denied (role not allowed for this transition)
+   4  fs / atomicity failure (intent / mv / journal)
 """
 
 from __future__ import annotations
 
-import argparse
+import fcntl
 import json
 import os
 import re
 import sys
 import time
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+import click
 import yaml
 
+from greatminds.core.errors import GreatMindsError
 from greatminds.core.paths import find_canon_dir, find_coord_dir
-from greatminds.core.util import ISO_FMT, die, now_iso  # noqa: F401  (ISO_FMT used below)
+from greatminds.core.util import ISO_FMT, now_iso  # noqa: F401  (ISO_FMT re-exported)
 
 
 # ---------------------------------------------------------------------------
-# Constants and small helpers
+# Constants
 # ---------------------------------------------------------------------------
 
-# ISO_FMT now lives in greatminds.core.util (imported above).
 INTENT_DIR_NAME = "intent"
 JOURNAL_NAME = "journal.ndjson"
 HEARTBEAT_PREFIX = "heartbeat."
@@ -74,7 +75,7 @@ STREAM_BLOCK_KINDS: dict[str, set[str]] = {
     "review_session": {"session_iteration", "blocked"},
 }
 
-# F1: only these roles may produce each block kind. `blocked` is special-
+# F1: only these roles may produce each block kind. ``blocked`` is special-
 # cased — the current owner of the queue where the task sits is the only
 # role allowed to mark it blocked.
 BLOCK_KIND_ROLES: dict[str, set[str]] = {
@@ -86,10 +87,10 @@ BLOCK_KIND_ROLES: dict[str, set[str]] = {
     "review":            {"ARCHITECT-REVIEWER"},
     "stand_result":      {"STAND-KEEPER"},
     "session_iteration": {"EXPLORER"},
-    # "blocked" handled in validate_role_for_block_kind via current_owner
+    # ``blocked`` handled in role_for_block_kind via current_owner
 }
 
-# For `implementation`, the caller role must match the task's `scope:`.
+# For ``implementation``, the caller role must match the task's ``scope:``.
 IMPL_ROLE_BY_SCOPE: dict[str, str] = {
     "backend": "DEVELOPER",
     "ui":      "UI-DEVELOPER",
@@ -118,10 +119,39 @@ QUEUE_BLOCK_KINDS: dict[str, set[str]] = {
     "stand_done":            set(),
 }
 
+PRODUCT_KINDS = {"feature", "bugfix", "docs", "ops", "research"}
+PRODUCT_SCOPES = {"backend", "ui", "docs", "stand", "research"}
+PRIORITIES = {"low", "normal", "high"}
+PLAN_KINDS = {"full", "bugfix"}
+MODES = {"A", "B", "C"}
+STAND_REQUEST_TYPES = {
+    "deploy", "restart", "rebuild", "smoke",
+    "remote_sync", "gpu_check", "teardown",
+}
+STAND_PROFILES = {"full-deploy", "vite-dev"}
+STAND_RESULTS = {"ok", "partial", "fail"}
+STAND_STATUSES = {"READY", "DEGRADED", "DOWN", "BLOCKED"}
+TEST_RESULTS = {"pass", "fail", "partial"}
+GATE_CHECK_RESULTS = {"pass", "fail", "missing", "n/a"}
+REVIEW_OUTCOMES = {"approved", "changes_requested"}
+READER_OUTCOMES = {"pass", "fail", "partial"}
 
-# now_iso, die and the path-resolution functions are imported from
-# greatminds.core (above). Kept as module-level names for the rest of this
-# file so the historical body doesn't need rewriting.
+TITLE_MAX_LEN = 200
+
+# B5: ``--in-queue`` is restricted to known intake queues per stream.
+ALLOWED_INTAKE_QUEUES: dict[str, set[str]] = {
+    "product":         {"feature_inbox", "user_feedback"},
+    "stand":           {"stand_requests"},
+    "review_session":  {"review_sessions"},
+}
+
+# Fields whose ``--field key=value`` form is expected to carry a list.
+# Anything else is left as a string even if it contains commas (so prose
+# values like ``stand_reason="POST /x, then GET /y"`` aren't fragmented).
+LIST_FIELDS = {
+    "dependencies", "files", "test_files", "hosts", "scenarios",
+    "evidence_for", "docs_checked", "bugs_filed", "commands",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -140,24 +170,21 @@ def schema() -> dict[str, Any]:
     try:
         _schema_cache = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
     except (OSError, yaml.YAMLError) as exc:
-        die(1, f"failed to load schema.yaml: {exc}")
-        raise SystemExit
+        raise GreatMindsError(f"failed to load schema.yaml: {exc}")
     return _schema_cache
 
 
 def queue_meta(queue: str) -> dict[str, Any]:
     q = (schema().get("queues") or {}).get(queue)
     if not isinstance(q, dict):
-        die(1, f"unknown queue: {queue}")
-        raise SystemExit
+        raise GreatMindsError(f"unknown queue: {queue}")
     return q
 
 
 def role_meta(role: str) -> dict[str, Any]:
     r = (schema().get("roles") or {}).get(role)
     if not isinstance(r, dict):
-        die(1, f"unknown role: {role}")
-        raise SystemExit
+        raise GreatMindsError(f"unknown role: {role}")
     return r
 
 
@@ -169,7 +196,6 @@ def transition_for(from_q: str, to_q: str) -> dict[str, Any] | None:
         f, to = t.get("from"), t.get("to")
         if f == from_q and to == to_q:
             return t
-        # wildcards
         if f == "any_active_queue" and to_q == to:
             return t
         if f == from_q and to == "any_resume_to_queue":
@@ -183,16 +209,12 @@ def transition_for(from_q: str, to_q: str) -> dict[str, Any] | None:
 
 
 def caller_role() -> str:
-    """Task-level wrapper: ``core.paths.caller_role`` + ``schema.yaml`` validation.
-
-    The schema check stays here (not in core) because not every CLI module
-    wants to pay the YAML load just to know its role.
-    """
+    """Resolved caller role from ``$GREATMINDS_ROLE``, validated against schema."""
     from greatminds.core.paths import caller_role as _bare_caller_role
 
     role = _bare_caller_role()
     if role not in (schema().get("roles") or {}):
-        die(1, f"caller role not in schema: {role}")
+        raise GreatMindsError(f"caller role not in schema: {role}")
     return role
 
 
@@ -215,7 +237,7 @@ def task_path_in_queue(coord: Path, queue: str, task_id: str) -> Path | None:
 
 
 def find_task(coord: Path, task_id: str) -> tuple[Path, str] | None:
-    """Return (path, queue_name) where task currently sits, or None."""
+    """Return ``(path, queue_name)`` where task currently sits, or ``None``."""
     for q in coord.iterdir():
         if not q.is_dir() or q.name.startswith("."):
             continue
@@ -233,9 +255,7 @@ def load_task(path: Path) -> dict[str, Any]:
         try:
             return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         except yaml.YAMLError as exc:
-            die(2, f"yaml parse error in {path}: {exc}")
-            raise SystemExit
-    # legacy .md — parse front-matter + named blocks
+            raise GreatMindsError(f"yaml parse error in {path}: {exc}", exit_code=2)
     text = path.read_text(encoding="utf-8")
     return parse_legacy_md(text)
 
@@ -307,7 +327,7 @@ def journal_append(coord: Path, entry: dict[str, Any]) -> None:
             f.flush()
             os.fsync(f.fileno())
     except OSError as exc:
-        die(4, f"journal append failed: {exc}")
+        raise GreatMindsError(f"journal append failed: {exc}", exit_code=4)
 
 
 def intent_write(coord: Path, role: str, task_id: str,
@@ -337,330 +357,13 @@ def intent_clear(intent_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Validation
+# Per-task file lock (serialise concurrent append-block / mv on same id)
 # ---------------------------------------------------------------------------
-
-
-PRODUCT_KINDS = {"feature", "bugfix", "docs", "ops", "research"}
-PRODUCT_SCOPES = {"backend", "ui", "docs", "stand", "research"}
-PRIORITIES = {"low", "normal", "high"}
-PLAN_KINDS = {"full", "bugfix"}
-MODES = {"A", "B", "C"}
-STAND_REQUEST_TYPES = {
-    "deploy", "restart", "rebuild", "smoke",
-    "remote_sync", "gpu_check", "teardown",
-}
-STAND_PROFILES = {"full-deploy", "vite-dev"}
-STAND_RESULTS = {"ok", "partial", "fail"}
-STAND_STATUSES = {"READY", "DEGRADED", "DOWN", "BLOCKED"}
-TEST_RESULTS = {"pass", "fail", "partial"}
-GATE_CHECK_RESULTS = {"pass", "fail", "missing", "n/a"}
-REVIEW_OUTCOMES = {"approved", "changes_requested"}
-READER_OUTCOMES = {"pass", "fail", "partial"}
-
-
-def must_enum(field: str, value: Any, allowed: set[str]) -> None:
-    if value not in allowed:
-        die(2, f"field '{field}' must be one of {sorted(allowed)}, got: {value!r}")
-
-
-def must_str(field: str, value: Any, *, allow_empty: bool = False) -> None:
-    if not isinstance(value, str) or (not allow_empty and not value.strip()):
-        die(2, f"field '{field}' must be a non-empty string")
-
-
-def must_bool(field: str, value: Any) -> None:
-    if not isinstance(value, bool):
-        die(2, f"field '{field}' must be true|false")
-
-
-def must_list_of_str(field: str, value: Any) -> None:
-    if not isinstance(value, list) or any(not isinstance(x, str) for x in value):
-        die(2, f"field '{field}' must be a list of strings")
-
-
-def must_iso(field: str, value: Any) -> None:
-    if not isinstance(value, str) or not re.match(
-        r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", value
-    ):
-        die(2, f"field '{field}' must be ISO-8601 (got: {value!r})")
-
-
-def must_id(value: Any) -> None:
-    if not isinstance(value, str) or not ID_RE.match(value):
-        die(2, f"id must match {ID_RE.pattern} (got: {value!r})")
-
-
-def validate_header(data: dict[str, Any]) -> None:
-    stream = data.get("stream")
-    if stream not in ("product", "stand", "review_session"):
-        die(2, f"stream must be product|stand|review_session, got: {stream!r}")
-    must_id(data.get("id"))
-    must_str("title", data.get("title"))
-    must_str("reporter", data.get("reporter"))
-    must_iso("opened_at", data.get("opened_at"))
-    must_enum("priority", data.get("priority"), PRIORITIES)
-
-    if stream == "product":
-        must_enum("kind", data.get("kind"), PRODUCT_KINDS)
-        must_enum("scope", data.get("scope"), PRODUCT_SCOPES)
-    elif stream == "stand":
-        if data.get("kind") != "stand_request":
-            die(2, "stand-stream tasks must have kind: stand_request")
-        must_enum("request_type", data.get("request_type"), STAND_REQUEST_TYPES)
-        target = data.get("target") or {}
-        if not isinstance(target, dict):
-            die(2, "target must be a mapping")
-        must_enum("target.profile", target.get("profile"), STAND_PROFILES)
-        must_list_of_str("target.hosts", target.get("hosts") or [])
-        # evidence_for is optional but if present must be list of str ids
-        ef = data.get("evidence_for")
-        if ef is not None:
-            must_list_of_str("evidence_for", ef)
-    elif stream == "review_session":
-        if data.get("kind") != "review_session":
-            die(2, "review_session-stream tasks must have kind: review_session")
-        must_enum("mode", data.get("mode"), MODES)
-        must_str("target_functionality", data.get("target_functionality"))
-        scen = data.get("scenarios")
-        if not isinstance(scen, list) or not scen:
-            die(2, "scenarios must be a non-empty list")
-
-
-def validate_block(stream: str, block: dict[str, Any]) -> None:
-    kind = block.get("kind")
-    allowed = STREAM_BLOCK_KINDS.get(stream, set())
-    if kind not in allowed:
-        die(2, f"block kind {kind!r} not allowed in stream {stream!r}; allowed: {sorted(allowed)}")
-    must_str("block.by", block.get("by"))
-    must_iso("block.at", block.get("at"))
-    # per-kind required fields
-    if kind == "plan":
-        must_str("base_commit", block.get("base_commit"))
-        must_str("assignee_role", block.get("assignee_role"))
-        must_bool("stand_required", block.get("stand_required"))
-        must_enum("plan_kind", block.get("plan_kind"), PLAN_KINDS)
-        must_enum("mode", block.get("mode"), MODES)
-        must_bool("ready_for_implementation", block.get("ready_for_implementation"))
-        # A3: if stand_required, must justify why.
-        if block.get("stand_required") is True and not (block.get("stand_reason") or "").strip():
-            die(2, "plan with stand_required=true must include stand_reason")
-    elif kind == "implementation":
-        must_str("base_commit", block.get("base_commit"))
-        must_list_of_str("files", block.get("files") or [])
-        must_bool("ready_for_test", block.get("ready_for_test"))
-    elif kind == "tests":
-        must_str("base_commit", block.get("base_commit"))
-        must_list_of_str("test_files", block.get("test_files") or [])
-        # A1: TESTER must list at least one test file — empty list means
-        # "I ran nothing" and is incompatible with a tests block.
-        if not (block.get("test_files") or []):
-            die(2, "tests block requires at least one entry in test_files")
-        must_str("test_command", block.get("test_command"))
-        must_enum("test_result", block.get("test_result"), TEST_RESULTS)
-        must_enum("gate_check_result", block.get("gate_check_result"), GATE_CHECK_RESULTS)
-        must_iso("gate_check_at", block.get("gate_check_at"))
-        must_str("gate_check_commit", block.get("gate_check_commit"))
-        must_bool("ready_for_review", block.get("ready_for_review"))
-    elif kind == "reader_review":
-        must_enum("outcome", block.get("outcome"), READER_OUTCOMES)
-        must_bool("stand_checked", block.get("stand_checked"))
-        must_bool("ready_for_architect", block.get("ready_for_architect"))
-    elif kind == "review":
-        must_enum("outcome", block.get("outcome"), REVIEW_OUTCOMES)
-        # commit exists only for an approval. A changes_requested review
-        # is a hand-back — nothing was committed, so commit is empty.
-        # Requiring it unconditionally bricked every bounced task: the
-        # whole-file validation that append-block/mv run would then
-        # reject the DEVELOPER's re-implementation + re-handoff.
-        if block.get("outcome") == "approved":
-            must_str("commit", block.get("commit"))
-    elif kind == "blocked":
-        must_str("reason", block.get("reason"))
-        deps = block.get("dependencies") or []
-        must_list_of_str("dependencies", deps)
-        if not deps:
-            die(2, "blocked block requires at least one dependency")
-        # validate format AND that referenced queue is a known queue
-        dep_re = re.compile(r"^([a-z_]+)/([0-9]{1,4}-[a-z0-9-]+)\.(yaml|md)$")
-        known_queues = set((schema().get("queues") or {}).keys())
-        for d in deps:
-            m = dep_re.match(d)
-            if m is None:
-                die(2, f"dependency {d!r} must look like <queue>/<id>.{{yaml,md}}")
-            if m.group(1) not in known_queues:
-                die(2, f"dependency {d!r}: unknown queue {m.group(1)!r}")
-        must_str("resume_to", block.get("resume_to"))
-        # resume_to must be a known queue
-        if block.get("resume_to") not in known_queues:
-            die(2, f"resume_to: {block.get('resume_to')!r} is not a known queue")
-    elif kind == "stand_result":
-        must_enum("result", block.get("result"), STAND_RESULTS)
-        must_enum("stand_status", block.get("stand_status"), STAND_STATUSES)
-        must_str("commit", block.get("commit"))
-        must_enum("profile", block.get("profile"), STAND_PROFILES)
-    elif kind == "session_iteration":
-        must_str("summary", block.get("summary"))
-    elif kind == "triage":
-        pass  # triage block needs only by/at/notes (validated above)
-
-
-def validate_task(data: dict[str, Any]) -> None:
-    validate_header(data)
-    blocks = data.get("blocks") or []
-    if not isinstance(blocks, list):
-        die(2, "blocks: must be a list")
-    stream = data["stream"]
-    for i, b in enumerate(blocks):
-        if not isinstance(b, dict):
-            die(2, f"blocks[{i}] must be a mapping")
-        validate_block(stream, b)
-
-
-# ---------------------------------------------------------------------------
-# Permission: can role move from from_q to to_q?
-# ---------------------------------------------------------------------------
-
-
-def can_role_move(role: str, from_q: str, to_q: str, task_data: dict[str, Any]) -> str | None:
-    """Return None if allowed, error message string otherwise."""
-    t = transition_for(from_q, to_q)
-    if t is None:
-        return f"no transition {from_q} → {to_q} in schema"
-    by = t.get("by")
-    if by == "current_owner":
-        owner = (queue_meta(from_q).get("owner") or "").upper()
-        if owner and owner != role and role not in (queue_meta(from_q).get("writers") or []):
-            return f"role {role} is not current owner of {from_q} (owner: {owner})"
-        return None
-    if isinstance(by, str) and by != role:
-        return f"only role {by} may perform {from_q} → {to_q}, not {role}"
-    return None
-
-
-# ---------------------------------------------------------------------------
-# Subcommands
-# ---------------------------------------------------------------------------
-
-
-TITLE_MAX_LEN = 200
-
-# B5: --in-queue is restricted to known intake queues per stream.
-ALLOWED_INTAKE_QUEUES: dict[str, set[str]] = {
-    "product":         {"feature_inbox", "user_feedback"},
-    "stand":           {"stand_requests"},
-    "review_session":  {"review_sessions"},
-}
-
-
-def cmd_new(args: argparse.Namespace) -> int:
-    coord = find_coord_dir()
-    role = caller_role()
-
-    stream = args.stream
-    if stream not in ("product", "stand", "review_session"):
-        die(1, f"--stream must be product|stand|review_session")
-
-    # E1: bound title length so an accidental dump doesn't fill the file.
-    if len(args.title) > TITLE_MAX_LEN:
-        die(1, f"title too long ({len(args.title)} chars, max {TITLE_MAX_LEN})")
-
-    # generate id: <seq>-<slug>
-    slug = re.sub(r"[^a-z0-9]+", "-", args.title.lower()).strip("-")[:60]
-    if not slug:
-        # title was entirely non-ascii / control chars / empty after slugify
-        # fall back to a short hash so the id stays valid.
-        slug = "task-" + uuid.uuid4().hex[:8]
-    seq = args.seq or next_seq(coord)
-    if not re.match(r"^[0-9]{4}$", seq):
-        die(1, f"--seq must be a 4-digit non-negative number, got: {seq!r}")
-    task_id = f"{seq}-{slug}"
-
-    data: dict[str, Any] = {
-        "id": task_id,
-        "stream": stream,
-        "title": args.title,
-        "reporter": args.reporter or role,
-        "opened_at": now_iso(),
-        "priority": args.priority or "normal",
-    }
-    if stream == "product":
-        if not args.kind or not args.scope:
-            die(1, "product stream needs --kind and --scope")
-        data["kind"] = args.kind
-        data["scope"] = args.scope
-    elif stream == "stand":
-        data["kind"] = "stand_request"
-        if not args.request_type:
-            die(1, "stand stream needs --request-type")
-        data["request_type"] = args.request_type
-        data["target"] = {
-            "profile": args.profile or "full-deploy",
-            "hosts": args.hosts or [],
-        }
-        if args.evidence_for:
-            data["evidence_for"] = args.evidence_for
-    elif stream == "review_session":
-        data["kind"] = "review_session"
-        data["mode"] = args.mode or "B"
-        if not args.target_functionality:
-            die(1, "review_session needs --target-functionality")
-        data["target_functionality"] = args.target_functionality
-        data["scenarios"] = args.scenarios or []
-
-    if args.description:
-        data["description"] = read_body(args.description)
-    data["blocks"] = []
-
-    # which queue?
-    in_queue = args.in_queue or default_intake_queue(stream)
-    # B5: only intake queues are allowed for `new`. Creating tasks
-    # directly in feature_review / verified / archive / etc. bypasses
-    # the entire pipeline and is never legitimate.
-    allowed = ALLOWED_INTAKE_QUEUES.get(stream, set())
-    if in_queue not in allowed:
-        die(1, f"--in-queue {in_queue!r} not allowed for stream {stream!r}; "
-               f"allowed intake: {sorted(allowed)}")
-    target_path = coord / in_queue / f"{task_id}.yaml"
-    if target_path.exists():
-        die(1, f"task {task_id} already exists at {target_path}")
-
-    validate_task(data)
-
-    atomic_write_yaml(target_path, data)
-    journal_append(coord, {
-        "t": now_iso(),
-        "actor": role,
-        "task": task_id,
-        "from": "_new",
-        "to": in_queue,
-        "reason": args.reason or f"new {stream} task",
-        "intent_id": "",
-    })
-    touch_heartbeat(coord, role)
-    print(f"created {target_path}")
-    return 0
-
-
-def default_intake_queue(stream: str) -> str:
-    return {
-        "product": "feature_inbox",
-        "stand": "stand_requests",
-        "review_session": "review_sessions",
-    }[stream]
-
-
-import fcntl
-from contextlib import contextmanager
 
 
 @contextmanager
 def task_file_lock(coord: Path, task_id: str):
-    """Exclusive lock for read-modify-write on a single task file.
-
-    Held via a sibling `.task.<id>.lock` so the lock survives the rename
-    that mv does. Released on context exit.
-    """
+    """Exclusive lock for read-modify-write on a single task file."""
     lock_dir = coord / ".locks"
     lock_dir.mkdir(parents=True, exist_ok=True)
     lock_path = lock_dir / f"{task_id}.lock"
@@ -677,140 +380,221 @@ def task_file_lock(coord: Path, task_id: str):
         os.close(fd)
 
 
-def next_seq(coord: Path) -> str:
-    """Find max numeric prefix in queues + counter file, return next.
-
-    Uses an exclusive flock on coord/.id_counter so two concurrent
-    bin/task new invocations don't collide on the same id. The counter
-    file caches the last issued id; on first use we seed it from the
-    actual filesystem scan.
-    """
-    lock_path = coord / ".id_counter"
-    lock_path.touch(exist_ok=True)
-    fd = os.open(str(lock_path), os.O_RDWR)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        # read current counter
-        os.lseek(fd, 0, os.SEEK_SET)
-        raw = os.read(fd, 64).decode("ascii", errors="ignore").strip()
-        cached = int(raw) if raw.isdigit() else 0
-        # rescan FS in case files were created out-of-band
-        mx = cached
-        for q in coord.iterdir():
-            if not q.is_dir() or q.name.startswith("."):
-                continue
-            for f in q.glob("[0-9][0-9][0-9][0-9]-*"):
-                try:
-                    n = int(f.name.split("-", 1)[0])
-                    if n > mx:
-                        mx = n
-                except (ValueError, IndexError):
-                    continue
-        nxt = mx + 1
-        # write back
-        os.lseek(fd, 0, os.SEEK_SET)
-        os.ftruncate(fd, 0)
-        os.write(fd, str(nxt).encode("ascii"))
-        os.fsync(fd)
-        return f"{nxt:04d}"
-    finally:
-        try:
-            fcntl.flock(fd, fcntl.LOCK_UN)
-        except OSError:
-            pass
-        os.close(fd)
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
 
 
-def read_body(spec: str) -> str:
-    """If spec starts with '@' it's a file path; if '-' it's stdin; else literal."""
-    if spec == "-":
-        return sys.stdin.read()
-    if spec.startswith("@"):
-        return Path(spec[1:]).read_text(encoding="utf-8")
-    return spec
+def must_enum(field: str, value: Any, allowed: set[str]) -> None:
+    if value not in allowed:
+        raise GreatMindsError(
+            f"field '{field}' must be one of {sorted(allowed)}, got: {value!r}"
+        , exit_code=2)
 
 
-def cmd_mv(args: argparse.Namespace) -> int:
-    coord = find_coord_dir()
-    role = caller_role()
-    task_id = args.id
-    to_q = args.to_queue
-
-    # Hold the per-task lock so an append-block can't race with us.
-    with task_file_lock(coord, task_id):
-        return _do_mv(coord, role, task_id, to_q, args.reason or "")
+def must_str(field: str, value: Any, *, allow_empty: bool = False) -> None:
+    if not isinstance(value, str) or (not allow_empty and not value.strip()):
+        raise GreatMindsError(f"field '{field}' must be a non-empty string", exit_code=2)
 
 
-def _do_mv(coord: Path, role: str, task_id: str, to_q: str, reason: str) -> int:
-    found = find_task(coord, task_id)
-    if found is None:
-        die(1, f"task {task_id} not found in any queue")
-    src_path, from_q = found
+def must_bool(field: str, value: Any) -> None:
+    if not isinstance(value, bool):
+        raise GreatMindsError(f"field '{field}' must be true|false", exit_code=2)
 
-    if from_q == to_q:
-        die(1, f"task already in {to_q}")
 
-    # validate destination queue exists
-    if to_q not in (schema().get("queues") or {}):
-        die(1, f"unknown destination queue: {to_q}")
+def must_list_of_str(field: str, value: Any) -> None:
+    if not isinstance(value, list) or any(not isinstance(x, str) for x in value):
+        raise GreatMindsError(f"field '{field}' must be a list of strings", exit_code=2)
 
-    # load task data (also for validation)
-    data = load_task(src_path)
-    if data.get("_legacy_md"):
-        die(2, f"task {task_id} is legacy .md; migrate before moving")
 
-    # check transition permission
-    err = can_role_move(role, from_q, to_q, data)
-    if err is not None:
-        die(3, err)
+def must_iso(field: str, value: Any) -> None:
+    if not isinstance(value, str) or not re.match(
+        r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", value
+    ):
+        raise GreatMindsError(f"field '{field}' must be ISO-8601 (got: {value!r})", exit_code=2)
 
-    # F3: if routing feature_plan → per-scope queue, scope must match
-    require_scope_match_on_routing(data, from_q, to_q)
 
-    # check required block(s) for target — minimal: ready_for_* flags on
-    # the most recent block of the appropriate kind.
-    require_target_readiness(data, from_q, to_q)
+def must_id(value: Any) -> None:
+    if not isinstance(value, str) or not ID_RE.match(value):
+        raise GreatMindsError(f"id must match {ID_RE.pattern} (got: {value!r})", exit_code=2)
 
-    # intent write
-    intent_path = intent_write(coord, role, task_id, from_q, to_q, reason)
-    intent_id = intent_path.stem.rsplit("-", 1)[-1]
 
-    # mv
-    dst_path = coord / to_q / src_path.name
-    try:
-        dst_path.parent.mkdir(parents=True, exist_ok=True)
-        os.rename(src_path, dst_path)
-    except OSError as exc:
-        intent_clear(intent_path)
-        die(4, f"mv failed: {exc}")
+def validate_header(data: dict[str, Any]) -> None:
+    stream = data.get("stream")
+    if stream not in ("product", "stand", "review_session"):
+        raise GreatMindsError(
+            f"stream must be product|stand|review_session, got: {stream!r}"
+        , exit_code=2)
+    must_id(data.get("id"))
+    must_str("title", data.get("title"))
+    must_str("reporter", data.get("reporter"))
+    must_iso("opened_at", data.get("opened_at"))
+    must_enum("priority", data.get("priority"), PRIORITIES)
 
-    intent_clear(intent_path)
-    journal_append(coord, {
-        "t": now_iso(),
-        "actor": role,
-        "task": task_id,
-        "from": from_q,
-        "to": to_q,
-        "reason": (reason or "")[:200],
-        "intent_id": intent_id,
-    })
-    touch_heartbeat(coord, role)
-    print(f"moved {task_id}: {from_q} → {to_q}")
-    return 0
+    if stream == "product":
+        must_enum("kind", data.get("kind"), PRODUCT_KINDS)
+        must_enum("scope", data.get("scope"), PRODUCT_SCOPES)
+    elif stream == "stand":
+        if data.get("kind") != "stand_request":
+            raise GreatMindsError("stand-stream tasks must have kind: stand_request", exit_code=2)
+        must_enum("request_type", data.get("request_type"), STAND_REQUEST_TYPES)
+        target = data.get("target") or {}
+        if not isinstance(target, dict):
+            raise GreatMindsError("target must be a mapping", exit_code=2)
+        must_enum("target.profile", target.get("profile"), STAND_PROFILES)
+        must_list_of_str("target.hosts", target.get("hosts") or [])
+        ef = data.get("evidence_for")
+        if ef is not None:
+            must_list_of_str("evidence_for", ef)
+    elif stream == "review_session":
+        if data.get("kind") != "review_session":
+            raise GreatMindsError(
+                "review_session-stream tasks must have kind: review_session"
+            , exit_code=2)
+        must_enum("mode", data.get("mode"), MODES)
+        must_str("target_functionality", data.get("target_functionality"))
+        scen = data.get("scenarios")
+        if not isinstance(scen, list) or not scen:
+            raise GreatMindsError("scenarios must be a non-empty list", exit_code=2)
+
+
+def validate_block(stream: str, block: dict[str, Any]) -> None:
+    kind = block.get("kind")
+    allowed = STREAM_BLOCK_KINDS.get(stream, set())
+    if kind not in allowed:
+        raise GreatMindsError(
+            f"block kind {kind!r} not allowed in stream {stream!r}; "
+            f"allowed: {sorted(allowed)}"
+        , exit_code=2)
+    must_str("block.by", block.get("by"))
+    must_iso("block.at", block.get("at"))
+    if kind == "plan":
+        must_str("base_commit", block.get("base_commit"))
+        must_str("assignee_role", block.get("assignee_role"))
+        must_bool("stand_required", block.get("stand_required"))
+        must_enum("plan_kind", block.get("plan_kind"), PLAN_KINDS)
+        must_enum("mode", block.get("mode"), MODES)
+        must_bool("ready_for_implementation", block.get("ready_for_implementation"))
+        # A3: stand_required must be justified.
+        if block.get("stand_required") is True and not (block.get("stand_reason") or "").strip():
+            raise GreatMindsError(
+                "plan with stand_required=true must include stand_reason"
+            , exit_code=2)
+    elif kind == "implementation":
+        must_str("base_commit", block.get("base_commit"))
+        must_list_of_str("files", block.get("files") or [])
+        must_bool("ready_for_test", block.get("ready_for_test"))
+    elif kind == "tests":
+        must_str("base_commit", block.get("base_commit"))
+        must_list_of_str("test_files", block.get("test_files") or [])
+        # A1: TESTER must list at least one test file.
+        if not (block.get("test_files") or []):
+            raise GreatMindsError(
+                "tests block requires at least one entry in test_files"
+            , exit_code=2)
+        must_str("test_command", block.get("test_command"))
+        must_enum("test_result", block.get("test_result"), TEST_RESULTS)
+        must_enum("gate_check_result", block.get("gate_check_result"), GATE_CHECK_RESULTS)
+        must_iso("gate_check_at", block.get("gate_check_at"))
+        must_str("gate_check_commit", block.get("gate_check_commit"))
+        must_bool("ready_for_review", block.get("ready_for_review"))
+    elif kind == "reader_review":
+        must_enum("outcome", block.get("outcome"), READER_OUTCOMES)
+        must_bool("stand_checked", block.get("stand_checked"))
+        must_bool("ready_for_architect", block.get("ready_for_architect"))
+    elif kind == "review":
+        must_enum("outcome", block.get("outcome"), REVIEW_OUTCOMES)
+        # commit is only required on approval; changes_requested is a
+        # hand-back, nothing was committed.
+        if block.get("outcome") == "approved":
+            must_str("commit", block.get("commit"))
+    elif kind == "blocked":
+        must_str("reason", block.get("reason"))
+        deps = block.get("dependencies") or []
+        must_list_of_str("dependencies", deps)
+        if not deps:
+            raise GreatMindsError("blocked block requires at least one dependency", exit_code=2)
+        dep_re = re.compile(r"^([a-z_]+)/([0-9]{1,4}-[a-z0-9-]+)\.(yaml|md)$")
+        known_queues = set((schema().get("queues") or {}).keys())
+        for d in deps:
+            m = dep_re.match(d)
+            if m is None:
+                raise GreatMindsError(
+                    f"dependency {d!r} must look like <queue>/<id>.{{yaml,md}}"
+                , exit_code=2)
+            if m.group(1) not in known_queues:
+                raise GreatMindsError(
+                    f"dependency {d!r}: unknown queue {m.group(1)!r}"
+                , exit_code=2)
+        must_str("resume_to", block.get("resume_to"))
+        if block.get("resume_to") not in known_queues:
+            raise GreatMindsError(
+                f"resume_to: {block.get('resume_to')!r} is not a known queue"
+            , exit_code=2)
+    elif kind == "stand_result":
+        must_enum("result", block.get("result"), STAND_RESULTS)
+        must_enum("stand_status", block.get("stand_status"), STAND_STATUSES)
+        must_str("commit", block.get("commit"))
+        must_enum("profile", block.get("profile"), STAND_PROFILES)
+    elif kind == "session_iteration":
+        must_str("summary", block.get("summary"))
+    elif kind == "triage":
+        pass  # only needs by/at/notes
+
+
+def validate_task(data: dict[str, Any]) -> None:
+    validate_header(data)
+    blocks = data.get("blocks") or []
+    if not isinstance(blocks, list):
+        raise GreatMindsError("blocks: must be a list", exit_code=2)
+    stream = data["stream"]
+    for i, b in enumerate(blocks):
+        if not isinstance(b, dict):
+            raise GreatMindsError(f"blocks[{i}] must be a mapping", exit_code=2)
+        validate_block(stream, b)
+
+
+# ---------------------------------------------------------------------------
+# Permission: can this role move from_q → to_q?
+# ---------------------------------------------------------------------------
+
+
+def can_role_move(role: str, from_q: str, to_q: str,
+                  task_data: dict[str, Any]) -> str | None:
+    """Return ``None`` if allowed, otherwise an error message string."""
+    t = transition_for(from_q, to_q)
+    if t is None:
+        return f"no transition {from_q} → {to_q} in schema"
+    by = t.get("by")
+    if by == "current_owner":
+        owner = (queue_meta(from_q).get("owner") or "").upper()
+        if owner and owner != role and role not in (queue_meta(from_q).get("writers") or []):
+            return f"role {role} is not current owner of {from_q} (owner: {owner})"
+        return None
+    if isinstance(by, str) and by != role:
+        return f"only role {by} may perform {from_q} → {to_q}, not {role}"
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Routing / readiness preconditions
+# ---------------------------------------------------------------------------
 
 
 READY_FLAG_PER_TARGET: dict[str, tuple[str, str]] = {
-    # to_q: (latest_block_kind_needed, ready_flag_field).
-    # PLANNER writes the plan block IN feature_plan, so mv into
-    # feature_plan has no readiness prerequisite. mv from feature_plan
-    # into a per-scope queue requires the plan to be marked ready.
-    "feature_dev":          ("plan",            "ready_for_implementation"),
-    "feature_ui_dev":       ("plan",            "ready_for_implementation"),
-    "feature_docs":         ("plan",            "ready_for_implementation"),
-    "feature_test":         ("implementation",  "ready_for_test"),
-    # feature_docs_review and feature_review are special-cased in
-    # require_target_readiness (dual-source: writer-path vs audit-only /
-    # tests-path vs reader-path).
+    "feature_dev":    ("plan", "ready_for_implementation"),
+    "feature_ui_dev": ("plan", "ready_for_implementation"),
+    "feature_docs":   ("plan", "ready_for_implementation"),
+    "feature_test":   ("implementation", "ready_for_test"),
+    # feature_docs_review and feature_review are dual-source — handled
+    # explicitly in require_target_readiness().
+}
+
+# F3: routing from feature_plan → per-scope queue requires scope match.
+SCOPE_TO_QUEUE: dict[str, str] = {
+    "backend": "feature_dev",
+    "ui":      "feature_ui_dev",
+    "docs":    "feature_docs",
 }
 
 
@@ -825,63 +609,62 @@ def is_audit_only(data: dict[str, Any]) -> bool:
     return bool(p and p.get("audit_only") is True)
 
 
-def require_target_readiness(data: dict[str, Any], from_q: str, to_q: str) -> None:
-    """Some transitions require the most-recent block to have a ready_for_* flag.
-
-    Special cases:
-      - feature_review accepts from feature_test (tests.ready_for_review)
-        OR feature_docs_review (reader_review.ready_for_architect).
-      - feature_docs_review accepts from feature_docs (WRITER path:
-        implementation.ready_for_test) OR feature_plan (PLANNER
-        audit-only path: plan.ready_for_implementation + plan.audit_only).
-    The rule depends on the SOURCE queue, not just the target.
-    """
+def require_target_readiness(data: dict[str, Any],
+                             from_q: str, to_q: str) -> None:
+    """Some transitions require the latest block to set a ready_for_* flag."""
     # B1: triage block required before mv inbox → feature_plan, so the
-    # intake step is auditable in the task history.
+    # intake step is auditable.
     if to_q == "feature_plan" and from_q == "feature_inbox":
         blocks = data.get("blocks") or []
         if not any(isinstance(b, dict) and b.get("kind") == "triage" for b in blocks):
-            die(2, "mv feature_inbox → feature_plan requires a triage block first")
+            raise GreatMindsError(
+                "mv feature_inbox → feature_plan requires a triage block first"
+            , exit_code=2)
 
-    # B: an audit-only task must never be routed into feature_docs
-    # (WRITER's queue) — it has no write-plan; WRITER can't act on it.
-    # READER records findings; the audit itself flows to feature_review
-    # then verified, and PLANNER spawns a SEPARATE feature_docs write
-    # task from the findings.
+    # An audit-only task must never be routed into feature_docs (WRITER's
+    # queue) — it has no write-plan.
     if to_q == "feature_docs" and is_audit_only(data):
-        die(2, "audit-only task: do NOT route the audit into feature_docs. "
-               "Its findings become a separate feature_docs write task "
-               "(PLANNER triages). The audit flows feature_docs_review → "
-               "feature_review → verified.")
+        raise GreatMindsError(
+            "audit-only task: do NOT route the audit into feature_docs. "
+            "Its findings become a separate feature_docs write task "
+            "(PLANNER triages). The audit flows feature_docs_review → "
+            "feature_review → verified."
+        , exit_code=2)
 
-    # A: feature_docs_review dual-source readiness.
     if to_q == "feature_docs_review":
         if from_q == "feature_docs":
             block_kind, flag = "implementation", "ready_for_test"
         elif from_q == "feature_plan":
-            # audit-only path
             p = latest_plan(data)
             if not (p and p.get("audit_only") is True):
-                die(2, "mv feature_plan → feature_docs_review requires the "
-                       "latest plan block to set audit_only: true (this is "
-                       "the independent READER-audit path)")
+                raise GreatMindsError(
+                    "mv feature_plan → feature_docs_review requires the "
+                    "latest plan block to set audit_only: true (this is "
+                    "the independent READER-audit path)"
+                , exit_code=2)
             if not p.get("ready_for_implementation"):
-                die(2, "mv feature_plan → feature_docs_review requires "
-                       "plan.ready_for_implementation=true")
+                raise GreatMindsError(
+                    "mv feature_plan → feature_docs_review requires "
+                    "plan.ready_for_implementation=true"
+                , exit_code=2)
             return
         elif from_q == "feature_blocked":
             return
         else:
-            die(2, f"mv {from_q} → feature_docs_review not allowed")
+            raise GreatMindsError(f"mv {from_q} → feature_docs_review not allowed", exit_code=2)
         blocks = data.get("blocks") or []
         matching = [b for b in blocks
                     if isinstance(b, dict) and b.get("kind") == block_kind]
         if not matching:
-            die(2, f"mv → feature_docs_review (from {from_q}) requires "
-                   f"{block_kind} block")
+            raise GreatMindsError(
+                f"mv → feature_docs_review (from {from_q}) requires "
+                f"{block_kind} block"
+            , exit_code=2)
         if not matching[-1].get(flag):
-            die(2, f"mv → feature_docs_review (from {from_q}) requires "
-                   f"{block_kind}.{flag}=true")
+            raise GreatMindsError(
+                f"mv → feature_docs_review (from {from_q}) requires "
+                f"{block_kind}.{flag}=true"
+            , exit_code=2)
         return
 
     if to_q == "feature_review":
@@ -890,21 +673,24 @@ def require_target_readiness(data: dict[str, Any], from_q: str, to_q: str) -> No
         elif from_q == "feature_docs_review":
             block_kind, flag = "reader_review", "ready_for_architect"
         elif from_q == "feature_blocked":
-            # resuming from blocked: prior readiness already established;
-            # caller's decision.
             return
         else:
-            die(2, f"mv {from_q} → feature_review not allowed; route via "
-                   f"feature_test or feature_docs_review")
+            raise GreatMindsError(
+                f"mv {from_q} → feature_review not allowed; route via "
+                f"feature_test or feature_docs_review"
+            , exit_code=2)
         blocks = data.get("blocks") or []
         matching = [b for b in blocks
                     if isinstance(b, dict) and b.get("kind") == block_kind]
         if not matching:
-            die(2, f"mv → feature_review (from {from_q}) requires {block_kind} block")
-        latest = matching[-1]
-        if not latest.get(flag):
-            die(2, f"mv → feature_review (from {from_q}) requires "
-                   f"{block_kind}.{flag}=true")
+            raise GreatMindsError(
+                f"mv → feature_review (from {from_q}) requires {block_kind} block"
+            , exit_code=2)
+        if not matching[-1].get(flag):
+            raise GreatMindsError(
+                f"mv → feature_review (from {from_q}) requires "
+                f"{block_kind}.{flag}=true"
+            , exit_code=2)
         return
 
     rule = READY_FLAG_PER_TARGET.get(to_q)
@@ -912,25 +698,16 @@ def require_target_readiness(data: dict[str, Any], from_q: str, to_q: str) -> No
         return
     block_kind, flag = rule
     blocks = data.get("blocks") or []
-    # find LATEST block of the kind
-    matching = [b for b in blocks if isinstance(b, dict) and b.get("kind") == block_kind]
+    matching = [b for b in blocks
+                if isinstance(b, dict) and b.get("kind") == block_kind]
     if not matching:
-        die(2, f"mv → {to_q} requires {block_kind} block on task")
-    latest = matching[-1]
-    if not latest.get(flag):
-        die(2, f"mv → {to_q} requires {block_kind}.{flag}=true")
+        raise GreatMindsError(f"mv → {to_q} requires {block_kind} block on task", exit_code=2)
+    if not matching[-1].get(flag):
+        raise GreatMindsError(f"mv → {to_q} requires {block_kind}.{flag}=true", exit_code=2)
 
 
-# F3: when ARCHITECT-PLANNER routes from feature_plan → feature_{dev,ui_dev,docs},
-# task.scope must match the destination queue.
-SCOPE_TO_QUEUE: dict[str, str] = {
-    "backend": "feature_dev",
-    "ui":      "feature_ui_dev",
-    "docs":    "feature_docs",
-}
-
-
-def require_scope_match_on_routing(data: dict[str, Any], from_q: str, to_q: str) -> None:
+def require_scope_match_on_routing(data: dict[str, Any],
+                                   from_q: str, to_q: str) -> None:
     if from_q != "feature_plan":
         return
     if to_q not in SCOPE_TO_QUEUE.values():
@@ -938,19 +715,19 @@ def require_scope_match_on_routing(data: dict[str, Any], from_q: str, to_q: str)
     scope = data.get("scope")
     expected = SCOPE_TO_QUEUE.get(scope)
     if expected is None:
-        die(2, f"task scope {scope!r} has no per-scope queue routing")
+        raise GreatMindsError(
+            f"task scope {scope!r} has no per-scope queue routing"
+        , exit_code=2)
     if expected != to_q:
-        die(2, f"task scope: {scope!r} routes to {expected}, not {to_q}")
+        raise GreatMindsError(
+            f"task scope: {scope!r} routes to {expected}, not {to_q}"
+        , exit_code=2)
 
 
-# F1: role-per-block-kind validation.
 def role_for_block_kind(role: str, kind: str, queue: str,
                         data: dict[str, Any]) -> str | None:
-    """Return None if role may author this block-kind on this task,
-    otherwise an error message."""
+    """Return ``None`` if role may author this block-kind on this task."""
     if kind == "blocked":
-        # blocked block authored by the current owner of the queue the
-        # task sits in (per schema.queues[<queue>].owner).
         owner = (queue_meta(queue).get("owner") or "").upper()
         if owner and role == owner:
             return None
@@ -962,7 +739,6 @@ def role_for_block_kind(role: str, kind: str, queue: str,
     if role not in allowed:
         return (f"role {role} may not author block kind {kind!r}; "
                 f"allowed: {sorted(allowed)}")
-    # F1 cont'd: implementation block also requires scope/role match.
     if kind == "implementation":
         scope = data.get("scope")
         expected = IMPL_ROLE_BY_SCOPE.get(scope or "")
@@ -972,15 +748,10 @@ def role_for_block_kind(role: str, kind: str, queue: str,
     return None
 
 
-def require_block_cross_state(new_block: dict[str, Any], data: dict[str, Any]) -> None:
-    """A2: cross-block consistency at append time.
-
-    review.outcome=approved requires the most recent testing-side block
-    (tests or reader_review) to be a pass. Prevents REVIEWER from
-    rubber-stamping a task whose tests just failed.
-    """
-    kind = new_block.get("kind")
-    if kind != "review":
+def require_block_cross_state(new_block: dict[str, Any],
+                              data: dict[str, Any]) -> None:
+    """A2: REVIEWER cannot approve when latest testing block is not pass."""
+    if new_block.get("kind") != "review":
         return
     if new_block.get("outcome") != "approved":
         return
@@ -997,92 +768,90 @@ def require_block_cross_state(new_block: dict[str, Any], data: dict[str, Any]) -
     )
     if latest_tests is not None:
         if latest_tests.get("test_result") != "pass":
-            die(2, f"cannot approve: latest tests.test_result="
-                   f"{latest_tests.get('test_result')!r} (expected 'pass')")
+            raise GreatMindsError(
+                f"cannot approve: latest tests.test_result="
+                f"{latest_tests.get('test_result')!r} (expected 'pass')"
+            , exit_code=2)
         return
     if latest_reader is not None:
         if latest_reader.get("outcome") != "pass":
-            die(2, f"cannot approve: latest reader_review.outcome="
-                   f"{latest_reader.get('outcome')!r} (expected 'pass')")
+            raise GreatMindsError(
+                f"cannot approve: latest reader_review.outcome="
+                f"{latest_reader.get('outcome')!r} (expected 'pass')"
+            , exit_code=2)
         return
-    die(2, "cannot approve: no tests or reader_review block on this task")
+    raise GreatMindsError(
+        "cannot approve: no tests or reader_review block on this task"
+    , exit_code=2)
 
 
-# F5: queue → set of block kinds that may be appended to a task currently
-# in that queue.
 def require_block_acceptable_in_queue(queue: str, kind: str) -> None:
     allowed = QUEUE_BLOCK_KINDS.get(queue)
     if allowed is None:
-        die(2, f"queue {queue!r} has no block-policy entry")
+        raise GreatMindsError(f"queue {queue!r} has no block-policy entry", exit_code=2)
     if not allowed:
-        die(2, f"queue {queue!r} is terminal — no new blocks accepted")
+        raise GreatMindsError(f"queue {queue!r} is terminal — no new blocks accepted", exit_code=2)
     if kind not in allowed:
-        die(2, f"queue {queue!r} accepts {sorted(allowed)}, not {kind!r}")
+        raise GreatMindsError(
+            f"queue {queue!r} accepts {sorted(allowed)}, not {kind!r}"
+        , exit_code=2)
 
 
-def cmd_append_block(args: argparse.Namespace) -> int:
-    coord = find_coord_dir()
-    role = caller_role()
-    task_id = args.id
+# ---------------------------------------------------------------------------
+# Misc helpers
+# ---------------------------------------------------------------------------
 
-    # Hold the per-task lock for the whole read-modify-write so
-    # concurrent appends don't lose updates.
-    with task_file_lock(coord, task_id):
-        found = find_task(coord, task_id)
-        if found is None:
-            die(1, f"task {task_id} not found")
-        src_path, queue = found
-        if src_path.suffix != ".yaml":
-            die(2, f"task {task_id} is legacy .md; migrate first")
-        data = load_task(src_path)
 
-        # F5: this block kind must be acceptable in the current queue
-        require_block_acceptable_in_queue(queue, args.kind)
-        # F1: role must be allowed to author this block kind on this task
-        err = role_for_block_kind(role, args.kind, queue, data)
-        if err is not None:
-            die(3, err)
+def default_intake_queue(stream: str) -> str:
+    return {
+        "product": "feature_inbox",
+        "stand": "stand_requests",
+        "review_session": "review_sessions",
+    }[stream]
 
-        # parse --field foo=bar entries
-        block: dict[str, Any] = {
-            "kind": args.kind,
-            "by": role,
-            "at": now_iso(),
-        }
-        for kv in args.field or []:
-            if "=" not in kv:
-                die(1, f"--field expects key=value, got: {kv}")
-            k, v = kv.split("=", 1)
-            block[k] = coerce_value(k, v)
-        if args.body:
-            block_body_field = body_field_for(args.kind)
-            block[block_body_field] = read_body(args.body)
 
-        # validate block
-        validate_block(data.get("stream") or "product", block)
+def next_seq(coord: Path) -> str:
+    """Return next 4-digit id prefix, atomically incremented under flock."""
+    lock_path = coord / ".id_counter"
+    lock_path.touch(exist_ok=True)
+    fd = os.open(str(lock_path), os.O_RDWR)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        os.lseek(fd, 0, os.SEEK_SET)
+        raw = os.read(fd, 64).decode("ascii", errors="ignore").strip()
+        cached = int(raw) if raw.isdigit() else 0
+        mx = cached
+        for q in coord.iterdir():
+            if not q.is_dir() or q.name.startswith("."):
+                continue
+            for f in q.glob("[0-9][0-9][0-9][0-9]-*"):
+                try:
+                    n = int(f.name.split("-", 1)[0])
+                    if n > mx:
+                        mx = n
+                except (ValueError, IndexError):
+                    continue
+        nxt = mx + 1
+        os.lseek(fd, 0, os.SEEK_SET)
+        os.ftruncate(fd, 0)
+        os.write(fd, str(nxt).encode("ascii"))
+        os.fsync(fd)
+        return f"{nxt:04d}"
+    finally:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        except OSError:
+            pass
+        os.close(fd)
 
-        # A2: cross-block consistency (e.g. approve requires tests pass)
-        require_block_cross_state(block, data)
 
-        # validate whole task with this block appended
-        new_blocks = list(data.get("blocks") or []) + [block]
-        new_data = dict(data)
-        new_data["blocks"] = new_blocks
-        validate_task(new_data)
-
-        atomic_write_yaml(src_path, new_data)
-        journal_append(coord, {
-            "t": now_iso(),
-            "actor": role,
-            "task": task_id,
-            "from": queue,
-            "to": queue,
-            "reason": f"append-block {args.kind}",
-            "intent_id": "",
-        })
-    touch_heartbeat(coord, role)
-    print(f"appended {args.kind} block to {src_path}")
-    return 0
+def read_body(spec: str) -> str:
+    """``@PATH`` → file contents, ``-`` → stdin, else literal."""
+    if spec == "-":
+        return sys.stdin.read()
+    if spec.startswith("@"):
+        return Path(spec[1:]).read_text(encoding="utf-8")
+    return spec
 
 
 def body_field_for(kind: str) -> str:
@@ -1099,14 +868,14 @@ def body_field_for(kind: str) -> str:
     }.get(kind, "notes")
 
 
-LIST_FIELDS = {
-    "dependencies", "files", "test_files", "hosts", "scenarios",
-    "evidence_for", "docs_checked", "bugs_filed", "commands",
-}
-
-
 def coerce_value(key: str, v: str) -> Any:
-    """Best-effort coerce based on field name + value shape."""
+    """Best-effort coerce of a ``--field key=value`` value.
+
+    Only fields explicitly in :data:`LIST_FIELDS` are split on commas. All
+    other fields stay as strings even if they contain commas or colons —
+    so user-supplied prose like ``stand_reason="POST /node, then GET
+    /health"`` isn't accidentally turned into a YAML list.
+    """
     if key in LIST_FIELDS:
         if "," in v:
             return [x.strip() for x in v.split(",") if x.strip()]
@@ -1115,81 +884,256 @@ def coerce_value(key: str, v: str) -> Any:
         return v.lower() == "true"
     if v.isdigit():
         return int(v)
-    if "," in v:
-        return [x.strip() for x in v.split(",") if x.strip()]
     return v
 
 
-def cmd_show(args: argparse.Namespace) -> int:
+# ---------------------------------------------------------------------------
+# Public library API — called by click handlers below AND by other CLI
+# modules (stand.py, plan.py, inbox.py). No subprocess between modules.
+# ---------------------------------------------------------------------------
+
+
+def create_task(
+    *,
+    stream: str,
+    title: str,
+    reporter: str | None = None,
+    priority: str | None = None,
+    kind: str | None = None,
+    scope: str | None = None,
+    request_type: str | None = None,
+    profile: str | None = None,
+    hosts: list[str] | None = None,
+    evidence_for: list[str] | None = None,
+    mode: str | None = None,
+    target_functionality: str | None = None,
+    scenarios: list[str] | None = None,
+    description: str | None = None,
+    in_queue: str | None = None,
+    seq: str | None = None,
+    reason: str | None = None,
+) -> Path:
+    """Create a new task. Returns the path of the written file.
+
+    Raises :class:`GreatMindsError` on validation / permission failure.
+    """
     coord = find_coord_dir()
-    found = find_task(coord, args.id)
-    if found is None:
-        die(1, f"task {args.id} not found")
-    src_path, queue = found
-    if src_path.suffix == ".yaml":
-        print(f"# queue: {queue}")
-        print(src_path.read_text(encoding="utf-8"))
-    else:
-        print(f"# legacy .md, queue: {queue}")
-        print(src_path.read_text(encoding="utf-8"))
-    return 0
+    role = caller_role()
 
+    if stream not in ("product", "stand", "review_session"):
+        raise GreatMindsError("--stream must be product|stand|review_session")
 
-def cmd_list(args: argparse.Namespace) -> int:
-    coord = find_coord_dir()
-    qdir = coord / args.queue
-    if not qdir.is_dir():
-        die(1, f"queue {args.queue} not found")
-    for f in sorted(qdir.iterdir()):
-        if f.suffix not in (".yaml", ".md"):
-            continue
-        if f.name == "_TEMPLATE.md" or f.name == "_TEMPLATE.yaml":
-            continue
-        print(f.name)
-    return 0
+    # E1: bound title length so an accidental dump doesn't fill the file.
+    if len(title) > TITLE_MAX_LEN:
+        raise GreatMindsError(
+            f"title too long ({len(title)} chars, max {TITLE_MAX_LEN})"
+        )
 
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:60]
+    if not slug:
+        # title was entirely non-ascii / control chars / empty after slugify
+        slug = "task-" + uuid.uuid4().hex[:8]
+    seq_str = seq or next_seq(coord)
+    if not re.match(r"^[0-9]{4}$", seq_str):
+        raise GreatMindsError(
+            f"--seq must be a 4-digit non-negative number, got: {seq_str!r}"
+        )
+    task_id = f"{seq_str}-{slug}"
 
-def cmd_validate(args: argparse.Namespace) -> int:
-    coord = find_coord_dir()
-    if args.file:
-        path = Path(args.file)
-    else:
-        found = find_task(coord, args.id)
-        if found is None:
-            die(1, f"task {args.id} not found")
-        path = found[0]
-    if path.suffix != ".yaml":
-        die(2, f"only .yaml supported; got {path.suffix}")
-    data = load_task(path)
+    data: dict[str, Any] = {
+        "id": task_id,
+        "stream": stream,
+        "title": title,
+        "reporter": reporter or role,
+        "opened_at": now_iso(),
+        "priority": priority or "normal",
+    }
+    if stream == "product":
+        if not kind or not scope:
+            raise GreatMindsError("product stream needs --kind and --scope")
+        data["kind"] = kind
+        data["scope"] = scope
+    elif stream == "stand":
+        data["kind"] = "stand_request"
+        if not request_type:
+            raise GreatMindsError("stand stream needs --request-type")
+        data["request_type"] = request_type
+        data["target"] = {
+            "profile": profile or "full-deploy",
+            "hosts": hosts or [],
+        }
+        if evidence_for:
+            data["evidence_for"] = evidence_for
+    elif stream == "review_session":
+        data["kind"] = "review_session"
+        data["mode"] = mode or "B"
+        if not target_functionality:
+            raise GreatMindsError("review_session needs --target-functionality")
+        data["target_functionality"] = target_functionality
+        data["scenarios"] = scenarios or []
+
+    if description:
+        data["description"] = read_body(description)
+    data["blocks"] = []
+
+    in_q = in_queue or default_intake_queue(stream)
+    allowed = ALLOWED_INTAKE_QUEUES.get(stream, set())
+    if in_q not in allowed:
+        raise GreatMindsError(
+            f"--in-queue {in_q!r} not allowed for stream {stream!r}; "
+            f"allowed intake: {sorted(allowed)}"
+        )
+    target_path = coord / in_q / f"{task_id}.yaml"
+    if target_path.exists():
+        raise GreatMindsError(f"task {task_id} already exists at {target_path}")
+
     validate_task(data)
-    print(f"valid: {path}")
-    return 0
+
+    atomic_write_yaml(target_path, data)
+    journal_append(coord, {
+        "t": now_iso(),
+        "actor": role,
+        "task": task_id,
+        "from": "_new",
+        "to": in_q,
+        "reason": reason or f"new {stream} task",
+        "intent_id": "",
+    })
+    touch_heartbeat(coord, role)
+    return target_path
 
 
-def cmd_paths(args: argparse.Namespace) -> int:
+def move_task(*, task_id: str, to_queue: str, reason: str | None = None) -> str:
+    """Move a task between queues. Returns the resolved ``from_queue``."""
     coord = find_coord_dir()
-    canon = find_canon_dir()
-    print(f"coord:        {coord}")
-    print(f"canon:        {canon}")
-    print(f"intent_dir:   {coord / INTENT_DIR_NAME}")
-    print(f"journal:      {coord / JOURNAL_NAME}")
-    return 0
+    role = caller_role()
+    with task_file_lock(coord, task_id):
+        return _do_move(coord, role, task_id, to_queue, reason or "")
+
+
+def _do_move(coord: Path, role: str, task_id: str,
+             to_q: str, reason: str) -> str:
+    found = find_task(coord, task_id)
+    if found is None:
+        raise GreatMindsError(f"task {task_id} not found in any queue")
+    src_path, from_q = found
+
+    if from_q == to_q:
+        raise GreatMindsError(f"task already in {to_q}")
+
+    if to_q not in (schema().get("queues") or {}):
+        raise GreatMindsError(f"unknown destination queue: {to_q}")
+
+    data = load_task(src_path)
+    if data.get("_legacy_md"):
+        raise GreatMindsError(f"task {task_id} is legacy .md; migrate before moving", exit_code=2)
+
+    err = can_role_move(role, from_q, to_q, data)
+    if err is not None:
+        raise GreatMindsError(err, exit_code=3)
+
+    require_scope_match_on_routing(data, from_q, to_q)
+    require_target_readiness(data, from_q, to_q)
+
+    intent_path = intent_write(coord, role, task_id, from_q, to_q, reason)
+    intent_id = intent_path.stem.rsplit("-", 1)[-1]
+
+    dst_path = coord / to_q / src_path.name
+    try:
+        dst_path.parent.mkdir(parents=True, exist_ok=True)
+        os.rename(src_path, dst_path)
+    except OSError as exc:
+        intent_clear(intent_path)
+        raise GreatMindsError(f"mv failed: {exc}", exit_code=4)
+
+    intent_clear(intent_path)
+    journal_append(coord, {
+        "t": now_iso(),
+        "actor": role,
+        "task": task_id,
+        "from": from_q,
+        "to": to_q,
+        "reason": (reason or "")[:200],
+        "intent_id": intent_id,
+    })
+    touch_heartbeat(coord, role)
+    return from_q
+
+
+def append_block(
+    *,
+    task_id: str,
+    kind: str,
+    fields: dict[str, Any] | list[str] | None = None,
+    body: str | None = None,
+) -> Path:
+    """Append a typed block to an existing task.
+
+    ``fields`` may be a dict ``{"key": value, ...}`` or a list of
+    ``"key=value"`` strings (the latter is what comes from ``--field``
+    repeated flags on the CLI).
+
+    Returns the task's path.
+    """
+    coord = find_coord_dir()
+    role = caller_role()
+
+    with task_file_lock(coord, task_id):
+        found = find_task(coord, task_id)
+        if found is None:
+            raise GreatMindsError(f"task {task_id} not found")
+        src_path, queue = found
+        if src_path.suffix != ".yaml":
+            raise GreatMindsError(f"task {task_id} is legacy .md; migrate first", exit_code=2)
+        data = load_task(src_path)
+
+        require_block_acceptable_in_queue(queue, kind)
+        err = role_for_block_kind(role, kind, queue, data)
+        if err is not None:
+            raise GreatMindsError(err, exit_code=3)
+
+        block: dict[str, Any] = {
+            "kind": kind,
+            "by": role,
+            "at": now_iso(),
+        }
+        if isinstance(fields, dict):
+            for k, v in fields.items():
+                block[k] = v
+        else:
+            for kv in fields or []:
+                if "=" not in kv:
+                    raise GreatMindsError(f"--field expects key=value, got: {kv}")
+                k, v = kv.split("=", 1)
+                block[k] = coerce_value(k, v)
+        if body:
+            block[body_field_for(kind)] = read_body(body)
+
+        validate_block(data.get("stream") or "product", block)
+        require_block_cross_state(block, data)
+
+        new_blocks = list(data.get("blocks") or []) + [block]
+        new_data = dict(data)
+        new_data["blocks"] = new_blocks
+        validate_task(new_data)
+
+        atomic_write_yaml(src_path, new_data)
+        journal_append(coord, {
+            "t": now_iso(),
+            "actor": role,
+            "task": task_id,
+            "from": queue,
+            "to": queue,
+            "reason": f"append-block {kind}",
+            "intent_id": "",
+        })
+    touch_heartbeat(coord, role)
+    return src_path
 
 
 # ---------------------------------------------------------------------------
-# Entry
+# Click facade
 # ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# click facade — every legacy cmd_X(args) is wrapped into a click subcommand
-# of the `task` group. SimpleNamespace bridges click-options to the
-# argparse.Namespace shape the cmd_X bodies expect — keeps the 7 large
-# handler functions untouched.
-# ---------------------------------------------------------------------------
-
-import click
-from types import SimpleNamespace
 
 
 @click.group(help="task-file CRUD (intake, mv, append-block, show, list, validate)")
@@ -1198,6 +1142,30 @@ def task() -> None:
 
 
 _ALL_BLOCK_KINDS = sorted(set().union(*STREAM_BLOCK_KINDS.values()))
+
+
+def _split_multivalue(ctx, param, value):
+    """Click callback for list-typed options.
+
+    Click options don't natively accept space-separated values
+    (``--hosts X Y`` — argparse style — doesn't work). The supported forms are:
+
+      ``--hosts X --hosts Y``       (repeated flag — idiomatic click)
+      ``--hosts X,Y``               (one flag, comma-separated values)
+      ``--hosts X,Y --hosts Z``     (mix — flatten + split)
+
+    All collapse to a flat ``list[str]``. ``None`` if nothing was passed.
+    """
+    del ctx, param  # unused
+    if not value:
+        return None
+    out: list[str] = []
+    for v in value:
+        for piece in str(v).split(","):
+            piece = piece.strip()
+            if piece:
+                out.append(piece)
+    return out or None
 
 
 @task.command(name="new")
@@ -1213,81 +1181,140 @@ _ALL_BLOCK_KINDS = sorted(set().union(*STREAM_BLOCK_KINDS.values()))
 @click.option("--request-type", "request_type", default=None,
               type=click.Choice(sorted(STAND_REQUEST_TYPES)))
 @click.option("--profile", default=None, type=click.Choice(sorted(STAND_PROFILES)))
-@click.option("--hosts", multiple=True)
-@click.option("--evidence-for", "evidence_for", multiple=True)
+@click.option("--hosts", multiple=True, callback=_split_multivalue,
+              help="list of hosts; repeat the flag or comma-separate values")
+@click.option("--evidence-for", "evidence_for", multiple=True,
+              callback=_split_multivalue,
+              help="task ids this run is evidence for; repeat or comma-separate")
 @click.option("--mode", default=None, type=click.Choice(sorted(MODES)))
 @click.option("--target-functionality", "target_functionality", default=None)
-@click.option("--scenarios", multiple=True)
+@click.option("--scenarios", multiple=True, callback=_split_multivalue,
+              help="scenario IDs; repeat or comma-separate")
 @click.option("--description", default=None, help="literal | @file | - (stdin)")
 @click.option("--in-queue", "in_queue", default=None,
               help="destination queue (default depends on stream)")
 @click.option("--seq", default=None, help="override numeric id prefix")
 @click.option("--reason", default=None, help="journal reason")
-def _task_new(**kw) -> None:
-    # multiple=True → tuple; argparse-style code expects list-or-None
-    for k in ("hosts", "evidence_for", "scenarios"):
-        v = kw.get(k)
-        kw[k] = list(v) if v else None
-    rc = cmd_new(SimpleNamespace(**kw))
-    if rc:
-        raise click.exceptions.Exit(rc)
+def task_new(stream, title, reporter, priority, kind, scope,
+             request_type, profile, hosts, evidence_for,
+             mode, target_functionality, scenarios,
+             description, in_queue, seq, reason) -> None:
+    target_path = create_task(
+        stream=stream,
+        title=title,
+        reporter=reporter,
+        priority=priority,
+        kind=kind,
+        scope=scope,
+        request_type=request_type,
+        profile=profile,
+        hosts=hosts,
+        evidence_for=evidence_for,
+        mode=mode,
+        target_functionality=target_functionality,
+        scenarios=scenarios,
+        description=description,
+        in_queue=in_queue,
+        seq=seq,
+        reason=reason,
+    )
+    click.echo(f"created {target_path}")
 
 
 @task.command(name="mv")
-@click.argument("id")
+@click.argument("task_id", metavar="ID")
 @click.argument("to_queue")
 @click.option("--reason", default=None)
-def _task_mv(id, to_queue, reason) -> None:
-    rc = cmd_mv(SimpleNamespace(id=id, to_queue=to_queue, reason=reason))
-    if rc:
-        raise click.exceptions.Exit(rc)
+def task_mv(task_id, to_queue, reason) -> None:
+    from_q = move_task(task_id=task_id, to_queue=to_queue, reason=reason)
+    click.echo(f"moved {task_id}: {from_q} → {to_queue}")
 
 
 @task.command(name="append-block")
 @click.argument("kind", type=click.Choice(_ALL_BLOCK_KINDS))
-@click.option("--id", required=True)
-@click.option("--field", multiple=True, help="key=value (repeat)")
-@click.option("--body", default=None, help="literal | @file | - (stdin)")
-def _task_append_block(kind, id, field, body) -> None:
-    rc = cmd_append_block(SimpleNamespace(
-        kind=kind, id=id, field=list(field) if field else None, body=body,
-    ))
-    if rc:
-        raise click.exceptions.Exit(rc)
+@click.option("--id", "task_id", required=True)
+@click.option("--field", "fields", multiple=True, help="key=value (repeat)")
+@click.option("--body", default=None,
+              help="block body: literal text | @PATH (read file) | - (stdin)")
+@click.option("--body-file", "body_file", default=None,
+              help="block body file path (alias for --body @PATH; "
+                   "preserved for orchestrator and old-CLI compat)")
+def task_append_block(kind, task_id, fields, body, body_file) -> None:
+    if body is not None and body_file is not None:
+        raise click.UsageError("pass exactly one of --body or --body-file")
+    if body_file is not None:
+        body = "-" if body_file == "-" else f"@{body_file}"
+    src_path = append_block(
+        task_id=task_id,
+        kind=kind,
+        fields=list(fields) if fields else None,
+        body=body,
+    )
+    click.echo(f"appended {kind} block to {src_path}")
 
 
 @task.command(name="show")
-@click.argument("id")
-def _task_show(id) -> None:
-    rc = cmd_show(SimpleNamespace(id=id))
-    if rc:
-        raise click.exceptions.Exit(rc)
+@click.argument("task_id", metavar="ID")
+def task_show(task_id) -> None:
+    coord = find_coord_dir()
+    found = find_task(coord, task_id)
+    if found is None:
+        raise GreatMindsError(f"task {task_id} not found")
+    src_path, queue = found
+    prefix = "# queue" if src_path.suffix == ".yaml" else "# legacy .md, queue"
+    click.echo(f"{prefix}: {queue}")
+    click.echo(src_path.read_text(encoding="utf-8"))
 
 
 @task.command(name="list")
 @click.argument("queue")
-def _task_list(queue) -> None:
-    rc = cmd_list(SimpleNamespace(queue=queue))
-    if rc:
-        raise click.exceptions.Exit(rc)
+def task_list(queue) -> None:
+    coord = find_coord_dir()
+    # Heartbeat on read-only list — refreshes the running role's liveness
+    # check during long idle stretches. Best-effort; never blocks output.
+    try:
+        touch_heartbeat(coord, caller_role())
+    except GreatMindsError:
+        pass
+    qdir = coord / queue
+    if not qdir.is_dir():
+        raise GreatMindsError(f"queue {queue} not found")
+    for f in sorted(qdir.iterdir()):
+        if f.suffix not in (".yaml", ".md"):
+            continue
+        if f.name in ("_TEMPLATE.md", "_TEMPLATE.yaml"):
+            continue
+        click.echo(f.name)
 
 
 @task.command(name="validate")
-@click.option("--id", default=None)
-@click.option("--file", "file", default=None)
-def _task_validate(id, file) -> None:
-    if (id is None) == (file is None):
+@click.option("--id", "task_id", default=None)
+@click.option("--file", "file_path", default=None)
+def task_validate(task_id, file_path) -> None:
+    if (task_id is None) == (file_path is None):
         raise click.UsageError("exactly one of --id or --file is required")
-    rc = cmd_validate(SimpleNamespace(id=id, file=file))
-    if rc:
-        raise click.exceptions.Exit(rc)
+    coord = find_coord_dir()
+    if file_path is not None:
+        path = Path(file_path)
+    else:
+        found = find_task(coord, task_id)
+        if found is None:
+            raise GreatMindsError(f"task {task_id} not found")
+        path = found[0]
+    if path.suffix != ".yaml":
+        raise GreatMindsError(f"only .yaml supported; got {path.suffix}", exit_code=2)
+    validate_task(load_task(path))
+    click.echo(f"valid: {path}")
 
 
 @task.command(name="paths")
-def _task_paths() -> None:
-    rc = cmd_paths(SimpleNamespace())
-    if rc:
-        raise click.exceptions.Exit(rc)
+def task_paths() -> None:
+    coord = find_coord_dir()
+    canon = find_canon_dir()
+    click.echo(f"coord:        {coord}")
+    click.echo(f"canon:        {canon}")
+    click.echo(f"intent_dir:   {coord / INTENT_DIR_NAME}")
+    click.echo(f"journal:      {coord / JOURNAL_NAME}")
 
 
 if __name__ == "__main__":

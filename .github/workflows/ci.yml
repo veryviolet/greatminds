@@ -71,3 +71,8 @@ jobs:
           test -f /tmp/gm_ci_test/schema.yaml
           test -f /tmp/gm_ci_test/COORDINATE.md
           test -f /tmp/gm_ci_test/coordination/PROJECT.md
+
+      - name: install test deps + run pytest regression suite
+        run: |
+          .venv-test/bin/pip install --quiet pytest pyyaml
+          .venv-test/bin/pytest tests/ -v

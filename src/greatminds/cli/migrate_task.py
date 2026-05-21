@@ -40,8 +40,8 @@ from typing import Any
 import click
 import yaml
 
+from greatminds.core.errors import GreatMindsError
 from greatminds.core.paths import find_coord_dir
-from greatminds.core.util import die as _die_canonical
 
 
 def normalize_iso(value: Any) -> Any:
@@ -122,13 +122,16 @@ TERMINAL_QUEUES = ("verified", "archive", "stand_done", "bot_archive", "bot_veri
 
 
 def die(msg: str, code: int = 1) -> None:
-    """Adapter preserving this module's historical ``die(msg, code=1)`` signature.
+    """Raise :class:`GreatMindsError` with this module's historical
+    ``die(msg, code=1)`` signature.
 
-    ``greatminds.core.util.die`` itself takes ``(code, msg, *, prog=None)``;
-    every existing callsite below calls ``die("error message")`` and a few
-    pass ``code=N`` as a kwarg, so we adapt rather than rewrite every line.
+    The other modules raise ``GreatMindsError`` directly. This thin wrapper
+    is kept because every callsite below already uses ``die("...")`` /
+    ``die("...", code=N)`` — the rewrite would touch ~50 lines without
+    behavioural benefit. The raise still goes through ``GreatMindsError``,
+    so click catches it identically.
     """
-    _die_canonical(code, msg)
+    raise GreatMindsError(msg, exit_code=code)
 
 
 def split_md_chunks(text: str) -> list[str]:

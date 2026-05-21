@@ -58,11 +58,32 @@ def usage() -> None:
 
 
 def write_registry(role: str, sock_path: Path, tty_path: str, tool: str, pid: int) -> Path:
+    """Enrich the existing registry record with pty-launch's runtime info.
+
+    start_agent writes a pre-pty record with ``session_id`` and
+    ``session_new`` (it owns the session UUID). pty-launch then runs
+    inside the same execvp chain and rewrites the same file with
+    ``pid`` (the forked child's pid, not start_agent's) and the
+    ``input_sock`` path. We MERGE on top of the pre-existing record
+    rather than overwriting, so the session_id is preserved end-to-end
+    (otherwise downstream readers of the registry lose resume info).
+    """
     coord = find_coord_dir()
     registry = coord / ".agent_registry"
     registry.mkdir(parents=True, exist_ok=True)
     reg_file = registry / f"{role.lower()}.json"
-    reg = {
+
+    existing: dict = {}
+    if reg_file.is_file():
+        try:
+            existing = json.loads(reg_file.read_text(encoding="utf-8"))
+            if not isinstance(existing, dict):
+                existing = {}
+        except (OSError, json.JSONDecodeError):
+            existing = {}
+
+    enriched = {
+        **existing,
         "role": role,
         "tool": tool,
         "pid": pid,
@@ -70,7 +91,7 @@ def write_registry(role: str, sock_path: Path, tty_path: str, tool: str, pid: in
         "input_sock": str(sock_path),
         "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
-    reg_file.write_text(json.dumps(reg))
+    reg_file.write_text(json.dumps(enriched))
     return reg_file
 
 
@@ -253,5 +274,81 @@ def pty_launch(role: str, exec_binary: str, tool_args: tuple[str, ...]) -> None:
             pass
 
 
+def _pty_launch_impl(role: str, exec_binary: str, tool_args: list[str]) -> None:
+    """Pure-Python entry — invoked by ``__main__`` direct path so that
+    the ``--`` separator (which click strips during option parsing) is
+    preserved into the child process's argv. claude's ``--mcp-config``
+    is variadic and needs ``--`` to terminate it before the prompt.
+    """
+    tool = os.environ.get("GREATMINDS_REGISTRY_TOOL") or exec_binary
+
+    pid, master_fd = pty.fork()
+    if pid == 0:
+        try:
+            os.execvp(exec_binary, [exec_binary, *tool_args])
+        except OSError as exc:
+            print(f"pty-launch: exec {exec_binary} failed: {exc}", file=sys.stderr)
+            os._exit(127)
+
+    coord = find_coord_dir()
+    sock_path = coord / ".agent_registry" / f"{role.lower()}.sock"
+    sock_path.parent.mkdir(parents=True, exist_ok=True)
+    tty_path = os.ttyname(sys.stdin.fileno()) if os.isatty(sys.stdin.fileno()) else "none"
+    reg_file = write_registry(role, sock_path, tty_path, tool, pid)
+
+    stop_event = threading.Event()
+
+    sock_thread = threading.Thread(
+        target=serve_input_sock,
+        args=(sock_path, master_fd, stop_event),
+        daemon=True,
+    )
+    sock_thread.start()
+
+    def on_winch(signum, frame):
+        try:
+            import fcntl
+            import struct
+            sz = fcntl.ioctl(sys.stdout.fileno(), termios.TIOCGWINSZ, b"\0" * 8)
+            fcntl.ioctl(master_fd, termios.TIOCSWINSZ, sz)
+        except (OSError, ImportError):
+            pass
+
+    signal.signal(signal.SIGWINCH, on_winch)
+    on_winch(None, None)
+
+    try:
+        proxy_loop(master_fd, stop_event)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        stop_event.set()
+        try:
+            os.kill(pid, signal.SIGHUP)
+        except OSError:
+            pass
+        try:
+            os.waitpid(pid, 0)
+        except OSError:
+            pass
+        try:
+            reg_file.unlink()
+        except OSError:
+            pass
+        try:
+            sock_path.unlink()
+        except OSError:
+            pass
+
+
 if __name__ == "__main__":
-    pty_launch()
+    # ``python -m greatminds.cli.pty_launch ROLE EXEC_BINARY [args...]`` —
+    # the direct invocation path used by start_agent. Click would strip
+    # the ``--`` separator from variadic args here, breaking claude's
+    # ``--mcp-config ... -- PROMPT`` contract. Parse argv ourselves
+    # exactly when we're in the direct-exec form. ``--help`` / ``-h``
+    # still go through the click handler for proper help text.
+    if len(sys.argv) >= 3 and sys.argv[1] not in ("--help", "-h"):
+        _pty_launch_impl(sys.argv[1], sys.argv[2], sys.argv[3:])
+    else:
+        pty_launch()

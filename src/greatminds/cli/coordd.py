@@ -33,13 +33,14 @@ For a long-lived install, run via systemd-user; see bin/coordd-install.
 """
 from __future__ import annotations
 
-import argparse
 import json
 import os
 import signal
 import sys
 import time
 from pathlib import Path
+
+import click
 
 try:
     import yaml
@@ -390,25 +391,21 @@ def push_to_role(coord: Path, role: str, file_path: str, verbose: bool) -> bool:
     return False
 
 
-import click
-from types import SimpleNamespace
-
-
-@click.command(name="coordd", short_help="keystroke-pusher daemon (heartbeat-aware)",
+@click.command(name="coordd",
+               short_help="keystroke-pusher daemon (heartbeat-aware)",
                help=__doc__)
 @click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
-              default=None, help="project root containing coordination/ (default: cwd)")
+              default=None,
+              help="project root containing coordination/ (default: cwd)")
 @click.option("--interval-sec", type=float, default=1.0,
-              help="polling interval; 1.0 keeps CPU near zero on idle. Don't go below 0.2.")
+              help="polling interval; 1.0 keeps CPU near zero on idle. "
+                   "Don't go below 0.2.")
 @click.option("--verbose", "-v", is_flag=True)
 def coordd(project_dir: Path | None, interval_sec: float, verbose: bool) -> None:
     from greatminds.core.paths import find_canon_dir
 
     project_dir = project_dir or Path.cwd()
-    args = SimpleNamespace(project_dir=project_dir, interval_sec=interval_sec,
-                           verbose=verbose)
-
-    coord = args.project_dir / "coordination"
+    coord = project_dir / "coordination"
     if not coord.is_dir():
         click.echo(f"coordd: error: {coord} not found", err=True)
         raise click.exceptions.Exit(1)
@@ -417,7 +414,7 @@ def coordd(project_dir: Path | None, interval_sec: float, verbose: bool) -> None
     registry = coord / REGISTRY_DIR
     registry.mkdir(parents=True, exist_ok=True)
 
-    interval = max(0.2, float(args.interval_sec))
+    interval = max(0.2, float(interval_sec))
 
     # Graceful exit on SIGTERM / SIGINT
     stop = {"flag": False}
@@ -434,7 +431,7 @@ def coordd(project_dir: Path | None, interval_sec: float, verbose: bool) -> None
     # Per-file "known" tracking below still prevents repeated pushes for
     # the same file during one daemon lifetime.
     baseline: set[str] = set()
-    if args.verbose:
+    if verbose:
         pending = scan_inbox_files(inbox)
         print(
             f"coordd: watching {inbox}, registry {registry}, "
@@ -451,7 +448,7 @@ def coordd(project_dir: Path | None, interval_sec: float, verbose: bool) -> None
     # restart, which is fine.
     canon_dir = find_canon_dir()
     schema_roles = load_schema_roles(canon_dir)
-    if args.verbose:
+    if verbose:
         print(
             f"coordd: stale-kick enabled "
             f"(check every {STALE_CHECK_INTERVAL_SEC:.0f}s, "
@@ -486,14 +483,14 @@ def coordd(project_dir: Path | None, interval_sec: float, verbose: bool) -> None
                 subprocess.run(
                     [
                         *notify_invocation,
-                        "--project-dir", str(args.project_dir),
+                        "--project-dir", str(project_dir),
                     ],
                     check=False,
                     capture_output=True,
                     timeout=5,
                 )
             except Exception as exc:
-                if args.verbose:
+                if verbose:
                     print(f"coordd: notify_from_journal call failed: {exc}", file=sys.stderr)
 
             # Step 2: scan inbox/ for new files since last cycle, push
@@ -513,12 +510,12 @@ def coordd(project_dir: Path | None, interval_sec: float, verbose: bool) -> None
                 if role in NO_KEYSTROKE_INJECT_ROLES:
                     # chat-driven role: deliver the file (already on disk),
                     # but do NOT type into its live session.
-                    if args.verbose:
+                    if verbose:
                         print(f"  deliver-only (chat role, no keystroke): "
                               f"role={role} file={Path(path).name}",
                               file=sys.stderr)
                     continue
-                push_to_role(coord, role, path, args.verbose)
+                push_to_role(coord, role, path, verbose)
             # Drop known entries for files agents have processed and deleted.
             known &= current
 
@@ -546,7 +543,7 @@ def coordd(project_dir: Path | None, interval_sec: float, verbose: bool) -> None
                     if push_to_role(
                         coord, role_lower,
                         f"<stale-kick: heartbeat {age:.0f}s old>",
-                        args.verbose,
+                        verbose,
                     ):
                         last_kick[role_lower] = now_ts
 
@@ -585,22 +582,22 @@ def coordd(project_dir: Path | None, interval_sec: float, verbose: bool) -> None
                     try:
                         write_dead_report(coord, role, reg, now_ts)
                         last_dead_report[role] = now_ts
-                        if args.verbose:
+                        if verbose:
                             print(
                                 f"  dead-report: role={role} pid={pid} → inbox/maintainer/",
                                 file=sys.stderr,
                             )
                     except OSError as exc:
-                        if args.verbose:
+                        if verbose:
                             print(f"  dead-report failed for {role}: {exc}", file=sys.stderr)
         except KeyboardInterrupt:
             break
         except Exception as exc:
-            if args.verbose:
+            if verbose:
                 print(f"coordd: error in poll loop: {exc}", file=sys.stderr)
             time.sleep(1.0)
 
-    if args.verbose:
+    if verbose:
         print("coordd: exit", file=sys.stderr)
 
 

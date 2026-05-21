@@ -62,7 +62,6 @@ outside the terminal emulator. Disabled via ``GREATMINDS_START_AGENT_NOPTY=1``.
 
 from __future__ import annotations
 
-import argparse
 import json
 import os
 import re
@@ -70,12 +69,14 @@ import shutil
 import signal
 import subprocess
 import sys
-import time
 import uuid
 from pathlib import Path
 
+import click
+
+from greatminds.core.errors import GreatMindsError
 from greatminds.core.paths import find_canon_dir
-from greatminds.core.util import die, now_iso
+from greatminds.core.util import now_iso
 
 
 # ---------------------------------------------------------------------------
@@ -135,7 +136,7 @@ def render_prompt(role: str, project_dir: Path) -> str:
     )
     if proc.returncode != 0:
         sys.stderr.write(proc.stderr)
-        die(2, f"render-role failed for role {role}")
+        raise GreatMindsError(f"render-role failed for role {role}", exit_code=2)
     return proc.stdout.rstrip()
 
 
@@ -330,9 +331,6 @@ def build_cursor_argv(
 # ---------------------------------------------------------------------------
 
 
-import click
-
-
 @click.command(
     name="start-agent",
     short_help="launch ROLE as a TOOL agent (claude|codex|cursor)",
@@ -371,13 +369,16 @@ def start_agent(role: str, tool: str, mode: str, extra: tuple[str, ...]) -> None
             old_pid = old.get("pid")
             if isinstance(old_pid, int) and pid_alive(old_pid):
                 if os.environ.get("GREATMINDS_FORCE", "0") != "1":
-                    sys.stderr.write(
-                        f"error: {role} is already running (pid {old_pid}).\n"
+                    raise GreatMindsError(
+                        f"{role} is already running (pid {old_pid}). "
                         f"Close that terminal or run:  kill {old_pid}\n"
-                        f"Then re-run this command. (GREATMINDS_FORCE=1 to override.)\n"
+                        f"Then re-run this command. "
+                        f"(GREATMINDS_FORCE=1 to override.)"
                     )
-                    return 1
-                sys.stderr.write("  GREATMINDS_FORCE=1 set — proceeding anyway. Tool may still error.\n")
+                sys.stderr.write(
+                    "  GREATMINDS_FORCE=1 set — proceeding anyway. "
+                    "Tool may still error.\n"
+                )
         except (OSError, json.JSONDecodeError):
             pass
 
@@ -397,9 +398,23 @@ def start_agent(role: str, tool: str, mode: str, extra: tuple[str, ...]) -> None
         session_file.write_text(session_id + "\n", encoding="utf-8")
         session_new = True
 
-    # Write registry. Cleanup on signal — best-effort; if we ``execvp`` the
-    # tool, this process is replaced and the file outlives us. The next
-    # start_agent call will detect the stale entry via pid_alive() above.
+    def _cleanup_registry(*_args) -> None:
+        try:
+            registry_file.unlink()
+        except OSError:
+            pass
+
+    signal.signal(signal.SIGINT, lambda *_: (_cleanup_registry(), sys.exit(130)))
+    signal.signal(signal.SIGTERM, lambda *_: (_cleanup_registry(), sys.exit(143)))
+
+    # Pre-pty registry: minimal record so a concurrent start_agent's
+    # pid_alive() check above will refuse a duplicate launch. ``pty_launch``
+    # (if wrapping) rewrites this file after pty.fork() with the actual
+    # tool's pid AND ``input_sock``. If we skip pty wrapping
+    # (GREATMINDS_START_AGENT_NOPTY=1), this minimal record is what coordd
+    # sees — and coordd will fall back to /dev/pts writes (display only,
+    # NOT input — wake keystrokes won't reach the agent, which is the
+    # known limitation of running without pty-launch).
     registry_payload = {
         "role": role,
         "tool": tool,
@@ -410,15 +425,6 @@ def start_agent(role: str, tool: str, mode: str, extra: tuple[str, ...]) -> None
         "session_new": 1 if session_new else 0,
     }
     registry_file.write_text(json.dumps(registry_payload), encoding="utf-8")
-
-    def _cleanup_registry(*_args) -> None:
-        try:
-            registry_file.unlink()
-        except OSError:
-            pass
-
-    signal.signal(signal.SIGINT, lambda *_: (_cleanup_registry(), sys.exit(130)))
-    signal.signal(signal.SIGTERM, lambda *_: (_cleanup_registry(), sys.exit(143)))
 
     # Render the bootstrap prompt — on resume, replace with a short nudge.
     prompt = render_prompt(role, project_dir)
@@ -432,12 +438,15 @@ def start_agent(role: str, tool: str, mode: str, extra: tuple[str, ...]) -> None
         set_terminal_title(role)
 
     # pty-launch wrapper — exposes a unix socket that coordd writes to.
+    # Invoked via ``python -m greatminds.cli.pty_launch`` rather than a
+    # console-script binary: the 1.0.0 umbrella migration consolidated the
+    # console scripts down to a single ``greatminds`` entry-point, so the
+    # historical ``greatminds-pty-launch`` binary doesn't exist on PATH.
+    # Same pattern is used for render-role above. Set
+    # GREATMINDS_START_AGENT_NOPTY=1 to opt out (loses coordd keystroke
+    # injection — wake messages then sit in inbox until the agent's own
+    # ScheduleWakeup brings it back).
     use_pty = os.environ.get("GREATMINDS_START_AGENT_NOPTY", "0") != "1"
-    pty_bin = shutil.which("greatminds-pty-launch") if use_pty else None
-    if use_pty and pty_bin is None:
-        # No PTY wrapper available — fall back to direct exec. coordd
-        # keystroke injection won't work, but the agent itself runs fine.
-        use_pty = False
 
     # Build the per-tool command.
     if tool == "claude":
@@ -450,12 +459,11 @@ def start_agent(role: str, tool: str, mode: str, extra: tuple[str, ...]) -> None
         # cursor-agent operates on cwd — change into the project root.
         os.chdir(project_dir)
     else:
-        # argparse already validates choices; defensive guard for type-checkers.
-        die(2, f"unknown TOOL: {tool}")
-        return 2
+        # click.Choice already validates; defensive guard for type-checkers.
+        raise GreatMindsError(f"unknown TOOL: {tool}", exit_code=2)
 
     if use_pty:
-        cmd = [pty_bin, role, *cmd]
+        cmd = [sys.executable, "-m", "greatminds.cli.pty_launch", role, *cmd]
 
     # exec — replace this process image with the tool. atexit/finally won't
     # fire past this point; the registry file is left in place and reaped
@@ -464,7 +472,7 @@ def start_agent(role: str, tool: str, mode: str, extra: tuple[str, ...]) -> None
         os.execvp(cmd[0], cmd)
     except FileNotFoundError:
         _cleanup_registry()
-        die(127, f"{cmd[0]}: command not found")
+        raise GreatMindsError(f"{cmd[0]}: command not found", exit_code=127)
 
 
 if __name__ == "__main__":

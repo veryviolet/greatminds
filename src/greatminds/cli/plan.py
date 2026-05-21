@@ -10,21 +10,21 @@ Atomic 4-step chain:
 The chain stops at the first failing step and prints exactly where it
 stopped and what to do — never a silent partial failure.
 
-Only ``ARCHITECT-PLANNER`` may run this command (the GREATMINDS_ROLE env
-var is enforced; refusing other roles up-front avoids ambiguity).
+Only ``ARCHITECT-PLANNER`` may run this command (the ``GREATMINDS_ROLE``
+env var is enforced; refusing other roles up-front avoids ambiguity).
 """
 
 from __future__ import annotations
 
 import os
-import subprocess
-import sys
 from pathlib import Path
 
 import click
 
+from greatminds.cli._colors import info, ok
+from greatminds.cli.task import append_block, move_task
+from greatminds.core.errors import GreatMindsError
 from greatminds.core.paths import find_coord_dir
-from greatminds.cli._colors import err, info, ok
 
 
 SCOPE_QUEUE = {
@@ -32,16 +32,6 @@ SCOPE_QUEUE = {
     "ui":      "feature_ui_dev",
     "docs":    "feature_docs",
 }
-
-
-def run_task(*argv: str) -> int:
-    """Invoke ``greatminds task`` in a child process.
-
-    Uses ``python -m greatminds.cli.task`` so the call works regardless
-    of how greatminds was installed (pipx, system pip, project venv,
-    sourced env).
-    """
-    return subprocess.call([sys.executable, "-m", "greatminds.cli.task", *argv])
 
 
 def find_task_queue(coord: Path, task_id: str) -> str | None:
@@ -53,100 +43,128 @@ def find_task_queue(coord: Path, task_id: str) -> str | None:
     return None
 
 
-def _die(code: int, msg: str) -> None:
-    err(msg)
-    raise click.exceptions.Exit(code)
-
-
-@click.command(short_help="ARCHITECT-PLANNER: triage + plan + route in 4 atomic steps",
-               help=__doc__)
-@click.argument("id")
+@click.command(
+    short_help="ARCHITECT-PLANNER: triage + plan + route in 4 atomic steps",
+    help=__doc__,
+)
+@click.argument("task_id", metavar="ID")
 @click.option("--scope", required=True, type=click.Choice(sorted(SCOPE_QUEUE)))
 @click.option("--assignee-role", required=True)
 @click.option("--base-commit", required=True)
 @click.option("--plan-kind", required=True, type=click.Choice(["full", "bugfix"]))
 @click.option("--mode", required=True, type=click.Choice(["A", "B", "C"]))
-@click.option("--stand-required", required=True, type=click.Choice(["true", "false"]))
+@click.option("--stand-required", required=True,
+              type=click.Choice(["true", "false"]))
 @click.option("--stand-reason", default="")
 @click.option("--body", default=None, help="plan text (literal)")
-@click.option("--body-file", default=None, help="plan text: file path, or - for stdin")
+@click.option("--body-file", default=None,
+              help="plan text: file path, or - for stdin")
 @click.option("--triage", default=None, help="optional triage note")
 @click.option("--stop-at", type=click.Choice(["plan"]),
               help="stop after plan block; do not route to per-scope queue")
 @click.option("--audit-only", is_flag=True,
               help="READER audit (scope must be docs): no WRITER step — "
                    "route straight to feature_docs_review.")
-def plan(id: str, scope: str, assignee_role: str, base_commit: str,
-         plan_kind: str, mode: str, stand_required: str, stand_reason: str,
-         body: str | None, body_file: str | None, triage: str | None,
-         stop_at: str | None, audit_only: bool) -> None:
+def plan(task_id, scope, assignee_role, base_commit, plan_kind, mode,
+         stand_required, stand_reason, body, body_file, triage,
+         stop_at, audit_only) -> None:
     role = (os.environ.get("GREATMINDS_ROLE") or "").upper()
     if role != "ARCHITECT-PLANNER":
-        _die(3, f"only ARCHITECT-PLANNER may use greatminds plan (GREATMINDS_ROLE={role!r})")
+        raise GreatMindsError(
+            f"only ARCHITECT-PLANNER may use greatminds plan "
+            f"(GREATMINDS_ROLE={role!r})",
+            exit_code=3,
+        )
 
     if audit_only and scope != "docs":
-        _die(1, "--audit-only requires --scope docs (it is the READER audit path)")
+        raise GreatMindsError(
+            "--audit-only requires --scope docs (it is the READER audit path)"
+        )
 
     if stand_required == "true" and not stand_reason.strip():
-        _die(1, "--stand-required true requires --stand-reason")
+        raise GreatMindsError("--stand-required true requires --stand-reason")
     if not body and not body_file:
-        _die(1, "provide --body or --body-file")
+        raise GreatMindsError("provide --body or --body-file")
 
     coord = find_coord_dir()
-    where = find_task_queue(coord, id)
+    where = find_task_queue(coord, task_id)
     if where is None:
-        _die(1, f"task {id} not found in any queue")
+        raise GreatMindsError(f"task {task_id} not found in any queue")
     if where not in ("feature_inbox", "user_feedback"):
-        _die(1, f"task {id} is in {where}; plan only takes tasks "
-                "from feature_inbox or user_feedback")
+        raise GreatMindsError(
+            f"task {task_id} is in {where}; plan only takes tasks "
+            "from feature_inbox or user_feedback"
+        )
 
-    # 1. triage
+    # 1. triage block
     triage_body = triage or f"triaged for planning (scope:{scope})"
-    if run_task("append-block", "triage", "--id", id, "--body", triage_body) != 0:
-        _die(2, f"step 1/4 triage failed — task still in {where}, nothing moved")
+    try:
+        append_block(task_id=task_id, kind="triage", body=triage_body)
+    except GreatMindsError as exc:
+        raise GreatMindsError(
+            f"step 1/4 triage failed: {exc.message} — task still in {where}, "
+            f"nothing moved",
+            exit_code=2,
+        )
 
     # 2. mv → feature_plan
-    if run_task("mv", id, "feature_plan", "--reason", "triaged; planning") != 0:
-        _die(2, f"step 2/4 mv {where}→feature_plan failed — triage block written, "
-                f"task still in {where}")
+    try:
+        move_task(task_id=task_id, to_queue="feature_plan",
+                  reason="triaged; planning")
+    except GreatMindsError as exc:
+        raise GreatMindsError(
+            f"step 2/4 mv {where}→feature_plan failed: {exc.message} — "
+            f"triage block written, task still in {where}",
+            exit_code=2,
+        )
 
     # 3. plan block
-    plan_argv = [
-        "append-block", "plan", "--id", id,
-        "--field", f"base_commit={base_commit}",
-        "--field", f"assignee_role={assignee_role}",
-        "--field", f"stand_required={stand_required}",
-        "--field", f"plan_kind={plan_kind}",
-        "--field", f"mode={mode}",
-        "--field", "ready_for_implementation=true",
-    ]
+    fields: dict[str, object] = {
+        "base_commit": base_commit,
+        "assignee_role": assignee_role,
+        "stand_required": stand_required == "true",
+        "plan_kind": plan_kind,
+        "mode": mode,
+        "ready_for_implementation": True,
+    }
     if stand_reason.strip():
-        plan_argv += ["--field", f"stand_reason={stand_reason}"]
+        fields["stand_reason"] = stand_reason
     if audit_only:
-        plan_argv += ["--field", "audit_only=true"]
-    if body_file:
-        plan_argv += ["--body", "-" if body_file == "-" else f"@{body_file}"]
-    else:
-        plan_argv += ["--body", body]
-    if run_task(*plan_argv) != 0:
-        _die(2, f"step 3/4 plan block failed — task is in feature_plan; fix "
-                f"the field error and rerun just: greatminds task append-block "
-                f"plan --id {id} ... then greatminds task mv {id} "
-                f"{SCOPE_QUEUE[scope]}")
+        fields["audit_only"] = True
+
+    plan_body = body if body is not None else (
+        "-" if body_file == "-" else f"@{body_file}"
+    )
+    try:
+        append_block(task_id=task_id, kind="plan", fields=fields, body=plan_body)
+    except GreatMindsError as exc:
+        raise GreatMindsError(
+            f"step 3/4 plan block failed: {exc.message} — task is in "
+            f"feature_plan; fix the field error and rerun: greatminds task "
+            f"append-block plan --id {task_id} ... then greatminds task mv "
+            f"{task_id} {SCOPE_QUEUE[scope]}",
+            exit_code=2,
+        )
 
     if stop_at == "plan":
-        info(f"plan: {id} planned, left in feature_plan (--stop-at plan)")
+        info(f"plan: {task_id} planned, left in feature_plan (--stop-at plan)")
         return
 
-    # 4. route. audit-only docs tasks go straight to READER's queue
+    # 4. route. Audit-only docs tasks go straight to READER's queue.
     target = "feature_docs_review" if audit_only else SCOPE_QUEUE[scope]
     reason = ("route audit-only → READER" if audit_only
               else f"route scope:{scope}")
-    if run_task("mv", id, target, "--reason", reason) != 0:
-        _die(2, f"step 4/4 mv feature_plan→{target} failed — plan is valid "
-                f"and saved; rerun just: greatminds task mv {id} {target}")
+    try:
+        move_task(task_id=task_id, to_queue=target, reason=reason)
+    except GreatMindsError as exc:
+        raise GreatMindsError(
+            f"step 4/4 mv feature_plan→{target} failed: {exc.message} — "
+            f"plan is valid and saved; rerun: greatminds task mv {task_id} "
+            f"{target}",
+            exit_code=2,
+        )
 
-    ok(f"plan: {id} → {target} "
+    ok(f"plan: {task_id} → {target} "
        f"({'audit-only ' if audit_only else ''}scope:{scope} "
        f"assignee:{assignee_role})")
 

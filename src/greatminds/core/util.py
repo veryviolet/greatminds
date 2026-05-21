@@ -1,10 +1,9 @@
-"""Tiny shared utilities — error exit, UTC ISO timestamps, prog-name detection.
+"""Tiny shared utilities — ISO-8601 timestamps, prog-name, die().
 
-These are kept here (not duplicated per CLI module) so that bug-fixes propagate
-to every entry-point at once. Originally they were forked in nearly every
-``/opt/coordination/bin/*`` Python script with slightly different signatures
-(``die(code, msg)`` vs ``die(msg, code=1)``; per-script ``prog:`` prefix). This
-module normalises them.
+These are shared so that bug-fixes propagate to every entry-point at once.
+``die()`` raises :class:`greatminds.core.errors.GreatMindsError` so click's
+top-level handler picks it up uniformly. Callers don't need to know about
+exit codes — they pass an int, click formats the message and exits.
 """
 
 from __future__ import annotations
@@ -12,6 +11,8 @@ from __future__ import annotations
 import os
 import sys
 import time
+
+from greatminds.core.errors import GreatMindsError
 
 # UTC, second precision — matches the format used in every task-file
 # ``opened_at``, ``timestamp`` and journal entry. Don't change without
@@ -38,13 +39,14 @@ def prog_name() -> str:
     return "greatminds"
 
 
-def die(code: int, msg: str, *, prog: str | None = None) -> None:
-    """Print ``"<prog>: <msg>"`` to stderr and exit with ``code``.
+def die(code: int, msg: str, *, prog: str | None = None) -> "GreatMindsError":
+    """Raise :class:`GreatMindsError(msg, exit_code=code)`.
 
-    Behaves like ``sys.exit(code)`` after the message — callers that need the
-    type checker to see ``die`` as ``NoReturn`` may follow with
-    ``raise SystemExit`` (mypy quirk).
+    Historical callers wrote ``die(2, "bad value")`` expecting an exit-2.
+    Click catches ``GreatMindsError`` (a ``ClickException``) at the top
+    level, prints ``"Error: <msg>"`` to stderr, and exits with ``code``.
+    The ``prog`` argument is accepted for backward compatibility but
+    ignored — click owns the message format now.
     """
-    p = prog or prog_name()
-    print(f"{p}: {msg}", file=sys.stderr)
-    sys.exit(code)
+    del prog  # accepted for compat, click owns the prefix
+    raise GreatMindsError(msg, exit_code=code)
