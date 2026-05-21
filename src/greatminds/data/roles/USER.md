@@ -28,4 +28,4 @@ ARCHITECT-PLANNER — the user may discuss an idea before any task is filed.
 
 ## Bootstrap
 
-`<PROJECT_ROOT>/bin/render-role USER`
+`<PROJECT_ROOT>/greatminds render-role USER`

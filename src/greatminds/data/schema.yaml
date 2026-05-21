@@ -166,9 +166,9 @@ roles:
     heartbeat: heartbeat.architect-reviewer
     claims_from: [feature_review, feature_blocked]
     description: |
-      Final review with stand-evidence verification (via bin/gate_check
+      Final review with stand-evidence verification (via greatminds gate-check
       result in tests block), commit, push if policy allows. Owns
-      feature_blocked wake-up: runs bin/wake_check at start of each tick.
+      feature_blocked wake-up: runs greatminds wake-check at start of each tick.
   DEVELOPER:
     category: product
     launch_modes: [loop]
@@ -206,7 +206,7 @@ roles:
     claims_from: [feature_test]
     description: |
       Tests code on a deployed stand. Before mv to feature_review must
-      run bin/gate_check and record the result in the tests block.
+      run greatminds gate-check and record the result in the tests block.
   READER:
     category: product
     launch_modes: [loop]
@@ -275,8 +275,8 @@ roles:
 # the move is legal.
 # ---------------------------------------------------------------------------
 transitions:
-  # NOTE on `requires:` — this field is DOCUMENTARY (bin/task does not
-  # parse it; gating lives in bin/task require_target_readiness /
+  # NOTE on `requires:` — this field is DOCUMENTARY (greatminds task does not
+  # parse it; gating lives in greatminds task require_target_readiness /
   # validate_block). Names here must match the real block kind: the
   # triage block kind is `triage`, not `architect_triage_block`.
   - from: user_feedback
@@ -489,7 +489,7 @@ task_kinds:
       - test_result
       - stand_evidence
       - gate_check_result  # new: pass | fail | missing | n/a
-      - gate_check_at      # new: ISO timestamp of bin/gate_check run
+      - gate_check_at      # new: ISO timestamp of greatminds gate-check run
       - gate_check_commit  # new: commit checked against stand evidence
       - ready_for_review
     reader_block_required_fields:
@@ -596,7 +596,7 @@ scenarios:
 # ---------------------------------------------------------------------------
 # Watchdog thresholds
 #
-# Read by bin/watchdog. Times in seconds.
+# Read by greatminds watchdog. Times in seconds.
 # ---------------------------------------------------------------------------
 watchdog:
   heartbeat_stale_seconds: 600          # 10 min

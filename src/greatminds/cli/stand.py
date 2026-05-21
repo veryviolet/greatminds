@@ -135,44 +135,56 @@ def cmd_result(args: argparse.Namespace) -> int:
     return run_task(*mv_argv)
 
 
-def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="stand", description=__doc__.splitlines()[0])
-    sub = p.add_subparsers(dest="cmd", required=True)
-
-    pr = sub.add_parser("request", help="create stand_request")
-    pr.add_argument("--request-type", required=True,
-                    choices=["deploy", "restart", "rebuild", "smoke",
-                             "remote_sync", "gpu_check", "teardown"])
-    pr.add_argument("--profile", required=True,
-                    choices=["full-deploy", "vite-dev"])
-    pr.add_argument("--title", required=True)
-    pr.add_argument("--hosts", nargs="*")
-    pr.add_argument("--evidence-for", nargs="*",
-                    help="task ids that will use this stand's evidence")
-    pr.add_argument("--description", help="literal | @file | -")
-    pr.add_argument("--priority", choices=["low", "normal", "high"])
-    pr.add_argument("--reason", help="journal reason")
-    pr.set_defaults(func=cmd_request)
-
-    ps = sub.add_parser("result", help="record stand_result + mv to stand_done")
-    ps.add_argument("id")
-    ps.add_argument("--result", required=True, choices=["ok", "partial", "fail"])
-    ps.add_argument("--status", required=True,
-                    choices=["READY", "DEGRADED", "DOWN", "BLOCKED"])
-    ps.add_argument("--commit", required=True)
-    ps.add_argument("--profile", required=True, choices=["full-deploy", "vite-dev"])
-    ps.add_argument("--notes", help="literal | @file | -")
-    ps.add_argument("--reason", help="journal reason for mv")
-    ps.set_defaults(func=cmd_result)
-
-    return p
+import click
+from types import SimpleNamespace
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Entry point — wired up as ``greatminds-stand`` in pyproject.toml."""
-    args = build_parser().parse_args(argv)
-    return args.func(args)
+@click.group(help="stand_request stream — request a stand op, record result")
+def stand() -> None:
+    pass
+
+
+_REQUEST_TYPES = ["deploy", "restart", "rebuild", "smoke",
+                  "remote_sync", "gpu_check", "teardown"]
+_PROFILES = ["full-deploy", "vite-dev"]
+
+
+@stand.command(name="request")
+@click.option("--request-type", "request_type", required=True,
+              type=click.Choice(_REQUEST_TYPES))
+@click.option("--profile", required=True, type=click.Choice(_PROFILES))
+@click.option("--title", required=True)
+@click.option("--hosts", multiple=True)
+@click.option("--evidence-for", "evidence_for", multiple=True,
+              help="task ids that will use this stand's evidence")
+@click.option("--description", default=None, help="literal | @file | -")
+@click.option("--priority", default=None,
+              type=click.Choice(["low", "normal", "high"]))
+@click.option("--reason", default=None, help="journal reason")
+def _stand_request(**kw) -> None:
+    for k in ("hosts", "evidence_for"):
+        v = kw.get(k)
+        kw[k] = list(v) if v else None
+    rc = cmd_request(SimpleNamespace(**kw))
+    if rc:
+        raise click.exceptions.Exit(rc)
+
+
+@stand.command(name="result")
+@click.argument("id")
+@click.option("--result", required=True,
+              type=click.Choice(["ok", "partial", "fail"]))
+@click.option("--status", required=True,
+              type=click.Choice(["READY", "DEGRADED", "DOWN", "BLOCKED"]))
+@click.option("--commit", required=True)
+@click.option("--profile", required=True, type=click.Choice(_PROFILES))
+@click.option("--notes", default=None, help="literal | @file | -")
+@click.option("--reason", default=None, help="journal reason for mv")
+def _stand_result(**kw) -> None:
+    rc = cmd_result(SimpleNamespace(**kw))
+    if rc:
+        raise click.exceptions.Exit(rc)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    stand()

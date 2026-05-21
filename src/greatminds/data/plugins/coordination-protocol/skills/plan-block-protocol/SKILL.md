@@ -1,12 +1,12 @@
 ---
 name: plan-block-protocol
-description: Use when triaging a task into feature_plan, writing or reading a plan block, choosing scope routing (backend / ui / docs), setting mode (A=full feature, B=intensive review, C=fast UI), declaring stand_required, or deciding between parallel and serialised sub-tasks. Trigger on "plan block", "bin/plan", "feature_plan", "scope routing", "mode A/B/C", "depends_on", "audit_only", "stand_required", "ready_for_implementation".
+description: Use when triaging a task into feature_plan, writing or reading a plan block, choosing scope routing (backend / ui / docs), setting mode (A=full feature, B=intensive review, C=fast UI), declaring stand_required, or deciding between parallel and serialised sub-tasks. Trigger on "plan block", "greatminds plan", "feature_plan", "scope routing", "mode A/B/C", "depends_on", "audit_only", "stand_required", "ready_for_implementation".
 ---
 
 # Plan-block protocol
 
 A plan block authorises and parameterises implementation work. It is
-written by ARCHITECT-PLANNER (or the one-shot `bin/plan` wrapper) and
+written by ARCHITECT-PLANNER (or the one-shot `greatminds plan` wrapper) and
 read by every downstream role — implementers, TESTER, READER, REVIEWER.
 
 ## Required fields
@@ -61,11 +61,11 @@ read by every downstream role — implementers, TESTER, READER, REVIEWER.
 | `docs` | `feature_docs/` | TECHNICAL-WRITER |
 | `docs` + `audit_only=true` | `feature_docs_review/` | READER |
 
-`bin/plan` is the one-shot wrapper that does triage → feature_plan →
+`greatminds plan` is the one-shot wrapper that does triage → feature_plan →
 append plan-block → route in a single command:
 
 ```bash
-bin/plan <task-id> \
+greatminds plan <task-id> \
   --scope backend --assignee-role DEVELOPER \
   --base-commit "$(git rev-parse HEAD)" \
   --plan-kind full --mode A \
@@ -82,7 +82,7 @@ parallel feature_dev tasks both editing `app/datasources/manager.py`),
 - Task B → blocked block referencing `verified/<task-A-id>.yaml` →
   `feature_blocked/` (NOT `feature_dev/`)
 
-Wake-up: when Task A reaches `verified/`, AR runs `bin/wake_check` and
+Wake-up: when Task A reaches `verified/`, AR runs `greatminds wake-check` and
 moves Task B from `feature_blocked/` → `feature_dev/`.
 
 Mistake mode (0396/0397 precedent): parallel-dispatch of same-module

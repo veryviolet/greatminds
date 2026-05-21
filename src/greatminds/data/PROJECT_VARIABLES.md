@@ -78,7 +78,7 @@ Either is fine. The protocol has no preference.
 These env-var tokens are referenced by `mcp/canon.json` and by skill Bash blocks
 (`${TOKEN}` shell form) and may appear in `**Tokens used:**` paragraphs of skill
 bodies. Real values come from `<project>/coordination/PROJECT.env` (gitignored,
-secrets) which `bin/start_agent` sources before launching each Claude agent.
+secrets) which `greatminds start-agent` sources before launching each Claude agent.
 
 | Token                  | Meaning                                                                  | Example                                  |
 |------------------------|--------------------------------------------------------------------------|------------------------------------------|

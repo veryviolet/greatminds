@@ -1,31 +1,32 @@
-#!/usr/bin/env python3
 """Read-only watchdog for the coordination filesystem.
 
-Usage:
-    watchdog [--project-dir <dir>] [--canon-dir <dir>] [--quiet]
-
 Reports:
-  - heartbeat files older than schema.watchdog.heartbeat_stale_seconds
-  - orphaned intent files older than schema.watchdog.intent_orphan_seconds
-  - tasks in active queues older than task_stale_in_active_queue_seconds
-  - tasks in review queues older than task_stale_in_review_queue_seconds
+  - heartbeat files older than ``schema.watchdog.heartbeat_stale_seconds``
+  - orphaned intent files older than ``schema.watchdog.intent_orphan_seconds``
+  - tasks in active queues older than ``task_stale_in_active_queue_seconds``
+  - tasks in review queues older than ``task_stale_in_review_queue_seconds``
+  - registry entries whose ``pid`` is no longer alive
 
 ARCHITECT-REVIEWER is expected to run this at the start of every tick and
 follow up on flagged items. The watchdog never moves files or alters state.
 
-Exit code:
-  0 always (informational tool). --quiet only prints sections with findings.
+Exit code: 0 always (informational tool). ``--quiet`` only prints sections
+with findings.
 """
+
 from __future__ import annotations
 
-import argparse
 import json
 import os
-import sys
 import time
 from pathlib import Path
 
+import click
 import yaml
+
+from greatminds.core.paths import find_canon_dir
+from greatminds.cli._colors import err, info, ok, warn
+
 
 DEFAULT_THRESHOLDS = {
     "heartbeat_stale_seconds": 600,
@@ -57,36 +58,30 @@ def fmt_age(seconds: float) -> str:
     return f"{seconds / 86400:.1f}d"
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Entry point — wired up as ``greatminds-watchdog`` in pyproject.toml."""
-    from greatminds.core.paths import find_canon_dir
+@click.command(
+    short_help="report stale heartbeats / orphan intents / dead pids / stale tasks",
+    help=__doc__,
+)
+@click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
+              default=None, help="project root containing coordination/ (default: cwd)")
+@click.option("--canon-dir", type=click.Path(exists=True, file_okay=False, path_type=Path),
+              default=None, help="canon data directory (default: packaged greatminds.data)")
+@click.option("--quiet", is_flag=True, help="only print sections with findings")
+def watchdog(project_dir: Path | None, canon_dir: Path | None, quiet: bool) -> None:
+    project_dir = project_dir or Path.cwd()
+    canon_dir = canon_dir or find_canon_dir()
 
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--project-dir", type=Path, default=Path.cwd())
-    parser.add_argument(
-        "--canon-dir",
-        type=Path,
-        default=None,
-        help="canon data directory (default: packaged greatminds.data)",
-    )
-    parser.add_argument("--quiet", action="store_true")
-    args = parser.parse_args(argv)
-    if args.canon_dir is None:
-        args.canon_dir = find_canon_dir()
-
-    # Resolve coordination/: if --project-dir already points at a coordination/
-    # directory, use it directly; otherwise append coordination/.
-    if args.project_dir.name == "coordination" and (args.project_dir / "stand_requests").is_dir():
-        coord = args.project_dir
+    if project_dir.name == "coordination" and (project_dir / "stand_requests").is_dir():
+        coord = project_dir
     else:
-        coord = args.project_dir / "coordination"
+        coord = project_dir / "coordination"
     if not coord.is_dir():
-        print(f"error: {coord} not found", file=sys.stderr)
-        return 1
+        err(f"error: {coord} not found")
+        raise click.exceptions.Exit(1)
 
-    schema = load_schema(args.canon_dir)
+    schema = load_schema(canon_dir)
     thresholds = {**DEFAULT_THRESHOLDS, **(schema.get("watchdog") or {})}
-    queues = (schema.get("queues") or {})
+    queues = schema.get("queues") or {}
 
     now = time.time()
     findings = 0
@@ -103,12 +98,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if stale_heartbeats:
         findings += len(stale_heartbeats)
-        print(f"STALE HEARTBEATS ({len(stale_heartbeats)}, threshold {fmt_age(threshold)}):")
+        warn(f"STALE HEARTBEATS ({len(stale_heartbeats)}, threshold {fmt_age(threshold)}):")
         for name, age in stale_heartbeats:
-            print(f"  {name}: last touched {fmt_age(age)} ago")
-        print()
-    elif not args.quiet:
-        print(f"heartbeats: all fresh (threshold {fmt_age(threshold)})")
+            warn(f"  {name}: last touched {fmt_age(age)} ago")
+        click.echo()
+    elif not quiet:
+        info(f"heartbeats: all fresh (threshold {fmt_age(threshold)})")
 
     # ---- Orphaned intents
     threshold = thresholds["intent_orphan_seconds"]
@@ -121,16 +116,16 @@ def main(argv: list[str] | None = None) -> int:
                 orphans.append((f.name, age))
     if orphans:
         findings += len(orphans)
-        print(f"ORPHANED INTENTS ({len(orphans)}, threshold {fmt_age(threshold)}):")
+        warn(f"ORPHANED INTENTS ({len(orphans)}, threshold {fmt_age(threshold)}):")
         for name, age in orphans:
-            print(f"  {name}: {fmt_age(age)} old")
-        print()
-    elif not args.quiet:
-        print(f"intent/: 0 orphans (threshold {fmt_age(threshold)})")
+            warn(f"  {name}: {fmt_age(age)} old")
+        click.echo()
+    elif not quiet:
+        info(f"intent/: 0 orphans (threshold {fmt_age(threshold)})")
 
     # ---- Dead agent pids (registry says alive, /proc disagrees)
     registry_dir = coord / ".agent_registry"
-    dead_pids: list[tuple[str, int, str]] = []  # (role, pid, started_at)
+    dead_pids: list[tuple[str, int, str]] = []
     if registry_dir.is_dir():
         for f in sorted(registry_dir.glob("*.json")):
             try:
@@ -150,17 +145,17 @@ def main(argv: list[str] | None = None) -> int:
                 dead_pids.append((f.stem, pid_int, str(reg.get("started_at", "?"))))
     if dead_pids:
         findings += len(dead_pids)
-        print(f"DEAD AGENT PIDS ({len(dead_pids)}):")
+        warn(f"DEAD AGENT PIDS ({len(dead_pids)}):")
         for role, pid, started in dead_pids:
-            print(f"  {role}: pid={pid} dead (started_at: {started})")
-        print()
-    elif not args.quiet:
-        print("agent pids: all alive")
+            warn(f"  {role}: pid={pid} dead (started_at: {started})")
+        click.echo()
+    elif not quiet:
+        info("agent pids: all alive")
 
     # ---- Stale tasks per queue
     active_threshold = thresholds["task_stale_in_active_queue_seconds"]
     review_threshold = thresholds["task_stale_in_review_queue_seconds"]
-    stale_tasks: list[tuple[str, str, float]] = []  # (queue, name, age)
+    stale_tasks: list[tuple[str, str, float]] = []
 
     for queue_name, queue_meta in queues.items():
         if not isinstance(queue_meta, dict):
@@ -180,19 +175,17 @@ def main(argv: list[str] | None = None) -> int:
 
     if stale_tasks:
         findings += len(stale_tasks)
-        print(f"STALE TASKS ({len(stale_tasks)}):")
+        warn(f"STALE TASKS ({len(stale_tasks)}):")
         for queue, name, age in stale_tasks:
             t = review_threshold if queue in REVIEW_QUEUES else active_threshold
-            print(f"  {queue}/{name}: {fmt_age(age)} old (threshold {fmt_age(t)})")
-        print()
-    elif not args.quiet:
-        print("active queues: 0 stale tasks")
+            warn(f"  {queue}/{name}: {fmt_age(age)} old (threshold {fmt_age(t)})")
+        click.echo()
+    elif not quiet:
+        info("active queues: 0 stale tasks")
 
-    if findings == 0 and not args.quiet:
-        print("\nAll clear.")
-
-    return 0
+    if findings == 0 and not quiet:
+        ok("\nAll clear.")
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    watchdog()  # allows `python -m greatminds.cli.watchdog --help`

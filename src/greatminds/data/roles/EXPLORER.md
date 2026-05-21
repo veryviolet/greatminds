@@ -55,7 +55,7 @@ product**, not test output or doc text.
 
 ## Bootstrap
 
-`<PROJECT_ROOT>/bin/render-role EXPLORER`
+`<PROJECT_ROOT>/greatminds render-role EXPLORER`
 
 ## Canon skill plugin
 

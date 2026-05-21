@@ -6,7 +6,7 @@ description: "Use when deciding the next mv for a READER-claimed task — the tw
 # Audit-path vs post-write-path
 
 READER has two intake paths with sharply different routing rules.
-Confusing them is the most common READER mistake — and `bin/task`
+Confusing them is the most common READER mistake — and `greatminds task`
 will sometimes REFUSE the wrong mv, which is the safety net but
 slows things down. Get the routing right.
 
@@ -21,7 +21,7 @@ Look at the latest `plan` block in the task's YAML:
 
 You can also tell from history:
 - Audit-only: task came directly to feature_docs_review FROM
-  feature_plan (PLANNER routed via `bin/plan --audit-only`)
+  feature_plan (PLANNER routed via `greatminds plan --audit-only`)
 - Post-write: task came to feature_docs_review FROM feature_docs
   (after WRITER moved it)
 
@@ -46,16 +46,16 @@ Routing by outcome:
   WRITER with reader_review findings; WRITER iterates)
 
 ```bash
-bin/task append-block reader_review --id <id> \
+greatminds task append-block reader_review --id <id> \
   --field outcome=pass \
   --field scope="<scope desc>" \
   --body "..."
 
 # pass:
-bin/task mv <id> feature_review --reason "docs change approved"
+greatminds task mv <id> feature_review --reason "docs change approved"
 
 # fail/partial:
-bin/task mv <id> feature_docs --reason "back to WRITER per findings"
+greatminds task mv <id> feature_docs --reason "back to WRITER per findings"
 ```
 
 ## Audit-only path — full-surface vs reality
@@ -79,16 +79,16 @@ regardless of `outcome:` (pass, partial, or fail). Why:
   PLANNER to spawn a new WRITER task with specific fixes.
 
 ```bash
-bin/task append-block reader_review --id <id> \
+greatminds task append-block reader_review --id <id> \
   --field outcome=fail \
   --field scope="docs/admin-guide/identity-and-remotes.md" \
   --body "..."
 
-bin/task mv <id> feature_review --reason "audit complete; findings recorded"
+greatminds task mv <id> feature_review --reason "audit complete; findings recorded"
 ```
 
-If you try `bin/task mv <id> feature_docs` on an audit-only task,
-`bin/task` will refuse: "task is audit-only (no write plan); WRITER
+If you try `greatminds task mv <id> feature_docs` on an audit-only task,
+`greatminds task` will refuse: "task is audit-only (no write plan); WRITER
 can't act on it". That's the safety net mentioned above — heed it,
 re-route to feature_review.
 
@@ -97,7 +97,7 @@ re-route to feature_review.
 PLANNER reads your verified audit and decides:
 - If `outcome: pass`: nothing to do. Docs OK, audit confirms.
 - If `outcome: partial / fail`: PLANNER spawns a **separate** WRITER
-  task using `bin/plan --scope docs --assignee-role TECHNICAL-WRITER`
+  task using `greatminds plan --scope docs --assignee-role TECHNICAL-WRITER`
   with concrete edits derived from your findings. The WRITER task
   cites your verified audit as its source-of-requirements.
 
@@ -132,7 +132,7 @@ spawns a WRITER task; WRITER edits.
 ## Dependency on stand access
 
 For audit-only tasks that need a deployed stand to verify reality:
-- File `bin/stand request --evidence-for <id>` describing what state
+- File `greatminds stand request --evidence-for <id>` describing what state
   you need.
 - Wait for SK's stand_done before continuing audit.
 - Reference SK's stand_done commit in your findings (so REVIEWER can
@@ -146,7 +146,7 @@ behaviour, you may need to verify against the deployed UI.)
 ## Don't
 
 - Don't try to fold audit findings into a "fix" yourself.
-- Don't `mv → feature_docs` on an audit-only task. `bin/task` will
+- Don't `mv → feature_docs` on an audit-only task. `greatminds task` will
   refuse and you'll have wasted time.
 - Don't mark `outcome: pass` on a long audit if you didn't actually
   audit the whole scope — narrow the scope honestly and note what

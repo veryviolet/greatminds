@@ -1,6 +1,6 @@
 ---
 name: maintainer-vs-planner-routing
-description: Use when triaging USER asks or inter-role escalations to decide whether MAINTAINER or ARCHITECT-PLANNER should handle them. Covers the routing table, forwarding mechanics via bin/inbox, and the "when in doubt" defaults. Trigger on "USER asks", "triage", "route to planner", "route to maintainer", "forward inbox", "infra vs product".
+description: Use when triaging USER asks or inter-role escalations to decide whether MAINTAINER or ARCHITECT-PLANNER should handle them. Covers the routing table, forwarding mechanics via greatminds inbox, and the "when in doubt" defaults. Trigger on "USER asks", "triage", "route to planner", "route to maintainer", "forward inbox", "infra vs product".
 ---
 
 # MAINTAINER vs ARCHITECT-PLANNER routing
@@ -49,8 +49,8 @@ forward — don't drop and don't drag PLANNER's queue concerns into
 MAINTAINER scope (or vice versa).
 
 ```bash
-bin/inbox ack <original-message>      # acknowledge receipt
-bin/inbox send ARCHITECT-PLANNER --kind ask \
+greatminds inbox ack <original-message>      # acknowledge receipt
+greatminds inbox send ARCHITECT-PLANNER --kind ask \
   --task <task-if-any> \
   --about "forwarded: <original subject>" \
   --body "Forwarded from MAINTAINER queue — this is product/plan territory.\n\nOriginal body:\n<paste-or-summarise>"

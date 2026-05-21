@@ -23,10 +23,12 @@ Exit code:
 """
 from __future__ import annotations
 
-import argparse
 import re
-import sys
 from pathlib import Path
+
+import click
+
+from greatminds.core.paths import find_canon_dir
 
 import yaml
 
@@ -168,66 +170,65 @@ def get_task_commit(merged: dict) -> str | None:
     return None
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Entry point — wired up as ``greatminds-gate-check`` in pyproject.toml."""
-    from greatminds.core.paths import find_canon_dir
+@click.command(name="gate-check",
+               short_help="check stand-evidence gate for a product task",
+               help=__doc__)
+@click.argument("task_id")
+@click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
+              default=None, help="project root (default: cwd)")
+@click.option("--canon-dir", type=click.Path(exists=True, file_okay=False, path_type=Path),
+              default=None, help="canon data dir (default: packaged greatminds.data)")
+@click.option("-v", "--verbose", is_flag=True, help="print diagnostic reasons")
+def gate_check(task_id: str, project_dir: Path | None, canon_dir: Path | None,
+               verbose: bool) -> None:
+    from greatminds.cli._colors import err, info, ok, warn
 
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("task_id")
-    parser.add_argument("--project-dir", type=Path, default=Path.cwd())
-    parser.add_argument(
-        "--canon-dir",
-        type=Path,
-        default=None,
-        help="canon data directory (default: packaged greatminds.data)",
-    )
-    parser.add_argument("-v", "--verbose", action="store_true")
-    args = parser.parse_args(argv)
-    canon_dir = args.canon_dir if args.canon_dir is not None else find_canon_dir()
+    project_dir = project_dir or Path.cwd()
+    canon_dir = canon_dir or find_canon_dir()
 
     queues = load_schema_queues(canon_dir)
-    task_path = find_task_file(args.project_dir, args.task_id, queues)
+    task_path = find_task_file(project_dir, task_id, queues)
     if task_path is None:
-        print(f"error: task '{args.task_id}' not found in any queue", file=sys.stderr)
-        return 3
+        err(f"error: task '{task_id}' not found in any queue")
+        raise click.exceptions.Exit(3)
 
     blocks = split_yaml_blocks(
         task_path.read_text(encoding="utf-8"),
-        verbose_errors=args.verbose,
+        verbose_errors=verbose,
         source=str(task_path),
     )
     if not blocks:
-        print(f"error: no YAML blocks in {task_path}", file=sys.stderr)
-        return 3
+        err(f"error: no YAML blocks in {task_path}")
+        raise click.exceptions.Exit(3)
     merged = merge_blocks(blocks)
     plan = merged.get("plan")
     if not isinstance(plan, dict):
-        print("missing")
-        if args.verbose:
-            print(f"  reason: no plan block in {task_path}", file=sys.stderr)
-        return 2
+        info("missing")
+        if verbose:
+            warn(f"  reason: no plan block in {task_path}")
+        raise click.exceptions.Exit(2)
 
     stand_required = plan.get("stand_required")
     task_id_full = merged.get("id") or task_path.stem
 
     if stand_required is False or stand_required is None:
-        print("n/a")
-        if args.verbose:
-            print(f"  reason: plan.stand_required is {stand_required!r}", file=sys.stderr)
-        return 0
+        info("n/a")
+        if verbose:
+            warn(f"  reason: plan.stand_required is {stand_required!r}")
+        return
 
     if stand_required is not True:
-        print("missing")
-        if args.verbose:
-            print(f"  reason: plan.stand_required is {stand_required!r}, expected true/false", file=sys.stderr)
-        return 2
+        info("missing")
+        if verbose:
+            warn(f"  reason: plan.stand_required is {stand_required!r}, expected true/false")
+        raise click.exceptions.Exit(2)
 
-    candidates = find_stand_evidence(args.project_dir, str(task_id_full))
+    candidates = find_stand_evidence(project_dir, str(task_id_full))
     if not candidates:
-        print("missing")
-        if args.verbose:
-            print(f"  reason: no stand_done/*.md with evidence_for matching {task_id_full}", file=sys.stderr)
-        return 2
+        info("missing")
+        if verbose:
+            warn(f"  reason: no stand_done/*.md with evidence_for matching {task_id_full}")
+        raise click.exceptions.Exit(2)
 
     task_commit = get_task_commit(merged)
     pass_any = False
@@ -243,18 +244,22 @@ def main(argv: list[str] | None = None) -> int:
             fail_reasons.append(f"{path.name}: commit mismatch (stand={sr_commit!r}, task={task_commit!r})")
             continue
         pass_any = True
-        if args.verbose:
-            print(f"  matched: {path.name}", file=sys.stderr)
+        if verbose:
+            info(f"  matched: {path.name}")
         break
 
     if pass_any:
-        print("pass")
-        return 0
-    print("fail")
-    if args.verbose:
+        ok("pass")
+        return
+    warn("fail")
+    if verbose:
         for r in fail_reasons:
-            print(f"  {r}", file=sys.stderr)
-    return 1
+            warn(f"  {r}")
+    raise click.exceptions.Exit(1)
+
+
+if __name__ == "__main__":
+    gate_check()
 
 
 if __name__ == "__main__":

@@ -62,8 +62,8 @@ wants rapid iteration.
 
 ## Bootstrap
 
-- Pipeline: `<PROJECT_ROOT>/bin/render-role UI-DEVELOPER`
-- FAST:     `<PROJECT_ROOT>/bin/render-role UI-DEVELOPER-FAST`
+- Pipeline: `<PROJECT_ROOT>/greatminds render-role UI-DEVELOPER`
+- FAST:     `<PROJECT_ROOT>/greatminds render-role UI-DEVELOPER-FAST`
 
 ## Canon skill plugin
 

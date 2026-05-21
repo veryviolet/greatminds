@@ -26,7 +26,7 @@ matters; SK records it; impl quotes it.
 ```bash
 # In implementer's tick, after SK writes stand_done:
 GATE_SHA=$(grep '^commit:' coordination/stand_done/<id>.yaml | awk '{print $2}')
-bin/task append-block implementation --id <id> \
+greatminds task append-block implementation --id <id> \
   --field gate_check_commit="$GATE_SHA" \
   --field base_commit="$(git rev-parse HEAD)" \
   ...
@@ -87,7 +87,7 @@ do NOT unilaterally provision it on shared stand infrastructure. Do
 NOT curl-proxy through to fake the missing capability. Instead:
 
 ```bash
-bin/inbox send ARCHITECT-PLANNER --kind ask \
+greatminds inbox send ARCHITECT-PLANNER --kind ask \
   --task <id> --about "tooling-blocked smoke" \
   --body "Need <tool> on <host> for the <chain>; cannot self-provision on shared infra. Please decide: provision via SK, defer the chain, or use alternate verification path."
 ```

@@ -15,7 +15,7 @@ system. Each plugin lives in its own directory with the standard layout:
 - `role-<name>/` — per-role skills, loaded only when an agent runs as
   that `COORD_ROLE`.
 
-Loading is driven by `bin/start_agent`, which passes `--plugin-dir` per
+Loading is driven by `greatminds start-agent`, which passes `--plugin-dir` per
 session in the order: canon protocol → canon role → project overrides
 (`<project>/coordination/plugins.local/project-overrides`). Last
 `--plugin-dir` wins on skill name collision, so a project can shadow a

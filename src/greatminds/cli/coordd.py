@@ -390,30 +390,28 @@ def push_to_role(coord: Path, role: str, file_path: str, verbose: bool) -> bool:
     return False
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Entry point — wired up as ``greatminds-coordd`` in pyproject.toml."""
+import click
+from types import SimpleNamespace
+
+
+@click.command(name="coordd", short_help="keystroke-pusher daemon (heartbeat-aware)",
+               help=__doc__)
+@click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
+              default=None, help="project root containing coordination/ (default: cwd)")
+@click.option("--interval-sec", type=float, default=1.0,
+              help="polling interval; 1.0 keeps CPU near zero on idle. Don't go below 0.2.")
+@click.option("--verbose", "-v", is_flag=True)
+def coordd(project_dir: Path | None, interval_sec: float, verbose: bool) -> None:
     from greatminds.core.paths import find_canon_dir
 
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
-        "--project-dir",
-        type=Path,
-        default=Path.cwd(),
-        help="Project root containing coordination/ (default: cwd).",
-    )
-    parser.add_argument(
-        "--interval-sec",
-        type=float,
-        default=1.0,
-        help="Polling interval. 1.0 keeps CPU near zero on idle. Don't go below 0.2.",
-    )
-    parser.add_argument("--verbose", "-v", action="store_true")
-    args = parser.parse_args(argv)
+    project_dir = project_dir or Path.cwd()
+    args = SimpleNamespace(project_dir=project_dir, interval_sec=interval_sec,
+                           verbose=verbose)
 
     coord = args.project_dir / "coordination"
     if not coord.is_dir():
-        print(f"coordd: error: {coord} not found", file=sys.stderr)
-        return 1
+        click.echo(f"coordd: error: {coord} not found", err=True)
+        raise click.exceptions.Exit(1)
     inbox = coord / "inbox"
     inbox.mkdir(parents=True, exist_ok=True)
     registry = coord / REGISTRY_DIR
@@ -604,8 +602,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.verbose:
         print("coordd: exit", file=sys.stderr)
-    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    coordd()

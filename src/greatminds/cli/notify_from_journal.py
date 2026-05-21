@@ -22,15 +22,15 @@ producer's tick.
 """
 from __future__ import annotations
 
-import argparse
 import json
-import os
 import re
-import sys
 import time
 from pathlib import Path
 
+import click
 import yaml
+
+from greatminds.core.paths import find_canon_dir
 
 STATE_FILENAME = ".notify_state.json"
 INBOX_TEMPLATE = """---
@@ -200,32 +200,27 @@ def write_inbox(coord: Path, to_role: str, task: str, from_q: str, to_q: str, re
     path.write_text(body, encoding="utf-8")
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Entry point — wired up as ``greatminds-notify-journal`` in pyproject.toml."""
-    from greatminds.core.paths import find_canon_dir
+@click.command(name="notify-journal",
+               short_help="replay journal.ndjson → write inbox wake messages",
+               help=__doc__)
+@click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
+              default=None, help="project root (default: cwd)")
+@click.option("--canon-dir", type=click.Path(exists=True, file_okay=False, path_type=Path),
+              default=None, help="canon data dir (default: packaged greatminds.data)")
+@click.option("--once", is_flag=True,
+              help="replay ALL lines (backfill); default: only new lines")
+def notify_journal(project_dir: Path | None, canon_dir: Path | None, once: bool) -> None:
+    project_dir = project_dir or Path.cwd()
+    canon_dir = canon_dir or find_canon_dir()
 
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--project-dir", type=Path, default=Path.cwd())
-    parser.add_argument(
-        "--canon-dir",
-        type=Path,
-        default=None,
-        help="canon data directory (default: packaged greatminds.data)",
-    )
-    parser.add_argument("--once", action="store_true",
-                        help="Replay all lines (backfill). Default: only new lines.")
-    args = parser.parse_args(argv)
-    if args.canon_dir is None:
-        args.canon_dir = find_canon_dir()
-
-    coord = resolve_coord(args.project_dir)
+    coord = resolve_coord(project_dir)
     journal = coord / "journal.ndjson"
     if not journal.is_file():
-        return 0
+        return
 
     state_path = coord / STATE_FILENAME
     last_offset = 0
-    if not args.once and state_path.is_file():
+    if not once and state_path.is_file():
         try:
             st = json.loads(state_path.read_text(encoding="utf-8"))
             last_offset = int(st.get("offset", 0))
@@ -238,11 +233,11 @@ def main(argv: list[str] | None = None) -> int:
             new_bytes = f.read()
             new_offset = f.tell()
     except OSError:
-        return 0
+        return
 
-    schema = load_schema(args.canon_dir)
+    schema = load_schema(canon_dir)
     if not schema:
-        return 0
+        return
 
     for raw_line in new_bytes.decode("utf-8", errors="replace").splitlines():
         line = raw_line.strip()
@@ -267,14 +262,12 @@ def main(argv: list[str] | None = None) -> int:
             except OSError:
                 continue
 
-    if not args.once:
+    if not once:
         try:
             state_path.write_text(json.dumps({"offset": new_offset}), encoding="utf-8")
         except OSError:
             pass
 
-    return 0
-
 
 if __name__ == "__main__":
-    sys.exit(main())
+    notify_journal()

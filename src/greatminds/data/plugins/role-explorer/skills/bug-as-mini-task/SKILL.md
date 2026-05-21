@@ -9,10 +9,10 @@ The output of EXPLORER's exploration is **filed bugs** — concise,
 reproducible, scoped mini-tasks that PLANNER can triage rapidly and
 implementers can fix without further interrogation.
 
-## File via `bin/task new`
+## File via `greatminds task new`
 
 ```bash
-bin/task new \
+greatminds task new \
   --stream product \
   --in-queue feature_inbox \
   --kind bugfix \
@@ -43,7 +43,7 @@ Avoid:
 
 ## Body — reproduction first, observation second
 
-After `bin/task new` creates the task, append a triage-ready bug body
+After `greatminds task new` creates the task, append a triage-ready bug body
 via the task's initial block (kind: feedback or kind: bugfix-intake,
 depending on schema). Body structure:
 

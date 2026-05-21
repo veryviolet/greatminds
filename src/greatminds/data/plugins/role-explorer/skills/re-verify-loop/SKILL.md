@@ -83,7 +83,7 @@ original behaviour: PARTIAL.
 The fix might require a fresh-DB or fresh-session to be visible. If
 re-verifying without the bugfix-pass cleanup leads to confusing
 results:
-- File `bin/stand request` for a fresh-DB if your scenario justifies
+- File `greatminds stand request` for a fresh-DB if your scenario justifies
   it.
 - Otherwise note in re-verify result: "verified with previously-
   existing test data; may behave differently on greenfield state".

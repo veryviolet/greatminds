@@ -51,7 +51,7 @@ body: |
   Parent is verified by REVIEWER when ALL children reach verified/.
 ```
 
-Children are created via `bin/task new` and routed via `bin/plan` each.
+Children are created via `greatminds task new` and routed via `greatminds plan` each.
 The parent stays in `feature_review/` (or `feature_blocked/` if it
 should wait) until all children are verified.
 
@@ -97,7 +97,7 @@ For docs scope where the goal is "find out if docs match reality"
 to feature_docs_review (READER), skipping WRITER:
 
 ```bash
-bin/plan <task-id> --scope docs --assignee-role READER --audit-only \
+greatminds plan <task-id> --scope docs --assignee-role READER --audit-only \
   --base-commit "$(git rev-parse HEAD)" \
   --plan-kind full --mode A \
   --stand-required false \

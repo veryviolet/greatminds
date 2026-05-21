@@ -1,113 +1,97 @@
-#!/usr/bin/env python3
 """intent-clean — remove orphan intent files whose task has already moved.
 
 An intent file says "I'm about to mv <task> from <queue> to <queue>".
-After the mv, the agent is supposed to delete its intent. UI-DEVELOPER
-has been crashing mid-tick repeatedly and leaving intents behind. This
-script garbage-collects them: if the task is NOT in the intent's `from`
-queue any more, the mv has completed (or the task was withdrawn) and
-the intent is stale.
+After the mv, the agent is supposed to delete its intent. If an agent
+crashes mid-tick, its intent file is left behind. This command garbage-
+collects them: if the task is no longer in the intent's ``from`` queue,
+the mv has completed (or the task was withdrawn) and the intent is
+stale.
 
-Safety: only removes intents older than --min-age-sec (default 300).
+Safety: only removes intents older than ``--min-age-sec`` (default 300).
 Recently-created intents may be legitimate ongoing claims.
-
-Usage:
-  intent-clean [--project-dir <dir>] [--min-age-sec N] [--dry-run]
-
-Exit code 0 always. Prints what was removed.
 """
+
 from __future__ import annotations
 
-import argparse
 import json
 import os
-import sys
 import time
 from pathlib import Path
 
+import click
+
+from greatminds.cli._colors import info, ok, warn
+
 
 def task_in_queue(coord: Path, queue: str, task_id: str) -> bool:
-    """True if task_id.md exists in coord/queue/."""
+    """True if ``task_id.{md,yaml}`` exists in ``coord/queue/``."""
     qdir = coord / queue
     if not qdir.is_dir():
         return False
-    return (qdir / f"{task_id}.md").is_file()
+    return any((qdir / f"{task_id}.{ext}").is_file() for ext in ("yaml", "md"))
 
 
-def queue_name_from_intent_path(p: str) -> str:
-    """'coordination/feature_plan/' -> 'feature_plan'."""
-    s = p.strip().rstrip("/")
+def strip_coord_prefix(s: str) -> str:
     if s.startswith("coordination/"):
         s = s[len("coordination/"):]
     return s
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Entry point — wired up as ``greatminds-intent-clean`` in pyproject.toml."""
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--project-dir", type=Path, default=Path.cwd())
-    ap.add_argument("--min-age-sec", type=int, default=300,
-                    help="Only consider intents older than this. Default 300s.")
-    ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--quiet", action="store_true")
-    args = ap.parse_args(argv)
-
-    coord = args.project_dir / "coordination"
+@click.command(name="intent-clean", short_help="garbage-collect orphaned intent files", help=__doc__)
+@click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
+              default=None, help="project root (default: cwd)")
+@click.option("--min-age-sec", type=int, default=300,
+              help="only consider intents older than this; default 300s")
+@click.option("--dry-run", is_flag=True, help="report what would be removed; don't delete")
+@click.option("--quiet", is_flag=True, help="suppress summary line on no-ops")
+def intent_clean(project_dir: Path | None, min_age_sec: int, dry_run: bool, quiet: bool) -> None:
+    project_dir = project_dir or Path.cwd()
+    coord = project_dir / "coordination"
     if not coord.is_dir():
-        if not args.quiet:
-            print(f"intent-clean: error: {coord} not found", file=sys.stderr)
-        return 0
+        if not quiet:
+            warn(f"intent-clean: {coord} not found")
+        return
     idir = coord / "intent"
     if not idir.is_dir():
-        return 0
+        if not quiet:
+            info("intent/: no directory, nothing to do")
+        return
 
     now = time.time()
-    removed: list[str] = []
-    kept_active: list[str] = []
-    kept_recent: list[str] = []
-
-    for f in idir.glob("*.json"):
-        try:
-            age = now - f.stat().st_mtime
-        except OSError:
-            continue
-        if age < args.min_age_sec:
-            kept_recent.append(f.name)
+    removed = 0
+    kept_active = 0
+    kept_recent = 0
+    for f in sorted(idir.glob("*.json")):
+        age = now - f.stat().st_mtime
+        if age < min_age_sec:
+            kept_recent += 1
             continue
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            # malformed — leave it alone, don't delete arbitrary files
+            warn(f"  unparseable intent {f.name} (age {int(age)}s)")
             continue
-        if not isinstance(data, dict):
+        from_q = strip_coord_prefix(str(data.get("from", "")))
+        task_id = str(data.get("task", ""))
+        # If from-queue resolves and the task still sits there, the agent
+        # is in the middle of a (long) operation; do NOT delete.
+        if from_q and task_id and task_in_queue(coord, from_q, task_id):
+            kept_active += 1
             continue
-        task_id = data.get("task_id") or ""
-        from_q = queue_name_from_intent_path(data.get("from") or "")
-        if not task_id or not from_q:
-            continue
-        if task_in_queue(coord, from_q, task_id):
-            # task is still where the intent says it was — mv did NOT happen,
-            # intent is legitimate ongoing claim. Leave alone.
-            kept_active.append(f.name)
-            continue
-        # task is no longer in from_q — mv done (or task withdrawn). Stale.
-        if args.dry_run:
-            removed.append(f.name)
+        if dry_run:
+            info(f"  [dry] would remove {f.name} (age {int(age)}s, from {from_q})")
         else:
             try:
                 f.unlink()
-                removed.append(f.name)
-            except OSError:
-                pass
+                ok(f"  removed {f.name} (age {int(age)}s, from {from_q})")
+            except OSError as exc:
+                warn(f"  cannot unlink {f.name}: {exc}")
+                continue
+        removed += 1
 
-    if not args.quiet:
-        print(f"intent-clean: removed={len(removed)} "
-              f"kept_active={len(kept_active)} "
-              f"kept_recent={len(kept_recent)}")
-        for name in removed:
-            print(f"  - {name}")
-    return 0
+    if not quiet or removed:
+        info(f"intent-clean: removed={removed} kept_active={kept_active} kept_recent={kept_recent}")
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    intent_clean()

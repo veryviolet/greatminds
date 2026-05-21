@@ -3,11 +3,11 @@
 Append before moving the task INTO `feature_blocked/`. The current owner (the
 role that decided it cannot make progress) is responsible for writing this
 block, then performing the mv. After parking, the task is owned by
-ARCHITECT-REVIEWER for wake-up via bin/wake_check.
+ARCHITECT-REVIEWER for wake-up via greatminds wake-check.
 
 Format for `dependencies` is strict: each entry must be `<queue>/<task-id>.md`
 where `<queue>` is one of the queues listed in schema.yaml and `<task-id>` is
-a real file id (no slug-only form). bin/wake_check validates this format and
+a real file id (no slug-only form). greatminds wake-check validates this format and
 rejects free-form strings.
 
 `resume_to` must be a queue name from schema.yaml that the originating role

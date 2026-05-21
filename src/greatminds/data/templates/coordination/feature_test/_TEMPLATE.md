@@ -3,7 +3,7 @@
 # On test_result=fail|partial: append the same block but omit `ready_for_review: true` and instead
 # add a `## Tests (tester) — bugs found` section listing what failed; then mv feature_test/X → feature_dev/X.
 
-# Stand gate (new): if plan.stand_required: true, run bin/gate_check <task-id> BEFORE this mv.
+# Stand gate (new): if plan.stand_required: true, run greatminds gate-check <task-id> BEFORE this mv.
 # The result MUST appear as gate_check_result/at/commit below. ARCHITECT-REVIEWER refuses
 # to approve any stand-required task without gate_check_result: pass.
 
@@ -21,7 +21,7 @@ tests:
   test_result: pass | fail | partial
   stand_evidence: null | <stand_done/Y.md readiness plus checked host/profile/commit summary>
   gate_check_result: pass | fail | missing | n/a   # n/a only if plan.stand_required: false
-  gate_check_at: <ISO-8601 UTC of bin/gate_check invocation>
+  gate_check_at: <ISO-8601 UTC of greatminds gate-check invocation>
   gate_check_commit: <short sha verified against stand evidence; null if n/a>
   ready_for_review: true       # ONLY on test_result=pass AND gate_check_result in [pass, n/a]
 ---
@@ -33,7 +33,7 @@ commit/working tree and hosts/profile, then record TESTER-owned product checks
 with URLs/commands/screenshots/logs and caveats. Do not pass with old, blocked,
 wrong-host/profile, or unrelated stand readiness evidence.
 
-The gate_check_* fields above record the verified bin/gate_check run. If gate
+The gate_check_* fields above record the verified greatminds gate-check run. If gate
 returned `fail` or `missing`, do NOT set ready_for_review: true; either create
 the missing stand request or move the task to feature_blocked/ with explicit
 dependencies.

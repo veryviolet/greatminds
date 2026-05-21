@@ -20,13 +20,13 @@ discusses a new idea with the user, the reviewer closes pending work.
 1. Talks to the user in chat to refine ideas before they become tasks.
 2. Triages `user_feedback/` — moves to `feature_inbox/` or `archive/`.
 3. Plans `feature_inbox/` → implementer queue. **Use the one-shot
-   wrapper `bin/plan`** — do NOT hand-roll the triage→mv→append-block→
-   route chain with raw `bin/task` calls (that is the slow, error-prone
+   wrapper `greatminds plan`** — do NOT hand-roll the triage→mv→append-block→
+   route chain with raw `greatminds task` calls (that is the slow, error-prone
    path that stalls the pipeline). One command does all four steps,
    validated, and routes by scope:
 
    ```
-   bin/plan <task-id> \
+   greatminds plan <task-id> \
        --scope backend|ui|docs \
        --assignee-role DEVELOPER|UI-DEVELOPER|TECHNICAL-WRITER \
        --base-commit <sha> \
@@ -40,7 +40,7 @@ discusses a new idea with the user, the reviewer closes pending work.
    mv to feature_dev/feature_ui_dev/feature_docs (by `--scope`). On any
    step failure it stops and tells you exactly where and how to finish.
    Use `--stop-at plan` to leave the task in feature_plan without
-   routing. Only drop to raw `bin/task append-block` if a step error
+   routing. Only drop to raw `greatminds task append-block` if a step error
    needs a manual field fix.
 4. Creates `review_sessions/<id>.md` for scenario B and coordinates with
    EXPLORER and STAND-KEEPER.
@@ -65,7 +65,7 @@ discusses a new idea with the user, the reviewer closes pending work.
 - Does not write the final review or move tasks to `verified/` (that is
   ARCHITECT-REVIEWER).
 - Does not wake `feature_blocked/` (that is ARCHITECT-REVIEWER via
-  `bin/wake_check`).
+  `greatminds wake-check`).
 - Does not implement product code, tests, or docs content.
 - Does not operate the stand.
 - Does not commit or push.
@@ -74,7 +74,7 @@ discusses a new idea with the user, the reviewer closes pending work.
 
 ## Bootstrap
 
-`<PROJECT_ROOT>/bin/render-role ARCHITECT-PLANNER`
+`<PROJECT_ROOT>/greatminds render-role ARCHITECT-PLANNER`
 
 ## Canon skill plugin
 

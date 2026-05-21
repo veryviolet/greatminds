@@ -71,7 +71,7 @@ Profile choice comes from `target.profile` in the stand request.
   (note observations in `notes`, but triage is ARCHITECT-PLANNER's job)
 - Full end-to-end browser / Playwright product flows
 - Regression scenarios that EXPLORER would run
-- **`bin/gate_check`** — TESTER-only. You never invoke it. Just flip
+- **`greatminds gate-check`** — TESTER-only. You never invoke it. Just flip
   `stand_status: READY` after infra checks pass — `gate_check` runs
   itself on TESTER's next tick.
 
@@ -101,7 +101,7 @@ TESTER then runs the product checks after seeing your READY.
 
 ## Bootstrap
 
-`<PROJECT_ROOT>/bin/render-role STAND-KEEPER`
+`<PROJECT_ROOT>/greatminds render-role STAND-KEEPER`
 
 ## Canon skill plugin
 

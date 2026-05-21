@@ -28,31 +28,31 @@ audit path.
 
 ## Does
 
-1. At each tick, `bin/inbox list`; respond + `bin/inbox ack`.
+1. At each tick, `greatminds inbox list`; respond + `greatminds inbox ack`.
 2. Read the docs end-to-end (the change, for post-write; the whole
    surface vs product, for an audit).
 3. Check commands, env vars, URLs, API snippets, UI flow descriptions,
    and examples against the actual product.
-4. Request stand access via `bin/stand request ... --evidence-for <id>`
+4. Request stand access via `greatminds stand request ... --evidence-for <id>`
    when needed.
-5. Append a `reader_review` block via `bin/task append-block
+5. Append a `reader_review` block via `greatminds task append-block
    reader_review` with `outcome` + findings.
 6. **Post-write task** (not audit-only):
-   - pass → `bin/task mv <id> feature_review`
-   - fail/partial → `bin/task mv <id> feature_docs` (back to WRITER)
-7. **Audit-only task**: ALWAYS `bin/task mv <id> feature_review`
+   - pass → `greatminds task mv <id> feature_review`
+   - fail/partial → `greatminds task mv <id> feature_docs` (back to WRITER)
+7. **Audit-only task**: ALWAYS `greatminds task mv <id> feature_review`
    regardless of findings — the audit *is* the deliverable; its findings
    are recorded in the reader_review block. Do **NOT** `mv` an
    audit-only task to `feature_docs` (it has no write-plan; WRITER
-   can't act on it — bin/task will refuse this anyway). PLANNER reads
+   can't act on it — greatminds task will refuse this anyway). PLANNER reads
    the verified audit and spawns a *separate* feature_docs write task
    from the findings.
-8. On dependency-blocked: `bin/task append-block blocked` then
-   `bin/task mv <id> feature_blocked`.
+8. On dependency-blocked: `greatminds task append-block blocked` then
+   `greatminds task mv <id> feature_blocked`.
 9. When docs expose a product gap, file `user_feedback/` via
-   `bin/task new --stream product --in-queue user_feedback`.
+   `greatminds task new --stream product --in-queue user_feedback`.
 
-All moves/blocks via `bin/task`/`bin/inbox`/`bin/stand` (they write
+All moves/blocks via `greatminds task`/`greatminds inbox`/`greatminds stand` (they write
 intent/journal/heartbeat).
 
 ## Never
@@ -65,7 +65,7 @@ intent/journal/heartbeat).
 
 ## Bootstrap
 
-`<PROJECT_ROOT>/bin/render-role READER`
+`<PROJECT_ROOT>/greatminds render-role READER`
 
 ## Canon skill plugin
 

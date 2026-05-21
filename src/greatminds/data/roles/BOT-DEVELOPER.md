@@ -40,4 +40,4 @@ Per `<BOT_COMMIT_POLICY>`. Default in a product repo: no commit, no deploy.
 
 ## Bootstrap
 
-`<PROJECT_ROOT>/bin/render-role BOT-DEVELOPER`
+`<PROJECT_ROOT>/greatminds render-role BOT-DEVELOPER`

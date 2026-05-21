@@ -41,9 +41,9 @@ git add <changed paths> && git commit -m "<message>" && git push origin main
 cd <project>
 # bin/ usually symlinks back to canon, so no project-side commit needed.
 # Verify:
-ls -la bin/start_agent     # should be symlink → /opt/coordination/bin/start_agent
+ls -la greatminds start-agent     # should be symlink → /opt/coordination/greatminds start-agent
 # If symlinks are stale, re-run coord-init to refresh:
-/opt/coordination/bin/coord-init --project-dir "$(pwd)"
+/opt/coordination/greatminds setup --project-dir "$(pwd)"
 ```
 
 `coord-init` is idempotent: re-running it copies/links missing pieces
@@ -57,27 +57,27 @@ required field, removed transition), an in-flight task in the old
 shape will break. Pattern:
 
 1. **Silence.** Tell all roles to stop claiming new work — via
-   `bin/inbox send <each-role> --kind ask` with a "drain in flight,
+   `greatminds inbox send <each-role> --kind ask` with a "drain in flight,
    do not claim" instruction. Wait for in-flight tasks to reach
-   `verified/` or `feature_blocked/` — watch `bin/watchdog`.
+   `verified/` or `feature_blocked/` — watch `greatminds watchdog`.
 
 2. **Migrate.** Apply the canon schema change. If existing tasks
-   need to be rewritten (e.g., a renamed field), use `bin/migrate-task`
-   or a one-off migration script. Run `bin/watchdog` to confirm 0
+   need to be rewritten (e.g., a renamed field), use `greatminds migrate-task`
+   or a one-off migration script. Run `greatminds watchdog` to confirm 0
    stale tasks, 0 orphaned intents.
 
 3. **Restart fleet.** Stop all role agents (in tmux, `C-c` each
    window), then re-bootstrap:
    ```bash
    cd <project>
-   bin/coord-tmux --recreate    # kills old session, rebuilds windows
+   greatminds launch --target tmux --recreate    # kills old session, rebuilds windows
    tmux a -t agents
    # Press Enter in each window to restart on new schema.
    ```
    coordd is independent (systemd-user) — leave it running; it will
    pick up new sessions automatically.
 
-4. **Verify.** `bin/watchdog` shows: heartbeats fresh, 0 stale,
+4. **Verify.** `greatminds watchdog` shows: heartbeats fresh, 0 stale,
    0 orphans. One canary tick per role (any small task) confirms the
    new shape works.
 
@@ -93,8 +93,8 @@ git revert <cutover-commit>     # creates a clean revert commit
 git push origin main
 
 cd <project>
-/opt/coordination/bin/coord-init --project-dir "$(pwd)" --force  # reapply canon, with --force to clobber
-# Restart fleet on rolled-back schema (same C-c + bin/coord-tmux --recreate dance)
+/opt/coordination/greatminds setup --project-dir "$(pwd)" --force  # reapply canon, with --force to clobber
+# Restart fleet on rolled-back schema (same C-c + greatminds launch --target tmux --recreate dance)
 ```
 
 `git revert` (not `git reset`) preserves the history of what we tried
@@ -105,13 +105,13 @@ cd <project>
 Project's `bin/` directory is expected to be a set of symlinks pointing
 back to `/opt/coordination/bin/<name>`. If you replace a script in
 canon, projects pick up the change at the next invocation
-automatically. If you find a project where `bin/start_agent` is a
+automatically. If you find a project where `greatminds start-agent` is a
 **copy** (not symlink), that's a defect — fix with:
 
 ```bash
 cd <project>/bin
-ln -sf /opt/coordination/bin/start_agent start_agent
-# Confirm: readlink start_agent → /opt/coordination/bin/start_agent
+ln -sf /opt/coordination/greatminds start-agent start_agent
+# Confirm: readlink start_agent → /opt/coordination/greatminds start-agent
 ```
 
 **Tokens used:** none.

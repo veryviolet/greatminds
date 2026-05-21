@@ -1,6 +1,6 @@
 ---
 name: fsm-mechanics
-description: Use whenever moving, modifying, or inspecting a task in the coordination FSM. Covers the file-based queue model (location = ownership), bin/* as the only mutation path, heartbeat as a side-effect, intent/journal discipline, and the PreToolUse hook that physically blocks raw mv/Edit on coordination files. Trigger on "task move", "bin/task", "queue ownership", "schema.yaml", "intent file", "journal.ndjson", "heartbeat", "claim".
+description: Use whenever moving, modifying, or inspecting a task in the coordination FSM. Covers the file-based queue model (location = ownership), bin/* as the only mutation path, heartbeat as a side-effect, intent/journal discipline, and the PreToolUse hook that physically blocks raw mv/Edit on coordination files. Trigger on "task move", "greatminds task", "queue ownership", "schema.yaml", "intent file", "journal.ndjson", "heartbeat", "claim".
 ---
 
 # FSM mechanics
@@ -34,20 +34,20 @@ transitions tasks into these.
 
 Every mutation of a task file MUST go through one of:
 
-- `bin/task` — generic verb interface (`new`, `mv`, `append-block`, `show`, `list`)
-- `bin/inbox` — inter-role messaging (`send`, `list`, `ack`)
-- `bin/stand` — thin wrapper for the `stand_request` stream
-- `bin/plan` — one-shot PLANNER pipeline (triage → feature_plan → plan → route)
+- `greatminds task` — generic verb interface (`new`, `mv`, `append-block`, `show`, `list`)
+- `greatminds inbox` — inter-role messaging (`send`, `list`, `ack`)
+- `greatminds stand` — thin wrapper for the `stand_request` stream
+- `greatminds plan` — one-shot PLANNER pipeline (triage → feature_plan → plan → route)
 
 Raw `mv`, raw `Edit`, raw `Write` on any file under `coordination/`
 (queues, inbox/, task YAMLs) is **physically blocked** by the
-`PreToolUse` hook (`bin/stop_decide` rejects with a clear error).
+`PreToolUse` hook (`greatminds stop-decide` rejects with a clear error).
 Even if the hook is bypassed, the strict-schema validators inside the
 bin/* scripts reject malformed transitions.
 
 ## Side effects you get for free
 
-After a successful `bin/task <verb>` (or `bin/inbox` / `bin/stand`), the
+After a successful `greatminds task <verb>` (or `greatminds inbox` / `greatminds stand`), the
 following are guaranteed to have happened atomically (per-task
 fcntl-locked):
 
@@ -59,7 +59,7 @@ fcntl-locked):
 
 Do NOT touch any of these by hand. Specifically: do not
 `date > heartbeat.<role>` from a /loop role — it's a side-effect of
-bin/task work. Exception: chat-mode roles (ARCHITECT-PLANNER,
+greatminds task work. Exception: chat-mode roles (ARCHITECT-PLANNER,
 MAINTAINER) that don't move tasks each tick may touch their heartbeat
 manually when they act.
 
@@ -69,23 +69,23 @@ manually when they act.
 transitions (from→to with required block_kind and authoring role),
 block-kind required fields, task kinds. `bin/*` consults it on every
 mutation. If a transition you need is not in schema.yaml, do **not**
-add a manual `mv` — escalate to MAINTAINER via `bin/inbox send
+add a manual `mv` — escalate to MAINTAINER via `greatminds inbox send
 MAINTAINER --kind ask` to amend the schema.
 
 ## Quick references
 
 ```bash
 # Inspect a task without mutating
-bin/task show <id>
+greatminds task show <id>
 
 # Append a block (validates against schema)
-bin/task append-block <kind> --id <id> --field key=value ... --body "text"
+greatminds task append-block <kind> --id <id> --field key=value ... --body "text"
 
 # Move (validates that current role + block state authorise it)
-bin/task mv <id> <to-queue> --reason "<short reason>"
+greatminds task mv <id> <to-queue> --reason "<short reason>"
 
 # Sweep stale intent / heartbeat / orphans
-bin/watchdog --project-dir "${PROJECT_ROOT}"
+greatminds watchdog --project-dir "${PROJECT_ROOT}"
 ```
 
 **Tokens used:** PROJECT_ROOT (PROJECT.env, exported by start_agent).

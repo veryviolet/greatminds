@@ -38,4 +38,4 @@ queues. The mailbox `inbox/` is available if the project wires it up.
 
 ## Bootstrap
 
-`<PROJECT_ROOT>/bin/render-role BOT-USER`
+`<PROJECT_ROOT>/greatminds render-role BOT-USER`

@@ -31,7 +31,7 @@ messages.
 
 - **Owner:** MAINTAINER. Exclusively.
 - Everything under `~/.claude/`, `~/.codex/`, `coord-tmux`,
-  `bin/start_agent`, `bin/coordd`, `.agent_registry/`, `inbox/*/` —
+  `greatminds start-agent`, `greatminds coordd`, `.agent_registry/`, `inbox/*/` —
   MAINTAINER.
 
 ### 3. Canon
@@ -54,7 +54,7 @@ When something goes wrong, the diagnostic question is "which surface?".
 | `lattice-a` ssh refuses | Stand (host network) | escalate MAINTAINER → SK rebuild/replace |
 | Agent X process is dead | Fleet | MAINTAINER restart |
 | Coordd not delivering wake messages | Fleet | MAINTAINER diagnose coordd |
-| `bin/task` rejects valid input | Canon (script defect) | MAINTAINER fix bin/* |
+| `greatminds task` rejects valid input | Canon (script defect) | MAINTAINER fix bin/* |
 | Schema doesn't allow needed transition | Canon (schema gap) | MAINTAINER amend schema with cutover |
 | Skill not auto-invoking when relevant | Canon (skill description quality) | MAINTAINER tune SKILL.md description |
 | Test failure on stand because of stale code | Stand (deploy issue) | SK rebuild+restart |
@@ -75,7 +75,7 @@ When something goes wrong, the diagnostic question is "which surface?".
 ```bash
 # What surface am I looking at right now?
 echo "stand: $(curl -fsSL "${STAND_URL_A}/health" 2>&1 | head -1)"
-echo "fleet: $(bin/watchdog --project-dir "${PROJECT_ROOT}" 2>&1 | grep -E 'STALE|stale|orphan' | head -3)"
+echo "fleet: $(greatminds watchdog --project-dir "${PROJECT_ROOT}" 2>&1 | grep -E 'STALE|stale|orphan' | head -3)"
 echo "canon: $(git -C /opt/coordination log -1 --oneline)"
 ```
 

@@ -14,15 +14,15 @@ product-work committer.
 
 ## Does
 
-1. At the start of each tick, runs `<PROJECT_ROOT>/bin/wake_check` and
-   `<PROJECT_ROOT>/bin/watchdog`:
+1. At the start of each tick, runs `<PROJECT_ROOT>/greatminds wake-check` and
+   `<PROJECT_ROOT>/greatminds watchdog`:
    - moves ready-to-wake tasks from `feature_blocked/` to their `resume_to`,
    - flags malformed `dependencies` for follow-up,
    - notes orphaned intents and stale tasks.
 2. Reviews `feature_review/` by seq:
    - verifies the plan/implementation/tests/reader blocks,
    - if `plan.stand_required: true`, requires `tests.gate_check_result: pass`
-     (set by TESTER via `bin/gate_check`); refuses approve without it,
+     (set by TESTER via `greatminds gate-check`); refuses approve without it,
    - verifies `git status --short -- <declared paths>` matches,
    - approves: `git add -- <files>`, `git commit`, appends review block,
      `mv feature_review/X verified/X`, pushes if project policy requires.
@@ -38,7 +38,7 @@ product-work committer.
   ARCHITECT-PLANNER).
 - Does not implement product code, tests, or docs.
 - Does not operate the stand (uses `stand_requests/`).
-- Does not skip `bin/gate_check` for stand-required tasks; the gate is
+- Does not skip `greatminds gate-check` for stand-required tasks; the gate is
   evidence, not a courtesy.
 - Does not use `git add .` or stage paths outside the declared list.
 - Forbidden git ops: `git reset`, `git restore`, `git checkout` against
@@ -47,7 +47,7 @@ product-work committer.
 
 ## Bootstrap
 
-`<PROJECT_ROOT>/bin/render-role ARCHITECT-REVIEWER`
+`<PROJECT_ROOT>/greatminds render-role ARCHITECT-REVIEWER`
 
 ## Canon skill plugin
 

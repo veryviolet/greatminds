@@ -5,7 +5,7 @@ This block records stand operation/readiness only. It is not product acceptance
 or regression testing; TESTER performs product checks after readiness exists.
 
 The `evidence_for` field (new) lists the product task ids this stand run
-provides evidence for. bin/gate_check matches by this field. For pure
+provides evidence for. greatminds gate-check matches by this field. For pure
 infrastructure operations not tied to a product task, set `evidence_for: []`.
 
 ---

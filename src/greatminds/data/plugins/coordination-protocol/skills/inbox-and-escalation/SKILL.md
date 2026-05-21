@@ -1,33 +1,33 @@
 ---
 name: inbox-and-escalation
-description: Use when sending an inter-role message via bin/inbox, deciding whether to escalate to MAINTAINER vs ARCHITECT-PLANNER, classifying an inbox message as ask vs info, or acking incoming messages. Covers bin/inbox semantics, message kinds, the MAINTAINER-vs-PLANNER routing table for USER and agent escalations. Trigger on "bin/inbox", "inbox/<role>", "ask", "info", "escalate", "MAINTAINER", "PLANNER triage", "wake message".
+description: Use when sending an inter-role message via greatminds inbox, deciding whether to escalate to MAINTAINER vs ARCHITECT-PLANNER, classifying an inbox message as ask vs info, or acking incoming messages. Covers greatminds inbox semantics, message kinds, the MAINTAINER-vs-PLANNER routing table for USER and agent escalations. Trigger on "greatminds inbox", "inbox/<role>", "ask", "info", "escalate", "MAINTAINER", "PLANNER triage", "wake message".
 ---
 
 # Inbox and escalation
 
-`bin/inbox` is the inter-role messaging channel for **out-of-band**
+`greatminds inbox` is the inter-role messaging channel for **out-of-band**
 communication that doesn't fit into task-block authoring. Use it for:
 asks (need an answer), infos (FYI, no action needed), wake-up nudges
 (coordd auto-generates these from journal events).
 
-## bin/inbox API
+## greatminds inbox API
 
 ```bash
 # Send an ask to another role
-bin/inbox send MAINTAINER --kind ask \
+greatminds inbox send MAINTAINER --kind ask \
   --task <optional task id> \
   --about "<one-line subject>" \
   --body "<markdown body>"
 
 # Send an info (no action expected; acks for record-keeping)
-bin/inbox send ARCHITECT-PLANNER --kind info \
+greatminds inbox send ARCHITECT-PLANNER --kind info \
   --about "<subject>" --body "<body>"
 
 # List your inbox (uses $COORD_ROLE)
-bin/inbox list
+greatminds inbox list
 
 # Ack a message after reading + acting (renames wake-… to processed-…)
-bin/inbox ack <filename-or-absolute-path>
+greatminds inbox ack <filename-or-absolute-path>
 ```
 
 ## Message kinds
@@ -43,7 +43,7 @@ bin/inbox ack <filename-or-absolute-path>
 ## Inbox directory convention
 
 `coordination/inbox/<role-lowercase>/` — that's it. Lowercase role
-names ONLY (`technical-writer`, NOT `TECHNICAL-WRITER`). `bin/inbox`
+names ONLY (`technical-writer`, NOT `TECHNICAL-WRITER`). `greatminds inbox`
 lowercases inputs automatically; never craft a path with uppercase
 directly (legacy uppercase dirs were purged — see git history).
 
@@ -66,7 +66,7 @@ something outside your own queue, who do you send to?
 | READER findings → write task | ARCHITECT-PLANNER |
 
 When genuinely uncertain, MAINTAINER and PLANNER can forward to each
-other via `bin/inbox send <other> --kind ask`. Better to over-route
+other via `greatminds inbox send <other> --kind ask`. Better to over-route
 than under-route — silent drops are the worst outcome.
 
 ## When to send vs when to write a task block
@@ -74,7 +74,7 @@ than under-route — silent drops are the worst outcome.
 - Inter-role question about a specific task that doesn't change its
   status → **inbox ask** (e.g., "what did you mean by X in the plan?")
 - A finding that should change a task's state → **block** authored
-  via `bin/task append-block` (e.g., TESTER writes `tests` block with
+  via `greatminds task append-block` (e.g., TESTER writes `tests` block with
   outcome=fail; READER writes `reader_review` block).
 - Out-of-band notification (process / schema / infra) → **inbox info**
   or **ask**.

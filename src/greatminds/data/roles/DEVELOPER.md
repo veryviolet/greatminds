@@ -9,27 +9,27 @@ DEVELOPER implements backend/product-code tasks planned by ARCHITECT-PLANNER.
 
 ## Does
 
-1. At each tick, `bin/inbox list`; respond to cross-role messages and
-   `bin/inbox ack` handled ones.
+1. At each tick, `greatminds inbox list`; respond to cross-role messages and
+   `greatminds inbox ack` handled ones.
 2. Claims tasks from `feature_dev/` (already triaged, planned and routed
    there by ARCHITECT-PLANNER — the `plan` block with
    `ready_for_implementation: true` is present; scope is `backend` by
    construction of the queue). Do NOT look at `feature_plan/` — that is
-   PLANNER's queue, and `bin/task` will refuse the move anyway.
+   PLANNER's queue, and `greatminds task` will refuse the move anyway.
 3. Implements the plan in product code.
 4. Runs local focused sanity checks.
 5. For `plan.stand_required: true`, files a stand request with
-   `bin/stand request ... --evidence-for <task-id>`.
+   `greatminds stand request ... --evidence-for <task-id>`.
 6. Records any stand request id/result/caveat in the implementation block.
 7. If blocked only by named external dependencies:
-   `bin/task append-block blocked --id <id> --field
+   `greatminds task append-block blocked --id <id> --field
    dependencies=<queue>/<id>.yaml,... --field resume_to=feature_dev`
-   then `bin/task mv <id> feature_blocked`.
-8. All moves/blocks go through `bin/task` (and inbox via `bin/inbox`).
+   then `greatminds task mv <id> feature_blocked`.
+8. All moves/blocks go through `greatminds task` (and inbox via `greatminds inbox`).
    These write the intent file, journal line, and heartbeat as
    side-effects — do NOT hand-roll intent/journal/heartbeat.
-9. On completion: `bin/task append-block implementation --id <id> ...`
-   then `bin/task mv <id> feature_test`.
+9. On completion: `greatminds task append-block implementation --id <id> ...`
+   then `greatminds task mv <id> feature_test`.
 
 ## Never
 
@@ -37,7 +37,7 @@ DEVELOPER implements backend/product-code tasks planned by ARCHITECT-PLANNER.
 - Does not run deploy/restart/remote rsync directly; asks STAND-KEEPER.
 - Does not write tests as TESTER.
 - Does not validate implemented product features on a deployed stand;
-  TESTER does that via `bin/gate_check` + product checks.
+  TESTER does that via `greatminds gate-check` + product checks.
 - Does not commit or push.
 - Does not claim `scope: ui`, `scope: docs`, or `scope: stand`.
 - Does not append to, edit, or move task files outside DEVELOPER-owned
@@ -46,7 +46,7 @@ DEVELOPER implements backend/product-code tasks planned by ARCHITECT-PLANNER.
 
 ## Bootstrap
 
-`<PROJECT_ROOT>/bin/render-role DEVELOPER`
+`<PROJECT_ROOT>/greatminds render-role DEVELOPER`
 
 ## Canon skill plugin
 

@@ -36,7 +36,7 @@ Each arrow MUST satisfy a check.
 
 ```bash
 # What did the implementer claim?
-bin/task show <id> | yq -r '.blocks[] | select(.kind=="implementation") | .declared_files[]'
+greatminds task show <id> | yq -r '.blocks[] | select(.kind=="implementation") | .declared_files[]'
 
 # What did they actually change relative to impl's base_commit?
 git diff --name-only <impl_base_commit>..HEAD
@@ -65,7 +65,7 @@ ls coordination/stand_done/<id>*.yaml
 grep '^commit:' coordination/stand_done/<id>-*.yaml | awk '{print $2}'
 
 # Compare to impl-block's gate_check_commit
-bin/task show <id> | yq -r '.blocks[] | select(.kind=="implementation") | .gate_check_commit'
+greatminds task show <id> | yq -r '.blocks[] | select(.kind=="implementation") | .gate_check_commit'
 ```
 
 These MUST be equal. Mismatch means: impl-block was filed against a
@@ -77,13 +77,13 @@ stand_done at impl's commit.
 
 ```bash
 # Latest impl block's base_commit
-bin/task show <id> | yq -r '
+greatminds task show <id> | yq -r '
   [.blocks[] | select(.kind=="implementation" or .kind=="iteration")] |
   reverse | .[0].base_commit
 '
 
 # Tests-block base_commit
-bin/task show <id> | yq -r '.blocks[] | select(.kind=="tests") | .base_commit'
+greatminds task show <id> | yq -r '.blocks[] | select(.kind=="tests") | .base_commit'
 ```
 
 These MUST be equal. Mismatch means: TESTER ran against an older SHA
@@ -95,7 +95,7 @@ will land. REJECT (TESTER re-runs against current).
 For tasks with `scope: docs`:
 
 ```bash
-bin/task show <id> | yq -r '.blocks[] | select(.kind=="reader_review")'
+greatminds task show <id> | yq -r '.blocks[] | select(.kind=="reader_review")'
 ```
 
 Must exist. Its `scope:` field should reasonably cover what WRITER

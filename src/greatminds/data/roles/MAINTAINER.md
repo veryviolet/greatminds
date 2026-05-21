@@ -27,7 +27,7 @@ when it acts.
 
 1. At each session start, read inbox/maintainer/ and act on every ask:
    - **dead-pid from coordd** — diagnose (was it crash? rate-limit?
-     intentional?). Restart via `bin/start_agent <ROLE> <tool>` or
+     intentional?). Restart via `greatminds start-agent <ROLE> <tool>` or
      remove `.agent_registry/<role>.json` if intentional.
    - **stand-blocked escalation** — when STAND-KEEPER reports BLOCKED
      repeatedly, diagnose stand config / hosts / credentials.
@@ -46,7 +46,7 @@ when it acts.
 - Does not claim from any product queue.
 - Does not append product-task blocks (plan, implementation, tests,
   review, blocked) — those are role-specific (see schema.yaml,
-  bin/task BLOCK_KIND_ROLES).
+  greatminds task BLOCK_KIND_ROLES).
 - Does not modify task files outside of the bin/* mutations its own
   scripts perform.
 
@@ -62,7 +62,7 @@ when it acts.
 | "what's in canon, how to update bin/*" | MAINTAINER |
 
 When in doubt, MAINTAINER may forward to ARCHITECT-PLANNER via
-`bin/inbox send ARCHITECT-PLANNER --kind ask` (or vice versa).
+`greatminds inbox send ARCHITECT-PLANNER --kind ask` (or vice versa).
 
 ## Bootstrap (chat)
 
@@ -87,8 +87,8 @@ claude --resume <session-id>
 Find `<session-id>` as the newest jsonl in
 `~/.claude/projects/<project-slug>/`.
 
-**coord-tmux + registry.** `bin/start_agent MAINTAINER …` (the line
-`bin/coord-tmux` pre-fills) is NOT inherently the fresh path: like
+**coord-tmux + registry.** `greatminds start-agent MAINTAINER …` (the line
+`greatminds launch --target tmux` pre-fills) is NOT inherently the fresh path: like
 every role, it resumes when `coordination/.agent_registry/maintainer.session-id`
 exists (`claude --resume <uuid>`), and only starts fresh when that file
 is absent. So Enter on the pre-filled line continues the operator
@@ -101,7 +101,7 @@ resume the empty one. Before bring-up, ensure the file is correct:
 echo <intended-uuid> > coordination/.agent_registry/maintainer.session-id
 ```
 
-All other windows use the pre-filled `bin/start_agent` line as-is —
+All other windows use the pre-filled `greatminds start-agent` line as-is —
 they self-resume the same way from their own `<role>.session-id`.
 
 ## Canon skill plugin

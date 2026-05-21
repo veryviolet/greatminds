@@ -1,6 +1,6 @@
 ---
 name: wake-and-unblock
-description: Use when AR runs the per-tick wake sweep — bin/wake_check to find blocked tasks whose dependencies are now verified, and the special role of AR as the only one who can unstick permanent jams (terminal-queue rule violations). Trigger on "wake_check", "bin/wake_check", "feature_blocked", "unblock", "dependencies verified", "stuck task", "AR unstick".
+description: Use when AR runs the per-tick wake sweep — greatminds wake-check to find blocked tasks whose dependencies are now verified, and the special role of AR as the only one who can unstick permanent jams (terminal-queue rule violations). Trigger on "wake_check", "greatminds wake-check", "feature_blocked", "unblock", "dependencies verified", "stuck task", "AR unstick".
 ---
 
 # Wake-and-unblock
@@ -13,10 +13,10 @@ related operations:
 
 ## Routine wake sweep
 
-At each tick, run `bin/wake_check`:
+At each tick, run `greatminds wake-check`:
 
 ```bash
-bin/wake_check
+greatminds wake-check
 ```
 
 Output looks like:
@@ -37,7 +37,7 @@ blocked:
 For each ready-to-wake task, mv it to its `resume_to`:
 
 ```bash
-bin/task mv 0042-foo-task feature_dev --reason "deps 0040+0041 verified — woken"
+greatminds task mv 0042-foo-task feature_dev --reason "deps 0040+0041 verified — woken"
 ```
 
 That's it. Implementer's loop picks it up next tick.
@@ -70,26 +70,26 @@ Repair procedure:
 ls coordination/feature_blocked/
 
 # 2. Inspect its blocked block — find the bad dependency
-bin/task show <stuck-id> | grep -A5 'kind: blocked'
+greatminds task show <stuck-id> | grep -A5 'kind: blocked'
 
 # 3. Find where the dep actually went (likely verified/, possibly
 #    archive/ if it was archived for being misplanned)
 ls coordination/verified/ coordination/archive/ | grep <dep-id>
 
 # 4. AR rewrites the blocked block to point to the correct
-#    terminal-queue path. Use bin/task append-block to add a
+#    terminal-queue path. Use greatminds task append-block to add a
 #    REPAIR block; do not edit the blocked block in place.
-bin/task append-block blocked --id <stuck-id> \
+greatminds task append-block blocked --id <stuck-id> \
   --field dependencies=verified/<correct-dep-id>.yaml \
   --field resume_to=<original-resume-target> \
   --body "REPAIR: prior blocked block referenced feature_dev/<id> which migrated to verified. Replacing with terminal-queue path. (Per feedback_blocked_dep_terminal_path; this is AR-only repair.)"
 
 # 5. Re-run wake_check to confirm it's now ready
-bin/wake_check
+greatminds wake-check
 # Should now list this task in ready-to-wake
 
 # 6. mv as normal
-bin/task mv <stuck-id> <resume_to> --reason "post-AR-repair: deps verified"
+greatminds task mv <stuck-id> <resume_to> --reason "post-AR-repair: deps verified"
 ```
 
 The new blocked block ADDS to history (doesn't erase the bad one) —
@@ -104,7 +104,7 @@ that was never created, or the dependency reference was a hallucinated
 task id.
 
 ```bash
-bin/inbox send ARCHITECT-PLANNER --kind ask \
+greatminds inbox send ARCHITECT-PLANNER --kind ask \
   --task <stuck-id> \
   --about "feature_blocked task references nonexistent dep" \
   --body "Task <stuck-id> in feature_blocked declared dependency
@@ -130,14 +130,14 @@ when PLANNER's plan stabilises.
 ## Tick discipline for AR
 
 AR's tick pattern is roughly:
-1. `bin/wake_check` — wake what's ready, escalate jams
+1. `greatminds wake-check` — wake what's ready, escalate jams
 2. Process feature_review/ tasks in oldest-first order (evidence-chain
    verification, architectural review, commit+push, mv to verified)
 3. Process feature_blocked/ repairs if any (see above)
 4. Read inbox if any (asks from other roles or coordd)
 
 That's the steady-state. heartbeat is updated as a side effect of
-bin/task / bin/inbox / bin/wake_check; AR doesn't touch it directly.
+greatminds task / greatminds inbox / greatminds wake-check; AR doesn't touch it directly.
 
 ## Don't
 
@@ -145,7 +145,7 @@ bin/task / bin/inbox / bin/wake_check; AR doesn't touch it directly.
   list them ready. The deps aren't satisfied; mv'ing breaks the
   chain.
 - Don't edit the blocked block in place (no Edit on coordination
-  files). Use `bin/task append-block blocked` to add a REPAIR block;
+  files). Use `greatminds task append-block blocked` to add a REPAIR block;
   the old block stays as history.
 - Don't fabricate verified/<id>.yaml entries by `touch`ing them to
   "satisfy" the wake_check. That's lying to the protocol; downstream

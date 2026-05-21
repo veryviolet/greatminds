@@ -221,36 +221,52 @@ def cmd_ack(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 
 
-def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="inbox", description=__doc__.splitlines()[0])
-    sub = p.add_subparsers(dest="cmd", required=True)
-
-    ps = sub.add_parser("send", help="send a message")
-    ps.add_argument("to", help="destination role")
-    ps.add_argument("--kind", required=True, choices=sorted(KINDS))
-    ps.add_argument("--task", help="task id ref")
-    ps.add_argument("--body", help="literal | @file | - (stdin)")
-    ps.set_defaults(func=cmd_send)
-
-    pl = sub.add_parser("list", help="list pending messages")
-    pl.add_argument("role", nargs="?", help="role (default: caller)")
-    pl.set_defaults(func=cmd_list)
-
-    psh = sub.add_parser("show", help="print one message")
-    psh.add_argument("path")
-    psh.set_defaults(func=cmd_show)
-
-    pa = sub.add_parser("ack", help="mark message processed")
-    pa.add_argument("path")
-    pa.set_defaults(func=cmd_ack)
-
-    return p
+import click
+from types import SimpleNamespace
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Entry point — wired up as ``greatminds-inbox`` in pyproject.toml."""
-    args = build_parser().parse_args(argv)
-    return args.func(args)
+@click.group(help="inter-role inbox messaging (wake/ask/info)")
+def inbox() -> None:
+    pass
+
+
+@inbox.command(name="send")
+@click.argument("to")
+@click.option("--kind", required=True, type=click.Choice(sorted(KINDS)))
+@click.option("--task", default=None, help="task id ref")
+@click.option("--body", default=None, help="literal | @file | - (stdin)")
+def _inbox_send(to, kind, task, body) -> None:
+    rc = cmd_send(SimpleNamespace(to=to, kind=kind, task=task, body=body))
+    if rc:
+        raise click.exceptions.Exit(rc)
+
+
+@inbox.command(name="list")
+@click.argument("role", required=False)
+def _inbox_list(role) -> None:
+    rc = cmd_list(SimpleNamespace(role=role))
+    if rc:
+        raise click.exceptions.Exit(rc)
+
+
+@inbox.command(name="show")
+@click.argument("path")
+def _inbox_show(path) -> None:
+    rc = cmd_show(SimpleNamespace(path=path))
+    if rc:
+        raise click.exceptions.Exit(rc)
+
+
+@inbox.command(name="ack")
+@click.argument("path")
+def _inbox_ack(path) -> None:
+    rc = cmd_ack(SimpleNamespace(path=path))
+    if rc:
+        raise click.exceptions.Exit(rc)
+
+
+if __name__ == "__main__":
+    inbox()
 
 
 if __name__ == "__main__":

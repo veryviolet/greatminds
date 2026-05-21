@@ -13,7 +13,7 @@ ARCHITECT-PLANNER decides so.
 
 ## Does
 
-1. At each tick, `bin/inbox list`; respond + `bin/inbox ack`.
+1. At each tick, `greatminds inbox list`; respond + `greatminds inbox ack`.
 2. Claims tasks from `feature_docs/` (already triaged, planned and
    routed there by ARCHITECT-PLANNER — `plan` block with
    `ready_for_implementation: true` present; scope is `docs` by
@@ -26,11 +26,11 @@ ARCHITECT-PLANNER decides so.
 5. Requests `stand_requests/` (with `evidence_for: [<task-id>]`) when docs
    preview or live system access is needed.
 6. Runs `<DOCS_BUILD_CMD>` if defined.
-7. On completion: `bin/task append-block implementation --id <id> ...`
-   then `bin/task mv <id> feature_docs_review`.
-8. On dependency-blocked: `bin/task append-block blocked` (strict
-   `dependencies` + `resume_to`) then `bin/task mv <id> feature_blocked`.
-   All moves/blocks via `bin/task`/`bin/inbox`; they handle
+7. On completion: `greatminds task append-block implementation --id <id> ...`
+   then `greatminds task mv <id> feature_docs_review`.
+8. On dependency-blocked: `greatminds task append-block blocked` (strict
+   `dependencies` + `resume_to`) then `greatminds task mv <id> feature_blocked`.
+   All moves/blocks via `greatminds task`/`greatminds inbox`; they handle
    intent/journal/heartbeat — do not hand-roll them.
 
 ## Never
@@ -44,7 +44,7 @@ ARCHITECT-PLANNER decides so.
 
 ## Bootstrap
 
-`<PROJECT_ROOT>/bin/render-role TECHNICAL-WRITER`
+`<PROJECT_ROOT>/greatminds render-role TECHNICAL-WRITER`
 
 ## Canon skill plugin
 

@@ -31,15 +31,13 @@ Unknown fields are preserved verbatim under their original key.
 
 from __future__ import annotations
 
-import argparse
 import datetime
-import os
 import re
-import sys
 import uuid
 from pathlib import Path
 from typing import Any
 
+import click
 import yaml
 
 from greatminds.core.paths import find_coord_dir
@@ -316,16 +314,17 @@ def write_yaml_atomic(path: Path, data: dict[str, Any]) -> None:
             pass
 
 
-def collect_targets(args: argparse.Namespace) -> list[Path]:
-    if args.file:
-        return [Path(args.file).resolve()]
+def collect_targets(file: str | None, queue: str | None, all_flag: bool,
+                    include_terminal: bool) -> list[Path]:
+    if file:
+        return [Path(file).resolve()]
     coord = find_coord_dir()
     queues: list[str] = []
-    if args.queue:
-        queues = [args.queue]
-    elif args.all:
+    if queue:
+        queues = [queue]
+    elif all_flag:
         queues = list(ACTIVE_QUEUES)
-        if args.include_terminal:
+        if include_terminal:
             queues += list(TERMINAL_QUEUES)
     else:
         die("specify --file FILE, --queue QUEUE, or --all")
@@ -341,39 +340,41 @@ def collect_targets(args: argparse.Namespace) -> list[Path]:
     return out
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Entry point — wired up as ``greatminds-migrate-task`` in pyproject.toml."""
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    g = ap.add_mutually_exclusive_group()
-    g.add_argument("--file", help="single .md file to migrate")
-    g.add_argument("--queue", help="migrate all .md in this queue")
-    g.add_argument("--all", action="store_true",
-                   help="migrate every .md in active queues")
-    ap.add_argument("--include-terminal", action="store_true",
-                    help="with --all, also include verified/archive/stand_done/...")
-    ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--keep-md", action="store_true",
-                    help="don't rename original .md to .md.legacy")
-    ap.add_argument("--force", action="store_true",
-                    help="overwrite existing .yaml")
-    args = ap.parse_args(argv)
-
-    targets = collect_targets(args)
+@click.command(name="migrate-task",
+               short_help="convert legacy .md task files to strict .yaml",
+               help=__doc__)
+@click.option("--file", "file", default=None, help="single .md file to migrate")
+@click.option("--queue", default=None, help="migrate all .md in this queue")
+@click.option("--all", "all_flag", is_flag=True,
+              help="migrate every .md in active queues")
+@click.option("--include-terminal", is_flag=True,
+              help="with --all, also include verified/archive/stand_done/...")
+@click.option("--dry-run", is_flag=True)
+@click.option("--keep-md", is_flag=True,
+              help="don't rename original .md to .md.legacy")
+@click.option("--force", is_flag=True, help="overwrite existing .yaml")
+def migrate_task(file: str | None, queue: str | None, all_flag: bool,
+                 include_terminal: bool, dry_run: bool, keep_md: bool,
+                 force: bool) -> None:
+    from greatminds.cli._colors import info, ok, warn, err
+    targets = collect_targets(file, queue, all_flag, include_terminal)
     if not targets:
-        print("migrate-task: no .md tasks found")
-        return 0
+        info("migrate-task: no .md tasks found")
+        return
 
     stats = {"migrated": 0, "skipped": 0, "error": 0}
     for path in targets:
-        status, msg = migrate_one(path, args.dry_run, args.force, args.keep_md)
+        status, msg = migrate_one(path, dry_run, force, keep_md)
         stats[status] = stats.get(status, 0) + 1
-        if status != "skipped" or args.dry_run:
+        if status != "skipped" or dry_run:
             tag = {"migrated": "OK", "skipped": "--", "error": "ERR"}[status]
-            print(f"  [{tag}] {path.name}: {msg}")
-    print(f"\nmigrated: {stats['migrated']}  "
-          f"skipped: {stats['skipped']}  errors: {stats['error']}")
-    return 0 if stats["error"] == 0 else 2
+            line = f"  [{tag}] {path.name}: {msg}"
+            (ok if status == "migrated" else warn if status == "error" else info)(line)
+    info(f"\nmigrated: {stats['migrated']}  "
+         f"skipped: {stats['skipped']}  errors: {stats['error']}")
+    if stats["error"] != 0:
+        raise click.exceptions.Exit(2)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    migrate_task()

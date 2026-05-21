@@ -1,7 +1,7 @@
 # Canon MCP
 
 `canon.json` — universal MCP servers loaded by every Claude agent via
-`bin/start_agent --mcp-config /opt/coordination/mcp/canon.json`.
+`greatminds start-agent --mcp-config /opt/coordination/mcp/canon.json`.
 
 Projects may add or override servers by providing
 `<project>/coordination/mcp.local.json`; both files are passed to
@@ -9,7 +9,7 @@ Projects may add or override servers by providing
 collision).
 
 Servers referencing `${TOKEN_NAME}` resolve those vars from the
-environment, which `bin/start_agent` exports from
+environment, which `greatminds start-agent` exports from
 `<project>/coordination/PROJECT.env` before launching Claude.
 
 Required env vars and their semantics: see the token-contract in

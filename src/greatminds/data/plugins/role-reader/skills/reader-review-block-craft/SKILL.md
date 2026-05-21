@@ -63,7 +63,7 @@ the product is broken. WRITER can't fix it without code changes.
 That's a `user_feedback` ticket for PLANNER:
 
 ```bash
-bin/task new --stream product --in-queue user_feedback \
+greatminds task new --stream product --in-queue user_feedback \
   --kind bugfix --scope backend \
   --title "endpoint X returns 500 instead of documented 422"
 ```
@@ -90,7 +90,7 @@ paraphrase tightly for longer ones with a `[quoting:]` note:
 
 ```yaml
 claim: "[quoting docs/setup.md:42-45] After running coord-init, the
-       project is fully bootstrapped and ready to run bin/coord-tmux."
+       project is fully bootstrapped and ready to run greatminds launch --target tmux."
 ```
 
 vs short:

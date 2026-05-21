@@ -11,7 +11,7 @@ for mechanics, and the prose is authoritative for the spirit of the
 invariants. Fix whichever is wrong, do not paper over the conflict.
 
 Project-specific values appear as `<TOKEN>` placeholders; their values live
-in the installed `coordination/PROJECT.md`. Use `bin/render-role <ROLE>` to
+in the installed `coordination/PROJECT.md`. Use `greatminds render-role <ROLE>` to
 get a token-substituted bootstrap prompt; the script reads this canon plus
 the local `PROJECT.md`.
 
@@ -32,8 +32,8 @@ Every installed agent reads `COORDINATE.md`, `schema.yaml`, its own role
   are evidence, not handoff. Only the physical move transfers ownership.
 - **No central authority.** Each role reads schema/inbox/queue and acts.
   There is no scheduler that decides what runs when.
-- **Read-only observability.** New tools (`bin/watchdog`, `bin/wake_check`,
-  `bin/gate_check`) only read; they never move files. They produce reports
+- **Read-only observability.** New tools (`greatminds watchdog`, `greatminds wake-check`,
+  `greatminds gate-check`) only read; they never move files. They produce reports
   for the appropriate role to act on.
 
 ---
@@ -49,7 +49,7 @@ The full roster, claim sources, and heartbeats are in `schema.yaml`. Brief:
 | DEVELOPER            | product  | Backend implementation.                                            |
 | UI-DEVELOPER         | product  | UI implementation (pipeline mode + FAST chat mode for scenario C). |
 | TECHNICAL-WRITER     | product  | Documentation implementation.                                      |
-| TESTER               | product  | Validates code on the stand; runs `bin/gate_check`.                |
+| TESTER               | product  | Validates code on the stand; runs `greatminds gate-check`.                |
 | READER               | product  | Validates docs as a fresh reader.                                  |
 | EXPLORER             | product  | Uses live product on stand (scenario B). Files bugs.               |
 | STAND-KEEPER         | service  | Owns stand and `stand.status`. Two profiles: full-deploy, vite-dev.|
@@ -185,7 +185,7 @@ with contents:
 ```
 
 After the `mv` succeeds, the role removes its own intent. If the role
-crashes mid-move, the intent file is left behind. `bin/watchdog` reports
+crashes mid-move, the intent file is left behind. `greatminds watchdog` reports
 intent files older than 5 minutes as orphaned, and the appropriate role
 investigates.
 
@@ -199,7 +199,7 @@ After every successful `mv`, the role appends one NDJSON line to
 ```
 
 The journal is derived state: you can reconstruct it by replaying the
-filesystem if it is lost. Useful for `bin/watchdog`, post-mortems, and a
+filesystem if it is lost. Useful for `greatminds watchdog`, post-mortems, and a
 global linear order of transitions.
 
 ---
@@ -216,7 +216,7 @@ owner must:
    - `resume_to: <queue>` — where the task should go when unblocked.
 2. `mv <current-queue>/X feature_blocked/X`.
 
-`ARCHITECT-REVIEWER` runs `bin/wake_check` at the start of every tick. The
+`ARCHITECT-REVIEWER` runs `greatminds wake-check` at the start of every tick. The
 script:
 - validates dependency syntax,
 - checks if each dependency file exists,
@@ -228,10 +228,10 @@ moves the task to `resume_to`.
 
 ---
 
-## 8. Stand gate (`bin/gate_check`)
+## 8. Stand gate (`greatminds gate-check`)
 
 For any task with `plan.stand_required: true`, TESTER must run
-`bin/gate_check <task-id>` before moving the task to `feature_review/`.
+`greatminds gate-check <task-id>` before moving the task to `feature_review/`.
 
 The script:
 - finds the task,
@@ -288,9 +288,9 @@ is a way to ask a question without escalating to handback.
 
 ---
 
-## 10. Watchdog (`bin/watchdog`)
+## 10. Watchdog (`greatminds watchdog`)
 
-`bin/watchdog` reports:
+`greatminds watchdog` reports:
 
 - stale heartbeats (older than `schema.watchdog.heartbeat_stale_seconds`),
 - orphaned intent files (older than `intent_orphan_seconds`),
@@ -354,10 +354,10 @@ No `git add .`; the committer stages exact paths only.
 
 ## 14. Bootstrap
 
-Render and run a role's bootstrap prompt with `bin/render-role`:
+Render and run a role's bootstrap prompt with `greatminds render-role`:
 
 ```bash
-<PROJECT_ROOT>/bin/render-role <ROLE> [--project-dir <dir>]
+<PROJECT_ROOT>/greatminds render-role <ROLE> [--project-dir <dir>]
 ```
 
 The output substitutes tokens from `coordination/PROJECT.md`. Either pipe
@@ -367,15 +367,15 @@ into your agent runner or copy the text. The complete role list lives in
 To check the canon for unknown tokens or missing catalog entries:
 
 ```bash
-<PROJECT_ROOT>/bin/lint-tokens
+<PROJECT_ROOT>/greatminds lint-tokens
 ```
 
 To audit the live coordination filesystem:
 
 ```bash
-<PROJECT_ROOT>/bin/watchdog
-<PROJECT_ROOT>/bin/wake_check
-<PROJECT_ROOT>/bin/gate_check <task-id>
+<PROJECT_ROOT>/greatminds watchdog
+<PROJECT_ROOT>/greatminds wake-check
+<PROJECT_ROOT>/greatminds gate-check <task-id>
 ```
 
 ## Canon skill plugins
@@ -401,5 +401,5 @@ the protocol. Skill files carry the procedural detail and are
 auto-invoked by Claude based on context.
 
 See also: `plugins/README.md` for plugin layout; `mcp/canon.json`
-for canon-wide MCP server set; `bin/start_agent` for how plugins
+for canon-wide MCP server set; `greatminds start-agent` for how plugins
 are wired per-launch.

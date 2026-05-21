@@ -24,7 +24,7 @@ ssh -o ConnectTimeout=5 "${STAND_HOST_A}" "echo ok"
 # MAINTAINER (infra), not SK's scope.
 ```
 
-If unreachable: file `bin/inbox send MAINTAINER --kind ask` describing
+If unreachable: file `greatminds inbox send MAINTAINER --kind ask` describing
 which host, when last reachable, what attempts you made.
 
 ### Layer 2 — Docker daemon health
@@ -63,7 +63,7 @@ Common patterns in the logs:
   MAINTAINER for proper host setup.
 - Application-level errors (validation failures, business logic
   errors, traceback in our code) → PRODUCT bug. Capture and escalate
-  PLANNER (file `bin/inbox send ARCHITECT-PLANNER --kind ask` with
+  PLANNER (file `greatminds inbox send ARCHITECT-PLANNER --kind ask` with
   context). SK doesn't fix product bugs.
 
 ### Layer 4 — DB connectivity
@@ -134,7 +134,7 @@ After isolating the layer:
 } > /tmp/fault-isolation-${TASK_ID}.log
 
 # Reference it in the inbox ask
-bin/inbox send MAINTAINER --kind ask \
+greatminds inbox send MAINTAINER --kind ask \
   --task "${TASK_ID}" \
   --about "stand smoke failed: <one-line summary>" \
   --body "$(cat /tmp/fault-isolation-${TASK_ID}.log)"

@@ -1,13 +1,13 @@
 ---
 name: agent-lifecycle-and-diagnostics
-description: Use when an agent is dead / hung / needs restart, when diagnosing coordd dead-pid reports, when switching an agent's tool (claude↔codex), or when verifying a restart succeeded. Covers bin/start_agent invocation, the .agent_registry layout, tmux send-keys patterns for driving role windows, rate-limit vs crash diagnosis, and post-restart verification. Trigger on "agent dead", "restart agent", "agent_registry", "tool switch", "pty-launch", "rate limit", "coordd dead-pid", "stuck agent".
+description: Use when an agent is dead / hung / needs restart, when diagnosing coordd dead-pid reports, when switching an agent's tool (claude↔codex), or when verifying a restart succeeded. Covers greatminds start-agent invocation, the .agent_registry layout, tmux send-keys patterns for driving role windows, rate-limit vs crash diagnosis, and post-restart verification. Trigger on "agent dead", "restart agent", "agent_registry", "tool switch", "pty-launch", "rate limit", "coordd dead-pid", "stuck agent".
 ---
 
 # Agent lifecycle and diagnostics
 
 MAINTAINER operates the agent fleet: starting, stopping, restarting,
 diagnosing. This is exclusively MAINTAINER's responsibility — no
-other role touches `bin/start_agent` or `.agent_registry/` files.
+other role touches `greatminds start-agent` or `.agent_registry/` files.
 
 ## Standard restart
 
@@ -17,10 +17,10 @@ tmux list-windows -t agents -F '#W' | grep -i <role>
 
 # Drive the window: Ctrl-C any stuck process, then re-launch
 tmux send-keys -t agents:<window> C-c
-tmux send-keys -t agents:<window> "bin/start_agent <ROLE> <tool> --mode <loop|chat>" Enter
+tmux send-keys -t agents:<window> "greatminds start-agent <ROLE> <tool> --mode <loop|chat>" Enter
 ```
 
-`bin/start_agent` is idempotent: if the role's session-id exists
+`greatminds start-agent` is idempotent: if the role's session-id exists
 in `.agent_registry/`, it resumes; otherwise it generates a new
 session. Per-tool resume mechanics:
 - claude: `--resume <session-id>` from `.agent_registry/<role>.session-id`
@@ -58,7 +58,7 @@ rm -f coordination/.agent_registry/<role>.{json,sock}
 $EDITOR coord.yaml
 
 # Restart on new tool — fresh session
-tmux send-keys -t agents:<window> "bin/start_agent <ROLE> <newtool> --mode loop" Enter
+tmux send-keys -t agents:<window> "greatminds start-agent <ROLE> <newtool> --mode loop" Enter
 ```
 
 ## Reading coordd dead-pid reports
@@ -79,7 +79,7 @@ started_at. Diagnostic flow:
 
 2. **Restart logic**:
    - Crash → restart with same tool, same session id (auto-resumed
-     via `bin/start_agent`).
+     via `greatminds start-agent`).
    - Rate-limit + self-recovered → just ack the dead-report, no
      restart needed.
    - Intentional → if expected to stay down, `rm

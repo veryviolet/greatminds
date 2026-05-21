@@ -2,7 +2,7 @@
 
 The `evidence_for` field (new) declares which product task(s) this stand
 operation provides evidence for. STAND-KEEPER mirrors it into the
-`stand_done/` block on completion so bin/gate_check can match. Empty list is
+`stand_done/` block on completion so greatminds gate-check can match. Empty list is
 fine for infrastructure-only operations.
 
 ---

@@ -22,7 +22,7 @@ declared_files:
 
 ```bash
 # Get the list
-declared=$(bin/task show <id> | yq -r '
+declared=$(greatminds task show <id> | yq -r '
   [.blocks[] | select(.kind=="implementation" or .kind=="iteration")] |
   reverse | .[0].declared_files[]
 ')

@@ -37,6 +37,8 @@ import time
 import tty
 from pathlib import Path
 
+import click
+
 from greatminds.core.paths import find_coord_dir as _strict_find_coord_dir
 
 
@@ -170,29 +172,24 @@ def proxy_loop(master_fd: int, stop_event: threading.Event) -> None:
                 pass
 
 
-def main() -> int:
-    """Entry point — wired up as ``greatminds-pty-launch`` in pyproject.toml.
-
-    Not an argparse CLI: argv[1] is ROLE, argv[2] is the binary to exec
-    (e.g. ``claude``), and argv[3:] are its args. ``--help`` / ``-h``
-    print the one-line usage and exit 0 so CI smoke tests pass.
-    """
-    if len(sys.argv) >= 2 and sys.argv[1] in ("--help", "-h", "help"):
-        usage()
-        return 0
-    if len(sys.argv) < 3:
-        usage()
-        return 2
-    role = sys.argv[1]
+@click.command(
+    name="pty-launch",
+    short_help="exec TOOL inside a pty + expose unix socket for coordd",
+    help=__doc__,
+    context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
+)
+@click.argument("role")
+@click.argument("exec_binary")
+@click.argument("tool_args", nargs=-1, type=click.UNPROCESSED)
+def pty_launch(role: str, exec_binary: str, tool_args: tuple[str, ...]) -> None:
     # argv[2] is the binary we exec. When start_agent wraps the agent in
-    # `systemd-run --user --scope ... cursor-agent`, argv[2] is
-    # `systemd-run`, which is useless in the registry (and hides that
+    # ``systemd-run --user --scope ... cursor-agent``, exec_binary is
+    # ``systemd-run``, which is useless in the registry (and hides that
     # this is really a cursor agent — coordd needs the logical tool to
     # pick the right wake/submit sequence). start_agent exports
     # COORD_REGISTRY_TOOL with the logical name; prefer it.
-    exec_binary = sys.argv[2]
     tool = os.environ.get("COORD_REGISTRY_TOOL") or exec_binary
-    tool_args = sys.argv[3:]
+    tool_args = list(tool_args)
 
     pid, master_fd = pty.fork()
     if pid == 0:
@@ -254,8 +251,7 @@ def main() -> int:
             sock_path.unlink()
         except OSError:
             pass
-    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    pty_launch()

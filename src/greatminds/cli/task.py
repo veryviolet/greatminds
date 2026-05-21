@@ -1181,75 +1181,114 @@ def cmd_paths(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 
 
-def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="task", description=__doc__.splitlines()[0])
-    sub = p.add_subparsers(dest="cmd", required=True)
+# ---------------------------------------------------------------------------
+# click facade — every legacy cmd_X(args) is wrapped into a click subcommand
+# of the `task` group. SimpleNamespace bridges click-options to the
+# argparse.Namespace shape the cmd_X bodies expect — keeps the 7 large
+# handler functions untouched.
+# ---------------------------------------------------------------------------
 
-    pn = sub.add_parser("new", help="create a new task")
-    pn.add_argument("--stream", required=True, choices=["product", "stand", "review_session"])
-    pn.add_argument("--title", required=True)
-    pn.add_argument("--reporter")
-    pn.add_argument("--priority", choices=sorted(PRIORITIES))
-    pn.add_argument("--kind", help="product: " + "|".join(sorted(PRODUCT_KINDS)))
-    pn.add_argument("--scope", help="product: " + "|".join(sorted(PRODUCT_SCOPES)))
-    pn.add_argument("--request-type", choices=sorted(STAND_REQUEST_TYPES))
-    pn.add_argument("--profile", choices=sorted(STAND_PROFILES))
-    pn.add_argument("--hosts", nargs="*")
-    pn.add_argument("--evidence-for", nargs="*")
-    pn.add_argument("--mode", choices=sorted(MODES))
-    pn.add_argument("--target-functionality")
-    pn.add_argument("--scenarios", nargs="*")
-    pn.add_argument("--description", help="literal | @file | - (stdin)")
-    pn.add_argument("--in-queue", help="destination queue (default depends on stream)")
-    pn.add_argument("--seq", help="override numeric id prefix")
-    pn.add_argument("--reason", help="journal reason")
-    pn.set_defaults(func=cmd_new)
+import click
+from types import SimpleNamespace
 
-    pm = sub.add_parser("mv", help="move task between queues")
-    pm.add_argument("id")
-    pm.add_argument("to_queue")
-    pm.add_argument("--reason")
-    pm.set_defaults(func=cmd_mv)
 
-    pa = sub.add_parser("append-block", help="append a typed block")
-    pa.add_argument("kind", choices=sorted(
-        set().union(*STREAM_BLOCK_KINDS.values())
+@click.group(help="task-file CRUD (intake, mv, append-block, show, list, validate)")
+def task() -> None:
+    pass
+
+
+_ALL_BLOCK_KINDS = sorted(set().union(*STREAM_BLOCK_KINDS.values()))
+
+
+@task.command(name="new")
+@click.option("--stream", required=True,
+              type=click.Choice(["product", "stand", "review_session"]))
+@click.option("--title", required=True)
+@click.option("--reporter", default=None)
+@click.option("--priority", default=None, type=click.Choice(sorted(PRIORITIES)))
+@click.option("--kind", default=None,
+              help="product: " + "|".join(sorted(PRODUCT_KINDS)))
+@click.option("--scope", default=None,
+              help="product: " + "|".join(sorted(PRODUCT_SCOPES)))
+@click.option("--request-type", "request_type", default=None,
+              type=click.Choice(sorted(STAND_REQUEST_TYPES)))
+@click.option("--profile", default=None, type=click.Choice(sorted(STAND_PROFILES)))
+@click.option("--hosts", multiple=True)
+@click.option("--evidence-for", "evidence_for", multiple=True)
+@click.option("--mode", default=None, type=click.Choice(sorted(MODES)))
+@click.option("--target-functionality", "target_functionality", default=None)
+@click.option("--scenarios", multiple=True)
+@click.option("--description", default=None, help="literal | @file | - (stdin)")
+@click.option("--in-queue", "in_queue", default=None,
+              help="destination queue (default depends on stream)")
+@click.option("--seq", default=None, help="override numeric id prefix")
+@click.option("--reason", default=None, help="journal reason")
+def _task_new(**kw) -> None:
+    # multiple=True → tuple; argparse-style code expects list-or-None
+    for k in ("hosts", "evidence_for", "scenarios"):
+        v = kw.get(k)
+        kw[k] = list(v) if v else None
+    rc = cmd_new(SimpleNamespace(**kw))
+    if rc:
+        raise click.exceptions.Exit(rc)
+
+
+@task.command(name="mv")
+@click.argument("id")
+@click.argument("to_queue")
+@click.option("--reason", default=None)
+def _task_mv(id, to_queue, reason) -> None:
+    rc = cmd_mv(SimpleNamespace(id=id, to_queue=to_queue, reason=reason))
+    if rc:
+        raise click.exceptions.Exit(rc)
+
+
+@task.command(name="append-block")
+@click.argument("kind", type=click.Choice(_ALL_BLOCK_KINDS))
+@click.option("--id", required=True)
+@click.option("--field", multiple=True, help="key=value (repeat)")
+@click.option("--body", default=None, help="literal | @file | - (stdin)")
+def _task_append_block(kind, id, field, body) -> None:
+    rc = cmd_append_block(SimpleNamespace(
+        kind=kind, id=id, field=list(field) if field else None, body=body,
     ))
-    pa.add_argument("--id", required=True)
-    pa.add_argument("--field", action="append", help="key=value (repeat)")
-    pa.add_argument("--body", help="literal | @file | - (stdin)")
-    pa.set_defaults(func=cmd_append_block)
-
-    ps = sub.add_parser("show", help="print a task")
-    ps.add_argument("id")
-    ps.set_defaults(func=cmd_show)
-
-    pl = sub.add_parser("list", help="list tasks in a queue")
-    pl.add_argument("queue")
-    pl.set_defaults(func=cmd_list)
-
-    pv = sub.add_parser("validate", help="validate a task")
-    g = pv.add_mutually_exclusive_group(required=True)
-    g.add_argument("--id")
-    g.add_argument("--file")
-    pv.set_defaults(func=cmd_validate)
-
-    pp = sub.add_parser("paths", help="print resolved paths")
-    pp.set_defaults(func=cmd_paths)
-
-    return p
+    if rc:
+        raise click.exceptions.Exit(rc)
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Entry point — argparse picks up ``sys.argv[1:]`` when ``argv`` is ``None``.
+@task.command(name="show")
+@click.argument("id")
+def _task_show(id) -> None:
+    rc = cmd_show(SimpleNamespace(id=id))
+    if rc:
+        raise click.exceptions.Exit(rc)
 
-    Wired up as ``greatminds-task`` via ``project.scripts`` in pyproject.toml;
-    a non-None ``argv`` is convenient for in-process testing.
-    """
-    parser = build_parser()
-    args = parser.parse_args(argv)
-    return args.func(args)
+
+@task.command(name="list")
+@click.argument("queue")
+def _task_list(queue) -> None:
+    rc = cmd_list(SimpleNamespace(queue=queue))
+    if rc:
+        raise click.exceptions.Exit(rc)
+
+
+@task.command(name="validate")
+@click.option("--id", default=None)
+@click.option("--file", "file", default=None)
+def _task_validate(id, file) -> None:
+    if (id is None) == (file is None):
+        raise click.UsageError("exactly one of --id or --file is required")
+    rc = cmd_validate(SimpleNamespace(id=id, file=file))
+    if rc:
+        raise click.exceptions.Exit(rc)
+
+
+@task.command(name="paths")
+def _task_paths() -> None:
+    rc = cmd_paths(SimpleNamespace())
+    if rc:
+        raise click.exceptions.Exit(rc)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    task()

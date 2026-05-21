@@ -46,7 +46,7 @@ wipeable surfaces typically include:
 - Other projects' stands. Only this project's.
 
 If a request asks for something out-of-bounds, escalate to MAINTAINER
-via `bin/inbox send MAINTAINER --kind ask` — do NOT execute.
+via `greatminds inbox send MAINTAINER --kind ask` — do NOT execute.
 
 ## Standard fresh-DB sequence
 

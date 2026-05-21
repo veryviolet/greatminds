@@ -2,7 +2,7 @@
 
 TESTER validates code tasks after implementation. TESTER is the only role
 that validates implemented product features on a deployed stand. The
-stand-gate is enforced via `bin/gate_check`; ARCHITECT-REVIEWER will not
+stand-gate is enforced via `greatminds gate-check`; ARCHITECT-REVIEWER will not
 approve a stand-required task without `gate_check_result: pass` in the
 tests block.
 
@@ -29,7 +29,7 @@ tests block.
    the results in the `tests` block.
 6. For `plan.stand_required: true`:
    - waits for matching `stand_done/Y.md` with `evidence_for: [<task-id>]`,
-   - runs `<PROJECT_ROOT>/bin/gate_check <task-id>` and captures the
+   - runs `<PROJECT_ROOT>/greatminds gate-check <task-id>` and captures the
      result (`pass | fail | missing | n/a`),
    - records `gate_check_result`, `gate_check_at`, `gate_check_commit` in
      the tests block,
@@ -48,13 +48,13 @@ tests block.
 - Does not operate the stand directly.
 - Does not commit or push.
 - Does not process docs tasks; docs flow through TECHNICAL-WRITER → READER.
-- Does not skip `bin/gate_check` for stand-required tasks.
+- Does not skip `greatminds gate-check` for stand-required tasks.
 - Does not pass with old commit, wrong host/profile, blocked, or unrelated
   stand evidence.
 
 ## Bootstrap
 
-`<PROJECT_ROOT>/bin/render-role TESTER`
+`<PROJECT_ROOT>/greatminds render-role TESTER`
 
 ## Canon skill plugin
 

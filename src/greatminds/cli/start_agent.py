@@ -330,23 +330,22 @@ def build_cursor_argv(
 # ---------------------------------------------------------------------------
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Entry point — wired up as ``greatminds-start-agent`` in pyproject.toml."""
-    parser = argparse.ArgumentParser(
-        description=__doc__.splitlines()[0] if __doc__ else "",
-        # We want unknown args to pass through to the underlying tool.
-    )
-    parser.add_argument("role", help="role key from command_START.yaml")
-    parser.add_argument("tool", choices=["claude", "codex", "cursor"],
-                        help="agent CLI to launch")
-    parser.add_argument("--mode", default="loop", choices=["loop", "chat"],
-                        help="loop = self-driving tick loop; chat = interactive")
-    args, extra = parser.parse_known_args(argv)
+import click
 
-    role = args.role
-    tool = args.tool
-    mode = args.mode
 
+@click.command(
+    name="start-agent",
+    short_help="launch ROLE as a TOOL agent (claude|codex|cursor)",
+    help=__doc__,
+    context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
+)
+@click.argument("role")
+@click.argument("tool", type=click.Choice(["claude", "codex", "cursor"]))
+@click.option("--mode", default="loop", type=click.Choice(["loop", "chat"]),
+              help="loop = self-driving tick loop; chat = interactive")
+@click.argument("extra", nargs=-1, type=click.UNPROCESSED)
+def start_agent(role: str, tool: str, mode: str, extra: tuple[str, ...]) -> None:
+    extra = list(extra)
     project_dir = Path(os.environ.get("COORD_PROJECT_DIR") or os.getcwd()).resolve()
     canon_dir = find_canon_dir()
 
@@ -466,8 +465,7 @@ def main(argv: list[str] | None = None) -> int:
     except FileNotFoundError:
         _cleanup_registry()
         die(127, f"{cmd[0]}: command not found")
-        return 127
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    start_agent()

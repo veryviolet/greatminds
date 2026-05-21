@@ -1,6 +1,6 @@
 ---
 name: iteration-and-blocking
-description: Use when a task bounces back from TESTER with fail/partial outcome, when a task needs to wait on another (depends_on chain), or when blocked tasks are ready to wake. Covers iteration block fields, the back-from-tester path, blocked-block format with the terminal-queue rule (verified/ paths only, never queue paths), and bin/wake_check workflow. Trigger on "iteration block", "blocked", "depends_on", "feature_blocked", "wake_check", "back from tester", "dependency".
+description: Use when a task bounces back from TESTER with fail/partial outcome, when a task needs to wait on another (depends_on chain), or when blocked tasks are ready to wake. Covers iteration block fields, the back-from-tester path, blocked-block format with the terminal-queue rule (verified/ paths only, never queue paths), and greatminds wake-check workflow. Trigger on "iteration block", "blocked", "depends_on", "feature_blocked", "wake_check", "back from tester", "dependency".
 ---
 
 # Iteration and blocking
@@ -29,13 +29,13 @@ the task moves back to the implementer's queue. Implementer must:
     code changed, why the fix addresses the root cause not the symptom.
 ```
 
-Then `bin/task mv <id> feature_test --reason "re-test after fix"`.
+Then `greatminds task mv <id> feature_test --reason "re-test after fix"`.
 
 Multiple iterations stack. If you find yourself on iteration ≥3 on
 the same task without progress, **stop** and either:
-- File `bin/inbox send ARCHITECT-PLANNER --kind ask` describing why the
+- File `greatminds inbox send ARCHITECT-PLANNER --kind ask` describing why the
   plan-block assumption seems wrong, or
-- File `bin/inbox send MAINTAINER --kind ask` if the issue is
+- File `greatminds inbox send MAINTAINER --kind ask` if the issue is
   schema/tooling.
 
 Do not silently keep iterating — that's how 8-iteration death spirals
@@ -59,11 +59,11 @@ append a `blocked` block and mv to `feature_blocked/`:
 ```
 
 ```bash
-bin/task append-block blocked --id <id> \
+greatminds task append-block blocked --id <id> \
   --field dependencies=verified/0123-other-task-slug.yaml \
   --field resume_to=feature_dev \
   --body "..."
-bin/task mv <id> feature_blocked --reason "depends on 0123"
+greatminds task mv <id> feature_blocked --reason "depends on 0123"
 ```
 
 ## CRITICAL: terminal-queue rule for dependencies
@@ -72,12 +72,12 @@ bin/task mv <id> feature_blocked --reason "depends on 0123"
 `verified/<id>.yaml`. Never `feature_dev/<id>.yaml` or any active
 queue.
 
-Why (feedback 0410 incident): `bin/wake_check` resolves the literal
+Why (feedback 0410 incident): `greatminds wake-check` resolves the literal
 path. If you wrote `feature_dev/<id>.yaml` and the dependency
 subsequently progresses (e.g., DEV → TESTER), the file moves out of
 `feature_dev/` to `feature_test/`, then `feature_review/`, then
 `verified/`. Your blocked-block's dependency path becomes stale and
-`bin/wake_check` reports `(missing)` — a permanent jam. Only AR can
+`greatminds wake-check` reports `(missing)` — a permanent jam. Only AR can
 manually unstick by rewriting the path.
 
 So: always reference dependencies in their **final, terminal** form:
@@ -86,10 +86,10 @@ proceeds; until then, your task waits.
 
 ## Wake_check workflow (REVIEWER)
 
-ARCHITECT-REVIEWER runs `bin/wake_check` at each tick start:
+ARCHITECT-REVIEWER runs `greatminds wake-check` at each tick start:
 
 ```bash
-bin/wake_check
+greatminds wake-check
 # Lists blocked tasks whose dependencies are ALL satisfied
 # (their verified/<id>.yaml files exist).
 ```
@@ -97,7 +97,7 @@ bin/wake_check
 For each ready task, AR moves it to `resume_to`:
 
 ```bash
-bin/task mv <blocked-id> <resume_to> --reason "deps verified — woken"
+greatminds task mv <blocked-id> <resume_to> --reason "deps verified — woken"
 ```
 
 This is one of the AR-only responsibilities. If wake_check reports

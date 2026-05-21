@@ -26,12 +26,14 @@ Exit code:
 """
 from __future__ import annotations
 
-import argparse
 import re
-import sys
 from pathlib import Path
 
+import click
 import yaml
+
+from greatminds.core.paths import find_canon_dir
+from greatminds.cli._colors import info, ok, warn
 
 # accept either yaml or md task files in dependency entries during the
 # R8 transition period
@@ -122,33 +124,30 @@ def all_blocked_files(coord: Path) -> list[Path]:
     return out
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Entry point — wired up as ``greatminds-wake-check`` in pyproject.toml."""
-    from greatminds.core.paths import find_canon_dir
+@click.command(
+    short_help="report blocked-tasks ready to wake, cycles, malformed deps",
+    help=__doc__,
+)
+@click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
+              default=None, help="project root containing coordination/ (default: cwd)")
+@click.option("--canon-dir", type=click.Path(exists=True, file_okay=False, path_type=Path),
+              default=None, help="canon data dir (default: packaged greatminds.data)")
+@click.option("--quiet", is_flag=True, help="suppress no-findings output")
+def wake_check(project_dir: Path | None, canon_dir: Path | None, quiet: bool) -> None:
+    project_dir = project_dir or Path.cwd()
+    canon_dir = canon_dir or find_canon_dir()
 
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--project-dir", type=Path, default=Path.cwd())
-    parser.add_argument(
-        "--canon-dir", type=Path,
-        default=None,
-        help="canon data directory (default: packaged greatminds.data)",
-    )
-    parser.add_argument("--quiet", action="store_true")
-    args = parser.parse_args(argv)
-    if args.canon_dir is None:
-        args.canon_dir = find_canon_dir()
-
-    if (args.project_dir.name == "coordination"
-            and (args.project_dir / "feature_blocked").is_dir()):
-        coord = args.project_dir
+    if (project_dir.name == "coordination"
+            and (project_dir / "feature_blocked").is_dir()):
+        coord = project_dir
     else:
-        coord = args.project_dir / "coordination"
+        coord = project_dir / "coordination"
     if not (coord / "feature_blocked").is_dir():
-        if not args.quiet:
-            print(f"no feature_blocked/ at {coord}")
-        return 0
+        if not quiet:
+            info(f"no feature_blocked/ at {coord}")
+        return
 
-    schema_queues = load_schema_queues(args.canon_dir)
+    schema_queues = load_schema_queues(canon_dir)
     blocked_files = all_blocked_files(coord)
     blocked_id_set = {f.stem for f in blocked_files}
 
@@ -228,10 +227,15 @@ def main(argv: list[str] | None = None) -> int:
     # Anything in an active queue (incl. feature_blocked itself) means
     # work is not finished, so the blocked task is NOT yet ready.
     terminal_queues = set()
-    for q, meta in (yaml.safe_load((args.canon_dir / "schema.yaml").read_text()) or {}).get("queues", {}).items():
-        if isinstance(meta, dict) and meta.get("kind") == "terminal":
-            terminal_queues.add(q)
-    # fallback if schema didn't load
+    schema_path = canon_dir / "schema.yaml"
+    if schema_path.is_file():
+        try:
+            schema_data = yaml.safe_load(schema_path.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError:
+            schema_data = {}
+        for q, meta in (schema_data.get("queues") or {}).items():
+            if isinstance(meta, dict) and meta.get("kind") == "terminal":
+                terminal_queues.add(q)
     if not terminal_queues:
         terminal_queues = {"verified", "archive", "stand_done", "bot_verified", "bot_archive"}
 
@@ -246,7 +250,6 @@ def main(argv: list[str] | None = None) -> int:
             if p is None:
                 unresolved.append(f"{d} (missing)")
                 continue
-            # dep file exists — but only counts as done if in a terminal queue
             parent = p.parent.name
             if parent not in terminal_queues:
                 unresolved.append(f"{d} (in {parent}, not terminal)")
@@ -258,49 +261,48 @@ def main(argv: list[str] | None = None) -> int:
     findings = 0
     if ready:
         findings += len(ready)
-        print(f"READY TO WAKE ({len(ready)}):")
+        ok(f"READY TO WAKE ({len(ready)}):")
         for tid, resume_to in ready:
-            print(f"  {tid} → {resume_to}")
-        print()
-    elif not args.quiet:
-        print("ready to wake: 0")
+            ok(f"  {tid} → {resume_to}")
+        click.echo()
+    elif not quiet:
+        info("ready to wake: 0")
 
-    if not_ready and not args.quiet:
-        print(f"BLOCKED (not yet ready) ({len(not_ready)}):")
+    if not_ready and not quiet:
+        info(f"BLOCKED (not yet ready) ({len(not_ready)}):")
         for tid, deps in not_ready:
-            print(f"  {tid}: {', '.join(deps)}")
-        print()
+            info(f"  {tid}: {', '.join(deps)}")
+        click.echo()
 
     if cycles:
         findings += len(cycles)
-        print(f"DEADLOCK CYCLES ({len(cycles)}):")
+        warn(f"DEADLOCK CYCLES ({len(cycles)}):")
         seen: set[tuple[str, ...]] = set()
         for cyc in cycles:
             key = tuple(sorted(set(cyc)))
             if key in seen:
                 continue
             seen.add(key)
-            print(f"  cycle: {' → '.join(cyc)}")
-        print()
+            warn(f"  cycle: {' → '.join(cyc)}")
+        click.echo()
 
     if malformed:
         findings += len(malformed)
-        print(f"MALFORMED DEPENDENCIES ({len(malformed)}):")
+        warn(f"MALFORMED DEPENDENCIES ({len(malformed)}):")
         for tid, dep, why in malformed:
-            print(f"  {tid}: {dep!r} — {why}")
-        print()
+            warn(f"  {tid}: {dep!r} — {why}")
+        click.echo()
 
     if no_block:
         findings += len(no_block)
-        print(f"BLOCKED WITHOUT blocked BLOCK ({len(no_block)}):")
+        warn(f"BLOCKED WITHOUT blocked BLOCK ({len(no_block)}):")
         for tid in no_block:
-            print(f"  {tid}")
-        print()
+            warn(f"  {tid}")
+        click.echo()
 
-    if findings == 0 and not args.quiet:
-        print("(no actionable findings)")
-    return 0
+    if findings == 0 and not quiet:
+        info("(no actionable findings)")
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    wake_check()

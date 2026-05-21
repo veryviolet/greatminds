@@ -102,7 +102,7 @@ These are NOT bugs in the sense of "spec violation" — they're product
 direction. Don't file as bugfix. File as:
 
 ```bash
-bin/task new --stream product --in-queue user_feedback \
+greatminds task new --stream product --in-queue user_feedback \
   --kind feedback --title "UX: <one-line summary>"
 ```
 
@@ -137,7 +137,7 @@ exposed API (use that), or you've hit something that needs SK
 investigation (file an ask).
 
 Stand-infra readiness changes (rebuild, redeploy, wipe) go through
-`bin/stand request` to SK. Don't freelance.
+`greatminds stand request` to SK. Don't freelance.
 
 ## When the product is plainly broken
 
@@ -146,7 +146,7 @@ If a scenario can't even get past pass 1 (happy path) due to infra
 exploring. File:
 
 ```bash
-bin/inbox send STAND-KEEPER --kind ask \
+greatminds inbox send STAND-KEEPER --kind ask \
   --about "exploring 0042 blocked by stand: <symptom>" \
   --body "<reproduction>; check stand health"
 ```

@@ -6,7 +6,7 @@ description: Use when writing the implementation block for a feature_dev / featu
 # impl-block craft
 
 Implementer roles (DEVELOPER, UI-DEVELOPER, TECHNICAL-WRITER) file an
-`implementation` block via `bin/task append-block implementation`
+`implementation` block via `greatminds task append-block implementation`
 before `mv → feature_test` (or `feature_docs_review` for docs).
 
 ## Required fields
@@ -81,16 +81,16 @@ follow-up iteration; do NOT mv yet.
 ## Handoff
 
 ```bash
-bin/task append-block implementation --id <id> \
+greatminds task append-block implementation --id <id> \
   --field base_commit="$(git rev-parse HEAD)" \
   --field declared_files=app/foo.py,app/bar.py,tests/unit/test_foo.py \
   --field ready_for_test=true \
   --body "<summary prose>"
 
-bin/task mv <id> feature_test --reason "ready for verification"
+greatminds task mv <id> feature_test --reason "ready for verification"
 ```
 
-`bin/task mv` checks that `ready_for_test=true` is set in the latest
+`greatminds task mv` checks that `ready_for_test=true` is set in the latest
 implementation block; refuses otherwise.
 
 ## Iteration loop
