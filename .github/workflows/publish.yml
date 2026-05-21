@@ -51,13 +51,15 @@ jobs:
       - name: build wheel + sdist
         run: uv build
 
-      - name: smoke install + every entry-point --help
+      - name: smoke install + every greatminds subcommand --help
         run: |
           set -e
           uv venv .venv-test --python 3.13 --seed
           .venv-test/bin/pip install --quiet dist/*.whl
-          for bin in .venv-test/bin/greatminds-*; do
-            "$bin" --help > /dev/null
+          .venv-test/bin/greatminds --help > /dev/null
+          subs="$(.venv-test/bin/greatminds --help | awk '/^Commands:/{f=1;next} f && /^[ ]+[a-z]/{print $1}')"
+          for sub in $subs; do
+            .venv-test/bin/greatminds "$sub" --help > /dev/null
           done
 
       - name: publish to PyPI via OIDC
