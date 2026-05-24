@@ -331,6 +331,101 @@ def build_cursor_argv(
 # ---------------------------------------------------------------------------
 
 
+def _print_dry_run_report(
+    *,
+    role: str,
+    tool: str,
+    mode: str,
+    project_dir: Path,
+    canon_dir: Path,
+    session_id: str,
+    session_new: bool,
+    session_file: Path,
+    registry_file: Path,
+    project_env_file: Path,
+    cmd: list[str],
+    cmd_with_pty: list[str] | None,
+    prompt: str,
+) -> None:
+    """Print the effective config of a would-be start-agent invocation.
+
+    Strictly stdout, strictly read-only — caller must guarantee no
+    registry/session files were written.
+    """
+    out = sys.stdout.write
+
+    out("DRY RUN — no side effects, no exec.\n\n")
+    out(f"role:         {role}\n")
+    out(f"tool:         {tool}\n")
+    out(f"mode:         {mode}\n")
+    out(f"project_dir:  {project_dir}\n")
+    out(f"canon_dir:    {canon_dir}\n")
+    sess_label = "NEW (would write)" if session_new else "RESUME (read from file)"
+    out(f"session_id:   {session_id}  [{sess_label}]\n")
+    out(f"session_file: {session_file}\n")
+    out(f"registry:     {registry_file}\n")
+    out(f"PROJECT.env:  {project_env_file}"
+        f"{'' if project_env_file.is_file() else '  (not present, skipped)'}\n")
+    out("\n")
+
+    out("env that would be exported:\n")
+    out(f"  GREATMINDS_ROLE={role}\n")
+    out(f"  PROJECT_ROOT={project_dir}\n")
+    out("  (+ any KEY=value pairs sourced from PROJECT.env, if present)\n")
+    out("\n")
+
+    # Plugin / MCP layers — Claude-specific (codex and cursor don't use
+    # --plugin-dir / --mcp-config flags).
+    if tool == "claude":
+        role_plugin_suffix = role.lower().replace("_", "-")
+        plugin_layers = [
+            ("coordination-protocol (canon)",
+             canon_dir / "plugins" / "coordination-protocol"),
+            (f"role-{role_plugin_suffix} (canon)",
+             canon_dir / "plugins" / f"role-{role_plugin_suffix}"),
+            ("project-overrides (project)",
+             project_dir / "coordination" / "plugins.local" / "project-overrides"),
+        ]
+        out("claude plugin layers (--plugin-dir each, in order):\n")
+        for label, p in plugin_layers:
+            present = "" if p.is_dir() else "  (not present, skipped)"
+            out(f"  [{label}] {p}{present}\n")
+        out("\n")
+
+        mcp_layers = [
+            ("canon", canon_dir / "mcp" / "canon.json"),
+            ("project", project_dir / "coordination" / "mcp.local.json"),
+        ]
+        out("mcp config layers (--mcp-config each, in order):\n")
+        for label, p in mcp_layers:
+            present = "" if p.is_file() else "  (not present, skipped)"
+            out(f"  [{label}] {p}{present}\n")
+        out("\n")
+
+    out(f"prompt (first line, len={len(prompt)}):\n")
+    preview = prompt.splitlines()[0] if prompt else ""
+    if len(preview) > 200:
+        preview = preview[:200] + "…"
+    out(f"  {preview}\n\n")
+
+    out("argv (would exec):\n")
+    out("  " + " ".join(_shell_quote(a) for a in cmd) + "\n\n")
+
+    if cmd_with_pty is not None:
+        out("argv with pty wrapper (would exec instead, default):\n")
+        out("  " + " ".join(_shell_quote(a) for a in cmd_with_pty) + "\n\n")
+        out("  (set GREATMINDS_START_AGENT_NOPTY=1 to skip the pty wrapper)\n")
+    else:
+        out("pty wrapper disabled (GREATMINDS_START_AGENT_NOPTY=1).\n")
+
+
+def _shell_quote(arg: str) -> str:
+    """Minimal shell-quoting for human-readable dry-run argv output."""
+    if not arg or any(c in arg for c in " \t\n\"'\\$`#&|<>(){};*?[]"):
+        return "'" + arg.replace("'", "'\\''") + "'"
+    return arg
+
+
 @click.command(
     name="start-agent",
     short_help="launch ROLE as a TOOL agent (claude|codex|cursor)",
@@ -341,29 +436,42 @@ def build_cursor_argv(
 @click.argument("tool", type=click.Choice(["claude", "codex", "cursor"]))
 @click.option("--mode", default="loop", type=click.Choice(["loop", "chat"]),
               help="loop = self-driving tick loop; chat = interactive")
+@click.option("--dry-run", is_flag=True, default=False,
+              help="print the effective config (role, tool, plugin dirs, "
+                   "mcp layers, final argv) and exit 0 without writing "
+                   "to .agent_registry/ and without exec'ing the tool.")
 @click.argument("extra", nargs=-1, type=click.UNPROCESSED)
-def start_agent(role: str, tool: str, mode: str, extra: tuple[str, ...]) -> None:
+def start_agent(role: str, tool: str, mode: str,
+                dry_run: bool, extra: tuple[str, ...]) -> None:
     extra = list(extra)
     project_dir = Path(os.environ.get("GREATMINDS_PROJECT_DIR") or os.getcwd()).resolve()
     canon_dir = find_canon_dir()
 
     # Export role identity so hooks (Stop / PostToolUse / …) can pick it up.
+    # Even in --dry-run we set these in-process: they don't escape this
+    # python process (no exec) and the env block is shown in the report.
     os.environ["GREATMINDS_ROLE"] = role
     # Export PROJECT_ROOT so MCP servers (e.g. git ${PROJECT_ROOT}) resolve
     # project-relative paths via env-var substitution.
     os.environ["PROJECT_ROOT"] = str(project_dir)
 
     # Source per-project env vars (gitignored secrets file; optional).
-    load_env_file(project_dir / "coordination" / "PROJECT.env")
+    project_env_file = project_dir / "coordination" / "PROJECT.env"
+    if not dry_run:
+        load_env_file(project_env_file)
 
-    # Registry per role — coordd uses this to find our tty/socket.
+    # Registry per role — coordd uses this to find our tty/socket. In
+    # --dry-run we compute paths but never mkdir or write.
     role_lower = role.lower()
     registry_dir = project_dir / "coordination" / ".agent_registry"
-    registry_dir.mkdir(parents=True, exist_ok=True)
+    if not dry_run:
+        registry_dir.mkdir(parents=True, exist_ok=True)
     registry_file = registry_dir / f"{role_lower}.json"
 
     # Refuse to start if another agent is alive — unless GREATMINDS_FORCE=1.
-    if registry_file.is_file() and registry_file.stat().st_size > 0:
+    # In --dry-run we skip the check entirely: dry-run is for inspection,
+    # not coordination, and we never write the registry anyway.
+    if not dry_run and registry_file.is_file() and registry_file.stat().st_size > 0:
         try:
             old = json.loads(registry_file.read_text(encoding="utf-8"))
             old_pid = old.get("pid")
@@ -385,6 +493,8 @@ def start_agent(role: str, tool: str, mode: str, extra: tuple[str, ...]) -> None
     # Persistent session id per role. First start → new UUID; subsequent
     # starts → reuse (so the tool can --resume the same conversation).
     # GREATMINDS_FRESH=1 rotates the UUID unconditionally.
+    # In --dry-run we READ an existing session id if present (so the
+    # report shows the real resume path), but NEVER write a new UUID.
     session_file = registry_dir / f"{role_lower}.session-id"
     session_new = True
     if session_file.is_file() and session_file.stat().st_size > 0:
@@ -392,10 +502,12 @@ def start_agent(role: str, tool: str, mode: str, extra: tuple[str, ...]) -> None
         session_new = False
     else:
         session_id = str(uuid.uuid4())
-        session_file.write_text(session_id + "\n", encoding="utf-8")
+        if not dry_run:
+            session_file.write_text(session_id + "\n", encoding="utf-8")
     if os.environ.get("GREATMINDS_FRESH", "0") == "1":
         session_id = str(uuid.uuid4())
-        session_file.write_text(session_id + "\n", encoding="utf-8")
+        if not dry_run:
+            session_file.write_text(session_id + "\n", encoding="utf-8")
         session_new = True
 
     def _cleanup_registry(*_args) -> None:
@@ -404,8 +516,11 @@ def start_agent(role: str, tool: str, mode: str, extra: tuple[str, ...]) -> None
         except OSError:
             pass
 
-    signal.signal(signal.SIGINT, lambda *_: (_cleanup_registry(), sys.exit(130)))
-    signal.signal(signal.SIGTERM, lambda *_: (_cleanup_registry(), sys.exit(143)))
+    if not dry_run:
+        signal.signal(signal.SIGINT,
+                      lambda *_: (_cleanup_registry(), sys.exit(130)))
+        signal.signal(signal.SIGTERM,
+                      lambda *_: (_cleanup_registry(), sys.exit(143)))
 
     # Pre-pty registry: minimal record so a concurrent start_agent's
     # pid_alive() check above will refuse a duplicate launch. ``pty_launch``
@@ -415,16 +530,17 @@ def start_agent(role: str, tool: str, mode: str, extra: tuple[str, ...]) -> None
     # sees — and coordd will fall back to /dev/pts writes (display only,
     # NOT input — wake keystrokes won't reach the agent, which is the
     # known limitation of running without pty-launch).
-    registry_payload = {
-        "role": role,
-        "tool": tool,
-        "pid": os.getpid(),
-        "tty": tty_path(),
-        "started_at": now_iso(),
-        "session_id": session_id,
-        "session_new": 1 if session_new else 0,
-    }
-    registry_file.write_text(json.dumps(registry_payload), encoding="utf-8")
+    if not dry_run:
+        registry_payload = {
+            "role": role,
+            "tool": tool,
+            "pid": os.getpid(),
+            "tty": tty_path(),
+            "started_at": now_iso(),
+            "session_id": session_id,
+            "session_new": 1 if session_new else 0,
+        }
+        registry_file.write_text(json.dumps(registry_payload), encoding="utf-8")
 
     # Render the bootstrap prompt — on resume, replace with a short nudge.
     prompt = render_prompt(role, project_dir)
@@ -434,7 +550,7 @@ def start_agent(role: str, tool: str, mode: str, extra: tuple[str, ...]) -> None
         prompt = prompt[len("/loop "):]
 
     # Terminal title.
-    if os.environ.get("GREATMINDS_START_AGENT_NOTITLE", "0") != "1":
+    if not dry_run and os.environ.get("GREATMINDS_START_AGENT_NOTITLE", "0") != "1":
         set_terminal_title(role)
 
     # pty-launch wrapper — exposes a unix socket that coordd writes to.
@@ -457,13 +573,30 @@ def start_agent(role: str, tool: str, mode: str, extra: tuple[str, ...]) -> None
     elif tool == "cursor":
         cmd = build_cursor_argv(session_new, extra, prompt)
         # cursor-agent operates on cwd — change into the project root.
-        os.chdir(project_dir)
+        if not dry_run:
+            os.chdir(project_dir)
     else:
         # click.Choice already validates; defensive guard for type-checkers.
         raise GreatMindsError(f"unknown TOOL: {tool}", exit_code=2)
 
-    if use_pty:
-        cmd = [sys.executable, "-m", "greatminds.cli.pty_launch", role, *cmd]
+    cmd_with_pty = (
+        [sys.executable, "-m", "greatminds.cli.pty_launch", role, *cmd]
+        if use_pty else None
+    )
+
+    if dry_run:
+        _print_dry_run_report(
+            role=role, tool=tool, mode=mode,
+            project_dir=project_dir, canon_dir=canon_dir,
+            session_id=session_id, session_new=session_new,
+            session_file=session_file, registry_file=registry_file,
+            project_env_file=project_env_file,
+            cmd=cmd, cmd_with_pty=cmd_with_pty, prompt=prompt,
+        )
+        return
+
+    if cmd_with_pty is not None:
+        cmd = cmd_with_pty
 
     # exec — replace this process image with the tool. atexit/finally won't
     # fire past this point; the registry file is left in place and reaped
