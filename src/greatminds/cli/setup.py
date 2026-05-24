@@ -189,6 +189,114 @@ def _copy_if_missing(src: Path, dst: Path, force: bool = False) -> str:
     return "overwritten" if existed else "copied"
 
 
+# ---------------------------------------------------------------------------
+# task 0076: pre-trust config. TESTER and STAND-KEEPER cannot walk
+# through Claude Code's "Do you trust this folder?" or codex's
+# "Allow Codex to run" dialogs on the avatar host (Unauthorized
+# Persistence classifier blocks interactive trust acceptance). Without
+# pre-trust, fresh agent spawns on a toy project sit at the dialog and
+# the role contract never starts. This adds an opt-in pre-trust step
+# scoped per-project: writes ONE entry for THIS project's abs path
+# into the user-level config files (~/.claude.json and
+# ~/.codex/config.toml), idempotent, never touching other projects'
+# trust state.
+# ---------------------------------------------------------------------------
+
+
+def _install_claude_pretrust(project_dir: Path) -> str:
+    """Mark ``project_dir`` as trust-accepted in ``~/.claude.json``.
+
+    Schema (verified by probing a real Claude Code install):
+
+      {
+        "projects": {
+          "<abs-project-path>": {
+            "hasTrustDialogAccepted": true,
+            ...
+          }
+        }
+      }
+
+    Idempotent: returns ``"existing"`` if already True, ``"written"``
+    if newly added, ``"skipped: <reason>"`` on any failure (no crash —
+    pre-trust is opt-in and best-effort).
+    """
+    abs_dir = str(project_dir.resolve())
+    home_cfg = Path.home() / ".claude.json"
+    try:
+        if home_cfg.is_file():
+            data = json.loads(home_cfg.read_text(encoding="utf-8"))
+        else:
+            data = {}
+    except (OSError, json.JSONDecodeError) as exc:
+        return f"skipped: ~/.claude.json unreadable ({exc})"
+    if not isinstance(data, dict):
+        return "skipped: ~/.claude.json is not a JSON object"
+
+    projects = data.setdefault("projects", {})
+    if not isinstance(projects, dict):
+        return "skipped: ~/.claude.json's 'projects' is not an object"
+
+    entry = projects.setdefault(abs_dir, {})
+    if not isinstance(entry, dict):
+        return f"skipped: ~/.claude.json projects[{abs_dir}] is not an object"
+
+    if entry.get("hasTrustDialogAccepted") is True:
+        return "existing"
+
+    entry["hasTrustDialogAccepted"] = True
+    # Atomic write: tempfile + rename in the same directory.
+    tmp = home_cfg.with_suffix(home_cfg.suffix + ".tmp")
+    try:
+        tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        tmp.replace(home_cfg)
+    except OSError as exc:
+        return f"skipped: write failed ({exc})"
+    return "written"
+
+
+def _install_codex_pretrust(project_dir: Path) -> str:
+    """Mark ``project_dir`` as trusted in ``~/.codex/config.toml``.
+
+    Schema (verified):
+
+      [projects."<abs-project-path>"]
+      trust_level = "trusted"
+
+    Idempotent: returns ``"existing"`` if a matching block is already
+    present, ``"written"`` if newly added, ``"skipped: <reason>"`` on
+    any failure. Append-only — never modifies existing sections, so a
+    user-customized trust_level (e.g. "untrusted") is preserved.
+    """
+    abs_dir = str(project_dir.resolve())
+    home_cfg = Path.home() / ".codex" / "config.toml"
+    try:
+        home_cfg.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        return f"skipped: ~/.codex/ mkdir failed ({exc})"
+    try:
+        existing = home_cfg.read_text(encoding="utf-8") if home_cfg.is_file() else ""
+    except OSError as exc:
+        return f"skipped: ~/.codex/config.toml unreadable ({exc})"
+
+    marker = f'[projects."{abs_dir}"]'
+    if marker in existing:
+        return "existing"
+
+    # Append a fresh entry. Ensure a leading newline if the existing
+    # content doesn't end with one (avoid concatenating to the last line).
+    suffix = "" if existing.endswith("\n") or not existing else "\n"
+    block = f'\n{marker}\ntrust_level = "trusted"\n'
+    new_content = existing + suffix + block
+    tmp = home_cfg.with_suffix(home_cfg.suffix + ".tmp")
+    try:
+        tmp.write_text(new_content, encoding="utf-8")
+        tmp.replace(home_cfg)
+    except OSError as exc:
+        return f"skipped: write failed ({exc})"
+    return "written"
+
+
 @click.command(short_help="bootstrap a project (create queues + copy canon docs)",
                help=__doc__)
 @click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
@@ -207,8 +315,16 @@ def _copy_if_missing(src: Path, dst: Path, force: bool = False) -> str:
                    "(default: basename of project_dir). Must match "
                    "[A-Za-z0-9_.-]{1,64}; used as the systemd template "
                    "instance and the tmux session name.")
+@click.option("--pre-trust", "pre_trust", is_flag=True, default=False,
+              help="pre-accept Claude Code's 'Do you trust this folder?' "
+                   "and codex's 'Allow Codex to run' dialogs for this "
+                   "project. Writes a single per-project entry into "
+                   "~/.claude.json and ~/.codex/config.toml; idempotent; "
+                   "never touches other projects' entries. Intended for "
+                   "toy / test fleets where TESTER / STAND-KEEPER cannot "
+                   "walk dialogs interactively (task 0076).")
 def setup(project_dir: Path | None, force: bool, lang: str,
-          session: str | None) -> None:
+          session: str | None, pre_trust: bool) -> None:
     project_dir = (project_dir or Path.cwd()).resolve()
     project_dir.mkdir(parents=True, exist_ok=True)
     canon = find_canon_dir()
@@ -409,6 +525,17 @@ def setup(project_dir: Path | None, force: bool, lang: str,
             f"  codex profiles → ~/.codex/: {copied} copied, "
             f"{skipped} preserved (existing)"
         )
+
+    # Pre-trust install (task 0076) — opt-in. Adds ONE entry for this
+    # project's abs path into ~/.claude.json and ~/.codex/config.toml so
+    # TESTER / STAND-KEEPER can spawn fresh tool sessions on toy fleets
+    # without the trust dialog interrupting. Other projects' trust state
+    # is untouched.
+    if pre_trust:
+        claude_state = _install_claude_pretrust(project_dir)
+        codex_state = _install_codex_pretrust(project_dir)
+        info(f"  pre-trust → ~/.claude.json: {claude_state}")
+        info(f"  pre-trust → ~/.codex/config.toml: {codex_state}")
 
     # Register project with the daemon (task 0015) — runs on both
     # fresh-gen and skip-existing paths. Graceful degradation: if

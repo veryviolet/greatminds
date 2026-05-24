@@ -265,3 +265,145 @@ def test_shipped_codex_profiles_cover_loop_mode_roles():
     }
     missing = expected - shipped
     assert not missing, f"shipped codex profiles missing: {missing}"
+
+
+# ---------------------------------------------------------------------------
+# task 0076: pre-trust config installer (opt-in via --pre-trust)
+# ---------------------------------------------------------------------------
+
+
+def test_install_claude_pretrust_writes_entry_in_empty_config(tmp_path, monkeypatch):
+    """No prior ~/.claude.json → file created with our project marked
+    hasTrustDialogAccepted: true."""
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr(setup_mod.Path, "home", classmethod(lambda cls: home))
+    proj = tmp_path / "toy"
+    proj.mkdir()
+
+    result = setup_mod._install_claude_pretrust(proj)
+    assert result == "written"
+
+    data = json.loads((home / ".claude.json").read_text(encoding="utf-8"))
+    abs_proj = str(proj.resolve())
+    assert data["projects"][abs_proj]["hasTrustDialogAccepted"] is True
+
+
+def test_install_claude_pretrust_idempotent(tmp_path, monkeypatch):
+    """Second call when already True → 'existing', file unchanged."""
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr(setup_mod.Path, "home", classmethod(lambda cls: home))
+    proj = tmp_path / "toy"
+    proj.mkdir()
+
+    setup_mod._install_claude_pretrust(proj)  # first call
+    result = setup_mod._install_claude_pretrust(proj)  # second call
+    assert result == "existing"
+
+
+def test_install_claude_pretrust_preserves_other_projects(tmp_path, monkeypatch):
+    """Other projects' entries MUST NOT be touched."""
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr(setup_mod.Path, "home", classmethod(lambda cls: home))
+    proj = tmp_path / "toy"
+    proj.mkdir()
+
+    # Pre-seed with another project's entry.
+    pre = {
+        "projects": {
+            "/other/project": {
+                "hasTrustDialogAccepted": True,
+                "allowedTools": ["bash"],
+            },
+        },
+        "numStartups": 42,
+    }
+    (home / ".claude.json").write_text(json.dumps(pre), encoding="utf-8")
+
+    setup_mod._install_claude_pretrust(proj)
+    data = json.loads((home / ".claude.json").read_text(encoding="utf-8"))
+    assert data["projects"]["/other/project"]["hasTrustDialogAccepted"] is True
+    assert data["projects"]["/other/project"]["allowedTools"] == ["bash"]
+    assert data["numStartups"] == 42
+    abs_proj = str(proj.resolve())
+    assert data["projects"][abs_proj]["hasTrustDialogAccepted"] is True
+
+
+def test_install_codex_pretrust_writes_entry_in_empty_config(tmp_path, monkeypatch):
+    """No prior ~/.codex/config.toml → file created with our project
+    in a [projects."<abs>"] section trust_level = "trusted"."""
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr(setup_mod.Path, "home", classmethod(lambda cls: home))
+    proj = tmp_path / "toy"
+    proj.mkdir()
+
+    result = setup_mod._install_codex_pretrust(proj)
+    assert result == "written"
+
+    content = (home / ".codex" / "config.toml").read_text(encoding="utf-8")
+    abs_proj = str(proj.resolve())
+    assert f'[projects."{abs_proj}"]' in content
+    assert 'trust_level = "trusted"' in content
+
+
+def test_install_codex_pretrust_idempotent(tmp_path, monkeypatch):
+    """Second call → 'existing', file content unchanged."""
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr(setup_mod.Path, "home", classmethod(lambda cls: home))
+    proj = tmp_path / "toy"
+    proj.mkdir()
+
+    setup_mod._install_codex_pretrust(proj)
+    before = (home / ".codex" / "config.toml").read_text(encoding="utf-8")
+    result = setup_mod._install_codex_pretrust(proj)
+    assert result == "existing"
+    after = (home / ".codex" / "config.toml").read_text(encoding="utf-8")
+    assert before == after
+
+
+def test_install_codex_pretrust_append_only_preserves_existing(tmp_path, monkeypatch):
+    """Existing config.toml with model, other projects, etc. — pre-trust
+    appends ONLY a new section for our project. Existing content
+    (including other projects' trust_level) untouched."""
+    home = tmp_path / "home"
+    (home / ".codex").mkdir(parents=True)
+    monkeypatch.setattr(setup_mod.Path, "home", classmethod(lambda cls: home))
+    proj = tmp_path / "toy"
+    proj.mkdir()
+
+    pre = (
+        'model = "gpt-5.5"\n'
+        '\n'
+        '[projects."/other/proj"]\n'
+        'trust_level = "untrusted"\n'  # opposite of trusted; must be preserved
+    )
+    (home / ".codex" / "config.toml").write_text(pre, encoding="utf-8")
+
+    setup_mod._install_codex_pretrust(proj)
+    after = (home / ".codex" / "config.toml").read_text(encoding="utf-8")
+    # Preserved:
+    assert 'model = "gpt-5.5"' in after
+    assert '[projects."/other/proj"]' in after
+    assert 'trust_level = "untrusted"' in after
+    # Added:
+    abs_proj = str(proj.resolve())
+    assert f'[projects."{abs_proj}"]' in after
+
+
+def test_install_claude_pretrust_handles_malformed_json(tmp_path, monkeypatch):
+    """Malformed ~/.claude.json doesn't crash setup — returns
+    'skipped: ...' diagnostic."""
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr(setup_mod.Path, "home", classmethod(lambda cls: home))
+    (home / ".claude.json").write_text("{this is not json", encoding="utf-8")
+    proj = tmp_path / "toy"
+    proj.mkdir()
+
+    result = setup_mod._install_claude_pretrust(proj)
+    assert result.startswith("skipped:")
+    assert "unreadable" in result
