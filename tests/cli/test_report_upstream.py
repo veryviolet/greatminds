@@ -410,3 +410,118 @@ def test_default_mode_is_url_when_no_flag_and_no_coord_setting(tmp_path, monkeyp
     assert len(opened) == 1
 
 
+# ---------------------------------------------------------------------------
+# task 0034: venv layout reports install kind (PEP 610 direct_url.json) —
+# editable vs PyPI wheel vs local file/wheel/sdist vs VCS.
+# ---------------------------------------------------------------------------
+
+
+def _fake_venv(root: Path, dist_info_files: dict[str, str] | None) -> Path:
+    """Build a minimal fake venv layout: bin/python + a
+    greatminds-X.Y.dist-info/ containing the named files. Pass ``None``
+    for ``dist_info_files`` to make greatminds absent (venv with no
+    package); omit ``direct_url.json`` to model a registry install.
+    """
+    (root / "bin").mkdir(parents=True, exist_ok=True)
+    (root / "bin" / "python").write_text("#!shebang\n", encoding="utf-8")
+    sp = root / "lib" / "python3.12" / "site-packages"
+    sp.mkdir(parents=True, exist_ok=True)
+    if dist_info_files is None:
+        return root
+    dist_info = sp / "greatminds-1.2.0.dist-info"
+    dist_info.mkdir()
+    for name, content in dist_info_files.items():
+        (dist_info / name).write_text(content, encoding="utf-8")
+    return root
+
+
+def test_venv_install_kind_pypi_when_no_direct_url(tmp_path):
+    """Modern pip/uv only write direct_url.json for direct-URL installs;
+    its absence is the PyPI-registry-install signal."""
+    venv = _fake_venv(tmp_path / "v", {"METADATA": "Name: greatminds\n"})
+    assert ru_mod._venv_install_kind(venv) == "PyPI wheel"
+
+
+def test_venv_install_kind_editable_when_direct_url_says_so(tmp_path):
+    venv = _fake_venv(tmp_path / "v", {
+        "METADATA": "Name: greatminds\n",
+        "direct_url.json": json.dumps({
+            "url": "file:///home/dev/greatminds",
+            "dir_info": {"editable": True},
+        }),
+    })
+    out = ru_mod._venv_install_kind(venv)
+    assert out.startswith("editable"), out
+    assert "file:///home/dev/greatminds" in out
+
+
+def test_venv_install_kind_local_wheel(tmp_path):
+    venv = _fake_venv(tmp_path / "v", {
+        "METADATA": "Name: greatminds\n",
+        "direct_url.json": json.dumps({
+            "url": "file:///tmp/greatminds-1.2.0-py3-none-any.whl",
+            "archive_info": {"hash": "sha256=abc"},
+        }),
+    })
+    assert ru_mod._venv_install_kind(venv) == "local wheel/sdist"
+
+
+def test_venv_install_kind_vcs(tmp_path):
+    venv = _fake_venv(tmp_path / "v", {
+        "METADATA": "Name: greatminds\n",
+        "direct_url.json": json.dumps({
+            "url": "https://github.com/veryviolet/greatminds",
+            "vcs_info": {"vcs": "git", "commit_id": "abc"},
+        }),
+    })
+    assert ru_mod._venv_install_kind(venv) == "VCS"
+
+
+def test_venv_install_kind_absent_when_no_python(tmp_path):
+    """Empty dir / venv without bin/python = absent (not 'not installed')."""
+    (tmp_path / "empty").mkdir()
+    assert ru_mod._venv_install_kind(tmp_path / "empty") == "absent"
+
+
+def test_venv_install_kind_not_installed_when_no_dist_info(tmp_path):
+    """Venv exists, python present, but greatminds is not installed."""
+    venv = _fake_venv(tmp_path / "v", None)
+    assert ru_mod._venv_install_kind(venv) == "greatminds not installed"
+
+
+def test_venv_install_kind_bad_direct_url_returns_unknown(tmp_path):
+    venv = _fake_venv(tmp_path / "v", {
+        "METADATA": "Name: greatminds\n",
+        "direct_url.json": "{this is not valid json",
+    })
+    assert ru_mod._venv_install_kind(venv) == "unknown"
+
+
+def test_venv_layout_mixed_two_venvs(tmp_path):
+    """Two-venv layout: .venv editable + .venv-coord PyPI — common dev shape."""
+    _fake_venv(tmp_path / ".venv", {
+        "METADATA": "Name: greatminds\n",
+        "direct_url.json": json.dumps({
+            "url": "file:///opt/greatminds",
+            "dir_info": {"editable": True},
+        }),
+    })
+    _fake_venv(tmp_path / ".venv-coord", {"METADATA": "Name: greatminds\n"})
+    out = ru_mod._venv_layout(tmp_path)
+    assert ".venv/ (editable" in out
+    assert ".venv-coord/ (PyPI wheel)" in out
+
+
+def test_venv_layout_pypi_only_no_longer_says_editable(tmp_path):
+    """Regression: the 1.2.0 bug labelled a PyPI uv-installed .venv as
+    'editable only'. After the fix it must say 'PyPI wheel'."""
+    _fake_venv(tmp_path / ".venv", {"METADATA": "Name: greatminds\n"})
+    out = ru_mod._venv_layout(tmp_path)
+    assert "PyPI wheel" in out
+    assert "editable" not in out
+
+
+def test_venv_layout_no_venvs(tmp_path):
+    assert ru_mod._venv_layout(tmp_path) == "no project-local venv detected"
+
+

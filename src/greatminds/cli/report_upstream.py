@@ -108,15 +108,63 @@ def _project_name(coord_dir: Path) -> str:
     return m.group(1) if m else "unknown"
 
 
+def _venv_install_kind(venv_root: Path) -> str:
+    """Classify a project-local venv by how ``greatminds`` got into it.
+
+    Returns one of: ``"absent"`` (no python in this venv),
+    ``"editable"`` (PEP 610 direct_url.json says ``dir_info.editable``),
+    ``"local wheel/sdist"`` (PEP 610 archive_info points at a file),
+    ``"VCS"`` (PEP 610 vcs_info), ``"PyPI wheel"`` (no direct_url.json
+    = registry install — the common ``pip install greatminds`` /
+    ``uv add greatminds`` shape), ``"greatminds not installed"``,
+    or ``"unknown"`` if site-packages is missing/unreadable.
+    """
+    if not (venv_root / "bin" / "python").is_file():
+        return "absent"
+    lib = venv_root / "lib"
+    if not lib.is_dir():
+        return "unknown"
+    for py_dir in sorted(lib.iterdir()):
+        sp = py_dir / "site-packages"
+        if not sp.is_dir():
+            continue
+        dist_infos = sorted(sp.glob("greatminds-*.dist-info"))
+        if not dist_infos:
+            continue
+        dist_info = dist_infos[-1]  # newest if multiple
+        durl = dist_info / "direct_url.json"
+        if durl.is_file():
+            try:
+                data = json.loads(durl.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                return "unknown"
+            dir_info = data.get("dir_info") or {}
+            if dir_info.get("editable") is True:
+                src = data.get("url", "")
+                return f"editable from {src}" if src else "editable"
+            if data.get("archive_info"):
+                return "local wheel/sdist"
+            if data.get("vcs_info"):
+                return "VCS"
+            return "direct URL"
+        # Modern pip/uv only write direct_url.json for direct-URL installs;
+        # absence means the package came from an index — typically PyPI.
+        return "PyPI wheel"
+    return "greatminds not installed"
+
+
 def _venv_layout(project_root: Path) -> str:
-    have_dev = (project_root / ".venv" / "bin" / "python").is_file()
-    have_coord = (project_root / ".venv-coord" / "bin" / "python").is_file()
-    if have_dev and have_coord:
-        return ".venv/ (editable) + .venv-coord/ (PyPI-pinned)"
-    if have_dev:
-        return ".venv/ (editable only)"
-    if have_coord:
-        return ".venv-coord/ (PyPI-pinned only)"
+    """One-line summary of project-local venvs and how greatminds got in."""
+    dev_kind = _venv_install_kind(project_root / ".venv")
+    coord_kind = _venv_install_kind(project_root / ".venv-coord")
+    dev_present = dev_kind != "absent"
+    coord_present = coord_kind != "absent"
+    if dev_present and coord_present:
+        return f".venv/ ({dev_kind}) + .venv-coord/ ({coord_kind})"
+    if dev_present:
+        return f".venv/ ({dev_kind})"
+    if coord_present:
+        return f".venv-coord/ ({coord_kind})"
     return "no project-local venv detected"
 
 
