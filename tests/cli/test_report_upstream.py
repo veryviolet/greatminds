@@ -411,117 +411,130 @@ def test_default_mode_is_url_when_no_flag_and_no_coord_setting(tmp_path, monkeyp
 
 
 # ---------------------------------------------------------------------------
-# task 0034: venv layout reports install kind (PEP 610 direct_url.json) —
-# editable vs PyPI wheel vs local file/wheel/sdist vs VCS.
+# task 0044: venv-kind detection reads the running greatminds's own
+# importlib.metadata distribution; downstream consumers have ONE .venv/, so
+# we no longer probe arbitrary .venv-coord/ paths (a greatminds-dev-only
+# convention). _venv_layout() emits "<sys.prefix> (<kind>)" — single line.
 # ---------------------------------------------------------------------------
 
 
-def _fake_venv(root: Path, dist_info_files: dict[str, str] | None) -> Path:
-    """Build a minimal fake venv layout: bin/python + a
-    greatminds-X.Y.dist-info/ containing the named files. Pass ``None``
-    for ``dist_info_files`` to make greatminds absent (venv with no
-    package); omit ``direct_url.json`` to model a registry install.
+class _FakeDistribution:
+    """Stand-in for importlib.metadata.Distribution.
+
+    Implements only ``read_text(name)`` since that's what _venv_install_kind
+    uses; matches the contract that returns None when the file is absent.
     """
-    (root / "bin").mkdir(parents=True, exist_ok=True)
-    (root / "bin" / "python").write_text("#!shebang\n", encoding="utf-8")
-    sp = root / "lib" / "python3.12" / "site-packages"
-    sp.mkdir(parents=True, exist_ok=True)
-    if dist_info_files is None:
-        return root
-    dist_info = sp / "greatminds-1.2.0.dist-info"
-    dist_info.mkdir()
-    for name, content in dist_info_files.items():
-        (dist_info / name).write_text(content, encoding="utf-8")
-    return root
+
+    def __init__(self, files: dict[str, str]):
+        self._files = files
+
+    def read_text(self, name: str) -> str | None:
+        return self._files.get(name)
 
 
-def test_venv_install_kind_pypi_when_no_direct_url(tmp_path):
+def _install_fake_dist(monkeypatch, files: dict[str, str] | None) -> None:
+    """Patch importlib.metadata.distribution to return a controlled
+    fake (or raise PackageNotFoundError when files is None)."""
+    def _fake(name: str):
+        if name != "greatminds" or files is None:
+            raise ru_mod.importlib.metadata.PackageNotFoundError(name)
+        return _FakeDistribution(files)
+    monkeypatch.setattr(ru_mod.importlib.metadata, "distribution", _fake)
+
+
+def test_venv_install_kind_pypi_when_no_direct_url(monkeypatch):
     """Modern pip/uv only write direct_url.json for direct-URL installs;
     its absence is the PyPI-registry-install signal."""
-    venv = _fake_venv(tmp_path / "v", {"METADATA": "Name: greatminds\n"})
-    assert ru_mod._venv_install_kind(venv) == "PyPI wheel"
+    _install_fake_dist(monkeypatch, {"METADATA": "Name: greatminds\n"})
+    assert ru_mod._venv_install_kind() == "PyPI wheel"
 
 
-def test_venv_install_kind_editable_when_direct_url_says_so(tmp_path):
-    venv = _fake_venv(tmp_path / "v", {
-        "METADATA": "Name: greatminds\n",
+def test_venv_install_kind_editable_when_direct_url_says_so(monkeypatch):
+    _install_fake_dist(monkeypatch, {
         "direct_url.json": json.dumps({
             "url": "file:///home/dev/greatminds",
             "dir_info": {"editable": True},
         }),
     })
-    out = ru_mod._venv_install_kind(venv)
+    out = ru_mod._venv_install_kind()
     assert out.startswith("editable"), out
     assert "file:///home/dev/greatminds" in out
 
 
-def test_venv_install_kind_local_wheel(tmp_path):
-    venv = _fake_venv(tmp_path / "v", {
-        "METADATA": "Name: greatminds\n",
+def test_venv_install_kind_local_wheel(monkeypatch):
+    _install_fake_dist(monkeypatch, {
         "direct_url.json": json.dumps({
             "url": "file:///tmp/greatminds-1.2.0-py3-none-any.whl",
             "archive_info": {"hash": "sha256=abc"},
         }),
     })
-    assert ru_mod._venv_install_kind(venv) == "local wheel/sdist"
+    assert ru_mod._venv_install_kind() == "local wheel/sdist"
 
 
-def test_venv_install_kind_vcs(tmp_path):
-    venv = _fake_venv(tmp_path / "v", {
-        "METADATA": "Name: greatminds\n",
+def test_venv_install_kind_vcs(monkeypatch):
+    _install_fake_dist(monkeypatch, {
         "direct_url.json": json.dumps({
             "url": "https://github.com/veryviolet/greatminds",
             "vcs_info": {"vcs": "git", "commit_id": "abc"},
         }),
     })
-    assert ru_mod._venv_install_kind(venv) == "VCS"
+    assert ru_mod._venv_install_kind() == "VCS"
 
 
-def test_venv_install_kind_absent_when_no_python(tmp_path):
-    """Empty dir / venv without bin/python = absent (not 'not installed')."""
-    (tmp_path / "empty").mkdir()
-    assert ru_mod._venv_install_kind(tmp_path / "empty") == "absent"
+def test_venv_install_kind_not_installed_when_package_missing(monkeypatch):
+    """importlib.metadata raises PackageNotFoundError → reported as such."""
+    _install_fake_dist(monkeypatch, None)
+    assert ru_mod._venv_install_kind() == "greatminds not installed"
 
 
-def test_venv_install_kind_not_installed_when_no_dist_info(tmp_path):
-    """Venv exists, python present, but greatminds is not installed."""
-    venv = _fake_venv(tmp_path / "v", None)
-    assert ru_mod._venv_install_kind(venv) == "greatminds not installed"
-
-
-def test_venv_install_kind_bad_direct_url_returns_unknown(tmp_path):
-    venv = _fake_venv(tmp_path / "v", {
-        "METADATA": "Name: greatminds\n",
+def test_venv_install_kind_bad_direct_url_returns_unknown(monkeypatch):
+    _install_fake_dist(monkeypatch, {
         "direct_url.json": "{this is not valid json",
     })
-    assert ru_mod._venv_install_kind(venv) == "unknown"
+    assert ru_mod._venv_install_kind() == "unknown"
 
 
-def test_venv_layout_mixed_two_venvs(tmp_path):
-    """Two-venv layout: .venv editable + .venv-coord PyPI — common dev shape."""
-    _fake_venv(tmp_path / ".venv", {
-        "METADATA": "Name: greatminds\n",
-        "direct_url.json": json.dumps({
-            "url": "file:///opt/greatminds",
-            "dir_info": {"editable": True},
-        }),
-    })
-    _fake_venv(tmp_path / ".venv-coord", {"METADATA": "Name: greatminds\n"})
-    out = ru_mod._venv_layout(tmp_path)
-    assert ".venv/ (editable" in out
-    assert ".venv-coord/ (PyPI wheel)" in out
+def test_venv_layout_emits_sys_prefix_and_kind(monkeypatch):
+    """``venv:`` line must be ``<sys.prefix> (<kind>)`` — one venv, one path."""
+    _install_fake_dist(monkeypatch, {"METADATA": "Name: greatminds\n"})
+    monkeypatch.setattr(ru_mod.sys, "prefix", "/home/user/proj/.venv")
+    out = ru_mod._venv_layout()
+    assert out == "/home/user/proj/.venv (PyPI wheel)", out
 
 
-def test_venv_layout_pypi_only_no_longer_says_editable(tmp_path):
-    """Regression: the 1.2.0 bug labelled a PyPI uv-installed .venv as
-    'editable only'. After the fix it must say 'PyPI wheel'."""
-    _fake_venv(tmp_path / ".venv", {"METADATA": "Name: greatminds\n"})
-    out = ru_mod._venv_layout(tmp_path)
-    assert "PyPI wheel" in out
-    assert "editable" not in out
+def test_venv_layout_never_mentions_venv_coord(monkeypatch, tmp_path):
+    """task 0044 regression: ``.venv-coord/`` is a greatminds-dev-only
+    convention; shipped diagnostics must never imply it."""
+    _install_fake_dist(monkeypatch, {"METADATA": "Name: greatminds\n"})
+    monkeypatch.setattr(ru_mod.sys, "prefix", str(tmp_path / ".venv"))
+    out = ru_mod._venv_layout()
+    assert ".venv-coord" not in out, (
+        f"shipped report-upstream must not mention .venv-coord/; got: {out}"
+    )
 
 
-def test_venv_layout_no_venvs(tmp_path):
-    assert ru_mod._venv_layout(tmp_path) == "no project-local venv detected"
+def test_full_report_body_environment_line_no_venv_coord(monkeypatch, tmp_path):
+    """End-to-end: the assembled report body's Environment section must
+    contain a single ``venv:`` line referring to sys.prefix only, with no
+    trace of ``.venv-coord/`` anywhere — even on a project_root that
+    happens to have such a directory next to it."""
+    _install_fake_dist(monkeypatch, {"METADATA": "Name: greatminds\n"})
+    monkeypatch.setattr(ru_mod.sys, "prefix", "/home/u/p/.venv")
+    # Decoy: a .venv-coord/ directory next to project_root.
+    proj = tmp_path / "proj"
+    coord = proj / "coordination"
+    coord.mkdir(parents=True)
+    (proj / ".venv-coord").mkdir()
+    (proj / ".venv-coord" / "bin").mkdir()
+    (proj / ".venv-coord" / "bin" / "python").write_text("#!\n")
+
+    body, _ = ru_mod._build_body(
+        title="t", severity="medium",
+        user_body="symptom text",
+        project_root=proj, coord_dir=coord,
+        include_diagnostics=True,
+    )
+    assert ".venv-coord" not in body, body
+    assert "venv: /home/u/p/.venv (PyPI wheel)" in body
 
 

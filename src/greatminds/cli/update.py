@@ -2,8 +2,9 @@
 
 Three moving parts to keep in sync after a release:
 
-  1. The package itself in ``.venv-coord/`` (or whatever venv shipped
-     greatminds to this host).
+  1. The package itself in the venv where ``greatminds`` is installed
+     (typically the project's ``.venv/`` from ``uv add greatminds`` or
+     ``pip install greatminds``).
   2. The systemd-user daemon ``greatminds-daemon@<project>.service``
      (per-project, refactored in task 0008).
   3. The tmux agents (restarted via ``greatminds restart`` from 0001).
