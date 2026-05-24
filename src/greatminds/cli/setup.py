@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -28,7 +29,36 @@ from pathlib import Path
 import click
 
 from greatminds.core.paths import find_canon_dir
-from greatminds.cli._colors import header, info, ok, warn
+from greatminds.cli._colors import err, header, info, ok, warn
+
+
+SESSION_RE = re.compile(r"^[A-Za-z0-9_.\-]{1,64}$")
+
+
+def _default_session_name(project_dir: Path) -> str:
+    """Default session name = basename(project_dir.resolve()).
+
+    Strips a single leading dot (so e.g. ``/opt/.work`` → ``work``).
+    Falls back to ``"agents"`` when basename resolves empty (``/``).
+    """
+    try:
+        name = project_dir.resolve().name
+    except (OSError, RuntimeError):
+        name = ""
+    if name.startswith("."):
+        name = name[1:]
+    return name or "agents"
+
+
+def _validate_session_name(name: str) -> None:
+    """Raise Click Exit(2) on an invalid session name.
+
+    Disallowed: empty, whitespace, ``/``, ``:``, ``@``, length > 64.
+    Allowed alphabet: ``[A-Za-z0-9_.-]``.
+    """
+    if not SESSION_RE.match(name):
+        err(f"session name must match `[A-Za-z0-9_.-]{{1,64}}` — got {name!r}")
+        raise click.exceptions.Exit(2)
 
 
 def _greatminds_bin() -> str:
@@ -129,13 +159,21 @@ def _copy_if_missing(src: Path, dst: Path, force: bool = False) -> str:
 @click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
               default=None, help="project root (default: cwd)")
 @click.option("--force", is_flag=True,
-              help="overwrite coord.yaml and PROJECT.md if present")
+              help="overwrite PROJECT.md if present. NOTE: coord.yaml "
+                   "is NEVER overwritten by setup (init-style — delete it "
+                   "first to regenerate). --force does not apply to coord.yaml.")
 @click.option("--lang", "lang", default="en", metavar="CODE",
               help="user-facing language for agents (chat replies, console "
                    "status, errors). ISO code: en, ru, zh, es, fr, ja, etc. "
                    "Internal artifacts (task fields, journal, code) stay "
                    "English regardless. Default: en.")
-def setup(project_dir: Path | None, force: bool, lang: str) -> None:
+@click.option("--session", "session", default=None, metavar="NAME",
+              help="canonical session name for the generated coord.yaml "
+                   "(default: basename of project_dir). Must match "
+                   "[A-Za-z0-9_.-]{1,64}; used as the systemd template "
+                   "instance and the tmux session name.")
+def setup(project_dir: Path | None, force: bool, lang: str,
+          session: str | None) -> None:
     project_dir = (project_dir or Path.cwd()).resolve()
     project_dir.mkdir(parents=True, exist_ok=True)
     canon = find_canon_dir()
@@ -146,9 +184,31 @@ def setup(project_dir: Path | None, force: bool, lang: str) -> None:
     # kept locally so humans can `cat <project>/DEVELOPER.md` without
     # importing the package).
     header("\nproject-root config:")
-    coord_example = canon / "coord.example.yaml"
-    if coord_example.is_file():
-        info(f"  coord.yaml: {_copy_if_missing(coord_example, project_dir / 'coord.yaml', force)}")
+
+    # coord.yaml generation (init-style: never overwrite a user-edited file).
+    # The canonical 11-window roster lives in src/greatminds/data/coord.yaml.template;
+    # we substitute {SESSION, PROJECT_DIR} into it and write to <project>/coord.yaml.
+    coord_yaml_path = project_dir / "coord.yaml"
+    if coord_yaml_path.is_file():
+        info(f"  coord.yaml: exists, skipping — delete it first to regenerate")
+    else:
+        # `session is None` → flag omitted, derive default;
+        # `session == ""` → user explicitly passed empty, treat as invalid.
+        session_name = (
+            _default_session_name(project_dir) if session is None else session
+        )
+        _validate_session_name(session_name)
+        template_path = canon / "coord.yaml.template"
+        if template_path.is_file():
+            tpl = template_path.read_text(encoding="utf-8")
+            body = (
+                tpl.replace("__SESSION__", session_name)
+                   .replace("__PROJECT_DIR__", str(project_dir))
+            )
+            coord_yaml_path.write_text(body, encoding="utf-8")
+            info(f"  coord.yaml: written (session: {session_name})")
+        else:
+            warn("  coord.yaml: template missing in canon, skipping generation")
     info(f"  schema.yaml: {_copy_if_missing(canon / 'schema.yaml', project_dir / 'schema.yaml', force=True)}")
     info(f"  command_START.yaml: {_copy_if_missing(canon / 'command_START.yaml', project_dir / 'command_START.yaml', force=True)}")
     info(f"  COORDINATE.md: {_copy_if_missing(canon / 'COORDINATE.md', project_dir / 'COORDINATE.md', force=True)}")
