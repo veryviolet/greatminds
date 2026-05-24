@@ -130,33 +130,94 @@ def _detect_trust_state(pane_text: str) -> str:
     return "ready"
 
 
-def _ensure_coordd() -> None:
+def _systemd_unit_file_exists(unit: str) -> bool:
+    """True if systemctl --user has a unit FILE matching ``unit``. Used
+    to detect installed template units (e.g. ``greatminds-daemon@.service``)
+    and legacy singletons (``coordd.service``)."""
+    cp = _systemctl("list-unit-files", "--no-legend", unit)
+    if cp.returncode != 0:
+        return False
+    return bool(cp.stdout.strip())
+
+
+# task 0055: candidates the per-project daemon mechanism can be served
+# by. Each entry is ``(template_unit_to_check, runtime_unit_to_start)``.
+# - per-project template: list-unit-files shows ``greatminds-daemon@.service``
+#   (NOT the instance — systemd's template unit is the file on disk);
+#   start the instance ``greatminds-daemon@<session>.service`` which
+#   systemd instantiates from the template at runtime. (REVIEWER caught
+#   the iter-1 mismatch here.)
+# - legacy singleton: list-unit-files AND start use the same name.
+def _daemon_candidates(session: str | None) -> list[tuple[str, str]]:
+    out: list[tuple[str, str]] = []
+    if session:
+        out.append(("greatminds-daemon@.service",
+                    f"greatminds-daemon@{session}.service"))
+    out.append(("coordd.service", "coordd.service"))
+    return out
+
+
+def _ensure_coordd(session: str | None = None) -> None:
+    """Ensure the coordd daemon is running for this project.
+
+    Per-project units (template ``greatminds-daemon@.service`` →
+    instance ``greatminds-daemon@<session>.service``, task 0008) are
+    preferred. Legacy singleton ``coordd.service`` is a fallback.
+    **Critical (task 0055):** if no daemon unit file exists at all,
+    log a WARN and RETURN — restart's primary value is the tmux
+    Enter recovery path, which must still fire. Earlier behavior
+    (exit 1 on missing coordd.service) was a regression from the
+    1.2.0 daemon refactor.
+    """
     _log("==> coordd: ensure running")
-    if _systemctl("is-active", "--quiet", "coordd").returncode == 0:
-        main_pid = _systemctl(
-            "show", "-p", "MainPID", "--value", "coordd"
-        ).stdout.strip()
-        _log(f"    coordd: active ({main_pid})")
-        return
-    _log("    coordd not active, starting...")
-    started = _systemctl("start", "coordd")
-    if started.returncode != 0:
-        err(
-            "    ERROR: systemctl --user start coordd failed: "
-            f"{started.stderr.strip()}"
+    candidates = _daemon_candidates(session)
+
+    # First pass: any candidate's runtime instance already active?
+    for _template, runtime in candidates:
+        if _systemctl("is-active", "--quiet", runtime).returncode == 0:
+            main_pid = _systemctl(
+                "show", "-p", "MainPID", "--value", runtime,
+            ).stdout.strip()
+            _log(f"    {runtime}: active ({main_pid})")
+            return
+
+    # Second pass: for each candidate whose UNIT FILE exists on disk,
+    # try to start its runtime instance. Template units don't carry
+    # instance-name in their filename — list-unit-files reports the
+    # template (e.g. ``greatminds-daemon@.service``) while ``systemctl
+    # start`` takes the instance name (``greatminds-daemon@<session>.service``).
+    for template, runtime in candidates:
+        if not _systemd_unit_file_exists(template):
+            continue
+        _log(f"    {runtime}: not active, starting from template "
+             f"{template}...")
+        started = _systemctl("start", runtime)
+        if started.returncode != 0:
+            _log(
+                f"    WARN: systemctl --user start {runtime} failed: "
+                f"{started.stderr.strip()}"
+            )
+            continue
+        time.sleep(1)
+        if _systemctl("is-active", "--quiet", runtime).returncode == 0:
+            main_pid = _systemctl(
+                "show", "-p", "MainPID", "--value", runtime,
+            ).stdout.strip()
+            _log(f"    {runtime}: active ({main_pid})")
+            return
+        _log(
+            f"    WARN: {runtime} failed to come up — "
+            f"inspect `journalctl --user -u {runtime}`"
         )
-        raise click.exceptions.Exit(1)
-    time.sleep(1)
-    if _systemctl("is-active", "--quiet", "coordd").returncode != 0:
-        err(
-            "    ERROR: coordd failed to start — "
-            "inspect `journalctl --user -u coordd`"
-        )
-        raise click.exceptions.Exit(1)
-    main_pid = _systemctl(
-        "show", "-p", "MainPID", "--value", "coordd"
-    ).stdout.strip()
-    _log(f"    coordd: active ({main_pid})")
+
+    # No daemon unit available — degrade gracefully. tmux Enter recovery
+    # below is the user-visible value of `greatminds restart`; the daemon
+    # is for nudges, not required for restart to do its primary job.
+    _log(
+        "    WARN: no coordd unit installed for this project. "
+        "Continuing with tmux Enter recovery. Install via: "
+        "`greatminds daemon install`"
+    )
 
 
 def _ensure_tmux_session(session: str, project_dir: Path) -> None:
@@ -356,7 +417,7 @@ def restart(config_path: Path | None, project_dir: Path | None) -> None:
 
     registry_dir = project_dir / "coordination" / ".agent_registry"
 
-    _ensure_coordd()
+    _ensure_coordd(session)
     _ensure_tmux_session(session, project_dir)
     _restart_dead_agents(registry_dir, windows, session)
     rc = _verify(registry_dir, windows, VERIFY_WAIT_SEC, session)

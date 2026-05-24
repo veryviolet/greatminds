@@ -149,42 +149,128 @@ def test_coordd_already_active_no_start_call(env):
     env.sub.set(("systemctl", "--user", "is-active"), rc=0)
     _run(env)
     assert env.sub.find("systemctl", "is-active")
-    assert not env.sub.find("systemctl", "start", "coordd"), \
-        "systemctl --user start coordd must NOT be called when active"
+    assert not env.sub.find("systemctl", "start"), \
+        "systemctl --user start must NOT be called when a unit is active"
 
 
-def test_coordd_inactive_then_started(env):
-    _write_coord_yaml(env.project_dir)
-    # Two is-active probes: first NO (rc=3), second YES (rc=0).
+def test_coordd_per_project_template_present_starts_instance(env):
+    """task 0055 (b) — REVIEWER catch: systemctl installs the TEMPLATE
+    unit ``greatminds-daemon@.service``; instances are created on-the-fly
+    at start time. The detector must check for the template, not for
+    the instance, and start the instance from it."""
+    _write_coord_yaml(env.project_dir, session="myproj")
+
+    # Both is-active probes fail initially (no instance currently active).
+    env.sub.set(("systemctl", "--user", "is-active"), rc=3)
+
+    # list-unit-files: TEMPLATE unit file exists; legacy coordd does NOT.
+    def list_unit_files(cmd):
+        unit = cmd[-1]
+        if unit == "greatminds-daemon@.service":
+            return subprocess.CompletedProcess(
+                list(cmd), 0,
+                "greatminds-daemon@.service enabled\n", "",
+            )
+        return subprocess.CompletedProcess(list(cmd), 0, "", "")
+    env.sub.handlers.append((
+        lambda cmd: tuple(cmd[:4]) == (
+            "systemctl", "--user", "list-unit-files", "--no-legend",
+        ),
+        list_unit_files,
+    ))
+    # After "start" the next is-active should report active.
     calls = {"n": 0}
-
-    def is_active_handler(cmd):
+    def is_active_after_start(cmd):
         calls["n"] += 1
-        rc = 3 if calls["n"] == 1 else 0
+        rc = 0 if calls["n"] > 2 else 3  # first two pre-start probes fail
         return subprocess.CompletedProcess(list(cmd), rc, "", "")
-
     env.sub.handlers.append((
         lambda cmd: tuple(cmd[:3]) == ("systemctl", "--user", "is-active"),
-        is_active_handler,
+        is_active_after_start,
     ))
-    env.sub.set(("systemctl", "--user", "start", "coordd"), rc=0)
+    env.sub.set(("systemctl", "--user", "start",
+                 "greatminds-daemon@myproj.service"), rc=0)
 
     result = _run(env)
-    starts = env.sub.find("systemctl", "start", "coordd")
-    assert len(starts) == 1
-    # Verify exited 1 (registries empty), but coordd path succeeded.
-    assert "ERROR: coordd failed to start" not in result.output
+    # The INSTANCE was started exactly once (systemd creates the instance
+    # from the template at start time).
+    starts = env.sub.find("systemctl", "start",
+                          "greatminds-daemon@myproj.service")
+    assert len(starts) == 1, env.sub.calls
+    # Legacy coordd NOT started.
+    assert not env.sub.find("systemctl", "start", "coordd.service")
+    # list-unit-files was queried with the TEMPLATE name, not the instance.
+    list_calls = env.sub.find("systemctl", "list-unit-files")
+    template_queries = [c for c in list_calls
+                        if "greatminds-daemon@.service" in c]
+    instance_queries = [c for c in list_calls
+                        if "greatminds-daemon@myproj.service" in c]
+    assert template_queries, "must query template unit file existence"
+    assert not instance_queries, \
+        "must NOT query for the instance unit file (it doesn't exist on disk)"
 
 
-def test_coordd_fails_to_start(env):
-    _write_coord_yaml(env.project_dir)
-    # Both is-active probes return failure.
+def test_coordd_no_daemon_unit_at_all_warns_and_continues(env):
+    """task 0055 (c) — the actual regression: no daemon unit installed
+    must NOT cause exit 1. restart's tmux Enter recovery is the
+    user-visible value and must still fire."""
+    _write_coord_yaml(env.project_dir, session="myproj",
+                      windows=[{"name": "dev", "role": "DEVELOPER",
+                                "tool": "claude"}])
+    env.alive.add(701)
+    _write_registry(env.project_dir, "developer", pid=701, with_sock=True)
+
+    # No unit ever active; list-unit-files returns empty for every unit.
     env.sub.set(("systemctl", "--user", "is-active"), rc=3)
-    env.sub.set(("systemctl", "--user", "start", "coordd"), rc=0)
+    env.sub.set(("systemctl", "--user", "list-unit-files"), rc=0, stdout="")
 
     result = _run(env)
-    assert result.exit_code == 1
-    assert "coordd failed to start" in result.output
+    # Must NOT exit 1 on missing daemon — and any non-zero must NOT be
+    # because "coordd not found" / "failed to start".
+    assert "WARN: no coordd unit installed" in result.output
+    # No systemctl start was attempted at all.
+    assert not env.sub.find("systemctl", "start"), \
+        "no start call when no unit exists"
+
+
+def test_coordd_legacy_unit_fallback_when_per_project_missing(env):
+    """task 0055 (d): only legacy coordd.service is installed → it
+    gets used as the fallback (existing 1.0.x behavior preserved)."""
+    _write_coord_yaml(env.project_dir, session="myproj")
+
+    env.sub.set(("systemctl", "--user", "is-active"), rc=3)
+    def list_unit_files(cmd):
+        unit = cmd[-1]
+        if unit == "coordd.service":
+            return subprocess.CompletedProcess(
+                list(cmd), 0, "coordd.service enabled\n", "",
+            )
+        return subprocess.CompletedProcess(list(cmd), 0, "", "")
+    env.sub.handlers.append((
+        lambda cmd: tuple(cmd[:4]) == (
+            "systemctl", "--user", "list-unit-files", "--no-legend",
+        ),
+        list_unit_files,
+    ))
+    calls = {"n": 0}
+    def is_active(cmd):
+        calls["n"] += 1
+        # First two pre-start probes fail, post-start active.
+        rc = 0 if calls["n"] > 2 else 3
+        return subprocess.CompletedProcess(list(cmd), rc, "", "")
+    env.sub.handlers.append((
+        lambda cmd: tuple(cmd[:3]) == ("systemctl", "--user", "is-active"),
+        is_active,
+    ))
+    env.sub.set(("systemctl", "--user", "start", "coordd.service"), rc=0)
+
+    result = _run(env)
+    starts_legacy = env.sub.find("systemctl", "start", "coordd.service")
+    starts_perproj = env.sub.find("systemctl", "start",
+                                   "greatminds-daemon@myproj.service")
+    assert len(starts_legacy) == 1, env.sub.calls
+    # Per-project unit start NOT attempted (it didn't exist).
+    assert not starts_perproj
 
 
 # ---------------------------------------------------------------------------
