@@ -1,0 +1,205 @@
+"""Regression tests for `transitions_for` / `can_role_move`.
+
+Bug context: schema.yaml may legitimately carry multiple `transitions[]`
+rows with the same `(from, to)` and different `by:` roles — e.g.
+`review_sessions → archive` permits both ARCHITECT-PLANNER and EXPLORER.
+Previously `transition_for` returned the first match only, blocking
+whichever role appeared second.
+"""
+from __future__ import annotations
+
+import pytest
+
+from greatminds.cli import task as task_mod
+
+
+@pytest.fixture(autouse=True)
+def _reset_schema_cache():
+    """Each test installs its own schema; reset module-level cache."""
+    task_mod._schema_cache = None
+    yield
+    task_mod._schema_cache = None
+
+
+def _install_schema(monkeypatch, transitions: list[dict],
+                    queues: dict[str, dict] | None = None) -> None:
+    queues = queues or {
+        "review_sessions": {"owner": "EXPLORER", "writers": ["ARCHITECT-PLANNER", "EXPLORER"]},
+        "feature_dev":     {"owner": "DEVELOPER", "writers": ["DEVELOPER"]},
+        "feature_blocked": {"owner": "ARCHITECT-REVIEWER",
+                            "writers": ["DEVELOPER", "UI-DEVELOPER", "TECHNICAL-WRITER",
+                                        "TESTER", "READER", "ARCHITECT-REVIEWER"]},
+        "archive":         {"owner": "ARCHITECT-PLANNER", "writers": ["ARCHITECT-PLANNER"]},
+    }
+    monkeypatch.setattr(task_mod, "_schema_cache", {
+        "version": 1,
+        "queues": queues,
+        "transitions": transitions,
+    })
+
+
+# ---------------------------------------------------------------------------
+# transitions_for: multi-row + wildcard resolution
+# ---------------------------------------------------------------------------
+
+
+def test_transitions_for_returns_all_matching_rows(monkeypatch):
+    _install_schema(monkeypatch, [
+        {"from": "review_sessions", "to": "archive", "by": "ARCHITECT-PLANNER"},
+        {"from": "review_sessions", "to": "archive", "by": "EXPLORER"},
+    ])
+    matches = task_mod.transitions_for("review_sessions", "archive")
+    assert len(matches) == 2
+    assert {m["by"] for m in matches} == {"ARCHITECT-PLANNER", "EXPLORER"}
+
+
+def test_transitions_for_resolves_any_active_queue_wildcard(monkeypatch):
+    _install_schema(monkeypatch, [
+        {"from": "any_active_queue", "to": "feature_blocked", "by": "current_owner"},
+    ])
+    matches = task_mod.transitions_for("feature_dev", "feature_blocked")
+    assert len(matches) == 1
+    assert matches[0]["from"] == "any_active_queue"
+
+
+def test_transitions_for_resolves_any_resume_to_queue_wildcard(monkeypatch):
+    _install_schema(monkeypatch, [
+        {"from": "feature_blocked", "to": "any_resume_to_queue",
+         "by": "ARCHITECT-REVIEWER"},
+    ])
+    matches = task_mod.transitions_for("feature_blocked", "feature_dev")
+    assert len(matches) == 1
+    assert matches[0]["by"] == "ARCHITECT-REVIEWER"
+
+
+def test_transitions_for_singular_back_compat(monkeypatch):
+    _install_schema(monkeypatch, [
+        {"from": "review_sessions", "to": "archive", "by": "ARCHITECT-PLANNER"},
+        {"from": "review_sessions", "to": "archive", "by": "EXPLORER"},
+    ])
+    # transition_for returns the FIRST match, unchanged from prior behavior.
+    t = task_mod.transition_for("review_sessions", "archive")
+    assert t is not None
+    assert t["by"] == "ARCHITECT-PLANNER"
+
+
+# ---------------------------------------------------------------------------
+# can_role_move: both roles for a two-row pair
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("schema_order", [
+    [
+        {"from": "review_sessions", "to": "archive", "by": "ARCHITECT-PLANNER"},
+        {"from": "review_sessions", "to": "archive", "by": "EXPLORER"},
+    ],
+    [
+        # Flip the order — multi-by must not depend on which row is first.
+        {"from": "review_sessions", "to": "archive", "by": "EXPLORER"},
+        {"from": "review_sessions", "to": "archive", "by": "ARCHITECT-PLANNER"},
+    ],
+])
+def test_both_authorized_roles_pass_regardless_of_schema_order(monkeypatch, schema_order):
+    _install_schema(monkeypatch, schema_order)
+    assert task_mod.can_role_move("ARCHITECT-PLANNER", "review_sessions",
+                                  "archive", {}) is None
+    assert task_mod.can_role_move("EXPLORER", "review_sessions",
+                                  "archive", {}) is None
+
+
+# ---------------------------------------------------------------------------
+# can_role_move: single-row, wrong role
+# ---------------------------------------------------------------------------
+
+
+def test_single_row_wrong_role_lists_only_permitted_role(monkeypatch):
+    _install_schema(monkeypatch, [
+        {"from": "feature_dev", "to": "archive", "by": "ARCHITECT-PLANNER"},
+    ])
+    msg = task_mod.can_role_move("DEVELOPER", "feature_dev", "archive", {})
+    assert msg is not None
+    assert "only role ARCHITECT-PLANNER" in msg
+
+
+def test_three_row_permission_error_lists_all_three_sorted(monkeypatch):
+    _install_schema(monkeypatch, [
+        {"from": "feature_dev", "to": "archive", "by": "ARCHITECT-REVIEWER"},
+        {"from": "feature_dev", "to": "archive", "by": "ARCHITECT-PLANNER"},
+        {"from": "feature_dev", "to": "archive", "by": "MAINTAINER"},
+    ])
+    msg = task_mod.can_role_move("DEVELOPER", "feature_dev", "archive", {})
+    assert msg is not None
+    # Sorted, joined with " or ".
+    assert (
+        "ARCHITECT-PLANNER or ARCHITECT-REVIEWER or MAINTAINER" in msg
+    ), msg
+
+
+# ---------------------------------------------------------------------------
+# can_role_move: current_owner wildcard semantics preserved
+# ---------------------------------------------------------------------------
+
+
+def test_current_owner_literal_accepts_queue_owner(monkeypatch):
+    _install_schema(monkeypatch, [
+        {"from": "any_active_queue", "to": "feature_blocked", "by": "current_owner"},
+    ])
+    # DEVELOPER owns feature_dev → may park to feature_blocked.
+    assert task_mod.can_role_move(
+        "DEVELOPER", "feature_dev", "feature_blocked", {},
+    ) is None
+
+
+def test_current_owner_literal_accepts_queue_writer(monkeypatch):
+    """A role listed in queue writers (but not the canonical owner) may
+    still satisfy the current_owner literal — matches the existing
+    `writers` check in the function."""
+    _install_schema(monkeypatch, [
+        {"from": "any_active_queue", "to": "feature_blocked", "by": "current_owner"},
+    ])
+    # TESTER is in feature_blocked.writers per the real schema; we mirror
+    # by adding TESTER to feature_dev.writers in the install fixture.
+    queues = {
+        "feature_dev": {"owner": "DEVELOPER", "writers": ["DEVELOPER", "TESTER"]},
+        "feature_blocked": {"owner": "ARCHITECT-REVIEWER", "writers": ["TESTER"]},
+    }
+    _install_schema(monkeypatch, [
+        {"from": "any_active_queue", "to": "feature_blocked", "by": "current_owner"},
+    ], queues=queues)
+    assert task_mod.can_role_move(
+        "TESTER", "feature_dev", "feature_blocked", {},
+    ) is None
+
+
+# ---------------------------------------------------------------------------
+# requires: per-row distinction (documentary at runtime, no spurious rejection)
+# ---------------------------------------------------------------------------
+
+
+def test_authorized_role_passes_even_if_other_row_has_unmet_requires(monkeypatch):
+    """Two rows for the same (from, to). Row A requires a plan_block; row B
+    requires nothing. A task with no plan_block, called by the role
+    authorized in row B, must succeed — the failing requires of row A
+    must not block row B's caller.
+    """
+    _install_schema(monkeypatch, [
+        {"from": "feature_dev", "to": "archive", "by": "ARCHITECT-PLANNER",
+         "requires": ["plan_block"]},
+        {"from": "feature_dev", "to": "archive", "by": "DEVELOPER",
+         "requires": []},
+    ])
+    assert task_mod.can_role_move(
+        "DEVELOPER", "feature_dev", "archive", {},  # no plan_block in task data
+    ) is None
+
+
+# ---------------------------------------------------------------------------
+# No matching transition
+# ---------------------------------------------------------------------------
+
+
+def test_no_transition_returns_clear_error(monkeypatch):
+    _install_schema(monkeypatch, [])
+    msg = task_mod.can_role_move("DEVELOPER", "feature_dev", "archive", {})
+    assert msg is not None
+    assert "no transition feature_dev → archive in schema" in msg

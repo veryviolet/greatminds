@@ -188,19 +188,39 @@ def role_meta(role: str) -> dict[str, Any]:
     return r
 
 
-def transition_for(from_q: str, to_q: str) -> dict[str, Any] | None:
-    """Find allowed transition in schema; None if none."""
+def transitions_for(from_q: str, to_q: str) -> list[dict[str, Any]]:
+    """All schema rows matching the (from, to) pair.
+
+    Multiple rows may share the same ``(from, to)`` with different ``by:``
+    roles — e.g. ``review_sessions → archive`` legitimately permits both
+    ARCHITECT-PLANNER (intake archive) and EXPLORER (self-close after AC
+    campaign). Returning only the first row, as ``transition_for`` did,
+    silently blocks any role that appears second in ``schema.yaml``.
+
+    Wildcards resolved here:
+      ``from == "any_active_queue"``       → matches any concrete ``from_q``.
+      ``to   == "any_resume_to_queue"``    → matches any concrete ``to_q``.
+    """
+    matches: list[dict[str, Any]] = []
     for t in schema().get("transitions") or []:
         if not isinstance(t, dict):
             continue
         f, to = t.get("from"), t.get("to")
-        if f == from_q and to == to_q:
-            return t
-        if f == "any_active_queue" and to_q == to:
-            return t
-        if f == from_q and to == "any_resume_to_queue":
-            return t
-    return None
+        f_ok = (f == from_q) or (f == "any_active_queue")
+        to_ok = (to == to_q) or (to == "any_resume_to_queue")
+        if f_ok and to_ok:
+            matches.append(t)
+    return matches
+
+
+def transition_for(from_q: str, to_q: str) -> dict[str, Any] | None:
+    """Back-compat singular form: first match or None.
+
+    Prefer ``transitions_for`` in new code that needs role-aware
+    disambiguation (see ``can_role_move``).
+    """
+    matches = transitions_for(from_q, to_q)
+    return matches[0] if matches else None
 
 
 # ---------------------------------------------------------------------------
@@ -561,19 +581,44 @@ def validate_task(data: dict[str, Any]) -> None:
 
 def can_role_move(role: str, from_q: str, to_q: str,
                   task_data: dict[str, Any]) -> str | None:
-    """Return ``None`` if allowed, otherwise an error message string."""
-    t = transition_for(from_q, to_q)
-    if t is None:
+    """Return ``None`` if allowed, otherwise an error message string.
+
+    Iterates ALL schema rows matching ``(from_q, to_q)`` and authorizes
+    if any one of them is satisfied. Handles two row shapes:
+
+      - ``by: <ROLE>``: succeeds if ``role == by``.
+      - ``by: current_owner``: succeeds if ``role`` owns or writes the
+        ``from_q`` queue.
+
+    If no row authorizes ``role``, the error lists the union of permitted
+    ``by:`` roles for that pair (joined with " or " in sorted order), so
+    the caller sees every legal alternative rather than just the first.
+    """
+    matches = transitions_for(from_q, to_q)
+    if not matches:
         return f"no transition {from_q} → {to_q} in schema"
-    by = t.get("by")
-    if by == "current_owner":
+
+    for t in matches:
+        by = t.get("by")
+        if by == "current_owner":
+            owner = (queue_meta(from_q).get("owner") or "").upper()
+            writers = queue_meta(from_q).get("writers") or []
+            if not owner or owner == role or role in writers:
+                return None
+            # This `current_owner` row rejects `role`; another row may still authorize.
+            continue
+        if isinstance(by, str) and by == role:
+            return None
+
+    permitted = sorted({
+        str(t.get("by")) for t in matches if isinstance(t.get("by"), str)
+    })
+    if not permitted:
+        # All matches were current_owner-only and `role` failed ownership.
         owner = (queue_meta(from_q).get("owner") or "").upper()
-        if owner and owner != role and role not in (queue_meta(from_q).get("writers") or []):
-            return f"role {role} is not current owner of {from_q} (owner: {owner})"
-        return None
-    if isinstance(by, str) and by != role:
-        return f"only role {by} may perform {from_q} → {to_q}, not {role}"
-    return None
+        return f"role {role} is not current owner of {from_q} (owner: {owner})"
+    permitted_str = " or ".join(permitted)
+    return f"only role {permitted_str} may perform {from_q} → {to_q}, not {role}"
 
 
 # ---------------------------------------------------------------------------
