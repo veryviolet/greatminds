@@ -26,4 +26,4 @@ Explicit non-goals.
 - [ ] ...
 
 ## Review focus
-What ARCHITECT must pay special attention to on final review.
+What ARCHITECT-REVIEWER must pay special attention to on final review.

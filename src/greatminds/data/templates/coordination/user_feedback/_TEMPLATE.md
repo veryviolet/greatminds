@@ -29,4 +29,4 @@ What happened.
 Commands, URLs, screenshots paths, logs, or exact UI text.
 
 ## Suggested next step
-ARCHITECT decides: feature task, bug, docs task, archive, or question.
+ARCHITECT-PLANNER decides: feature task, bug, docs task, archive, or question.

@@ -38,6 +38,6 @@ Why this is needed and which task depends on it.
 
 ## Expected Result
 What STAND-KEEPER should leave ready and how the requester will use it.
-For product-task verification, name the evidence TESTER/ARCHITECT need:
+For product-task verification, name the evidence TESTER/ARCHITECT-REVIEWER need:
 checked URLs, browser screenshots, logs, commands, host/profile, commit or
 working-tree source, and expected pass/fail markers.
