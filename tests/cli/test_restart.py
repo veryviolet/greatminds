@@ -297,3 +297,63 @@ def test_verify_partial_fail_missing_input_sock(env):
     assert result.exit_code == 1
     assert "role(s) failed to come up clean" in result.output
     assert "input_sock=NO" in result.output
+
+
+# ---------------------------------------------------------------------------
+# _resolve_session_default — generic, project-derived fallback
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_session_default_uses_basename_of_project_dir(tmp_path):
+    """basename(project_dir) wins as the fallback session name."""
+    p = tmp_path / "foo-bar"
+    p.mkdir()
+    assert restart_mod._resolve_session_default(p) == "foo-bar"
+
+
+def test_resolve_session_default_degrades_to_agents_for_root(tmp_path):
+    """Path resolving to an empty `.name` (e.g. `/`) falls back to 'agents'."""
+    assert restart_mod._resolve_session_default(Path("/")) == "agents"
+
+
+def test_resolve_session_default_handles_nonexistent_dir(tmp_path):
+    """Missing path: resolve(strict=False) still returns a name; no crash."""
+    p = tmp_path / "never-created"
+    # The dir does NOT exist; resolve() in non-strict mode returns it anyway.
+    name = restart_mod._resolve_session_default(p)
+    # Result must be a non-empty string, never the fleet-specific "greatminds-dev".
+    assert name
+    assert name != "greatminds-dev"
+    assert name == "never-created"
+
+
+def test_session_default_does_not_leak_greatminds_dev_into_session_targets(env):
+    """End-to-end: a coord.yaml without `session:` must NOT result in any
+    `greatminds-dev:` send-keys target. The fallback must be derived from
+    project_dir (tmp_path basename) instead."""
+    # coord.yaml with explicit `session: ""` to exercise the fallback path.
+    cfg = {
+        "project_dir": str(env.project_dir),
+        # session deliberately omitted
+        "windows": [
+            {"name": "dev", "role": "DEVELOPER", "tool": "claude"},
+        ],
+    }
+    coord_yaml = env.project_dir / "coord.yaml"
+    coord_yaml.write_text(yaml.safe_dump(cfg), encoding="utf-8")
+
+    runner = CliRunner()
+    runner.invoke(
+        restart_mod.restart,
+        ["--config", str(coord_yaml)],
+        catch_exceptions=False,
+    )
+    targets = {c[c.index("-t") + 1] for c in env.sub.find("send-keys") if "-t" in c}
+    # No greatminds-dev anywhere.
+    for t in targets:
+        assert not t.startswith("greatminds-dev:"), \
+            f"fallback leaked 'greatminds-dev' into send-keys target: {t!r}"
+    # Falls back to basename(project_dir) = tmp_path.name.
+    expected_session = env.project_dir.resolve().name
+    assert any(t.startswith(f"{expected_session}:") for t in targets), \
+        f"expected session prefix {expected_session!r} not in {targets!r}"

@@ -36,8 +36,20 @@ import yaml
 from greatminds.cli._colors import err, info
 
 
-SESSION_DEFAULT = "greatminds-dev"
 VERIFY_WAIT_SEC = 10
+
+
+def _resolve_session_default(project_dir: Path) -> str:
+    """Generic fallback session name when coord.yaml is missing or has no
+    ``session:`` key. Prefer ``basename(project_dir)`` for uniqueness across
+    projects on the same machine; degrade to ``"agents"`` (the convention used
+    elsewhere in this CLI, see ``launch.py``) only if basename resolves empty.
+    """
+    try:
+        name = project_dir.resolve().name
+    except (OSError, RuntimeError):
+        name = ""
+    return name or "agents"
 
 
 def _log(msg: str) -> None:
@@ -270,7 +282,7 @@ def restart(config_path: Path | None, project_dir: Path | None) -> None:
         err(f"project_dir {project_dir} not found")
         raise click.exceptions.Exit(1)
 
-    session = cfg.get("session") or SESSION_DEFAULT
+    session = cfg.get("session") or _resolve_session_default(project_dir)
     windows = cfg.get("windows") or []
     if not isinstance(windows, list) or not windows:
         err("coord.yaml: windows must be a non-empty list")
