@@ -100,6 +100,16 @@ NO_STALE_KICK_ROLES = NO_KEYSTROKE_INJECT_ROLES
 DEAD_CHECK_INTERVAL_SEC  = float(os.environ.get("COORDD_DEAD_CHECK_INTERVAL_SEC",  "60"))
 DEAD_REPORT_INTERVAL_SEC = float(os.environ.get("COORDD_DEAD_REPORT_INTERVAL_SEC", "600"))
 
+# Stalled-agent sweep (task 0017): even with no pending work, an agent
+# whose heartbeat goes cold past `STALLED_THRESHOLD_DEFAULT` is treated
+# as stuck (typically: Anthropic server-side rate-limit aborted the turn
+# before `ScheduleWakeup` got called). Coordd nudges it through the same
+# input_sock channel `push_to_role` uses. Defaults match
+# `schema.watchdog.heartbeat_stale_seconds` so "stale" is one definition
+# across the system. Overridable per-project via `coord.yaml: coordd:`.
+STALLED_SWEEP_INTERVAL_DEFAULT = 300.0   # 5 min
+STALLED_THRESHOLD_DEFAULT      = 600.0   # 10 min
+
 
 def scan_inbox_files(inbox_dir: Path) -> set[str]:
     """Find pending inbox messages across all roles. After R8 bin/inbox
@@ -267,7 +277,167 @@ def write_dead_report(coord: Path, role: str, reg: dict, now_ts: float) -> None:
     p.write_text(text, encoding="utf-8")
 
 
-def push_to_role(coord: Path, role: str, file_path: str, verbose: bool) -> bool:
+def _read_coordd_config(project_dir: Path) -> tuple[float, float]:
+    """Read coord.yaml ``coordd:`` block; fall back to defaults.
+
+    Returns ``(stalled_sweep_interval_seconds, stalled_threshold_seconds)``.
+    Invalid (non-numeric, ``<= 0``) values trigger a stderr warning and
+    fall back to the module-level defaults. Missing block or missing
+    coord.yaml → silent defaults. Cheap (one yaml.safe_load); coordd
+    calls this at startup, not per-sweep.
+    """
+    interval = STALLED_SWEEP_INTERVAL_DEFAULT
+    threshold = STALLED_THRESHOLD_DEFAULT
+    coord_yaml_path = project_dir / "coord.yaml"
+    if yaml is None or not coord_yaml_path.is_file():
+        return interval, threshold
+    try:
+        cfg = yaml.safe_load(coord_yaml_path.read_text(encoding="utf-8"))
+    except yaml.YAMLError:
+        return interval, threshold
+    if not isinstance(cfg, dict):
+        return interval, threshold
+    sub = cfg.get("coordd")
+    if not isinstance(sub, dict):
+        return interval, threshold
+
+    def _coerce(key: str, default: float) -> float:
+        v = sub.get(key)
+        if v is None:
+            return default
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0:
+            return float(v)
+        print(
+            f"coordd: invalid coord.yaml: coordd.{key}={v!r}; using default {default}",
+            file=sys.stderr,
+        )
+        return default
+
+    return (
+        _coerce("stalled_sweep_interval_seconds", interval),
+        _coerce("stalled_threshold_seconds", threshold),
+    )
+
+
+def _load_coord_yaml_doc(project_dir: Path) -> dict:
+    """Best-effort coord.yaml parse — returns {} on any failure."""
+    p = project_dir / "coord.yaml"
+    if yaml is None or not p.is_file():
+        return {}
+    try:
+        data = yaml.safe_load(p.read_text(encoding="utf-8"))
+    except yaml.YAMLError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _mode_for_role(coord_yaml: dict, role_upper: str) -> str | None:
+    """Return ``coord.yaml.windows[N].mode`` for the entry whose ``role``
+    matches ``role_upper`` (case-insensitive). ``None`` if no matching
+    entry — used by ``_stalled_agent_sweep`` to flag orphan heartbeats.
+    """
+    windows = coord_yaml.get("windows") if isinstance(coord_yaml, dict) else None
+    if not isinstance(windows, list):
+        return None
+    for w in windows:
+        if not isinstance(w, dict):
+            continue
+        rw = (w.get("role") or "").strip().upper()
+        if rw == role_upper:
+            return w.get("mode") or None
+    return None
+
+
+def _stalled_agent_sweep(
+    project_dir: Path,
+    coord_yaml: dict,
+    threshold_seconds: float,
+    verbose: bool = False,
+) -> int:
+    """One pass over heartbeats; nudge stalled loop-mode agents.
+
+    Closes the rate-limit-stall hole: Anthropic server-side rate limits
+    abort a tick before ``ScheduleWakeup`` is called, leaving the agent
+    pid alive but heartbeat cold forever. This sweep detects that state
+    and pokes the agent's input_sock to wake it up.
+
+    Per-heartbeat behavior (see plan 0017 §Behavior contract):
+
+      - fresh (age < threshold)  → skip silently
+      - FAST suffix (``.fast``)  → skip (scenario-C chat session)
+      - orphan (no coord.yaml entry) → skip with WARN
+      - mode != "loop"            → skip silently (chat is USER-paced)
+      - dead pid                  → skip (``greatminds restart`` territory)
+      - missing registry / input_sock → skip silently
+      - otherwise → ``push_to_role`` (reuses existing socket I/O,
+        PUSH_FRESH_GUARD_SEC, alive-check, fallback chain — no
+        duplicate socket code).
+
+    Returns count of nudges sent.
+    """
+    coord = project_dir / "coordination"
+    if not coord.is_dir():
+        return 0
+    nudge_count = 0
+    now = time.time()
+    for hb_path in sorted(coord.glob("heartbeat.*")):
+        try:
+            age = now - hb_path.stat().st_mtime
+        except OSError:
+            continue
+        if age < threshold_seconds:
+            continue
+        # `heartbeat.<role-lower>` or `heartbeat.<role-lower>.fast`.
+        suffix = hb_path.name[len("heartbeat."):]
+        if suffix.endswith(".fast"):
+            if verbose:
+                print(
+                    f"  stalled-sweep skip: {hb_path.name} (FAST/chat mode)",
+                    file=sys.stderr,
+                )
+            continue
+        role_lower = suffix
+        role_upper = role_lower.upper()
+        mode = _mode_for_role(coord_yaml, role_upper)
+        if mode is None:
+            if verbose:
+                print(
+                    f"coordd: WARN orphan heartbeat {hb_path.name} — "
+                    f"no matching role in coord.yaml; skipping nudge",
+                    file=sys.stderr,
+                )
+            continue
+        if mode != "loop":
+            if verbose:
+                print(
+                    f"  stalled-sweep skip: {role_upper} mode={mode!r} (not loop)",
+                    file=sys.stderr,
+                )
+            continue
+        # Hand off to push_to_role for the actual socket write — pid-alive
+        # check (skips dead agents) and unix-socket I/O still run.
+        # `bypass_fresh_guard=True` because the sweep has already filtered
+        # by ``stalled_threshold_seconds`` (potentially < 60s); the
+        # fixed-60s PUSH_FRESH_GUARD_SEC would otherwise suppress every
+        # sub-60-second-threshold config and leave the agent unrescued.
+        if push_to_role(
+            coord, role_lower,
+            f"<stalled-sweep: heartbeat {age:.0f}s old>",
+            verbose,
+            bypass_fresh_guard=True,
+        ):
+            nudge_count += 1
+            if verbose:
+                print(
+                    f"  nudged stalled {role_upper} "
+                    f"(heartbeat {age:.0f}s old)",
+                    file=sys.stderr,
+                )
+    return nudge_count
+
+
+def push_to_role(coord: Path, role: str, file_path: str, verbose: bool,
+                 bypass_fresh_guard: bool = False) -> bool:
     """Attempt to nudge the role. Prefers writing to the unix socket
     exposed by bin/pty-launch (this end is the *master* of the agent's
     pty, so bytes become real input to the running process — identical
@@ -286,8 +456,15 @@ def push_to_role(coord: Path, role: str, file_path: str, verbose: bool) -> bool:
     tick completes). Keystroke kick is reserved for agents whose
     heartbeat is stale (idle / asleep / waiting), where interrupting
     the sleep IS the goal.
+
+    ``bypass_fresh_guard=True`` (task 0017) — callers that have already
+    made the staleness decision against their own threshold
+    (``_stalled_agent_sweep`` with ``stalled_threshold_seconds``, which
+    may be < 60s) skip this guard. The sweep already filtered by
+    heartbeat age; double-checking with a fixed 60s ceiling would
+    suppress every threshold below 60s. Pid liveness check still runs.
     """
-    if role.lower() not in NO_KEYSTROKE_INJECT_ROLES:
+    if not bypass_fresh_guard and role.lower() not in NO_KEYSTROKE_INJECT_ROLES:
         hb_path = coord / f"heartbeat.{role.lower()}"
         if hb_path.is_file():
             try:
@@ -501,6 +678,19 @@ def coordd(project_dir: Path | None, project_name: str | None,
     last_dead_report: dict[str, float] = {}
     last_dead_check: float = 0.0
 
+    # Stalled-agent sweep (task 0017): periodic poke for loop-mode
+    # agents whose heartbeat went cold past threshold. Config is read
+    # once at startup; restart coordd to pick up coord.yaml changes.
+    stalled_sweep_interval, stalled_threshold = _read_coordd_config(project_dir)
+    last_stalled_sweep: float = 0.0
+    if verbose:
+        print(
+            f"coordd: stalled-sweep enabled "
+            f"(interval {stalled_sweep_interval:.0f}s, "
+            f"threshold {stalled_threshold:.0f}s)",
+            file=sys.stderr,
+        )
+
     # Push exactly once per inbox file. If the push lands but the agent
     # doesn't react, that's on the agent — coordd is not the place to
     # retry; agents have their own ScheduleWakeup/sleep loop for that.
@@ -623,6 +813,26 @@ def coordd(project_dir: Path | None, project_name: str | None,
                     except OSError as exc:
                         if verbose:
                             print(f"  dead-report failed for {role}: {exc}", file=sys.stderr)
+
+            # Step 5: stalled-agent sweep (task 0017) — nudge loop-mode
+            # agents whose heartbeat has gone cold past
+            # `stalled_threshold_seconds`. Independent of Step 3's
+            # opt-in stale-kick (which also requires pending work);
+            # this sweep fires unconditionally on heartbeat age alone.
+            if now_ts - last_stalled_sweep >= stalled_sweep_interval:
+                last_stalled_sweep = now_ts
+                coord_yaml_doc = _load_coord_yaml_doc(project_dir)
+                try:
+                    _stalled_agent_sweep(
+                        project_dir, coord_yaml_doc,
+                        stalled_threshold, verbose,
+                    )
+                except Exception as exc:  # noqa: BLE001 — sweep must never crash the loop
+                    if verbose:
+                        print(
+                            f"coordd: stalled-sweep error: {exc}",
+                            file=sys.stderr,
+                        )
         except KeyboardInterrupt:
             break
         except Exception as exc:
