@@ -357,3 +357,88 @@ def test_session_default_does_not_leak_greatminds_dev_into_session_targets(env):
     expected_session = env.project_dir.resolve().name
     assert any(t.startswith(f"{expected_session}:") for t in targets), \
         f"expected session prefix {expected_session!r} not in {targets!r}"
+
+
+# ---------------------------------------------------------------------------
+# task 0048: trust-prompt detection. _verify reads each pane via tmux
+# capture-pane and surfaces "pending-trust" state — registry pid+sock can
+# be present while the tool process is actually parked at the
+# "Do you trust this folder?" dialog before the role contract starts.
+# ---------------------------------------------------------------------------
+
+
+def test_detect_trust_state_recognizes_claude_prompt():
+    pane = (
+        "...\n"
+        "Do you trust the files in this folder?\n"
+        "  Yes, proceed   No, exit\n"
+    )
+    assert restart_mod._detect_trust_state(pane) == "pending-trust"
+
+
+def test_detect_trust_state_recognizes_codex_prompt():
+    pane = "Allow Codex to run commands in this directory? [y/N]"
+    assert restart_mod._detect_trust_state(pane) == "pending-trust"
+
+
+def test_detect_trust_state_returns_ready_for_normal_output():
+    pane = "[02:34:56Z] DEVELOPER tick: feature_dev empty, idle 60s"
+    assert restart_mod._detect_trust_state(pane) == "ready"
+
+
+def test_detect_trust_state_empty_pane_is_ready():
+    """A pane we couldn't capture (empty string) defaults to ready —
+    we don't fabricate a pending-trust state on missing evidence."""
+    assert restart_mod._detect_trust_state("") == "ready"
+
+
+def test_verify_flags_pending_trust_role_as_fail(env, monkeypatch):
+    """A role whose pane is parked at the trust dialog must count as
+    failed and surface a remediation hint, even with pid+sock present."""
+    _write_coord_yaml(
+        env.project_dir,
+        windows=[
+            {"name": "planner", "role": "ARCHITECT-PLANNER", "tool": "claude"},
+            {"name": "dev", "role": "DEVELOPER", "tool": "claude"},
+        ],
+    )
+    env.alive.update({501, 502})
+    _write_registry(env.project_dir, "architect-planner", pid=501, with_sock=True)
+    _write_registry(env.project_dir, "developer", pid=502, with_sock=True)
+
+    # Stub _capture_pane directly — cleaner than re-routing subprocess.run.
+    captured: dict[str, str] = {
+        "test-session:planner": "DEVELOPER continuing tick — feature_dev empty",
+        "test-session:dev": "Do you trust this folder?\n  > Yes",
+    }
+    monkeypatch.setattr(
+        restart_mod, "_capture_pane",
+        lambda session, window: captured.get(f"{session}:{window}", ""),
+    )
+
+    result = _run(env)
+    assert result.exit_code == 1, result.output
+    assert "trust=TRUST?" in result.output
+    assert "stuck at tool-trust prompt" in result.output
+    assert "test-session:dev" in result.output
+    # The planner row should NOT be marked TRUST? (its pane is normal).
+    planner_line = [l for l in result.output.splitlines()
+                    if "architect-planner" in l and "trust=" in l]
+    assert planner_line, result.output
+    assert "trust=ok" in planner_line[0]
+
+
+def test_verify_clean_when_no_pending_trust(env):
+    """Normal pane content → trust=ok column, no spurious failures."""
+    _write_coord_yaml(
+        env.project_dir,
+        windows=[{"name": "dev", "role": "DEVELOPER", "tool": "claude"}],
+    )
+    env.alive.update({601})
+    _write_registry(env.project_dir, "developer", pid=601, with_sock=True)
+    # Default FakeSubprocess returns stdout="" for capture-pane → "ready".
+
+    result = _run(env)
+    assert result.exit_code == 0, result.output
+    assert "trust=ok" in result.output
+    assert "stuck at tool-trust prompt" not in result.output
