@@ -40,56 +40,13 @@ Every installed agent reads `COORDINATE.md`, `schema.yaml`, its own role
 
 ## 2. Roles
 
-The full roster, claim sources, and heartbeats are in `schema.yaml`. Brief:
-
-| Role                 | Category | What it does, in one line                                          |
-|----------------------|----------|--------------------------------------------------------------------|
-| ARCHITECT-PLANNER    | product  | Triage, planning, scenario-B sessions. Chat-capable.               |
-| ARCHITECT-REVIEWER   | product  | Final review, wake blocked, commits.                               |
-| DEVELOPER            | product  | Backend implementation.                                            |
-| UI-DEVELOPER         | product  | UI implementation (pipeline mode + FAST chat mode for scenario C). |
-| TECHNICAL-WRITER     | product  | Documentation implementation.                                      |
-| TESTER               | product  | Validates code on the stand; runs `greatminds gate-check`.                |
-| READER               | product  | Validates docs as a fresh reader.                                  |
-| EXPLORER             | product  | Uses live product on stand (scenario B). Files bugs.               |
-| STAND-KEEPER         | service  | Owns stand and `stand.status`. Two profiles: full-deploy, vite-dev.|
-| USER                 | entry    | Files feedback or initiates chat with ARCHITECT-PLANNER.           |
-| MAINTAINER           | system   | Infrastructure and fleet operations: agent lifecycle, canon/schema/CLI maintenance, cutovers. Chat-mode. |
-| BOT-USER, BOT-DEVELOPER | bot   | Bot stream, intentionally untouched by this refactor.              |
-
-The 2026-05 refactor split ARCHITECT into PLANNER + REVIEWER and added
-EXPLORER. See per-role `.md` files for the full description.
+See `schema.yaml` `roles:` for the full roster and per-role description.
 
 ---
 
 ## 3. Scenarios
 
-Three top-level modes of operation. Each task carries `plan.mode: A | B | C`.
-
-### Scenario A — feature / refactor (default)
-
-Standard product pipeline. User chats with `ARCHITECT-PLANNER` to refine an
-idea; planner writes a plan; implementers (DEVELOPER / UI-DEVELOPER /
-TECHNICAL-WRITER) work in **parallel** on their respective scopes; TESTER
-and READER validate; `ARCHITECT-REVIEWER` approves and commits.
-
-### Scenario B — intensive review
-
-Targeted exploration of a deployed function. `ARCHITECT-PLANNER` opens a
-`review_sessions/<id>.md` and asks `STAND-KEEPER` to ensure freshness.
-`EXPLORER` walks scenarios on the live system and files bugs as
-`plan_kind: bugfix`. PLANNER fast-triages bugs into `feature_dev/` or
-`feature_ui_dev/` without long planning. After fixes ship, EXPLORER re-runs
-scenarios.
-
-### Scenario C — UI rapid iteration
-
-`STAND-KEEPER` brings up backend + Vite (profile `vite-dev`). The user
-chats with `UI-DEVELOPER` started in FAST mode (separate heartbeat to avoid
-contention with any pipeline-mode UI-DEVELOPER agent). No `feature_plan/`,
-no `feature_test/` — Vite HMR feeds the change to the user's browser. An
-optional summary task may be filed in `feature_review/` at session end for
-audit.
+See `schema.yaml` `scenarios:` for A/B/C definitions.
 
 ---
 
