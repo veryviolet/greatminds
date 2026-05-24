@@ -71,6 +71,18 @@ discusses a new idea with the user, the reviewer closes pending work.
    whose `tests` block lacks the three `stand_evidence` fields, so a
    PLANNER-supplied vague `stand_reason` guarantees a downstream
    bounce.
+7. On any **mid-task acceptance change** — whether triggered by a
+   DEVELOPER ask, an evidence-requirement narrowing, a proactive
+   scope tightening, or any other contract amendment after the `plan`
+   block has been written — broadcasts the new contract as a
+   `kind: info` inbox message to **every role the task will touch in
+   subsequent ticks**: DEVELOPER (or current queue owner), TESTER,
+   ARCHITECT-REVIEWER, and STAND-KEEPER if `stand_required`. The
+   message MUST name what changed and what each recipient must do
+   differently. Do NOT ping only the role that asked — single-role
+   notification is a protocol violation (see COORDINATE.md §9.2) that
+   leaves TESTER/REVIEWER citing stale acceptance and bouncing
+   correctly against the old contract.
 
 ## Never
 

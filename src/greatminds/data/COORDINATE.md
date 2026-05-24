@@ -317,6 +317,26 @@ This carve-out is strictly limited: if the verification limitation
 existed for reasons UNRELATED to the fix, the standard §9 evidence
 requirement applies and the task bounces back.
 
+### §9.2 Mid-task acceptance changes — broadcast to all roles
+
+When `ARCHITECT-PLANNER` changes a task's acceptance criteria
+mid-flight (after the `plan` block has been written and the task has
+moved past `feature_plan/`), PLANNER MUST send the change as a
+`kind: info` inbox message to **every role the task will touch in
+subsequent ticks**: DEVELOPER (or the current queue owner),
+TESTER, ARCHITECT-REVIEWER, and STAND-KEEPER if `stand_required`.
+
+The message MUST explicitly name what changed and what each recipient
+must do differently — e.g. "TESTER: cite stand_done/<NEW> not
+<OLD>", "REVIEWER: gate-check now applies against <NEW> evidence",
+"DEVELOPER: refile impl with new base_commit / acceptance text".
+
+Single-role notification is a **protocol violation**: it leaves
+TESTER/REVIEWER citing stale acceptance, causing review-block
+bounces that re-emerge as new DEV asks and burn hours of stuck
+pipeline. The broadcast is mandatory regardless of which role
+prompted the change (asked, escalated, or PLANNER acted proactively).
+
 ---
 
 ## 10. Inbox mailbox (new)
