@@ -19,14 +19,67 @@ lives on PATH; per-project shims are unnecessary.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
+import sys
 from pathlib import Path
 
 import click
 
 from greatminds.core.paths import find_canon_dir
 from greatminds.cli._colors import header, info, ok, warn
+
+
+def _greatminds_bin() -> str:
+    """Resolve the absolute command string to invoke greatminds.
+
+    Returns the absolute path to the ``greatminds`` console script (as
+    found by ``shutil.which`` and normalized via ``Path.resolve()``),
+    or — if not found — a ``<sys.executable> -m greatminds.cli.main``
+    fallback (``sys.executable`` is already absolute). Either form is
+    PATH-independent AND cwd-independent, which is the whole point:
+    hook commands embedded into ``.claude/settings.local.json`` must
+    work in claude sessions opened without the project venv on PATH
+    (e.g. a maintainer Claude launched directly from the repo, not via
+    start-agent) and from arbitrary working directories.
+
+    ``shutil.which`` can return a relative path when PATH contains
+    relative entries (e.g. ``.venv/bin``), so we always normalize.
+    """
+    found = shutil.which("greatminds")
+    if found:
+        return str(Path(found).resolve())
+    return f"{sys.executable} -m greatminds.cli.main"
+
+
+def _build_settings_local_json(project_dir: Path) -> str:
+    """Return the JSON text for ``.claude/settings.local.json``.
+
+    Every hook command begins with an absolute reference to greatminds
+    (path or ``python -m`` fallback) so the file is portable across
+    claude sessions regardless of PATH.
+    """
+    gm_bin = _greatminds_bin()
+    stop_cmd = (
+        f'{gm_bin} stop-decide "${{GREATMINDS_ROLE:-UNKNOWN}}" '
+        f'--host claude --project-dir {project_dir}'
+    )
+    settings = {
+        "permissions": {"allow": []},
+        "autoMode": {"allow": ["$defaults"]},
+        "hooks": {
+            "Stop": [
+                {
+                    "matcher": "",
+                    "hooks": [
+                        {"type": "command", "command": stop_cmd},
+                    ],
+                },
+            ],
+        },
+    }
+    return json.dumps(settings, indent=2) + "\n"
 
 
 QUEUES = [
@@ -231,22 +284,7 @@ def setup(project_dir: Path | None, force: bool, lang: str) -> None:
     _ensure_dir(cclaude)
     sl = cclaude / "settings.local.json"
     if not sl.is_file():
-        settings_tpl = (
-            "{{\n"
-            '  "permissions": {{ "allow": [] }},\n'
-            '  "autoMode": {{ "allow": ["$defaults"] }},\n'
-            '  "hooks": {{\n'
-            '    "Stop": [{{\n'
-            '      "matcher": "",\n'
-            '      "hooks": [{{\n'
-            '        "type": "command",\n'
-            '        "command": "greatminds stop-decide \\"${{GREATMINDS_ROLE:-UNKNOWN}}\\" --host claude --project-dir {proj}"\n'
-            '      }}]\n'
-            '    }}]\n'
-            '  }}\n'
-            "}}\n"
-        )
-        sl.write_text(settings_tpl.format(proj=str(project_dir)), encoding="utf-8")
+        sl.write_text(_build_settings_local_json(project_dir), encoding="utf-8")
         info("  .claude/settings.local.json: written")
     else:
         info("  .claude/settings.local.json: exists")
