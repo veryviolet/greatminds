@@ -265,7 +265,27 @@ def build_codex_argv(
     extra: list[str],
     prompt: str,
 ) -> list[str]:
-    """Compose ``codex [resume <SID>|resume --last|] [profile-v2] EXTRA PROMPT``."""
+    """Compose ``codex [resume <SID>|] [profile-v2] EXTRA PROMPT``.
+
+    Two-branch design driven by ``codex_sid`` (the per-role codex rollout
+    UUID), NOT by ``session_new`` (which is the claude session-id concept;
+    irrelevant to codex's own session storage):
+
+      - codex_sid found → ``codex resume <sid> [yolo] [profile] EXTRA PROMPT``
+        (resume the prior conversation; PROMPT is the wake nudge).
+      - codex_sid empty → ``codex [yolo] [profile] EXTRA PROMPT``
+        (fresh session; PROMPT is the full bootstrap).
+
+    Task 0043 — EXPLORER avatar dogfood on codex 0.133.0 caught a stale
+    ``codex resume --last`` fallback that codex 0.133.0 silently rejected:
+    ``--last`` was parsed as an unknown flag, then the bootstrap prompt
+    text (next positional) was treated as the missing session-id, causing
+    ``No saved session found with ID continue your tick as DEVELOPER…``.
+    Removed. When codex_sid is missing we now start a fresh session and
+    let the role's bootstrap prompt (the full role intro) re-establish
+    context — the agent re-bootstraps from canon role files instead of
+    relying on a session continuity that codex couldn't provide anyway.
+    """
     role_lower = role.lower()
     codex_session_file = registry_dir / f"{role_lower}.codex-session-id"
 
@@ -284,13 +304,13 @@ def build_codex_argv(
 
     yolo = _yolo_args("codex")
 
-    if codex_sid and not session_new:
+    if codex_sid:
         codex_args = ["resume", codex_sid, *yolo, *codex_profile_args]
-    elif not session_new:
-        # We're resuming but couldn't find a session id — fall back to --last
-        # (the latest codex session in this cwd).
-        codex_args = ["resume", "--last", *yolo, *codex_profile_args]
     else:
+        # No prior rollout found (e.g. first launch, or codex storage was
+        # rotated/cleared, or codex self-updated and dropped the cache).
+        # Start a fresh session — the bootstrap prompt carries everything
+        # the role needs to re-establish context.
         codex_args = [*yolo, *codex_profile_args]
 
     return ["codex", *codex_args, *extra, prompt]
