@@ -1,0 +1,3161 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="File-based multi-agent coordination for agent fleets and task pipelines.">
+      
+      
+      
+        <link rel="canonical" href="https://veryviolet.github.io/greatminds/cli-reference/">
+      
+      
+        <link rel="prev" href="../concepts/inbox/">
+      
+      
+        <link rel="next" href="../architecture/overview/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>CLI Reference - greatminds</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#cli-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="greatminds" class="md-header__button md-logo" aria-label="greatminds" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            greatminds
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              CLI Reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/veryviolet/greatminds" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    veryviolet/greatminds
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../concepts/queues/" class="md-tabs__link">
+          
+  
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  CLI Reference
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../recipes/filing-a-bug/" class="md-tabs__link">
+          
+  
+  
+  Recipes
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../changelog/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="greatminds" class="md-nav__button md-logo" aria-label="greatminds" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    greatminds
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/veryviolet/greatminds" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    veryviolet/greatminds
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/first-project/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    First Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/upgrading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/queues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/roles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/stand-gate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stand Gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/inbox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inbox
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#greatminds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        greatminds
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="greatminds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-coordd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        coordd
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-daemon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        daemon
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="daemon">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-daemon-install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        install
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-daemon-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        list
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-daemon-migrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        migrate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-daemon-restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        restart
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-daemon-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-daemon-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        status
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-daemon-stop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stop
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-gate-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gate-check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-inbox" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        inbox
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="inbox">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-inbox-ack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ack
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-inbox-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        list
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-inbox-send" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        send
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-inbox-show" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        show
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-intent-clean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        intent-clean
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-launch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        launch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-lint-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lint-tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-migrate-task" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        migrate-task
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-notify-journal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        notify-journal
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        plan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-pty-launch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pty-launch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-render-role" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        render-role
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-report-upstream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        report-upstream
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        restart
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-stand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stand
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="stand">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-stand-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        request
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-stand-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        result
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-start-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        start-agent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-stop-decide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stop-decide
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-task" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        task
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="task">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-task-append-block" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        append-block
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-task-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        list
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-task-mv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mv
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-task-new" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        new
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-task-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        paths
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-task-show" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        show
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-task-validate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validate
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        update
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-wake-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        wake-check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-watchdog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        watchdog
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/filesystem-layout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Filesystem Layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/transitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transitions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/daemon-and-agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Daemon and Agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Recipes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Recipes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../recipes/filing-a-bug/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Filing a Bug
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../recipes/planning-a-feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planning a Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../recipes/e2e-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E2E Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../recipes/cutting-a-release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cutting a Release
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#greatminds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        greatminds
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="greatminds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-coordd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        coordd
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-daemon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        daemon
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="daemon">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-daemon-install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        install
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-daemon-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        list
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-daemon-migrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        migrate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-daemon-restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        restart
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-daemon-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-daemon-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        status
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-daemon-stop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stop
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-gate-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gate-check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-inbox" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        inbox
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="inbox">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-inbox-ack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ack
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-inbox-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        list
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-inbox-send" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        send
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-inbox-show" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        show
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-intent-clean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        intent-clean
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-launch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        launch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-lint-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lint-tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-migrate-task" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        migrate-task
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-notify-journal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        notify-journal
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        plan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-pty-launch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pty-launch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-render-role" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        render-role
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-report-upstream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        report-upstream
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        restart
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-stand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stand
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="stand">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-stand-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        request
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-stand-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        result
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-start-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        start-agent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-stop-decide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stop-decide
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-task" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        task
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="task">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-task-append-block" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        append-block
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-task-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        list
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-task-mv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mv
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-task-new" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        new
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-task-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        paths
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-task-show" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        show
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-task-validate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validate
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        update
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-wake-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        wake-check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-watchdog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        watchdog
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="cli-reference">CLI reference<a class="headerlink" href="#cli-reference" title="Permanent link">&para;</a></h1>
+<h2 id="greatminds">greatminds<a class="headerlink" href="#greatminds" title="Permanent link">&para;</a></h2>
+<p>File-based multi-agent coordination protocol — fleet orchestration,
+task pipeline, agent launcher.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds [OPTIONS] COMMAND [ARGS]...
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --version   Show the version and exit.
+  -h, --help  Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-coordd">greatminds coordd<a class="headerlink" href="#greatminds-coordd" title="Permanent link">&para;</a></h3>
+<p>coordd — optional coordination daemon. Closes the ScheduleWakeup gap.</p>
+<p>Two responsibilities, run every <interval> seconds:</p>
+<ol>
+<li>Drive notify_from_journal — replay any new journal.ndjson lines and
+     write wake-up messages to inbox/<role>/. (If PostToolUse hooks
+     already did this, the call is a cheap no-op since state advances
+     monotonically.)</li>
+<li>Scan coordination/inbox/<role>/ for new files. For each new file,
+     find the role's active TTY from coordination/.agent_registry/<role>.json
+     and write "check inbox and continue your tick
+" to that TTY. The sleeping
+     agent wakes, reads the inbox, and continues the tick.</li>
+</ol>
+<p>If the daemon is NOT running, nothing changes — agents still work via
+ScheduleWakeup polling, just with the old multi-minute latency. The daemon
+is purely additive (a "side-load"): killing it never breaks the pipeline.</p>
+<p>The daemon never moves task files, never edits queues, never decides on
+state. Its only side effects are:
+  - calling bin/notify_from_journal (which writes inbox messages),
+  - writing wake-up text to known agent TTYs.</p>
+<p>State sources (read-only):
+  - coordination/inbox/<role>/*.md   — new files to react to
+  - coordination/.agent_registry/<role>.json — written by bin/start_agent
+    with {role, tool, pid, tty, started_at}</p>
+<p>Usage:
+    coordd [--project-dir <dir>] [--interval-sec 1.0] [--verbose]</p>
+<p>For a long-lived install, run via systemd-user; see bin/coordd-install.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds coordd [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --project-dir DIRECTORY  project root containing coordination/ (default: cwd
+                           or registry lookup via --project)
+  --project TEXT           project name; resolved to project_dir via
+                           ~/.config/greatminds/projects.json. Used by the
+                           systemd template unit greatminds-
+                           daemon@&lt;project&gt;.service.
+  --interval-sec FLOAT     polling interval; 1.0 keeps CPU near zero on idle.
+                           Don&#39;t go below 0.2.
+  -v, --verbose
+  -h, --help               Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-daemon">greatminds daemon<a class="headerlink" href="#greatminds-daemon" title="Permanent link">&para;</a></h3>
+<p>greatminds daemon — per-project coordination daemon supervision.</p>
+<p>Wraps <code>systemctl --user</code> to manage instances of the
+<code>greatminds-daemon@&lt;project&gt;.service</code> template unit. Each greatminds
+project on the host gets ONE daemon instance keyed by its
+<code>coord.yaml: session</code> name (or an explicit <code>--project NAME</code> flag),
+so multiple projects on the same user can run their daemons
+concurrently without colliding on a global unit name.</p>
+<p>Subcommands::</p>
+<pre><code>greatminds daemon install [--name NAME] [--project-dir DIR]
+greatminds daemon start    [--project NAME] [--project-dir DIR]
+greatminds daemon stop     [--project NAME] [--project-dir DIR]
+greatminds daemon restart  [--project NAME] [--project-dir DIR]
+greatminds daemon status   [--project NAME] [--project-dir DIR]
+greatminds daemon list
+greatminds daemon migrate  [--yes]
+</code></pre>
+<p><code>install</code> is idempotent: it writes the template unit if missing and
+adds the <code>{name → project_dir}</code> entry to the per-user registry at
+<code>~/.config/greatminds/projects.json</code>. <code>migrate</code> removes the deprecated
+singleton <code>coordd.service</code> if present.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds daemon [OPTIONS] COMMAND [ARGS]...
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  -h, --help  Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-daemon-install">greatminds daemon install<a class="headerlink" href="#greatminds-daemon-install" title="Permanent link">&para;</a></h4>
+<p>install template unit + register project</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds daemon install [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --name TEXT              project name (default: coord.yaml `session`)
+  --project-dir DIRECTORY  project root (default: cwd)
+  -h, --help               Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-daemon-list">greatminds daemon list<a class="headerlink" href="#greatminds-daemon-list" title="Permanent link">&para;</a></h4>
+<p>list all registered projects + active state</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds daemon list [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  -h, --help  Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-daemon-migrate">greatminds daemon migrate<a class="headerlink" href="#greatminds-daemon-migrate" title="Permanent link">&para;</a></h4>
+<p>remove legacy singleton coordd.service</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds daemon migrate [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --yes       confirm removal of legacy coordd.service
+  -h, --help  Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-daemon-restart">greatminds daemon restart<a class="headerlink" href="#greatminds-daemon-restart" title="Permanent link">&para;</a></h4>
+<p>restart the daemon for a project</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds daemon restart [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --project TEXT           project name (default: coord.yaml session)
+  --project-dir DIRECTORY  project root (default: cwd)
+  -h, --help               Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-daemon-start">greatminds daemon start<a class="headerlink" href="#greatminds-daemon-start" title="Permanent link">&para;</a></h4>
+<p>start the daemon for a project</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds daemon start [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --project TEXT           project name (default: coord.yaml session)
+  --project-dir DIRECTORY  project root (default: cwd)
+  -h, --help               Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-daemon-status">greatminds daemon status<a class="headerlink" href="#greatminds-daemon-status" title="Permanent link">&para;</a></h4>
+<p>show daemon status for a project</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds daemon status [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --project TEXT           project name (default: coord.yaml session)
+  --project-dir DIRECTORY  project root (default: cwd)
+  -h, --help               Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-daemon-stop">greatminds daemon stop<a class="headerlink" href="#greatminds-daemon-stop" title="Permanent link">&para;</a></h4>
+<p>stop the daemon for a project</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds daemon stop [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --project TEXT           project name (default: coord.yaml session)
+  --project-dir DIRECTORY  project root (default: cwd)
+  -h, --help               Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-gate-check">greatminds gate-check<a class="headerlink" href="#greatminds-gate-check" title="Permanent link">&para;</a></h3>
+<p>Check stand-evidence gate for a product task.</p>
+<p>Usage:
+    gate_check <task-id> [--project-dir <dir>] [--canon-dir <dir>]</p>
+<p><task-id> may be the full id (e.g. 0123-foo) or just the seq (e.g. 0123).</p>
+<p>Looks up the task across coordination queues, reads its plan block, and
+verifies stand-evidence per the schema:
+  - plan.stand_required: false  → output 'n/a'
+  - plan.stand_required: true   → find stand_done/*.{yaml,md} whose
+    stand_result.evidence_for (or the file's top-level evidence_for in
+    the yaml-native shape) contains this task id. If commit hash in
+    plan/implementation matches the stand_result.commit, output 'pass'.
+    If a candidate exists but commit differs or
+    result not in {pass, ok} → 'fail'. No candidate → 'missing'.</p>
+<p>Both the legacy fenced markdown shape and the yaml-native shape are
+supported; the reader picks the right parser per file.</p>
+<p>Exit code:
+  0  pass | n/a
+  1  fail
+  2  missing
+  3  error (task not found, malformed)</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds gate-check [OPTIONS] TASK_ID
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --project-dir DIRECTORY  project root (default: cwd)
+  --canon-dir DIRECTORY    canon data dir (default: packaged greatminds.data)
+  -v, --verbose            print diagnostic reasons
+  -h, --help               Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-inbox">greatminds inbox<a class="headerlink" href="#greatminds-inbox" title="Permanent link">&para;</a></h3>
+<p>inter-role inbox messaging (wake/ask/info)</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds inbox [OPTIONS] COMMAND [ARGS]...
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  -h, --help  Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-inbox-ack">greatminds inbox ack<a class="headerlink" href="#greatminds-inbox-ack" title="Permanent link">&para;</a></h4>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds inbox ack [OPTIONS] PATH
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  -h, --help  Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-inbox-list">greatminds inbox list<a class="headerlink" href="#greatminds-inbox-list" title="Permanent link">&para;</a></h4>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds inbox list [OPTIONS] [ROLE]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  -h, --help  Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-inbox-send">greatminds inbox send<a class="headerlink" href="#greatminds-inbox-send" title="Permanent link">&para;</a></h4>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds inbox send [OPTIONS] TO
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --kind [ask|info|wake]  [required]
+  --task TEXT             task id ref
+  --body TEXT             literal | @file | - (stdin)
+  -h, --help              Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-inbox-show">greatminds inbox show<a class="headerlink" href="#greatminds-inbox-show" title="Permanent link">&para;</a></h4>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds inbox show [OPTIONS] PATH
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  -h, --help  Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-intent-clean">greatminds intent-clean<a class="headerlink" href="#greatminds-intent-clean" title="Permanent link">&para;</a></h3>
+<p>intent-clean — remove orphan intent files whose task has already moved.</p>
+<p>An intent file says "I'm about to mv <task> from <queue> to <queue>".
+After the mv, the agent is supposed to delete its intent. If an agent
+crashes mid-tick, its intent file is left behind. This command garbage-
+collects them: if the task is no longer in the intent's <code>from</code> queue,
+the mv has completed (or the task was withdrawn) and the intent is
+stale.</p>
+<p>Safety: only removes intents older than <code>--min-age-sec</code> (default 300).
+Recently-created intents may be legitimate ongoing claims.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds intent-clean [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --project-dir DIRECTORY  project root (default: cwd)
+  --min-age-sec INTEGER    only consider intents older than this; default 300s
+  --dry-run                report what would be removed; don&#39;t delete
+  --quiet                  suppress summary line on no-ops
+  -h, --help               Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-launch">greatminds launch<a class="headerlink" href="#greatminds-launch" title="Permanent link">&para;</a></h3>
+<p>greatminds launch — start the fleet (tmux | vscode | cursor-ide).</p>
+<p>Reads <code>&lt;project&gt;/coord.yaml</code>, detects the project's Python env via
+<code>greatminds.core.env</code>, and:</p>
+<p><code>--target tmux</code>        creates a tmux session with one window per
+                           role. Each window pre-types the env activation
+                           command (so bare <code>greatminds-start-agent</code>
+                           works in the shell) followed by the actual
+                           launcher line (without Enter — you review and
+                           confirm).</p>
+<p><code>--target vscode</code>      writes <code>.vscode/tasks.json</code> + a workspace
+                           file. Each task launches the agent in a
+                           dedicated terminal panel; the task <code>env</code>
+                           block (for simple envs) or wrapping
+                           <code>bash -c</code> (for pixi/conda) ensures
+                           greatminds-* is on PATH.</p>
+<p><code>--target cursor-ide</code>  same generated files as <code>vscode</code> (Cursor
+                           IDE reads <code>.vscode/</code> verbatim); prints
+                           <code>cursor</code> as the open command.</p>
+<p>Env auto-detection ladder:
+  pixi.toml | uv.lock | poetry.lock | environment.yml | .venv/bin/activate
+  → fallback to <code>$VIRTUAL_ENV</code> / <code>$CONDA_DEFAULT_ENV</code> from parent shell
+  → system PATH only (e.g. pipx).</p>
+<p>Pass <code>--venv /path</code> to force <code>source &lt;path&gt;/bin/activate</code> and skip
+detection (useful when no marker files describe the env).</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds launch [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --target [tmux|vscode|cursor-ide]
+                                  frontend (default: tmux)
+  --config FILE                   path to coord.yaml (default:
+                                  &lt;project&gt;/coord.yaml)
+  --project-dir DIRECTORY         override config.project_dir / cwd
+  --venv DIRECTORY                explicit venv to activate (skips auto-
+                                  detect)
+  --recreate                      (tmux target only) kill existing session and
+                                  rebuild
+  -h, --help                      Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-lint-tokens">greatminds lint-tokens<a class="headerlink" href="#greatminds-lint-tokens" title="Permanent link">&para;</a></h3>
+<p>Lint <TOKEN> usage across the canon coordination files.</p>
+<p>Scans <code>command_START.yaml</code>, <code>COORDINATE.md</code>, role docs (<code>*.md</code>)
+and <code>templates/</code> for <code>&lt;TOKEN&gt;</code> patterns. Compares with the token
+catalog in <code>PROJECT_VARIABLES.md</code>.</p>
+<p>Exits non-zero if unknown tokens are found. Unused catalog tokens are
+warned about but do not fail.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds lint-tokens [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --canon-dir DIRECTORY  canon data dir (default: packaged greatminds.data)
+  -h, --help             Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-migrate-task">greatminds migrate-task<a class="headerlink" href="#greatminds-migrate-task" title="Permanent link">&para;</a></h3>
+<p>bin/migrate-task — convert legacy .md task files to the strict .yaml format.</p>
+<p>Legacy format (current): a markdown file with multiple YAML blocks separated
+by <code>---</code>, optionally interleaved with free prose.
+  * the first dict-shaped YAML block is the header (id, stream, kind, ...);
+  * subsequent dict-shaped YAML blocks whose only top-level key is a known
+    "<kind>_block" name are progress blocks;
+  * everything else (prose, headings) becomes the task's <code>description</code> field.</p>
+<p>New format: single YAML file with header fields at top level and an
+ordered <code>blocks:</code> list. See bin/task for the exact shape.</p>
+<p>Usage:
+  migrate-task --file path/to/task.md          one file
+  migrate-task --queue feature_dev             all active in a queue
+  migrate-task --all                           every .md task in coordination/
+                                               (active queues only by default;
+                                               pass --include-terminal to also
+                                               touch verified/, archive/, etc.)</p>
+<p>Flags:
+  --dry-run         report what would be migrated; write nothing
+  --keep-md         leave .md alongside new .yaml (default: rename to .md.legacy)
+  --force           overwrite existing .yaml if present</p>
+<p>Best-effort: per-block fields are remapped where the canonical name
+changed (written_by→by, written_at→at, closed_by→by, closed_at→at).
+Unknown fields are preserved verbatim under their original key.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds migrate-task [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --file TEXT         single .md file to migrate
+  --queue TEXT        migrate all .md in this queue
+  --all               migrate every .md in active queues
+  --include-terminal  with --all, also include verified/archive/stand_done/...
+  --dry-run
+  --keep-md           don&#39;t rename original .md to .md.legacy
+  --force             overwrite existing .yaml
+  -h, --help          Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-notify-journal">greatminds notify-journal<a class="headerlink" href="#greatminds-notify-journal" title="Permanent link">&para;</a></h3>
+<p>Replay recent journal.ndjson lines and write inbox wake-up messages.</p>
+<p>Called from a PostToolUse hook (claude/cursor). It is idempotent — a state
+file tracks the last processed offset so duplicate invocations are safe.</p>
+<p>For each new journal entry, looks up which role should be woken via
+schema.yaml (the role whose <code>claims_from</code> contains the destination queue
+gets a wake message). Special-cases:</p>
+<ul>
+<li>to=stand_done   → notify TESTER for each task in evidence_for.</li>
+<li>to=verified     → notify ARCHITECT-REVIEWER (so it runs wake_check).</li>
+</ul>
+<p>Usage:
+    notify_from_journal [--project-dir <dir>] [--canon-dir <dir>] [--once]</p>
+<p>By default scans only new lines since the last invocation. <code>--once</code>
+processes every line (useful for backfill).</p>
+<p>Exit code is always 0 — failure to notify should never block the
+producer's tick.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds notify-journal [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --project-dir DIRECTORY  project root (default: cwd)
+  --canon-dir DIRECTORY    canon data dir (default: packaged greatminds.data)
+  --once                   replay ALL lines (backfill); default: only new
+                           lines
+  -h, --help               Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-plan">greatminds plan<a class="headerlink" href="#greatminds-plan" title="Permanent link">&para;</a></h3>
+<p>plan — ARCHITECT-PLANNER convenience: triage + plan + route in one go.</p>
+<p>Atomic 4-step chain:</p>
+<ol>
+<li><code>append-block triage</code> on the inbox task</li>
+<li><code>mv</code> → <code>feature_plan</code></li>
+<li><code>append-block plan</code> (with all required fields)</li>
+<li><code>mv</code> → per-scope queue (or <code>feature_docs_review</code> for <code>--audit-only</code>)</li>
+</ol>
+<p>The chain stops at the first failing step and prints exactly where it
+stopped and what to do — never a silent partial failure.</p>
+<p>Only <code>ARCHITECT-PLANNER</code> may run this command (the <code>GREATMINDS_ROLE</code>
+env var is enforced; refusing other roles up-front avoids ambiguity).</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds plan [OPTIONS] ID
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --scope [backend|docs|ui]      [required]
+  --assignee-role TEXT           [required]
+  --base-commit TEXT             [required]
+  --plan-kind [full|bugfix]      [required]
+  --mode [A|B|C]                 [required]
+  --stand-required [true|false]  [required]
+  --stand-reason TEXT
+  --body TEXT                    plan text (literal)
+  --body-file TEXT               plan text: file path, or - for stdin
+  --triage TEXT                  optional triage note
+  --stop-at [plan]               stop after plan block; do not route to per-
+                                 scope queue
+  --audit-only                   READER audit (scope must be docs): no WRITER
+                                 step — route straight to feature_docs_review.
+  -h, --help                     Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-pty-launch">greatminds pty-launch<a class="headerlink" href="#greatminds-pty-launch" title="Permanent link">&para;</a></h3>
+<p>pty-launch <ROLE> <TOOL> [tool args...] — spawn TOOL in a pty we own.</p>
+<p>Why: writing to /dev/pts/N as an unrelated process targets the <em>slave</em> side
+and shows up as terminal output (display), not input. The reason user
+keystrokes wake the agent is that the terminal emulator (xterm/gnome-
+terminal/…) writes to the <em>master</em> end of the pty, which routes to the
+slave's read-queue — i.e. the running process's stdin.</p>
+<p>This launcher creates its own pty, runs TOOL inside it (slave fd as
+stdin/stdout/stderr), keeps the master fd, and proxies bytes between
+the user's terminal and the pty. Crucially it also exposes a unix
+socket at <code>&lt;COORDINATION_DIR&gt;/.agent_registry/&lt;role&gt;.sock</code> that any
+external process (coordd!) can connect to and write bytes — those bytes
+go straight into the master end and are seen by the agent exactly like
+user keystrokes.</p>
+<p>The registry file <code>&lt;role&gt;.json</code> is updated to record the socket path so
+coordd knows where to push.</p>
+<p>Usage in start_agent:
+    pty-launch DEVELOPER claude --name DEVELOPER --permission-mode auto "$PROMPT"</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds pty-launch [OPTIONS] ROLE EXEC_BINARY [TOOL_ARGS]...
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  -h, --help  Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-render-role">greatminds render-role<a class="headerlink" href="#greatminds-render-role" title="Permanent link">&para;</a></h3>
+<p>Render a role's bootstrap command with project tokens substituted.</p>
+<p><code>ROLE</code> is one of the keys under <code>roles:</code> in <code>command_START.yaml</code>
+(e.g. <code>DEVELOPER</code>, <code>ARCHITECT-PLANNER</code>, <code>UI-DEVELOPER-FAST</code>).</p>
+<p><code>--project-dir</code> points at an installed project containing
+<code>coordination/PROJECT.md</code> (default: current working directory).
+<code>--canon-dir</code> defaults to the packaged <code>greatminds.data</code> shipped
+with this wheel; pass to override (test fixtures, dev clones).</p>
+<p>Prints the rendered bootstrap text to stdout; warnings about unresolved
+tokens go to stderr.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds render-role [OPTIONS] ROLE
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --project-dir DIRECTORY  project root containing coordination/PROJECT.md
+                           (default: cwd)
+  --canon-dir DIRECTORY    canon data dir (default: packaged greatminds.data)
+  -h, --help               Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-report-upstream">greatminds report-upstream<a class="headerlink" href="#greatminds-report-upstream" title="Permanent link">&para;</a></h3>
+<p>greatminds report-upstream — file a bug against the upstream greatminds repo.</p>
+<p>Three submission modes, configurable via <code>--mode</code> or
+<code>coord.yaml: report.mode</code>:</p>
+<p><code>url</code>        Default. URL-encode the body into
+                 <code>https://github.com/&lt;repo&gt;/issues/new?...</code> and open it in
+                 the user's browser (also printed to stdout). Zero creds,
+                 zero side effects beyond a browser tab.
+  <code>gh</code>         Shell out to the local <code>gh</code> CLI (<code>gh issue create</code>);
+                 requires <code>gh auth login</code> already done.
+  <code>api-token</code>  POST to the GitHub REST API directly, using a PAT read
+                 from <code>$&lt;token_env&gt;</code> first, then
+                 <code>coordination/PROJECT.env</code>. No token is bundled in the
+                 PyPI artifact.</p>
+<p>Designed for MAINTAINER use only — other roles file inbox/maintainer/
+asks; MAINTAINER triages "наш баг vs апстрим" and invokes this command
+when the bug is upstream.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds report-upstream [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --title TEXT                  issue title (short)  [required]
+  --body TEXT                   issue body text (inline)
+  --body-file FILE              read body from FILE (use &#39;-&#39; for stdin)
+  --severity [low|normal|high]  [default: normal]
+  --label TEXT                  label to attach (repeatable)
+  --mode [url|gh|api-token]     submission mode (overrides coord.yaml
+                                report.mode)
+  --dry-run                     print the assembled body to stdout and exit
+  --no-diagnostics              skip auto-collected diagnostics (manual body
+                                only)
+  --project-dir DIRECTORY       override project root (default: cwd /
+                                coord.yaml)
+  -h, --help                    Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-restart">greatminds restart<a class="headerlink" href="#greatminds-restart" title="Permanent link">&para;</a></h3>
+<p>greatminds restart — idempotent fleet restart.</p>
+<p>Replaces the temporary <code>restart_fleet.sh</code> bash crutch with a tested
+Python implementation. Same external behavior, same order:</p>
+<ol>
+<li><code>systemctl --user is-active --quiet coordd</code>; if not, start it.</li>
+<li><code>tmux has-session -t &lt;session&gt;</code>; if missing, shell out to
+     <code>greatminds launch --target tmux</code>.</li>
+<li>For each window in <code>coord.yaml</code> with a non-empty <code>role</code>,
+     resolve <code>coordination/.agent_registry/&lt;role-lowercase&gt;.json</code>:<ul>
+<li>missing / pid dead / no pid → <code>tmux send-keys Enter</code> to
+     (re)launch the agent (its window already runs a wrapper that
+     waits on Enter).</li>
+<li>alive → skip.</li>
+</ul>
+</li>
+<li>Wait 10s, then re-read each registry. A role passes if the file
+     exists, <code>pid</code> is alive (<code>os.kill(pid, 0)</code>), and <code>input_sock</code>
+     is present. Exit 0 if all roles pass; exit 1 otherwise.</li>
+</ol>
+<p>Usage::</p>
+<pre><code>greatminds restart [--config &lt;coord.yaml&gt;] [--project-dir &lt;dir&gt;]
+</code></pre>
+<p>Linux + systemd-user only, same as the bash version.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds restart [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --config FILE            path to coord.yaml (default: &lt;project&gt;/coord.yaml)
+  --project-dir DIRECTORY  override config.project_dir / cwd
+  -h, --help               Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-setup">greatminds setup<a class="headerlink" href="#greatminds-setup" title="Permanent link">&para;</a></h3>
+<p>greatminds setup — bootstrap a project to use the coordination protocol.</p>
+<p>Creates the runtime queue tree, copies the schema / command_START /
+role docs from the packaged <code>greatminds.data</code> directory, and seeds
+the inbox + plugin-overlay layout.</p>
+<p>After this command, the project has everything it needs to run the
+fleet. Next steps:</p>
+<ol>
+<li>edit <code>&lt;project&gt;/coord.yaml</code> to confirm project_dir + window list</li>
+<li>fill in <code>&lt;project&gt;/coordination/PROJECT.md</code> tokens (project name,
+     stand hosts, env paths, etc.)</li>
+<li>run <code>greatminds launch --target tmux</code> to start the fleet</li>
+</ol>
+<p>No <code>bin/*</code> shims are created. With greatminds installed in your env
+(pip, pipx, uv, poetry, pixi, conda), the unified <code>greatminds</code> binary
+lives on PATH; per-project shims are unnecessary.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds setup [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --project-dir DIRECTORY  project root (default: cwd)
+  --force                  overwrite PROJECT.md if present. NOTE: coord.yaml
+                           is NEVER overwritten by setup (init-style — delete
+                           it first to regenerate). --force does not apply to
+                           coord.yaml.
+  --lang CODE              user-facing language for agents (chat replies,
+                           console status, errors). ISO code: en, ru, zh, es,
+                           fr, ja, etc. Internal artifacts (task fields,
+                           journal, code) stay English regardless. Default:
+                           en.
+  --session NAME           canonical session name for the generated coord.yaml
+                           (default: basename of project_dir). Must match
+                           [A-Za-z0-9_.-]{1,64}; used as the systemd template
+                           instance and the tmux session name.
+  -h, --help               Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-stand">greatminds stand<a class="headerlink" href="#greatminds-stand" title="Permanent link">&para;</a></h3>
+<p>stand_request stream — request a stand op, record result</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds stand [OPTIONS] COMMAND [ARGS]...
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  -h, --help  Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-stand-request">greatminds stand request<a class="headerlink" href="#greatminds-stand-request" title="Permanent link">&para;</a></h4>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds stand request [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --request-type [deploy|restart|rebuild|smoke|remote_sync|gpu_check|teardown]
+                                  [required]
+  --profile [full-deploy|vite-dev]
+                                  [required]
+  --title TEXT                    [required]
+  --hosts TEXT                    list of hosts; repeat the flag or comma-
+                                  separate values
+  --evidence-for TEXT             task ids that will use this stand&#39;s
+                                  evidence; repeat or comma-separate
+  --description TEXT              literal | @file | -
+  --priority [low|normal|high]
+  --reason TEXT                   journal reason
+  -h, --help                      Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-stand-result">greatminds stand result<a class="headerlink" href="#greatminds-stand-result" title="Permanent link">&para;</a></h4>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds stand result [OPTIONS] ID
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --result [ok|partial|fail]      [required]
+  --status [READY|DEGRADED|DOWN|BLOCKED]
+                                  [required]
+  --commit TEXT                   [required]
+  --profile [full-deploy|vite-dev]
+                                  [required]
+  --notes TEXT                    literal | @file | -
+  --reason TEXT                   journal reason for mv
+  -h, --help                      Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-start-agent">greatminds start-agent<a class="headerlink" href="#greatminds-start-agent" title="Permanent link">&para;</a></h3>
+<p>start_agent — launch an agent for a coordination ROLE in a given TOOL.</p>
+<p>Replaces the 353-line Bash original at /opt/coordination/bin/start_agent.
+Same external contract; same env var surface; same exec semantics — the
+tool process replaces this script via <code>os.execvp</code>.</p>
+<p>Usage::</p>
+<pre><code>greatminds-start-agent &lt;ROLE&gt; &lt;TOOL&gt; [--mode loop|chat] [extra tool args...]
+</code></pre>
+<p>ROLE
+    Role key from <code>command_START.yaml</code> (DEVELOPER, ARCHITECT-PLANNER,
+    UI-DEVELOPER, EXPLORER, TESTER, …).</p>
+<p>TOOL
+    One of <code>claude</code> | <code>codex</code> | <code>cursor</code>.</p>
+<p>What it does:</p>
+<ol>
+<li>Resolve project root from <code>$GREATMINDS_PROJECT_DIR</code> (or cwd).</li>
+<li>Resolve canon (packaged <code>greatminds.data</code>) via <code>find_canon_dir</code>.</li>
+<li>Export <code>GREATMINDS_ROLE</code>, <code>PROJECT_ROOT</code> and source the optional
+   <code>$PROJECT/coordination/PROJECT.env</code> (gitignored secrets file).</li>
+<li>Manage the per-role registry under
+   <code>$PROJECT/coordination/.agent_registry/&lt;role&gt;.{json,session-id}</code>:
+   refuse to start if another agent is alive (unless <code>GREATMINDS_FORCE=1</code>);
+   reuse the persistent session UUID for <code>--resume</code> semantics;
+   rotate the UUID when <code>GREATMINDS_FRESH=1</code>.</li>
+<li>Render the bootstrap prompt via
+   <code>python -m greatminds.cli.render_role</code>. On resume, replace it with
+   a short "continue your tick" nudge so the tool doesn't re-ingest the
+   giant role spec.</li>
+<li>Strip leading <code>/loop</code> for chat mode.</li>
+<li>Set the terminal title (OSC 0) unless
+   <code>GREATMINDS_START_AGENT_NOTITLE=1</code>.</li>
+<li>Per-tool branching:</li>
+</ol>
+<p><code>claude</code>
+       Layered <code>--plugin-dir</code> (canon coordination-protocol → canon
+       per-role → project overrides) and <code>--mcp-config</code> (canon →
+       project local). New session: <code>--session-id</code>. Resume:
+       <code>--resume</code>. <code>--</code> separator before the prompt so the variadic
+       <code>--mcp-config</code> doesn't eat it.</p>
+<p><code>codex</code>
+       Discovers the role's most recent rollout in
+       <code>~/.codex/sessions</code>; caches its UUID for <code>codex resume</code>.
+       Falls back to <code>codex resume --last</code> if no session found. Adds
+       <code>--profile-v2 &lt;role-lower&gt;</code> when
+       <code>~/.codex/&lt;role-lower&gt;.config.toml</code> exists.</p>
+<p><code>cursor</code>
+       Wrapped in <code>systemd-run --user --scope</code> with memory/CPU caps
+       (cursor-agent leaks memory in long sessions). Sets
+       <code>GREATMINDS_REGISTRY_TOOL=cursor</code> so <code>pty-launch</code> records the
+       logical tool, not <code>systemd-run</code>.</p>
+<p>Optional <code>greatminds-pty-launch</code> wraps the tool process in a pty we
+control plus a unix socket so <code>coordd</code> can inject keystrokes from
+outside the terminal emulator. Disabled via <code>GREATMINDS_START_AGENT_NOPTY=1</code>.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds start-agent [OPTIONS] ROLE {claude|codex|cursor} [EXTRA]...
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --mode [loop|chat]  loop = self-driving tick loop; chat = interactive
+  -h, --help          Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-stop-decide">greatminds stop-decide<a class="headerlink" href="#greatminds-stop-decide" title="Permanent link">&para;</a></h3>
+<p>Hook helper: decide whether the agent should keep ticking instead of stopping.</p>
+<p>Invoked from claude's <code>Stop</code> hook and cursor's <code>stop</code>/<code>subagentStop</code>
+hooks. Receives JSON on stdin (mostly ignored). Looks at:</p>
+<ul>
+<li>the role's inbox (anything pending?),</li>
+<li>(optional) the role's <code>claims_from</code> queues.</li>
+</ul>
+<p>If there is wake work, prints a JSON blob telling the host to continue
+the loop. Otherwise prints <code>{}</code> (allow stop).</p>
+<p>Output format depends on the host:</p>
+<p>claude   <code>{"decision": "block", "reason": "&lt;text&gt;", "systemMessage": "&lt;text&gt;"}</code>
+  cursor   <code>{"followup_message": "&lt;text&gt;"}</code></p>
+<p>Exit code is always 0; the JSON on stdout is the signal the host reads.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds stop-decide [OPTIONS] ROLE
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --host [claude|cursor]   output schema (claude vs cursor)
+  --project-dir DIRECTORY  project root (default: cwd)
+  --canon-dir DIRECTORY    canon data dir (default: packaged greatminds.data)
+  -h, --help               Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-task">greatminds task<a class="headerlink" href="#greatminds-task" title="Permanent link">&para;</a></h3>
+<p>task-file CRUD (intake, mv, append-block, show, list, validate)</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds task [OPTIONS] COMMAND [ARGS]...
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  -h, --help  Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-task-append-block">greatminds task append-block<a class="headerlink" href="#greatminds-task-append-block" title="Permanent link">&para;</a></h4>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds task append-block [OPTIONS] {blocked|implementation|plan|reader_rev
+                             iew|review|session_iteration|stand_result|tests|t
+                             riage}
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --id TEXT         [required]
+  --field TEXT      key=value (repeat)
+  --body TEXT       block body: literal text | @PATH (read file) | - (stdin)
+  --body-file TEXT  block body file path (alias for --body @PATH; preserved
+                    for orchestrator and old-CLI compat)
+  -h, --help        Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-task-list">greatminds task list<a class="headerlink" href="#greatminds-task-list" title="Permanent link">&para;</a></h4>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds task list [OPTIONS] QUEUE
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  -h, --help  Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-task-mv">greatminds task mv<a class="headerlink" href="#greatminds-task-mv" title="Permanent link">&para;</a></h4>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds task mv [OPTIONS] ID TO_QUEUE
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --reason TEXT
+  -h, --help     Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-task-new">greatminds task new<a class="headerlink" href="#greatminds-task-new" title="Permanent link">&para;</a></h4>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds task new [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --stream [product|stand|review_session]
+                                  [required]
+  --title TEXT                    [required]
+  --reporter TEXT
+  --priority [high|low|normal]
+  --kind TEXT                     product: bugfix|docs|feature|ops|research
+  --scope TEXT                    product: backend|docs|research|stand|ui
+  --request-type [deploy|gpu_check|rebuild|remote_sync|restart|smoke|teardown]
+  --profile [full-deploy|vite-dev]
+  --hosts TEXT                    list of hosts; repeat the flag or comma-
+                                  separate values
+  --evidence-for TEXT             task ids this run is evidence for; repeat or
+                                  comma-separate
+  --mode [A|B|C]
+  --target-functionality TEXT
+  --scenarios TEXT                scenario IDs; repeat or comma-separate
+  --description TEXT              literal | @file | - (stdin)
+  --in-queue TEXT                 destination queue (default depends on
+                                  stream)
+  --seq TEXT                      override numeric id prefix
+  --reason TEXT                   journal reason
+  -h, --help                      Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-task-paths">greatminds task paths<a class="headerlink" href="#greatminds-task-paths" title="Permanent link">&para;</a></h4>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds task paths [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  -h, --help  Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-task-show">greatminds task show<a class="headerlink" href="#greatminds-task-show" title="Permanent link">&para;</a></h4>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds task show [OPTIONS] ID
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  -h, --help  Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-task-validate">greatminds task validate<a class="headerlink" href="#greatminds-task-validate" title="Permanent link">&para;</a></h4>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds task validate [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --id TEXT
+  --file TEXT
+  -h, --help   Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-update">greatminds update<a class="headerlink" href="#greatminds-update" title="Permanent link">&para;</a></h3>
+<p>greatminds update — single-command upgrade of CLI + daemon + agents.</p>
+<p>Three moving parts to keep in sync after a release:</p>
+<ol>
+<li>The package itself in <code>.venv-coord/</code> (or whatever venv shipped
+     greatminds to this host).</li>
+<li>The systemd-user daemon <code>greatminds-daemon@&lt;project&gt;.service</code>
+     (per-project, refactored in task 0008).</li>
+<li>The tmux agents (restarted via <code>greatminds restart</code> from 0001).</li>
+</ol>
+<p>This command runs all three in one pass, with a self-replacement step
+(<code>os.execv</code>) between phase 1 and the rest so the new code drives the
+post-pip phases. <code>--post-pip</code> is the idempotent recovery mode used
+both by the self-replace dispatch and by users whose package version
+got out ahead of the daemon (e.g. raw <code>pip install --upgrade</code>).</p>
+<p>CLI surface::</p>
+<pre><code>greatminds update                  # full path: pip + daemon + agents
+greatminds update --post-pip       # skip pip; daemon + agents only
+greatminds update --check          # report would-be changes, no actions
+greatminds update --dry-run        # alias of --check
+greatminds update --major          # allow major-version bump
+</code></pre>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds update [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --post-pip      skip pip; only run daemon + agent restarts (idempotent
+                  recovery mode).
+  --check         report what would change; no actions.
+  --dry-run       alias of --check.
+  --major         allow major-version bump (default: refuse).
+  --project TEXT  project name for `greatminds daemon restart` (default:
+                  coord.yaml session).
+  -h, --help      Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-wake-check">greatminds wake-check<a class="headerlink" href="#greatminds-wake-check" title="Permanent link">&para;</a></h3>
+<p>Report blocked tasks ready to wake, malformed deps, and deadlock cycles.</p>
+<p>Usage:
+    wake_check [--project-dir <dir>] [--canon-dir <dir>] [--quiet]</p>
+<p>Scans <project-dir>/coordination/feature_blocked/*.{yaml,md}. For each:
+  - parses the latest <code>blocked</code> block (or <code>blocked_block</code> for legacy md);
+  - validates dependency entries match <code>&lt;queue&gt;/&lt;id&gt;.{yaml,md}</code>;
+  - checks each referenced file actually exists;
+  - flags tasks whose ALL deps exist AND none of those deps is itself
+    in a wait state (active blocked queue) → READY TO WAKE.</p>
+<p>Also detects:
+  - malformed deps (wrong format or unknown queue);
+  - deadlock cycles (A blocked on B, B blocked on A, etc — DFS over
+    the feature_blocked dependency graph);
+  - tasks with no blocked block (orphans).</p>
+<p>ARCHITECT-REVIEWER is expected to run this at the start of every tick
+and act on ready-to-wake / cycle / malformed findings. wake_check
+never moves files.</p>
+<p>Exit code:
+  0 always (informational).</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds wake-check [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --project-dir DIRECTORY  project root containing coordination/ (default:
+                           cwd)
+  --canon-dir DIRECTORY    canon data dir (default: packaged greatminds.data)
+  --quiet                  suppress no-findings output
+  -h, --help               Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-watchdog">greatminds watchdog<a class="headerlink" href="#greatminds-watchdog" title="Permanent link">&para;</a></h3>
+<p>Read-only watchdog for the coordination filesystem.</p>
+<p>Reports:
+  - heartbeat files older than <code>schema.watchdog.heartbeat_stale_seconds</code>
+  - orphaned intent files older than <code>schema.watchdog.intent_orphan_seconds</code>
+  - tasks in active queues older than <code>task_stale_in_active_queue_seconds</code>
+  - tasks in review queues older than <code>task_stale_in_review_queue_seconds</code>
+  - registry entries whose <code>pid</code> is no longer alive</p>
+<p>ARCHITECT-REVIEWER is expected to run this at the start of every tick and
+follow up on flagged items. The watchdog never moves files or alters state.</p>
+<p>Exit code: 0 always (informational tool). <code>--quiet</code> only prints sections
+with findings.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds watchdog [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --project-dir DIRECTORY  project root containing coordination/ (default:
+                           cwd)
+  --canon-dir DIRECTORY    canon data directory (default: packaged
+                           greatminds.data)
+  --quiet                  only print sections with findings
+  -h, --help               Show this message and exit.
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
