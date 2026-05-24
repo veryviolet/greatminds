@@ -253,6 +253,81 @@ def test_hosts_repeated_flag(tmp_path: Path):
     assert data["target"]["hosts"] == ["host-a", "host-b"], data["target"]
 
 
+# ---------------------------------------------------------------------------
+# task 0067: --evidence-for / --hosts / any _split_multivalue option must
+# parse YAML bracket-list syntax. Was poisoning every stand_done with
+# evidence_for: ['[<task-id>]'] which gate-check could never match.
+# ---------------------------------------------------------------------------
+
+
+def test_split_multivalue_unit_bracket_list_parses_to_real_list():
+    """Direct unit test on the click callback: ``[a, b, c]`` → 3-element
+    list of strings (NOT one literal '[a, b, c]')."""
+    from greatminds.cli.task import _split_multivalue
+    out = _split_multivalue(None, None, ("[task-a, task-b, task-c]",))
+    assert out == ["task-a", "task-b", "task-c"], out
+
+
+def test_split_multivalue_unit_bracket_with_single_item():
+    """The minimal bracket-list shape ``[X]`` — exact repro from the
+    USER bug: 'evidence_for' poisoned with '[<task-id>]'."""
+    from greatminds.cli.task import _split_multivalue
+    out = _split_multivalue(None, None, ("[0051-foo]",))
+    assert out == ["0051-foo"], out
+
+
+def test_split_multivalue_unit_bracket_empty_list():
+    """Empty bracket-list ``[]`` → empty result (returned as None per
+    the convention 'None when nothing was passed')."""
+    from greatminds.cli.task import _split_multivalue
+    out = _split_multivalue(None, None, ("[]",))
+    # ``out`` is "or None" at the end, so empty list collapses to None.
+    assert out is None, out
+
+
+def test_split_multivalue_unit_comma_path_unchanged():
+    """Comma-separated path remains unchanged (1.1.0 regression net)."""
+    from greatminds.cli.task import _split_multivalue
+    out = _split_multivalue(None, None, ("host-a,host-b,host-c",))
+    assert out == ["host-a", "host-b", "host-c"], out
+
+
+def test_stand_request_evidence_for_bracket_list_writes_real_list(tmp_path: Path):
+    """End-to-end: ``stand request --evidence-for [task-id]`` writes the
+    stand_requests YAML with ``evidence_for: ['task-id']`` (a proper
+    list of strings), NOT ``evidence_for: ['[task-id]']`` (the poison).
+    This is the actual bug repro USER filed against the stand writer."""
+    import yaml
+    proj = _setup_project(tmp_path)
+    tid = _new_task(proj, "0067-target")
+    cp = _gm(proj, "stand", "request",
+             "--request-type", "deploy", "--profile", "full-deploy",
+             "--title", "stand for 0067 target",
+             "--evidence-for", f"[{tid}]")
+    assert cp.returncode == 0, cp.stderr
+    yaml_files = list((proj / "coordination" / "stand_requests").glob("*.yaml"))
+    assert len(yaml_files) == 1, yaml_files
+    data = yaml.safe_load(yaml_files[0].read_text(encoding="utf-8"))
+    assert data["evidence_for"] == [tid], (
+        f"poisoned evidence_for shape: {data['evidence_for']!r}. "
+        f"Expected single-element list [tid], got the bracket-string."
+    )
+
+
+def test_stand_request_hosts_bracket_list(tmp_path: Path):
+    """Same fix applies to --hosts (also routed through _split_multivalue)."""
+    import yaml
+    proj = _setup_project(tmp_path)
+    cp = _gm(proj, "stand", "request",
+             "--request-type", "deploy", "--profile", "full-deploy",
+             "--title", "hosts bracket-list",
+             "--hosts", "[host-a, host-b]")
+    assert cp.returncode == 0, cp.stderr
+    yaml_files = list((proj / "coordination" / "stand_requests").glob("*.yaml"))
+    data = yaml.safe_load(yaml_files[0].read_text(encoding="utf-8"))
+    assert data["target"]["hosts"] == ["host-a", "host-b"], data["target"]
+
+
 def test_append_block_rejects_both_body_and_body_file(tmp_path: Path):
     """Passing both flags is a usage error, not a silent precedence rule."""
     proj = _setup_project(tmp_path)

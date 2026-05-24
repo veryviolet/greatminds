@@ -1247,15 +1247,38 @@ def _split_multivalue(ctx, param, value):
       ``--hosts X --hosts Y``       (repeated flag — idiomatic click)
       ``--hosts X,Y``               (one flag, comma-separated values)
       ``--hosts X,Y --hosts Z``     (mix — flatten + split)
+      ``--hosts [X, Y]``            (YAML bracket-list, task 0067 fix)
 
     All collapse to a flat ``list[str]``. ``None`` if nothing was passed.
+
+    Bracket-list parsing (task 0067): if a single value starts with ``[``
+    after strip, try ``yaml.safe_load`` first. The same fix shape as
+    task 0035 for ``task append-block --field`` LIST_FIELDS keys. Was
+    poisoning ``stand request --evidence-for [<task-id>]`` and ``stand
+    result`` evidence chains downstream — gate-check could not match the
+    string-literal ``'[<task-id>]'`` against the task identity ``<task-id>``.
     """
     del ctx, param  # unused
     if not value:
         return None
     out: list[str] = []
     for v in value:
-        for piece in str(v).split(","):
+        s = str(v).strip()
+        # Bracket-list path: yaml.safe_load on a single bracketed token.
+        # If it parses to a list, stringify each item and append.
+        if s.startswith("["):
+            try:
+                parsed = yaml.safe_load(s)
+            except yaml.YAMLError:
+                parsed = None
+            if isinstance(parsed, list):
+                for item in parsed:
+                    piece = str(item).strip()
+                    if piece:
+                        out.append(piece)
+                continue
+            # Fall through on parse-failure: treat as comma-split fallback.
+        for piece in s.split(","):
             piece = piece.strip()
             if piece:
                 out.append(piece)
