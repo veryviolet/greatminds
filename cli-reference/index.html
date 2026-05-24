@@ -3019,8 +3019,9 @@ the loop. Otherwise prints <code>{}</code> (allow stop).</p>
 <p>greatminds update — single-command upgrade of CLI + daemon + agents.</p>
 <p>Three moving parts to keep in sync after a release:</p>
 <ol>
-<li>The package itself in <code>.venv-coord/</code> (or whatever venv shipped
-     greatminds to this host).</li>
+<li>The package itself in the venv where <code>greatminds</code> is installed
+     (typically the project's <code>.venv/</code> from <code>uv add greatminds</code> or
+     <code>pip install greatminds</code>).</li>
 <li>The systemd-user daemon <code>greatminds-daemon@&lt;project&gt;.service</code>
      (per-project, refactored in task 0008).</li>
 <li>The tmux agents (restarted via <code>greatminds restart</code> from 0001).</li>
