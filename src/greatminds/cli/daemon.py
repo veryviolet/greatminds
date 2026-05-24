@@ -26,7 +26,9 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import click
@@ -41,6 +43,23 @@ REGISTRY_PATH = REGISTRY_DIR / "projects.json"
 SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
 TEMPLATE_UNIT_NAME = "greatminds-daemon@.service"
 LEGACY_UNIT_NAME = "coordd.service"
+
+
+def _resolved_greatminds_exec() -> str:
+    """Pick the ExecStart command for the systemd template unit.
+
+    Mirrors `setup.py:_greatminds_bin()` (task 0002): resolves the
+    currently-running greatminds binary via shutil.which, normalises to
+    absolute path. Falls back to ``<sys.executable> -m greatminds.cli.main``
+    when no console script is on PATH (e.g. a bare-pip module install).
+    Per-project venv installs (uv add greatminds) put the binary at
+    ``<project>/.venv/bin/greatminds`` — picking it up here makes
+    `daemon install` work without requiring a global ~/.local/bin/greatminds.
+    """
+    found = shutil.which("greatminds")
+    if found:
+        return str(Path(found).resolve())
+    return f"{sys.executable} -m greatminds.cli.main"
 
 
 # ---------------------------------------------------------------------------
@@ -121,11 +140,25 @@ def _resolve_project_name(project: str | None,
 
 
 def _template_unit_body() -> str:
-    """Read the shipped template unit, or fall back to an inline copy."""
+    """Compose the systemd template unit with the resolved ExecStart path.
+
+    The shipped canon copy under ``src/greatminds/data/systemd/`` uses a
+    placeholder ``__GREATMINDS_BIN__`` that we substitute at install time
+    with the actual greatminds binary path (per
+    ``_resolved_greatminds_exec``). This avoids the 203/EXEC failure
+    reported by 0030 from EXPLORER's avatar dogfood: a uv-style
+    per-project venv install put the binary at
+    ``<project>/.venv/bin/greatminds``, NOT at the canon-template's
+    ``%h/.local/bin/greatminds``.
+
+    Falls back to an inline body when the canon file is missing.
+    """
+    exec_cmd = _resolved_greatminds_exec()
     try:
         src = find_canon_dir() / "systemd" / TEMPLATE_UNIT_NAME
         if src.is_file():
-            return src.read_text(encoding="utf-8")
+            body = src.read_text(encoding="utf-8")
+            return body.replace("__GREATMINDS_BIN__", exec_cmd)
     except Exception:  # noqa: BLE001
         pass
     return (
@@ -135,7 +168,7 @@ def _template_unit_body() -> str:
         "\n"
         "[Service]\n"
         "Type=simple\n"
-        "ExecStart=%h/.local/bin/greatminds coordd --project %i\n"
+        f"ExecStart={exec_cmd} coordd --project %i\n"
         "Restart=on-failure\n"
         "RestartSec=2\n"
         "\n"
@@ -145,12 +178,25 @@ def _template_unit_body() -> str:
 
 
 def install_template_unit() -> bool:
-    """Idempotent: write the template unit if missing. Returns True if new."""
+    """Idempotent: write the template unit if missing. Returns True if new.
+
+    NOTE: the rendered body is computed at every call from the currently
+    running greatminds binary, so re-running ``greatminds daemon install``
+    from a different venv overwrites a stale unit. We still skip the
+    write when the file exists AND its current contents already match
+    the freshly-rendered body — avoids gratuitous mtime churn and
+    daemon-reload triggers.
+    """
     SYSTEMD_USER_DIR.mkdir(parents=True, exist_ok=True)
     dest = SYSTEMD_USER_DIR / TEMPLATE_UNIT_NAME
+    body = _template_unit_body()
     if dest.is_file():
-        return False
-    dest.write_text(_template_unit_body(), encoding="utf-8")
+        try:
+            if dest.read_text(encoding="utf-8") == body:
+                return False
+        except OSError:
+            pass
+    dest.write_text(body, encoding="utf-8")
     return True
 
 

@@ -268,3 +268,70 @@ def test_register_and_lookup_project_roundtrip(_isolate_paths, tmp_path):
     daemon_mod.register_project("zeta", tmp_path / "z")
     assert daemon_mod.lookup_project_dir("zeta") == tmp_path / "z"
     assert daemon_mod.lookup_project_dir("missing") is None
+
+
+# ---------------------------------------------------------------------------
+# task 0030: install resolves greatminds binary from the running env
+# ---------------------------------------------------------------------------
+
+
+def test_install_template_unit_uses_resolved_greatminds_path(_isolate_paths,
+                                                              monkeypatch):
+    """Reviewer-flagged scenario: a per-project venv install puts greatminds
+    at <project>/.venv/bin/greatminds, NOT at ~/.local/bin/greatminds.
+    The unit file ExecStart must match whatever shutil.which returns at
+    install time, not a hardcoded canon path."""
+    fake_path = "/tmp/some-toy-project/.venv/bin/greatminds"
+    monkeypatch.setattr(
+        daemon_mod.shutil, "which",
+        lambda name: fake_path if name == "greatminds" else None,
+    )
+
+    daemon_mod.install_template_unit()
+
+    body = (daemon_mod.SYSTEMD_USER_DIR / daemon_mod.TEMPLATE_UNIT_NAME).read_text(encoding="utf-8")
+    assert "__GREATMINDS_BIN__" not in body, "placeholder must be substituted"
+    assert f"ExecStart={fake_path} coordd --project %i" in body
+    assert "%h/.local/bin/greatminds" not in body, \
+        "stale hardcoded path must be gone"
+
+
+def test_install_template_unit_falls_back_to_python_module(_isolate_paths,
+                                                            monkeypatch):
+    """When `greatminds` is not on PATH, fall back to `<py> -m greatminds.cli.main`."""
+    monkeypatch.setattr(daemon_mod.shutil, "which", lambda name: None)
+    fake_py = "/opt/some/bin/python"
+    monkeypatch.setattr(daemon_mod.sys, "executable", fake_py)
+
+    daemon_mod.install_template_unit()
+
+    body = (daemon_mod.SYSTEMD_USER_DIR / daemon_mod.TEMPLATE_UNIT_NAME).read_text(encoding="utf-8")
+    assert f"ExecStart={fake_py} -m greatminds.cli.main coordd --project %i" in body
+
+
+def test_install_template_unit_overwrites_stale_path(_isolate_paths, monkeypatch):
+    """Re-running install from a NEW venv should refresh the unit body —
+    otherwise the daemon keeps pointing at the old (now-missing) binary."""
+    # First install from venv A
+    monkeypatch.setattr(daemon_mod.shutil, "which",
+                        lambda name: "/old/venv/bin/greatminds")
+    daemon_mod.install_template_unit()
+    unit_path = daemon_mod.SYSTEMD_USER_DIR / daemon_mod.TEMPLATE_UNIT_NAME
+    assert "/old/venv/bin/greatminds" in unit_path.read_text()
+
+    # Second install from venv B
+    monkeypatch.setattr(daemon_mod.shutil, "which",
+                        lambda name: "/new/venv/bin/greatminds")
+    wrote = daemon_mod.install_template_unit()
+    assert wrote is True, "second install must rewrite when ExecStart differs"
+    body = unit_path.read_text()
+    assert "/new/venv/bin/greatminds" in body
+    assert "/old/venv/bin/greatminds" not in body
+
+
+def test_install_template_unit_idempotent_same_path(_isolate_paths, monkeypatch):
+    """Same-venv re-install must NOT rewrite (no daemon-reload churn)."""
+    monkeypatch.setattr(daemon_mod.shutil, "which",
+                        lambda name: "/same/venv/bin/greatminds")
+    assert daemon_mod.install_template_unit() is True   # first call writes
+    assert daemon_mod.install_template_unit() is False  # second is no-op

@@ -4,7 +4,11 @@ After=default.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/greatminds coordd --project %i
+# __GREATMINDS_BIN__ is substituted at install time by `greatminds daemon
+# install` to the absolute path of the running greatminds binary (resolved
+# via shutil.which). This makes per-project venv installs (`uv add
+# greatminds`) work without requiring a global ~/.local/bin/greatminds.
+ExecStart=__GREATMINDS_BIN__ coordd --project %i
 Restart=on-failure
 RestartSec=2
 
