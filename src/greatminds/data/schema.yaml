@@ -275,10 +275,23 @@ roles:
 # the move is legal.
 # ---------------------------------------------------------------------------
 transitions:
-  # NOTE on `requires:` — this field is DOCUMENTARY (greatminds task does not
-  # parse it; gating lives in greatminds task require_target_readiness /
-  # validate_block). Names here must match the real block kind: the
-  # triage block kind is `triage`, not `architect_triage_block`.
+  # `requires:` is LOAD-BEARING since task 0103. Each name must have a
+  # registered validator in cli/task.py SCHEMA_REQUIRES_VALIDATORS;
+  # unknown names raise an error at mv time (no silent documentary
+  # keys). The validators run AFTER can_role_move and after the
+  # legacy require_target_readiness path — they're additive, not a
+  # replacement, so adding a new require name today does not need to
+  # retire the existing hardcoded check for it.
+  #
+  # The hardcoded checks in require_target_readiness still handle
+  # block-presence + ready_for_* flags for the standard block kinds
+  # (triage, plan, implementation, tests, reader_review) — the
+  # registry maps those names to no-op validators that just record
+  # them as known. The names that get REAL enforcement at the
+  # registry layer:
+  #   - gate_check_pass_if_stand_required (re-runs the gate-check
+  #     evaluation; TESTER cannot bypass by writing pass into the
+  #     field manually).
   - from: user_feedback
     to: feature_inbox
     by: ARCHITECT-PLANNER

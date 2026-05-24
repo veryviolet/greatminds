@@ -769,6 +769,203 @@ def require_scope_match_on_routing(data: dict[str, Any],
         , exit_code=2)
 
 
+# ---------------------------------------------------------------------------
+# Schema requires-validator (task 0103)
+#
+# transitions[].requires used to be marked "DOCUMENTARY" in schema.yaml —
+# the field was never parsed. Result: schema and code could drift, and
+# new require keys added to schema would be silently no-ops (the FSM-hole
+# class that 0102 / 0105 want to use to close further holes).
+#
+# 0103 makes the field load-bearing:
+#   - SCHEMA_REQUIRES_VALIDATORS maps each known require name to a
+#     callable returning None (ok) or an error message string.
+#   - enforce_schema_requires() looks up the (from, to, by) row, iterates
+#     its `requires:` list, and runs each validator.
+#   - An unknown require name is itself an error ("schema requires key
+#     'X' has no registered validator"). This prevents anyone (including
+#     0102/0105 follow-ups) from adding a documentary key by accident.
+#
+# Strategy: most existing require names (triage_block, plan_block, etc.)
+# are still enforced by the pre-existing `require_target_readiness()`
+# function — their entries here just record the name as known and return
+# None. The single name that needed REAL implementation per the task
+# body is `gate_check_pass_if_stand_required`, which now invokes the
+# gate-check logic (not just reads tests.gate_check_result from the
+# block) so TESTER cannot bypass the gate by writing pass into the
+# field manually.
+# ---------------------------------------------------------------------------
+
+
+def _evaluate_gate_check(task_data: dict[str, Any]) -> str:
+    """Run the gate-check logic against a task dict, return 'pass' |
+    'fail' | 'missing' | 'n/a' as a string (matching the CLI's exit
+    codes 0 / 1 / 2 / 0)."""
+    from greatminds.cli import gate_check as gc_mod
+
+    plan = latest_plan(task_data)
+    if not isinstance(plan, dict):
+        return "missing"
+    stand_required = plan.get("stand_required")
+    if stand_required is False or stand_required is None:
+        return "n/a"
+    if stand_required is not True:
+        return "missing"
+
+    task_id_full = task_data.get("id") or ""
+    if not task_id_full:
+        return "missing"
+
+    project_dir = Path.cwd()
+    try:
+        from greatminds.core.paths import find_coord_dir
+        project_dir = find_coord_dir().parent
+    except Exception:
+        pass
+
+    candidates = gc_mod.find_stand_evidence(project_dir, str(task_id_full))
+    if not candidates:
+        return "missing"
+
+    # Replicate gate_check.gate_check()'s pass/fail logic on the merged
+    # task data we already have in-hand (no need to re-parse the task
+    # file — we're called mid-mv after the task is loaded).
+    impl_blocks = [b for b in (task_data.get("blocks") or [])
+                   if isinstance(b, dict) and b.get("kind") == "implementation"]
+    task_commit = None
+    if impl_blocks:
+        task_commit = impl_blocks[-1].get("base_commit")
+    if not task_commit and plan:
+        task_commit = plan.get("base_commit")
+
+    for path, sr in candidates:
+        result = sr.get("result")
+        sr_commit = sr.get("commit")
+        if result not in ("pass", "ok"):
+            continue
+        if task_commit and sr_commit and not str(sr_commit).startswith(str(task_commit)) \
+                and not str(task_commit).startswith(str(sr_commit)):
+            continue
+        return "pass"
+    return "fail"
+
+
+def _check_gate_for_stand_required(data: dict[str, Any],
+                                   from_q: str, to_q: str) -> str | None:
+    """Real check for ``gate_check_pass_if_stand_required``.
+
+    The pre-0103 hardcoded logic in require_target_readiness only looked
+    at the tests block's ``gate_check_result`` field — which TESTER could
+    set to ``pass`` manually without running ``greatminds gate-check``.
+    This validator actually evaluates the gate-check rule (stand_done
+    file presence + matching commit + result in {pass,ok}) the same way
+    the CLI command does, so the field cannot be forged.
+    """
+    plan = latest_plan(data)
+    if not isinstance(plan, dict):
+        return None  # No plan → other validators catch this case.
+    if plan.get("stand_required") is not True:
+        return None  # Gate doesn't apply.
+    result = _evaluate_gate_check(data)
+    if result == "pass":
+        return None
+    return (
+        f"gate_check_pass_if_stand_required: gate_check returns {result!r} "
+        f"(stand_done evidence missing / wrong commit / result not pass)"
+    )
+
+
+# Validators that return None — these names are still enforced by the
+# pre-existing `require_target_readiness()` function. Recording them
+# here keeps the registry the single source of truth for "is this
+# require name known to the validator layer".
+def _noop_existing(data: dict[str, Any], from_q: str, to_q: str) -> str | None:
+    return None
+
+
+SCHEMA_REQUIRES_VALIDATORS: dict[str, "callable"] = {
+    # Empty pre-condition is always satisfied.
+    # (Schema entries with `requires: []` are still validated for role/
+    # transition existence via can_role_move.)
+    "triage_block": _noop_existing,
+    "plan_block": _noop_existing,
+    "scope_backend": _noop_existing,
+    "scope_ui": _noop_existing,
+    "scope_docs": _noop_existing,
+    "plan.audit_only": _noop_existing,
+    "implementation_block": _noop_existing,
+    "tests_block": _noop_existing,
+    "tests_block_fail_or_partial": _noop_existing,
+    "reader_block_pass": _noop_existing,
+    "reader_block_fail_or_partial": _noop_existing,
+    "review_block_approved": _noop_existing,
+    "review_block_changes_requested": _noop_existing,
+    "blocked_block_with_dependencies_and_resume_to": _noop_existing,
+    "all_dependencies_exist_per_wake_check": _noop_existing,
+    "stand_result_block": _noop_existing,
+    "evidence_for_if_related_product_task": _noop_existing,
+    # 0103 real-enforcement: re-evaluate gate-check rather than trust
+    # tests.gate_check_result.
+    "gate_check_pass_if_stand_required": _check_gate_for_stand_required,
+}
+
+
+def enforce_schema_requires(data: dict[str, Any], role: str,
+                            from_q: str, to_q: str) -> None:
+    """Run each `requires:` entry's validator for every (from, to) schema
+    row that authorizes ``role`` to perform this move. Raise
+    GreatMindsError on the first failure or on an unknown require name.
+
+    Row matching mirrors ``can_role_move`` authorization, including
+    ``by: current_owner`` — when ``role`` owns or writes ``from_q``,
+    the current_owner row authorizes the move and its requires must
+    be enforced. Restricting to ``by == role`` would leave current_owner
+    rows (e.g. any_active_queue → feature_blocked) with documentary-only
+    requires — the exact FSM-hole class 0103 closes.
+
+    If multiple rows authorize the role, requires from all of them are
+    enforced (deduped by name).
+    """
+    matches = transitions_for(from_q, to_q)
+    if not matches:
+        return  # can_role_move already rejected; no schema row to enforce.
+
+    owner = (queue_meta(from_q).get("owner") or "").upper()
+    writers = queue_meta(from_q).get("writers") or []
+    authorizing_rows: list[dict[str, Any]] = []
+    for t in matches:
+        by = t.get("by")
+        if isinstance(by, str) and by == role:
+            authorizing_rows.append(t)
+        elif by == "current_owner":
+            if not owner or owner == role or role in writers:
+                authorizing_rows.append(t)
+    if not authorizing_rows:
+        return  # No row authorizes role; can_role_move handles the rejection.
+
+    seen: set[str] = set()
+    for row in authorizing_rows:
+        for name in row.get("requires") or []:
+            if name in seen:
+                continue
+            seen.add(name)
+            validator = SCHEMA_REQUIRES_VALIDATORS.get(name)
+            if validator is None:
+                raise GreatMindsError(
+                    f"schema requires key {name!r} (transition {from_q} → "
+                    f"{to_q} by {row.get('by')!r}) has no registered "
+                    f"validator in SCHEMA_REQUIRES_VALIDATORS — this would "
+                    f"land as a documentary-only key (the exact FSM-hole "
+                    f"class task 0103 closes). Add an entry to the registry."
+                , exit_code=2)
+            err = validator(data, from_q, to_q)
+            if err is not None:
+                raise GreatMindsError(
+                    f"transition {from_q} → {to_q} by {role} failed "
+                    f"requires-check {name!r}: {err}"
+                , exit_code=2)
+
+
 def role_for_block_kind(role: str, kind: str, queue: str,
                         data: dict[str, Any]) -> str | None:
     """Return ``None`` if role may author this block-kind on this task."""
@@ -1128,6 +1325,9 @@ def _do_move(coord: Path, role: str, task_id: str,
 
     require_scope_match_on_routing(data, from_q, to_q)
     require_target_readiness(data, from_q, to_q)
+    # 0103: enforce schema's `requires:` list table-driven (the
+    # previously documentary-only field is now load-bearing).
+    enforce_schema_requires(data, role, from_q, to_q)
 
     intent_path = intent_write(coord, role, task_id, from_q, to_q, reason)
     intent_id = intent_path.stem.rsplit("-", 1)[-1]
