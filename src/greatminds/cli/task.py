@@ -381,22 +381,74 @@ def intent_clear(intent_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
+TASK_FILE_LOCK_TIMEOUT_SEC = 30.0
+TASK_FILE_LOCK_POLL_SEC = 0.1
+
+
 @contextmanager
-def task_file_lock(coord: Path, task_id: str):
-    """Exclusive lock for read-modify-write on a single task file."""
+def task_file_lock(coord: Path, task_id: str,
+                   timeout: float = TASK_FILE_LOCK_TIMEOUT_SEC,
+                   poll_interval: float = TASK_FILE_LOCK_POLL_SEC):
+    """Exclusive per-task-id flock for read-modify-write on a single
+    task file (used by ``mv`` and ``append-block``).
+
+    Non-blocking acquire with a polling retry loop up to ``timeout``
+    seconds. On timeout, raises ``GreatMindsError`` naming the holder
+    PID (read from the lock file content). The kernel auto-releases
+    flock on holder process exit — no explicit stale-pid cleanup
+    required.
+
+    While the lock is held, the lock file content is the holder PID
+    (decimal ASCII). Other waiters read this on timeout to produce a
+    diagnostic message.
+    """
     lock_dir = coord / ".locks"
     lock_dir.mkdir(parents=True, exist_ok=True)
     lock_path = lock_dir / f"{task_id}.lock"
     lock_path.touch(exist_ok=True)
     fd = os.open(str(lock_path), os.O_RDWR)
+    acquired = False
+    deadline = time.monotonic() + timeout
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        yield
-    finally:
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                acquired = True
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    try:
+                        holder = lock_path.read_text(encoding="utf-8").strip()
+                    except OSError:
+                        holder = ""
+                    holder_desc = f"pid {holder}" if holder else "unknown pid"
+                    raise GreatMindsError(
+                        f"task {task_id} is being transitioned by "
+                        f"{holder_desc}; waited {int(timeout)}s "
+                        f"(lock at {lock_path}). Retry after the holder "
+                        f"releases, or investigate if the pid is stuck.",
+                        exit_code=4,
+                    )
+                time.sleep(poll_interval)
         try:
-            fcntl.flock(fd, fcntl.LOCK_UN)
+            os.lseek(fd, 0, os.SEEK_SET)
+            os.ftruncate(fd, 0)
+            os.write(fd, str(os.getpid()).encode("ascii"))
+            os.fsync(fd)
         except OSError:
             pass
+        yield
+    finally:
+        if acquired:
+            try:
+                os.lseek(fd, 0, os.SEEK_SET)
+                os.ftruncate(fd, 0)
+            except OSError:
+                pass
+            try:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            except OSError:
+                pass
         os.close(fd)
 
 
