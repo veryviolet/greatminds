@@ -453,6 +453,33 @@ This document stays as the **philosophy / invariants / queue map** for
 the protocol. Skill files carry the procedural detail and are
 auto-invoked by Claude based on context.
 
+### Per-tool loading mechanism
+
+Skill loading is tool-specific. The same role's procedural knowledge
+reaches the agent via different mechanisms depending on which tool the
+role is launched on:
+
+- **Claude Code** — `greatminds start-agent <ROLE> claude` passes
+  `--plugin-dir <canon>/plugins/coordination-protocol` and
+  `--plugin-dir <canon>/plugins/role-<role>` (plus the project
+  override under `coordination/plugins.local/project-overrides/`).
+  Skill content is auto-invoked by Claude based on description-keyword
+  match in the agent's working context.
+- **Codex** — codex CLI has no `--plugin-dir` equivalent. The
+  equivalent path is the codex **profile** mechanism: each role-on-codex
+  reads `~/.codex/<role-lower>.config.toml`'s `instructions = """..."""`
+  block at session start. `greatminds setup` (task 0047) copies the
+  shipped per-role profiles from `<canon>/codex/profiles/*.config.toml`
+  to `~/.codex/<role>.config.toml` on first run (idempotent: existing
+  user-customized files are preserved). `greatminds start-agent <ROLE>
+  codex` then adds `--profile-v2 <role-lower>` when the file is
+  present. The profile body summarizes the role contract — it's not a
+  full SKILL-format auto-invoke, but it brings the role-specific
+  procedural posture into every codex session.
+- **Cursor** — currently no per-role plugin/profile mechanism is
+  wired; cursor roles get the bootstrap prompt only (which already
+  contains the full role brief rendered from `<role>.md`).
+
 See also: `plugins/README.md` for plugin layout; `mcp/canon.json`
 for canon-wide MCP server set; `greatminds start-agent` for how plugins
-are wired per-launch.
+/ profiles are wired per-launch.

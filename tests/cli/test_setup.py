@@ -158,3 +158,110 @@ def test_generated_json_is_valid(tmp_path, monkeypatch):
     assert data["permissions"]["allow"] == []
     assert data["autoMode"]["allow"] == ["$defaults"]
     assert "Stop" in data["hooks"]
+
+
+# ---------------------------------------------------------------------------
+# task 0047: setup copies shipped codex profiles to ~/.codex/<role>.config.toml.
+# Idempotent: existing files are NOT overwritten (preserve user edits).
+# ---------------------------------------------------------------------------
+
+
+def _fake_canon(tmp_path: Path, profile_names: list[str]) -> Path:
+    """Build a synthetic canon dir with codex/profiles/ entries."""
+    canon = tmp_path / "canon"
+    (canon / "codex" / "profiles").mkdir(parents=True)
+    for name in profile_names:
+        p = canon / "codex" / "profiles" / name
+        p.write_text(f'instructions = """\nrole content for {name}\n"""\n',
+                     encoding="utf-8")
+    return canon
+
+
+def test_codex_profile_copy_first_run(tmp_path, monkeypatch):
+    """Fresh ~/.codex/ → all shipped profiles copied with their content intact."""
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr(setup_mod.Path, "home", classmethod(lambda cls: home))
+    canon = _fake_canon(tmp_path, [
+        "architect-reviewer.config.toml",
+        "developer.config.toml",
+        "tester.config.toml",
+    ])
+
+    copied, skipped = setup_mod._copy_codex_profiles_if_missing(canon)
+
+    assert copied == 3
+    assert skipped == 0
+    for name in ("architect-reviewer", "developer", "tester"):
+        dst = home / ".codex" / f"{name}.config.toml"
+        assert dst.is_file(), f"missing {dst}"
+        assert f"role content for {name}.config.toml" in dst.read_text(encoding="utf-8")
+
+
+def test_codex_profile_copy_preserves_user_edits(tmp_path, monkeypatch):
+    """A user-customized ~/.codex/<role>.config.toml is NOT overwritten."""
+    home = tmp_path / "home"
+    (home / ".codex").mkdir(parents=True)
+    monkeypatch.setattr(setup_mod.Path, "home", classmethod(lambda cls: home))
+    canon = _fake_canon(tmp_path, ["developer.config.toml",
+                                    "tester.config.toml"])
+
+    user_edit = "instructions = \"\"\"\nMY USER OVERRIDE\n\"\"\"\n"
+    (home / ".codex" / "developer.config.toml").write_text(
+        user_edit, encoding="utf-8",
+    )
+
+    copied, skipped = setup_mod._copy_codex_profiles_if_missing(canon)
+
+    assert copied == 1   # tester only
+    assert skipped == 1  # developer was preserved
+    # User edit must remain intact.
+    assert (home / ".codex" / "developer.config.toml").read_text(encoding="utf-8") == user_edit
+
+
+def test_codex_profile_copy_no_canon_dir(tmp_path, monkeypatch):
+    """Canon without codex/profiles/ → (0, 0), no crash."""
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr(setup_mod.Path, "home", classmethod(lambda cls: home))
+    canon = tmp_path / "canon"
+    canon.mkdir()  # exists but no codex/ subtree
+
+    copied, skipped = setup_mod._copy_codex_profiles_if_missing(canon)
+    assert (copied, skipped) == (0, 0)
+
+
+def test_shipped_codex_profiles_have_no_internal_brand_leaks():
+    """Regression for task 0047 part B: scrubbed profiles must not
+    reference internal product names from prior codebases."""
+    from greatminds.core.paths import find_canon_dir
+    profiles_dir = find_canon_dir() / "codex" / "profiles"
+    assert profiles_dir.is_dir()
+    profiles = list(profiles_dir.glob("*.config.toml"))
+    assert profiles, "shipped codex profiles missing from canon"
+    forbidden = ("Guardora", "/opt/guardora", "lattice")
+    for p in profiles:
+        text = p.read_text(encoding="utf-8")
+        for needle in forbidden:
+            assert needle not in text, (
+                f"{p.name} still contains internal-brand leak {needle!r}"
+            )
+
+
+def test_shipped_codex_profiles_cover_loop_mode_roles():
+    """Regression for task 0047 part C: every codex-realistic loop-mode
+    role MUST have a shipped profile so the agent gets role guidance
+    when launched on codex via --profile-v2 <role-lower>."""
+    from greatminds.core.paths import find_canon_dir
+    profiles_dir = find_canon_dir() / "codex" / "profiles"
+    shipped = {p.stem.replace(".config", "") for p in
+               profiles_dir.glob("*.config.toml")}
+    # The set of roles that PLANNER's 0047 revised scope flagged: any
+    # loop-mode role where codex is a realistic launcher. Chat-mode
+    # roles (planner, maintainer) and stand-keeper (chat) are excluded.
+    expected = {
+        "architect-reviewer", "developer", "ui-developer",
+        "tester", "reader", "explorer", "technical-writer",
+    }
+    missing = expected - shipped
+    assert not missing, f"shipped codex profiles missing: {missing}"

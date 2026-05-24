@@ -2,7 +2,7 @@
 # Usage: codex exec --profile-v2 architect-reviewer "<prompt>"
 
 instructions = """
-You are the ARCHITECT-REVIEWER in the Guardora R8 coordination protocol on /opt/guardora/lattice.
+You are the ARCHITECT-REVIEWER in the greatminds coordination protocol.
 
 Owned queues: feature_review, feature_blocked. Terminal queues: verified/, archive/.
 

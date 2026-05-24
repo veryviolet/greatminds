@@ -142,6 +142,41 @@ def _ensure_dir(p: Path) -> str:
     return "created"
 
 
+def _copy_codex_profiles_if_missing(canon: Path) -> tuple[int, int]:
+    """Copy shipped codex profiles to ``~/.codex/<basename>.config.toml``.
+
+    Per-user, idempotent: if a destination file already exists it is NOT
+    overwritten — the user may have customized it. Returns
+    ``(copied, skipped)`` counts for the setup summary.
+
+    start_agent.py picks these up automatically via ``--profile-v2 <role>``
+    when ``~/.codex/<role>.config.toml`` exists (task 0047 wired the full
+    path: shipped profiles → user-side config → codex agent).
+    """
+    src_dir = canon / "codex" / "profiles"
+    if not src_dir.is_dir():
+        return (0, 0)
+    dst_dir = Path.home() / ".codex"
+    try:
+        dst_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return (0, 0)
+    copied = 0
+    skipped = 0
+    for src in sorted(src_dir.glob("*.config.toml")):
+        dst = dst_dir / src.name
+        if dst.is_file():
+            skipped += 1
+            continue
+        try:
+            shutil.copyfile(src, dst)
+            copied += 1
+        except OSError:
+            # Per-profile failure is non-fatal — keep going.
+            continue
+    return (copied, skipped)
+
+
 def _copy_if_missing(src: Path, dst: Path, force: bool = False) -> str:
     if not src.is_file():
         return "(canon source missing)"
@@ -363,6 +398,17 @@ def setup(project_dir: Path | None, force: bool, lang: str,
         info("  .claude/settings.local.json: written")
     else:
         info("  .claude/settings.local.json: exists")
+
+    # Codex profile copy (task 0047) — install shipped profiles into
+    # ~/.codex/<role>.config.toml so start_agent.py's --profile-v2 path
+    # actually finds them. Per-user, idempotent: existing files are NOT
+    # overwritten (preserve user customizations).
+    copied, skipped = _copy_codex_profiles_if_missing(canon)
+    if copied or skipped:
+        info(
+            f"  codex profiles → ~/.codex/: {copied} copied, "
+            f"{skipped} preserved (existing)"
+        )
 
     # Register project with the daemon (task 0015) — runs on both
     # fresh-gen and skip-existing paths. Graceful degradation: if
