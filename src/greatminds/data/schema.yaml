@@ -43,7 +43,7 @@ queues:
       based on scope. Implementers do NOT claim from feature_plan.
   feature_blocked:
     owner: ARCHITECT-REVIEWER
-    writers: [DEVELOPER, UI-DEVELOPER, TECHNICAL-WRITER, TESTER, READER, ARCHITECT-REVIEWER]
+    writers: [DEVELOPER, UI-DEVELOPER, TECHNICAL-WRITER, TESTER, READER, ARCHITECT-REVIEWER, ARCHITECT-PLANNER]
     kind: parking
     description: Tasks waiting on explicit dependencies. Wake-up by ARCHITECT-REVIEWER.
   feature_dev:
