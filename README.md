@@ -1,48 +1,63 @@
 # greatminds
 
-File-based multi-agent coordination protocol. Per-role queues, atomic `mv` handoff,
-layered plugin set for [Claude Code](https://docs.claude.com/en/docs/claude-code) and
-profile-v2 setup for [OpenAI Codex CLI](https://github.com/openai/codex).
+<p align="center">
+File-based multi-agent coordination for agent fleets and task pipelines.
+</p>
 
-## Status
+<p align="center">
+  <a href="https://pypi.org/project/greatminds/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/greatminds.svg"></a>
+  <a href="https://pypi.org/project/greatminds/"><img alt="Python versions" src="https://img.shields.io/pypi/pyversions/greatminds.svg"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/pypi/l/greatminds.svg"></a>
+  <a href="https://veryviolet.github.io/greatminds/"><img alt="Docs" src="https://img.shields.io/badge/docs-github_pages-blue.svg"></a>
+</p>
 
-**Alpha** — `0.1.0.dev0`. Public foundation commit; CLI entry-points are wired
-incrementally as scripts are ported from the original `/opt/coordination/` layout.
+greatminds runs a fleet of Claude, Codex, or Cursor agents on a shared
+filesystem-based finite state machine. Tasks flow through queues such as
+`feature_inbox/`, `feature_plan/`, `feature_dev/`, `feature_test/`, and
+`verified/`; a small `coordd` daemon nudges agents when input appears. There is
+no central broker and no database. Per-project setup writes `coord.yaml`;
+the per-user daemon can supervise multiple projects on one machine.
 
-## What it is
-
-A fleet-orchestration substrate for agents running in `tmux` panes:
-
-- **R8 finite-state pipeline** — tasks move through typed queues (`feature_inbox/`,
-  `feature_plan/`, `feature_dev/`, `feature_ui_dev/`, `feature_docs/`, `feature_test/`,
-  `feature_review/`, `verified/`, …) via atomic `mv` — no daemon, no broker, no DB.
-- **Per-role identity** — each agent owns one role (e.g. `ARCHITECT-PLANNER`,
-  `DEVELOPER`, `TESTER`, `STAND-KEEPER`); roles claim from their queue, hand off to
-  the next.
-- **Append-only task files** — every transition adds a block; full audit trail.
-- **Layered plugins** for Claude Code — universal `coordination-protocol` plugin
-  loads for every role, per-role plugins layer on top.
-- **profile-v2 setup** for Codex — equivalent per-role config, allowing
-  hot-swapping `claude ↔ codex` per role from one fleet config.
-- **`coordd`** — keystroke pusher daemon that watches per-role wake-files and
-  forwards them to the live tmux pane only when the agent is genuinely idle
-  (heartbeat-freshness guard prevents interrupting active work).
-- **Stand evidence + gate-check** — tasks marked `stand_required` cannot reach
-  `verified/` until matching `stand_done/<id>.yaml` records the live-stand result.
-
-## Design philosophy
-
-- Files, not state machines in memory. If the orchestrator crashes, the FS still
-  tells you exactly where every task is.
-- Atomic `mv` is the only handoff primitive — same filesystem, same volume.
-- Each task is human-readable YAML/Markdown — no opaque blobs.
-- Roles are interchangeable between Claude Code and Codex via the same plugin /
-  skill / data layer.
-
-## Install
+## Quickstart
 
 ```bash
-pip install greatminds   # not yet published — first release pending
+# install
+pip install greatminds  # or: uv add greatminds
+
+# bootstrap a project
+mkdir -p /tmp/greatminds-demo
+cd /tmp/greatminds-demo
+greatminds setup --session myproject
+
+# install the per-project daemon
+greatminds daemon install
+greatminds daemon start
+
+# launch agents
+greatminds launch --target tmux
+tmux a -t myproject
+```
+
+The windows defined in `coord.yaml` boot inside one tmux session; each role
+starts in chat or loop mode according to that file.
+
+## Key Concepts
+
+- **Queues**: [`feature_inbox/`, `feature_plan/`, `feature_dev/`, `verified/`](https://veryviolet.github.io/greatminds/concepts/queues/) - task state is its directory.
+- **Roles**: [`ARCHITECT-PLANNER`, `DEVELOPER`, `TESTER`, and others](https://veryviolet.github.io/greatminds/concepts/roles/) - each role owns queues and a heartbeat file.
+- **Scenarios A/B/C**: [standard pipeline, intensive review, and UI rapid iteration](https://veryviolet.github.io/greatminds/concepts/scenarios/).
+- **Stand gate**: [stand-required tasks](https://veryviolet.github.io/greatminds/concepts/stand-gate/) need `STAND-KEEPER` evidence before review.
+- **Inbox**: [per-role mailbox](https://veryviolet.github.io/greatminds/concepts/inbox/) for `ask`, `info`, and `wake` messages without moving tasks.
+
+## Documentation
+
+Full documentation: <https://veryviolet.github.io/greatminds/>
+
+## Where to File Issues
+
+```text
+Bugs in greatminds: https://github.com/veryviolet/greatminds/issues
+Bugs in a project you use greatminds in: that project's issue tracker.
 ```
 
 ## License
