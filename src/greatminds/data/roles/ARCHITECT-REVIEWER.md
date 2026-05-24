@@ -30,6 +30,15 @@ product-work committer.
      and hands back to `feature_test/` with the missing fields named
      in the review_block if any are absent — pytest with mocks is
      necessary but NOT sufficient to ship a stand-required fix,
+   - **§9.1 fix-for-self-blocker carve-out**: if `tests.stand_evidence`
+     has all three fields AND TESTER explicitly cites a
+     chicken-and-egg in the tests block (the stand_done's
+     partial/fail result is caused by a verification-infra limitation
+     that THIS task's fix demonstrably removes), REVIEWER may approve
+     without `tests.gate_check_result: pass`. REVIEWER MUST cite the
+     carve-out and the tests block's chicken-and-egg explanation in
+     the review block. If the verification limitation is unrelated
+     to the fix, standard §9 applies and the task bounces back,
    - verifies `git status --short -- <declared paths>` matches,
    - approves: `git add -- <files>`, `git commit`, appends review block,
      `mv feature_review/X verified/X`, pushes if project policy requires.

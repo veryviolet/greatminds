@@ -41,6 +41,15 @@ tests block.
      `partial` (or `fail`) and the task bounces to `feature_dev/` /
      `feature_ui_dev/`. Pytest with mocks is necessary but NOT
      sufficient — see COORDINATE.md §9.
+   - **§9.1 fix-for-self-blocker carve-out**: if the associated
+     `stand_done` carries `result=partial` or `result=fail` ONLY
+     because of a verification-infrastructure limitation that THIS
+     task's fix demonstrably removes, TESTER MUST explicitly cite the
+     chicken-and-egg in the tests block notes (which infra gap
+     blocked STAND-KEEPER, and how this fix closes it). Doing so lets
+     REVIEWER invoke the §9.1 carve-out and approve without
+     `gate_check_result=pass`. Omitting the citation forfeits the
+     carve-out and the standard §9 rule applies.
 7. On test pass + gate pass: `feature_test/X -> feature_review/X`.
 8. On fail/partial: returns by scope to `feature_dev/` or `feature_ui_dev/`.
 9. On dependency-blocked: appends `blocked` block with strict

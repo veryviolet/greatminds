@@ -302,6 +302,21 @@ In status reports to USER, the words "fixed", "tested", "verified",
 "pytest green, awaiting stand verification" or "implementation
 complete, no behavioral verification yet".
 
+### §9.1 Fix-for-self-blocker carve-out
+
+If a task's `plan.stand_required` is true AND its TESTER tests block
+contains all three `stand_evidence` fields (reproduction-steps,
+observed-without-fix, observed-with-fix), but its associated
+`stand_done` carries `result=partial` or `result=fail` ONLY because of
+a verification-infrastructure limitation that THIS task's fix
+demonstrably removes — then `ARCHITECT-REVIEWER` may approve without
+`gate_check_result=pass`. REVIEWER MUST cite this carve-out and the
+tests block's chicken-and-egg explanation in the review block.
+
+This carve-out is strictly limited: if the verification limitation
+existed for reasons UNRELATED to the fix, the standard §9 evidence
+requirement applies and the task bounces back.
+
 ---
 
 ## 10. Inbox mailbox (new)
