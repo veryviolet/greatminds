@@ -178,12 +178,54 @@ def test_generated_coord_yaml_roundtrips_through_yaml_safe_load(tmp_path):
     assert yaml.safe_load(yaml.safe_dump(doc)) == doc
 
 
-# Note: daemon-registry integration (setup writing to
-# ~/.config/greatminds/projects.json) was originally planned as part of
-# 0010 + 0008 but was split into a follow-up task during REVIEWER iteration
-# — neither 0008 (no setup.py) nor 0010 (this task, scope = coord.yaml +
-# --session only) writes the registry. The follow-up will depend on
-# verified/0008 for daemon.register_project to exist.
+# ---------------------------------------------------------------------------
+# Daemon-registry integration (task 0015 restoration — was punted in 0008
+# iter-2 + 0010 iter-2 to land cleanly after both upstream tasks verified)
+# ---------------------------------------------------------------------------
+
+
+def test_registry_populated_when_generating_coord_yaml(tmp_path):
+    """Fresh setup → registry entry `{session_name: project_dir.resolve()}`."""
+    project_dir = tmp_path / "alpha"
+    project_dir.mkdir()
+    _invoke(["--project-dir", str(project_dir), "--session", "alpha"])
+
+    reg = daemon_mod.load_registry()
+    assert reg.get("alpha") == str(project_dir.resolve())
+
+
+def test_registry_populated_when_coord_yaml_pre_exists(tmp_path):
+    """Skip-existing path also writes the registry (idempotent — entry
+    refreshed in case the project_dir was moved/renamed)."""
+    project_dir = tmp_path / "beta"
+    project_dir.mkdir()
+    (project_dir / "coord.yaml").write_text(
+        yaml.safe_dump({"session": "beta-existing", "windows": []}),
+        encoding="utf-8",
+    )
+    _invoke(["--project-dir", str(project_dir)])
+
+    reg = daemon_mod.load_registry()
+    assert reg.get("beta-existing") == str(project_dir.resolve())
+
+
+def test_setup_degrades_gracefully_when_register_project_fails(
+    tmp_path, monkeypatch,
+):
+    """If daemon.register_project raises, setup MUST exit 0 with a warning."""
+    project_dir = tmp_path / "graceful"
+    project_dir.mkdir()
+
+    def boom(*_a, **_kw):
+        raise RuntimeError("simulated systemd-user not available")
+
+    monkeypatch.setattr(daemon_mod, "register_project", boom)
+
+    result = _invoke(["--project-dir", str(project_dir), "--session", "graceful"])
+    assert result.exit_code == 0, result.output
+    assert "could not register" in result.output
+    # coord.yaml still generated; only the registry step degraded.
+    assert (project_dir / "coord.yaml").is_file()
 
 
 # ---------------------------------------------------------------------------

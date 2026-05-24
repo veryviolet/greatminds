@@ -189,8 +189,22 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     # The canonical 11-window roster lives in src/greatminds/data/coord.yaml.template;
     # we substitute {SESSION, PROJECT_DIR} into it and write to <project>/coord.yaml.
     coord_yaml_path = project_dir / "coord.yaml"
+    resolved_session: str | None = None
     if coord_yaml_path.is_file():
         info(f"  coord.yaml: exists, skipping — delete it first to regenerate")
+        # Read the session name from the existing file so we can still register
+        # the project with the daemon below (0015 — runs on both gen + skip paths).
+        try:
+            import yaml as _yaml
+            existing = _yaml.safe_load(
+                coord_yaml_path.read_text(encoding="utf-8")
+            )
+            if isinstance(existing, dict):
+                v = existing.get("session")
+                if isinstance(v, str) and v:
+                    resolved_session = v
+        except Exception:  # noqa: BLE001 — best-effort, don't block setup
+            resolved_session = None
     else:
         # `session is None` → flag omitted, derive default;
         # `session == ""` → user explicitly passed empty, treat as invalid.
@@ -207,6 +221,7 @@ def setup(project_dir: Path | None, force: bool, lang: str,
             )
             coord_yaml_path.write_text(body, encoding="utf-8")
             info(f"  coord.yaml: written (session: {session_name})")
+            resolved_session = session_name
         else:
             warn("  coord.yaml: template missing in canon, skipping generation")
     info(f"  schema.yaml: {_copy_if_missing(canon / 'schema.yaml', project_dir / 'schema.yaml', force=True)}")
@@ -348,6 +363,22 @@ def setup(project_dir: Path | None, force: bool, lang: str,
         info("  .claude/settings.local.json: written")
     else:
         info("  .claude/settings.local.json: exists")
+
+    # Register project with the daemon (task 0015) — runs on both
+    # fresh-gen and skip-existing paths. Graceful degradation: if
+    # register_project fails for any reason (no systemd-user yet,
+    # registry path not writable, etc.), setup still exits 0 with a
+    # warning; the user can finish via `greatminds daemon install`.
+    if resolved_session:
+        try:
+            from greatminds.cli.daemon import register_project
+            register_project(resolved_session, project_dir.resolve())
+            info(f"  daemon registry: {resolved_session} → {project_dir}")
+        except Exception as exc:  # noqa: BLE001 — graceful degrade per plan
+            warn(
+                f"  daemon registry: could not register "
+                f"(greatminds daemon install will fix). reason: {exc}"
+            )
 
     ok("\ndone.")
     info("\nNext:")
