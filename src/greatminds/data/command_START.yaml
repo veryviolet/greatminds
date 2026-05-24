@@ -151,9 +151,34 @@ common: |
 
   - **If you have the `ScheduleWakeup` tool** (claude) — `delaySeconds`
     per the backoff table above (60/120/300/600).
-  - **If `ScheduleWakeup` is unavailable** (codex, cursor) — last
-    action of the tick is a **synchronous** `Bash sleep <N>` with the
-    same N per the table. Not backgrounded (`&`).
+  - **If `ScheduleWakeup` is unavailable** (codex, cursor) — DO NOT
+    issue a single synchronous `Bash sleep <N>` as the inter-tick
+    backoff. codex/cursor execute `sleep <N>` as a long-running tool
+    call that **blocks pty input**: coordd's input-socket nudges and
+    restart Enter keystrokes reach the prompt but cannot interrupt
+    the sleep, so reaction latency = N. Instead **short-poll**:
+    repeatedly run
+
+      ``greatminds inbox list && greatminds task list <one of your claims_from queues>``
+
+    and ``Bash sleep 5`` between iterations. **Important sentinel
+    semantics:** ``greatminds inbox list`` prints the literal token
+    ``(empty)`` (parentheses included) when the inbox has no
+    messages — that line is NOT work. Same shape for
+    ``greatminds task list <queue>``: it prints nothing or just a
+    header when the queue is empty. The break-out condition is
+    therefore **actual work content**, not "non-empty stdout":
+    treat the cycle as having new work only if the output mentions
+    a real ``<id>.yaml`` task filename, a real ``<id>.md`` inbox
+    message, or an explicit ``ask|wake|info`` kind tag — NOT the
+    ``(empty)`` sentinel and NOT a bare header line. If actual work
+    appears — tick immediately. Otherwise continue the 5-second
+    poll cycle for at most ``N // 5`` iterations (so the total
+    backoff window matches the table). Each ``greatminds`` CLI
+    call also refreshes the heartbeat as a side effect, so coordd
+    / watchdog / stalled-sweep see the role as alive throughout.
+    Maximum end-of-tick reaction latency is then ~5s regardless of
+    which backoff tier you're in.
 
   **CRITICAL: you are in an infinite loop.** When sleep/ScheduleWakeup
   returns, the next tick starts from scratch: heartbeat (`greatminds task`
