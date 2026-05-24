@@ -396,19 +396,52 @@ def push_to_role(coord: Path, role: str, file_path: str, verbose: bool) -> bool:
                help=__doc__)
 @click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
               default=None,
-              help="project root containing coordination/ (default: cwd)")
+              help="project root containing coordination/ (default: cwd "
+                   "or registry lookup via --project)")
+@click.option("--project", "project_name", default=None,
+              help="project name; resolved to project_dir via "
+                   "~/.config/greatminds/projects.json. Used by the systemd "
+                   "template unit greatminds-daemon@<project>.service.")
 @click.option("--interval-sec", type=float, default=1.0,
               help="polling interval; 1.0 keeps CPU near zero on idle. "
                    "Don't go below 0.2.")
 @click.option("--verbose", "-v", is_flag=True)
-def coordd(project_dir: Path | None, interval_sec: float, verbose: bool) -> None:
+def coordd(project_dir: Path | None, project_name: str | None,
+           interval_sec: float, verbose: bool) -> None:
     from greatminds.core.paths import find_canon_dir
+
+    if project_dir is None and project_name:
+        # Resolve via the per-user project registry written by
+        # `greatminds daemon install` (and `greatminds setup` going forward).
+        from greatminds.cli.daemon import lookup_project_dir
+        resolved = lookup_project_dir(project_name)
+        if resolved is None:
+            click.echo(
+                f"coordd: error: no project registered as {project_name!r}; "
+                "run `greatminds daemon install` first",
+                err=True,
+            )
+            raise click.exceptions.Exit(2)
+        project_dir = resolved
 
     project_dir = project_dir or Path.cwd()
     coord = project_dir / "coordination"
     if not coord.is_dir():
         click.echo(f"coordd: error: {coord} not found", err=True)
         raise click.exceptions.Exit(1)
+
+    # Drift marker for `greatminds update` (task 0009): record the daemon's
+    # running version so any CLI invocation can compare its own __version__
+    # against this file and warn on mismatch (= post-pip restart needed).
+    try:
+        from greatminds import __version__ as _gm_version
+        version_path = coord / ".daemon_version"
+        version_path.write_text(f"{_gm_version}\n", encoding="utf-8")
+    except OSError:
+        # Non-fatal — if we can't write the marker, just log and continue.
+        if verbose:
+            click.echo("coordd: warning: could not write .daemon_version",
+                       err=True)
     inbox = coord / "inbox"
     inbox.mkdir(parents=True, exist_ok=True)
     registry = coord / REGISTRY_DIR

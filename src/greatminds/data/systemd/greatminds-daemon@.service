@@ -1,0 +1,12 @@
+[Unit]
+Description=greatminds coordination daemon for project %i
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/greatminds coordd --project %i
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

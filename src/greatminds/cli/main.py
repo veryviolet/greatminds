@@ -62,6 +62,7 @@ from . import plan as _plan_mod
 from . import gate_check as _gate_check_mod
 from . import restart as _restart_mod
 from . import report_upstream as _report_upstream_mod
+from . import daemon as _daemon_mod
 
 cli.add_command(_task_mod.task)
 cli.add_command(_inbox_mod.inbox)
@@ -83,6 +84,7 @@ cli.add_command(_plan_mod.plan)
 cli.add_command(_gate_check_mod.gate_check, name="gate-check")
 cli.add_command(_restart_mod.restart)
 cli.add_command(_report_upstream_mod.report_upstream, name="report-upstream")
+cli.add_command(_daemon_mod.daemon)
 
 
 if __name__ == "__main__":
