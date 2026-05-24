@@ -54,6 +54,7 @@ The full roster, claim sources, and heartbeats are in `schema.yaml`. Brief:
 | EXPLORER             | product  | Uses live product on stand (scenario B). Files bugs.               |
 | STAND-KEEPER         | service  | Owns stand and `stand.status`. Two profiles: full-deploy, vite-dev.|
 | USER                 | entry    | Files feedback or initiates chat with ARCHITECT-PLANNER.           |
+| MAINTAINER           | system   | Infrastructure and fleet operations: agent lifecycle, canon/schema/CLI maintenance, cutovers. Chat-mode. |
 | BOT-USER, BOT-DEVELOPER | bot   | Bot stream, intentionally untouched by this refactor.              |
 
 The 2026-05 refactor split ARCHITECT into PLANNER + REVIEWER and added
@@ -324,6 +325,12 @@ role resuming and touching its heartbeat again.
 Default:
 
 - `ARCHITECT-REVIEWER` is the only product-work committer.
+- `MAINTAINER` commits **canon and infrastructure** changes only
+  (schema.yaml, role docs, CLI source, plugin skills, MCP config,
+  templates) — explicitly distinct from product-pipeline work, which
+  flows through `ARCHITECT-REVIEWER`. MAINTAINER never commits
+  product-task artifacts (plan / implementation / tests / reader /
+  review blocks); the FSM owns those via per-role queues.
 - Implementers, TESTER, READER, USER, EXPLORER, and STAND-KEEPER do not
   commit.
 - BOT-DEVELOPER follows `<BOT_COMMIT_POLICY>`.
