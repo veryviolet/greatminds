@@ -107,14 +107,31 @@ def plan(task_id, scope, assignee_role, base_commit, plan_kind, mode,
             exit_code=2,
         )
 
-    # 2. mv → feature_plan
+    # 2. mv → feature_plan. Schema requires
+    # user_feedback → feature_inbox → feature_plan (the direct
+    # user_feedback → feature_plan transition does not exist), so when
+    # the task started in user_feedback we route through feature_inbox
+    # first. The triage block we just appended satisfies both
+    # transitions' `requires: [triage_block]`.
+    if where == "user_feedback":
+        try:
+            move_task(task_id=task_id, to_queue="feature_inbox",
+                      reason="triaged; advancing to feature_inbox")
+        except GreatMindsError as exc:
+            raise GreatMindsError(
+                f"step 2/4 mv user_feedback→feature_inbox failed: "
+                f"{exc.message} — triage block written, task still in "
+                f"user_feedback",
+                exit_code=2,
+            )
     try:
         move_task(task_id=task_id, to_queue="feature_plan",
                   reason="triaged; planning")
     except GreatMindsError as exc:
+        current = "feature_inbox" if where == "user_feedback" else where
         raise GreatMindsError(
-            f"step 2/4 mv {where}→feature_plan failed: {exc.message} — "
-            f"triage block written, task still in {where}",
+            f"step 2/4 mv {current}→feature_plan failed: {exc.message} — "
+            f"triage block written, task currently in {current}",
             exit_code=2,
         )
 
