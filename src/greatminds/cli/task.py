@@ -976,10 +976,24 @@ def create_task(
     Raises :class:`GreatMindsError` on validation / permission failure.
     """
     coord = find_coord_dir()
-    role = caller_role()
 
     if stream not in ("product", "stand", "review_session"):
         raise GreatMindsError("--stream must be product|stand|review_session")
+
+    # USER intake is the only flow where the caller is genuinely human and
+    # outside the agent fleet — there is no role launcher exporting
+    # GREATMINDS_ROLE for them. Schema says ``user_feedback.writers: [USER]``,
+    # so when the destination is user_feedback and no role is set, default
+    # to USER. Every other intake (feature_inbox, stand_requests, review
+    # sessions) is fleet-driven and keeps the strict env-var requirement.
+    _resolved_in_q = in_queue or default_intake_queue(stream)
+    if _resolved_in_q == "user_feedback" and not (os.environ.get("GREATMINDS_ROLE") or "").strip():
+        role = "USER"
+        if role not in (schema().get("roles") or {}):
+            # Defensive: if a future schema drops USER, fall back to strict.
+            role = caller_role()
+    else:
+        role = caller_role()
 
     # E1: bound title length so an accidental dump doesn't fill the file.
     if len(title) > TITLE_MAX_LEN:
