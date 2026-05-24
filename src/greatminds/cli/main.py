@@ -32,10 +32,22 @@ from .. import __version__
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 @click.version_option(__version__, prog_name="greatminds")
-def cli() -> None:
+@click.pass_context
+def cli(ctx: click.Context) -> None:
     """File-based multi-agent coordination protocol — fleet orchestration,
     task pipeline, agent launcher.
     """
+    # Version-drift detection (task 0009): if the running CLI's version
+    # disagrees with the recorded daemon version, warn USER (silent for
+    # agents). Never blocks — purely advisory. Skip when the invoked
+    # subcommand is `update` itself: `greatminds update` IS the fix, so
+    # nagging here is noise.
+    if ctx.invoked_subcommand and ctx.invoked_subcommand != "update":
+        try:
+            from greatminds._version_check import maybe_warn
+            maybe_warn()
+        except Exception:  # noqa: BLE001 — must never block the parent command
+            pass
 
 
 # Sub-group registration. Each module exposes a top-level ``click.Group``
@@ -63,6 +75,7 @@ from . import gate_check as _gate_check_mod
 from . import restart as _restart_mod
 from . import report_upstream as _report_upstream_mod
 from . import daemon as _daemon_mod
+from . import update as _update_mod
 
 cli.add_command(_task_mod.task)
 cli.add_command(_inbox_mod.inbox)
@@ -85,6 +98,7 @@ cli.add_command(_gate_check_mod.gate_check, name="gate-check")
 cli.add_command(_restart_mod.restart)
 cli.add_command(_report_upstream_mod.report_upstream, name="report-upstream")
 cli.add_command(_daemon_mod.daemon)
+cli.add_command(_update_mod.update)
 
 
 if __name__ == "__main__":
