@@ -10,7 +10,8 @@ adopted from later product-pipeline refactors) are documented in
 `BOT_STREAM_DIVERGENCE.md`.
 
 The bot stream is intentionally NOT touched by the 2026-05 refactor. The
-new bin/ scripts (gate_check, wake_check, watchdog) do not act on bot
+new `greatminds` CLI subcommands (`greatminds gate-check`,
+`greatminds wake-check`, `greatminds watchdog`) do not act on bot
 queues. The mailbox `inbox/` is available if the project wires it up.
 
 ## Owns

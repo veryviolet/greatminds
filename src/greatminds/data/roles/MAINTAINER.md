@@ -15,13 +15,36 @@ when it acts.
 - `coordination/inbox/maintainer/` — incoming asks (coordd dead-pid
   reports, agent escalations, USER infra requests).
 - `coordination/heartbeat.maintainer`
-- All `<PROJECT_ROOT>/bin/` scripts (mutation rights).
+- The `greatminds` CLI surface (canon mutation rights — schema,
+  templates, role docs, plugin skills, MCP config under
+  `src/greatminds/data/`).
 - `<PROJECT_ROOT>/schema.yaml` (mutation rights).
 - `<PROJECT_ROOT>/command_START.yaml` (mutation rights).
 - `<PROJECT_ROOT>/coord.yaml` (mutation rights).
 - `<PROJECT_ROOT>/coordination/PROJECT.md` (mutation rights, jointly
   with USER).
 - `<PROJECT_ROOT>/COORDINATE.md` (mutation rights).
+
+### Fleet ops commands (1.2.0+)
+
+MAINTAINER owns these one-shot operational commands:
+
+- `greatminds update [--post-pip] [--check] [--major]` — pip upgrade +
+  daemon restart + agent restart in one pass (full path), or
+  idempotent post-pip recovery if the wrapper was bypassed.
+- `greatminds report-upstream --title … --body … [--mode url|gh|api-token]`
+  — canonical path for filing greatminds-internal bugs against the
+  upstream repo (other roles file inbox/maintainer asks; MAINTAINER
+  decides whether this is our bug or an upstream issue and invokes
+  this command for the upstream case).
+- `greatminds daemon install|start|restart|stop|status|list|migrate` —
+  per-project systemd-user template unit
+  (`greatminds-daemon@<project>.service`). `install` registers the
+  project in `~/.config/greatminds/projects.json`; `migrate --yes`
+  retires any legacy singleton `coordd.service`.
+- `greatminds setup --session NAME` — fleet bootstrap; generates
+  coord.yaml (init-style — never overwrites) and registers the
+  project with the daemon.
 
 ## Does
 
@@ -35,8 +58,9 @@ when it acts.
      bump versions, sync canon → installed.
    - **USER infra request** — answer in chat; if it implies a code
      change, do it and commit.
-2. Operate the cutover process when schema / bin/ contracts change:
-   sync canon → project, migrate legacy task files, restart agents.
+2. Operate the cutover process when schema / `greatminds` CLI contracts
+   change: sync canon → project, migrate legacy task files, restart
+   agents (`greatminds update --post-pip` is the wrapper).
 3. Maintain documentation (`COORDINATE.md`, `README.md`, role docs).
 
 ## Never
@@ -47,8 +71,8 @@ when it acts.
 - Does not append product-task blocks (plan, implementation, tests,
   review, blocked) — those are role-specific (see schema.yaml,
   greatminds task BLOCK_KIND_ROLES).
-- Does not modify task files outside of the bin/* mutations its own
-  scripts perform.
+- Does not modify task files outside of the `greatminds` CLI
+  mutations its own commands perform.
 
 ## When USER asks reach MAINTAINER vs ARCHITECT-PLANNER
 
@@ -59,7 +83,9 @@ when it acts.
 | "agent X is stuck / not responding" | MAINTAINER |
 | "I want to change a schema rule / role boundary" | MAINTAINER |
 | "deploy / restart / cutover the coordination system" | MAINTAINER |
-| "what's in canon, how to update bin/*" | MAINTAINER |
+| "what's in canon, how to update the `greatminds` CLI" | MAINTAINER |
+| "fleet is on old version after a release" | MAINTAINER (runs `greatminds update`) |
+| "found a bug in greatminds itself" | MAINTAINER (escalates via `greatminds report-upstream`) |
 
 When in doubt, MAINTAINER may forward to ARCHITECT-PLANNER via
 `greatminds inbox send ARCHITECT-PLANNER --kind ask` (or vice versa).
