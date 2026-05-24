@@ -40,6 +40,7 @@ docs = [
 Homepage = "https://github.com/veryviolet/greatminds"
 Repository = "https://github.com/veryviolet/greatminds"
 Issues = "https://github.com/veryviolet/greatminds/issues"
+Documentation = "https://veryviolet.github.io/greatminds/"
 
 [project.scripts]
 # Single unified entry-point. All commands are subcommands of `greatminds`:

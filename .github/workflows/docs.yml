@@ -1,0 +1,35 @@
+name: docs
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:    # manual trigger for ad-hoc redeploys
+
+permissions:
+  contents: write        # gh-deploy commits to the gh-pages branch
+
+concurrency:
+  group: docs-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # mkdocs gh-deploy needs full history
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install docs deps
+        run: |
+          pip install -e '.[docs]'
+      - name: Configure git author for gh-deploy commit
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+      - name: mkdocs gh-deploy
+        run: |
+          mkdocs gh-deploy --force --message "docs: deploy ${GITHUB_REF_NAME}"
