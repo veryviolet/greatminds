@@ -258,7 +258,53 @@ that is for the wrong task, against the wrong commit, or has
 
 ---
 
-## 9. Inbox mailbox (new)
+## 9. Tested / verified — definition
+
+For ANY task with `plan.stand_required: true`, "tested" / "verified"
+means a **reproducible behavioral verification on the live stand**,
+NOT just pytest green. Pytest with mocks is necessary but NOT
+sufficient: mocks encode the author's mental model of how live tmux /
+pty / systemd / agent tools behave, and cannot detect failures the
+author did not anticipate.
+
+TESTER's `tests` block on a `stand_required: true` task MUST include
+`stand_evidence` with three fields:
+
+1. **Reproduction steps** — exact commands to trigger the original
+   failure mode on the live stand (e.g. for an agent-stall bug:
+   `ssh violet@<host> 'tmux send-keys -t toy:dev "" && sleep 60 &&
+   check agent heartbeat'`).
+2. **Observed-without-fix** — output of step 1 BEFORE the fix
+   (recorded from a separate stand_result, or from the bug report,
+   or from a pre-fix wheel build).
+3. **Observed-with-fix** — output of step 1 AFTER the fix is
+   deployed on the stand. Must visibly differ from
+   observed-without-fix in a way that resolves the bug.
+
+Without all three present, TESTER's `test_result` is NOT `pass`. It
+is `partial` (or `fail`) with the missing evidence named, and the
+task bounces back to DEVELOPER / PLANNER. The §8 `gate_check_pass`
+rule still applies; this strict definition is **on top of**
+`gate_check_pass`, not in place of it.
+
+`ARCHITECT-REVIEWER` refuses to approve a `stand_required: true` task
+whose tests block lacks these three fields. Reviewer cites this
+COORDINATE.md section in the handback.
+
+`ARCHITECT-PLANNER` writes plans that specify the EXACT stand
+reproduction command in `stand_reason` — not "stand evidence proves
+it works", but the actual command and the expected before/after
+output. If PLANNER cannot specify the reproduction, the task is
+mis-scoped and PLANNER must rescope or split before routing.
+
+In status reports to USER, the words "fixed", "tested", "verified",
+"done" require this evidence. Otherwise the correct phrasing is
+"pytest green, awaiting stand verification" or "implementation
+complete, no behavioral verification yet".
+
+---
+
+## 10. Inbox mailbox (new)
 
 `coordination/inbox/<role>/` is a per-role mailbox for cross-role messages
 that do NOT need a task move. Use it for:
@@ -289,7 +335,7 @@ is a way to ask a question without escalating to handback.
 
 ---
 
-## 10. Watchdog (`greatminds watchdog`)
+## 11. Watchdog (`greatminds watchdog`)
 
 `greatminds watchdog` reports:
 
@@ -303,7 +349,7 @@ each tick and follow up on findings.
 
 ---
 
-## 11. Heartbeats
+## 12. Heartbeats
 
 Every active agent touches its heartbeat at least once every five minutes:
 
@@ -320,7 +366,7 @@ role resuming and touching its heartbeat again.
 
 ---
 
-## 12. Git rules
+## 13. Git rules
 
 Default:
 
@@ -347,7 +393,7 @@ No `git add .`; the committer stages exact paths only.
 
 ---
 
-## 13. Non-goals
+## 14. Non-goals
 
 - No second bug-fix loop (bugs are `plan_kind: bugfix` product tasks).
 - No `active_loop`.
@@ -359,7 +405,7 @@ No `git add .`; the committer stages exact paths only.
 
 ---
 
-## 14. Bootstrap
+## 15. Bootstrap
 
 Render and run a role's bootstrap prompt with `greatminds render-role`:
 

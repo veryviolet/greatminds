@@ -59,6 +59,18 @@ discusses a new idea with the user, the reviewer closes pending work.
    ARCHITECT-REVIEWER will bounce the stacked task; add the `depends_on`
    retroactively then. Prefer this judgment call over blanket
    file-overlap blocking.
+8. **For `stand_required: true` tasks, `stand_reason` MUST contain a
+   concrete reproduction command** (the exact stand-side commands to
+   trigger the original failure) plus expected before/after output —
+   not vague phrasing like "stand evidence proves it works". This is
+   what TESTER will execute on the live stand to populate
+   `stand_evidence` (reproduction / observed-without-fix /
+   observed-with-fix; see COORDINATE.md §9). If the reproduction
+   cannot be written concretely, the task is mis-scoped: rescope or
+   split before routing. REVIEWER rejects implementation handoffs
+   whose `tests` block lacks the three `stand_evidence` fields, so a
+   PLANNER-supplied vague `stand_reason` guarantees a downstream
+   bounce.
 
 ## Never
 

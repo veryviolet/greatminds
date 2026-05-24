@@ -34,7 +34,13 @@ tests block.
    - records `gate_check_result`, `gate_check_at`, `gate_check_commit` in
      the tests block,
    - refuses to set `ready_for_review: true` unless gate is `pass` (or
-     `n/a` for non-stand-required tasks).
+     `n/a` for non-stand-required tasks),
+   - additionally records `stand_evidence` with three fields:
+     **reproduction steps**, **observed-without-fix**,
+     **observed-with-fix**. Without all three, `test_result` is
+     `partial` (or `fail`) and the task bounces to `feature_dev/` /
+     `feature_ui_dev/`. Pytest with mocks is necessary but NOT
+     sufficient — see COORDINATE.md §9.
 7. On test pass + gate pass: `feature_test/X -> feature_review/X`.
 8. On fail/partial: returns by scope to `feature_dev/` or `feature_ui_dev/`.
 9. On dependency-blocked: appends `blocked` block with strict

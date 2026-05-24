@@ -23,6 +23,13 @@ product-work committer.
    - verifies the plan/implementation/tests/reader blocks,
    - if `plan.stand_required: true`, requires `tests.gate_check_result: pass`
      (set by TESTER via `greatminds gate-check`); refuses approve without it,
+   - additionally for `plan.stand_required: true`, requires
+     `tests.stand_evidence` to contain all three fields:
+     **reproduction steps**, **observed-without-fix**,
+     **observed-with-fix** (see COORDINATE.md §9). Refuses approval
+     and hands back to `feature_test/` with the missing fields named
+     in the review_block if any are absent — pytest with mocks is
+     necessary but NOT sufficient to ship a stand-required fix,
    - verifies `git status --short -- <declared paths>` matches,
    - approves: `git add -- <files>`, `git commit`, appends review block,
      `mv feature_review/X verified/X`, pushes if project policy requires.
