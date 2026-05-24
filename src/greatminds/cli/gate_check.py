@@ -9,11 +9,15 @@ Usage:
 Looks up the task across coordination queues, reads its plan block, and
 verifies stand-evidence per the schema:
   - plan.stand_required: false  → output 'n/a'
-  - plan.stand_required: true   → find stand_done/*.md whose
-    stand_result.evidence_for contains this task id. If commit hash in
+  - plan.stand_required: true   → find stand_done/*.{yaml,md} whose
+    stand_result.evidence_for (or the file's top-level evidence_for in
+    the yaml-native shape) contains this task id. If commit hash in
     plan/implementation matches the stand_result.commit, output 'pass'.
-    If a candidate exists but commit differs or result != pass → 'fail'.
-    No candidate → 'missing'.
+    If a candidate exists but commit differs or
+    result not in {pass, ok} → 'fail'. No candidate → 'missing'.
+
+Both the legacy fenced markdown shape and the yaml-native shape are
+supported; the reader picks the right parser per file.
 
 Exit code:
   0  pass | n/a
@@ -24,6 +28,7 @@ Exit code:
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 
 import click
@@ -89,22 +94,80 @@ def merge_blocks(blocks: list[dict]) -> dict:
     return merged
 
 
+def _candidate_files(d: Path) -> list[Path]:
+    """All non-template task/evidence candidates under a directory.
+
+    Glob both `.md` (legacy fenced) and `.yaml` (yaml-native) shapes.
+    Excludes `_TEMPLATE.*` by stem (covers `_TEMPLATE.md` and
+    `_TEMPLATE.yaml` in one check).
+    """
+    if not d.is_dir():
+        return []
+    out: list[Path] = []
+    for ext in ("md", "yaml"):
+        for f in d.glob(f"*.{ext}"):
+            if f.stem == "_TEMPLATE":
+                continue
+            out.append(f)
+    return sorted(out)
+
+
+def parse_task_file(path: Path, verbose_errors: bool = False) -> dict:
+    """Parse a task/evidence file (yaml-native OR fenced .md) → merged dict.
+
+    Yaml-native (single YAML document, no `---` fences in body):
+        Whole file is a mapping with a top-level `blocks: [{kind: K, …}]`.
+    Fenced legacy (markdown with multiple `---`-fenced YAML chunks):
+        Parsed via `split_yaml_blocks` + `merge_blocks`.
+
+    After either path, the returned dict mirrors each blocks-list entry
+    at ``merged[entry["kind"]]`` so callers can read ``merged["plan"]``,
+    ``merged["stand_result"]`` etc. uniformly regardless of shape.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    has_fences = (
+        re.search(r"^---\s*$", text, flags=re.MULTILINE) is not None
+    )
+    if has_fences:
+        blocks = split_yaml_blocks(
+            text, verbose_errors=verbose_errors, source=str(path),
+        )
+        merged = merge_blocks(blocks)
+    else:
+        try:
+            doc = yaml.safe_load(text)
+        except yaml.YAMLError as exc:
+            if verbose_errors:
+                print(f"  YAML parse failed in {path}: {exc}",
+                      file=sys.stderr)
+            doc = None
+        merged = doc if isinstance(doc, dict) else {}
+
+    # Yaml-native shape: expand `blocks: [{kind: K, …}]` into
+    # `merged[K] = entry`. Keep this AFTER any legacy merge so an
+    # old fenced file (where top-level `plan` is already set) is
+    # unchanged when blocks list is absent.
+    blocks_list = merged.get("blocks")
+    if isinstance(blocks_list, list):
+        for entry in blocks_list:
+            if isinstance(entry, dict) and "kind" in entry:
+                merged[entry["kind"]] = entry
+    return merged
+
+
 def find_task_file(project_dir: Path, task_id: str, queues: list[str]) -> Path | None:
     coord = project_dir / "coordination"
     # Normalize: if just seq given, accept any file starting with "<seq>-".
     seq_only = re.fullmatch(r"\d{1,4}", task_id)
     for q in queues:
-        d = coord / q
-        if not d.is_dir():
-            continue
-        for f in sorted(d.glob("*.md")):
-            if f.name == "_TEMPLATE.md":
-                continue
+        for f in _candidate_files(coord / q):
             if f.stem == task_id:
                 return f
-            if seq_only:
-                if f.stem.startswith(f"{int(task_id):04d}-"):
-                    return f
+            if seq_only and f.stem.startswith(f"{int(task_id):04d}-"):
+                return f
     return None
 
 
@@ -123,32 +186,40 @@ def load_schema_queues(canon_dir: Path) -> list[str]:
 
 
 def find_stand_evidence(project_dir: Path, task_id: str) -> list[tuple[Path, dict]]:
-    """Return list of (path, parsed stand_result block) where evidence_for matches."""
+    """Return list of (path, parsed stand_result block) where evidence_for matches.
+
+    Reads both yaml-native (top-level ``evidence_for``) and legacy fenced
+    (``stand_result.evidence_for``) shapes via ``parse_task_file``.
+    """
     found: list[tuple[Path, dict]] = []
     stand_done = project_dir / "coordination" / "stand_done"
-    if not stand_done.is_dir():
-        return found
     seq = task_id.split("-")[0] if "-" in task_id else task_id
-    for f in sorted(stand_done.glob("*.md")):
-        if f.name == "_TEMPLATE.md":
-            continue
-        blocks = split_yaml_blocks(f.read_text(encoding="utf-8"))
-        merged = merge_blocks(blocks)
+    for f in _candidate_files(stand_done):
+        merged = parse_task_file(f)
         stand_result = merged.get("stand_result")
         if not isinstance(stand_result, dict):
             continue
-        evidence_for = stand_result.get("evidence_for") or []
+        # Yaml-native lifts evidence_for to the top of the evidence file;
+        # legacy fenced kept it inside the stand_result block. Accept both.
+        evidence_for = (
+            stand_result.get("evidence_for")
+            or merged.get("evidence_for")
+            or []
+        )
         if not isinstance(evidence_for, list):
             continue
         # Match by full id or by seq-prefix.
         match = any(
-            isinstance(e, str) and (e == task_id or e.startswith(f"{seq}-") or e == seq)
+            isinstance(e, str)
+            and (e == task_id or e.startswith(f"{seq}-") or e == seq)
             for e in evidence_for
         )
         if not match:
             # Legacy: also accept related_product_task scalar
             rpt = stand_result.get("related_product_task")
-            if isinstance(rpt, str) and (rpt == task_id or rpt.startswith(f"{seq}-") or rpt == seq):
+            if isinstance(rpt, str) and (
+                rpt == task_id or rpt.startswith(f"{seq}-") or rpt == seq
+            ):
                 match = True
         if match:
             found.append((f, stand_result))
@@ -192,15 +263,10 @@ def gate_check(task_id: str, project_dir: Path | None, canon_dir: Path | None,
         err(f"error: task '{task_id}' not found in any queue")
         raise click.exceptions.Exit(3)
 
-    blocks = split_yaml_blocks(
-        task_path.read_text(encoding="utf-8"),
-        verbose_errors=verbose,
-        source=str(task_path),
-    )
-    if not blocks:
-        err(f"error: no YAML blocks in {task_path}")
+    merged = parse_task_file(task_path, verbose_errors=verbose)
+    if not merged:
+        err(f"error: no parseable content in {task_path}")
         raise click.exceptions.Exit(3)
-    merged = merge_blocks(blocks)
     plan = merged.get("plan")
     if not isinstance(plan, dict):
         info("missing")
@@ -227,7 +293,7 @@ def gate_check(task_id: str, project_dir: Path | None, canon_dir: Path | None,
     if not candidates:
         info("missing")
         if verbose:
-            warn(f"  reason: no stand_done/*.md with evidence_for matching {task_id_full}")
+            warn(f"  reason: no stand_done/*.{{yaml,md}} with evidence_for matching {task_id_full}")
         raise click.exceptions.Exit(2)
 
     task_commit = get_task_commit(merged)
@@ -236,7 +302,7 @@ def gate_check(task_id: str, project_dir: Path | None, canon_dir: Path | None,
     for path, sr in candidates:
         result = sr.get("result")
         sr_commit = sr.get("commit")
-        if result != "pass":
+        if result not in ("pass", "ok"):
             fail_reasons.append(f"{path.name}: result={result!r}")
             continue
         if task_commit and sr_commit and not str(sr_commit).startswith(str(task_commit)) \
