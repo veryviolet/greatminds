@@ -50,16 +50,51 @@ def project(tmp_path):
 
 @pytest.fixture
 def fake_push(monkeypatch):
-    """Replace push_to_role with a recorder."""
+    """Replace press_enter (preferred path since 0051 iter-6) AND push_to_role
+    (fallback path) with the same recorder.
+
+    Iter-6 routes the stalled sweep through ``press_enter`` when coord.yaml
+    has a session+window for the role; otherwise it falls back to
+    ``push_to_role``. The recorder captures the same shape from both paths
+    so existing tests (which check ``.calls``) still work and the new
+    ``test_stalled_sweep_delegates_to_press_enter`` test verifies which
+    primitive was called.
+    """
     calls: list[tuple] = []
     result = {"return": True}
+    # Track WHICH primitive each call came through.
+    primitives: list[str] = []
 
-    def fake(coord, role, file_path, verbose, bypass_fresh_guard=False):
+    def fake_push(coord, role, file_path, verbose, bypass_fresh_guard=False):
         calls.append((role, file_path, bypass_fresh_guard))
+        primitives.append("push_to_role")
         return result["return"]
 
-    monkeypatch.setattr(cd, "push_to_role", fake)
-    return type("FakePush", (), {"calls": calls, "result": result})()
+    # Look up heartbeat age from the project coord_dir so the recorded
+    # payload string can include it (matches push_to_role's prior
+    # f"<stalled-sweep: heartbeat {age:.0f}s old>" format that existing
+    # tests assert on).
+    def fake_press_enter(coord_dir, session, window, role_lower, agent_type,
+                         *, mode="wake", verify=True, verify_timeout_s=30.0):
+        hb = Path(coord_dir) / f"heartbeat.{role_lower}"
+        try:
+            age = time.time() - hb.stat().st_mtime
+        except OSError:
+            age = 0.0
+        payload = f"<stalled-sweep via press_enter: heartbeat {age:.0f}s old>"
+        calls.append((role_lower, payload, True))
+        primitives.append("press_enter")
+        if result["return"]:
+            return (True, f"fake press_enter ok (role={role_lower})")
+        return (False, f"fake press_enter False (role={role_lower})")
+
+    monkeypatch.setattr(cd, "push_to_role", fake_push)
+    # press_enter is imported inside the sweep function (lazy import) — patch
+    # the source module so the lazy import resolves to the fake.
+    from greatminds.cli import _send_enter
+    monkeypatch.setattr(_send_enter, "press_enter", fake_press_enter)
+    return type("FakePush", (), {"calls": calls, "result": result,
+                                  "primitives": primitives})()
 
 
 def _set_heartbeat(project_dir: Path, role_lower: str, age_seconds: float):
@@ -205,34 +240,30 @@ def test_config_defaults_when_no_coord_yaml(tmp_path):
     assert threshold == cd.STALLED_THRESHOLD_DEFAULT
 
 
-def test_real_push_to_role_bypasses_fresh_guard_for_sub_60s_threshold(
+def test_sub_60s_threshold_still_nudges_via_press_enter(
     project, monkeypatch,
 ):
-    """REVIEWER iter-2 regression: a custom
-    `coordd.stalled_threshold_seconds: 30` config must actually nudge,
-    not get silently suppressed by push_to_role's internal
-    PUSH_FRESH_GUARD_SEC=60s. We exercise the REAL push_to_role here
-    (not the mock from fake_push fixture); only socket connect is
-    stubbed so the test can assert delivery without opening a real
-    unix socket. Without the bypass-fresh-guard fix, push_to_role
-    would see age (35s) < 60s, return False, and the agent stays
-    stalled forever.
-    """
-    # Heartbeat: 35s old → past custom 30s threshold but well inside
-    # the default 60s fresh-guard.
-    role_lower = "developer"
-    hb_path = _set_heartbeat(project, role_lower, age_seconds=35)
+    """Iter-6: with press_enter as the primary path (no fresh-guard
+    of its own — the sweep's own staleness gate is the authority), a
+    custom ``stalled_threshold_seconds: 30`` config must still nudge
+    even though heartbeat (35s) is less than the legacy 60s guard.
 
-    # Set up a registry entry with a fake input_sock pointing at an
-    # actually-existing path; the socket-connect call itself we stub.
+    This test exercises the REAL press_enter via the actual lazy
+    import in _stalled_agent_sweep; only the socket I/O is stubbed.
+    """
+    role_lower = "developer"
+    _set_heartbeat(project, role_lower, age_seconds=35)
+
+    # Registry entry with a fake input_sock so press_enter prefers
+    # the socket channel.
     reg_dir = project / "coordination" / ".agent_registry"
     fake_sock = reg_dir / f"{role_lower}.sock"
-    fake_sock.touch()  # Path(input_sock).exists() must be True
+    fake_sock.touch()
     (reg_dir / f"{role_lower}.json").write_text(
         json.dumps({
             "role": "DEVELOPER",
             "tool": "claude",
-            "pid": os.getpid(),  # always alive
+            "pid": os.getpid(),  # alive
             "tty": "/dev/pts/0",
             "input_sock": str(fake_sock),
         }),
@@ -250,8 +281,16 @@ def test_real_push_to_role_bypasses_fresh_guard_for_sub_60s_threshold(
     import socket as _socket_mod
     monkeypatch.setattr(_socket_mod, "socket",
                         lambda *_a, **_kw: FakeSocket())
-    # Don't actually sleep WAKE_GAP_SECONDS during the test.
+    # Don't actually sleep WAKE_GAP / verify timeout.
     monkeypatch.setattr(cd.time, "sleep", lambda *_a, **_kw: None)
+    from greatminds.cli import _send_enter
+    monkeypatch.setattr(_send_enter.time, "sleep", lambda *_a, **_kw: None)
+    # Heartbeat poll: simulate one immediate advance so press_enter returns True.
+    monkeypatch.setattr(_send_enter, "_poll_heartbeat_advance",
+                        lambda *a, **kw: True)
+    # capture-pane mock so the verify path doesn't shell out.
+    monkeypatch.setattr(_send_enter, "_capture_pane",
+                        lambda session, window: "developer> ticking")
 
     # Sub-60s threshold via coord.yaml.
     cfg = _read_coord_yaml(project)
@@ -262,12 +301,11 @@ def test_real_push_to_role_bypasses_fresh_guard_for_sub_60s_threshold(
 
     n = cd._stalled_agent_sweep(project, _read_coord_yaml(project),
                                 threshold_seconds=threshold)
-    # Without the bypass-fresh-guard fix, this would be 0 (push_to_role
-    # would return False because 35s < 60s).
     assert n == 1, "sub-60s-threshold config must produce a real nudge"
-    # WAKE_TEXT + WAKE_ENTER written via the (faked) socket.
+    # Press_enter wake-mode wrote WAKE_TEXT then \r via the input_sock.
     sent_blob = b"".join(sends)
-    assert b"check inbox" in sent_blob
+    assert b"continue your tick" in sent_blob
+    assert b"\r" in sent_blob
 
 
 def test_config_picks_up_both_keys(project):
@@ -280,3 +318,43 @@ def test_config_picks_up_both_keys(project):
     interval, threshold = cd._read_coordd_config(project)
     assert interval == 120.0
     assert threshold == 300.0
+
+
+# ---------------------------------------------------------------------------
+# task 0051 iter-6: stalled sweep delegates to the press_enter primitive
+# when coord.yaml has session+window for the role. REVIEWER-required
+# regression net: 'add regression coverage proving the higher-level path
+# uses the primitive'.
+# ---------------------------------------------------------------------------
+
+
+def test_stalled_sweep_delegates_to_press_enter(project, fake_push):
+    """Iter-6 contract: when session+window are present in coord.yaml,
+    the stalled sweep routes through ``press_enter`` (the unified
+    primitive from 0051) — NOT directly to ``push_to_role``. This is
+    the single regression net for the architectural unification."""
+    _set_heartbeat(project, "developer", age_seconds=900)
+    cd._stalled_agent_sweep(project, _read_coord_yaml(project),
+                            threshold_seconds=600.0)
+    # The developer role IS in coord.yaml's windows fixture, so press_enter
+    # is the primitive that should fire.
+    assert "press_enter" in fake_push.primitives
+    assert "push_to_role" not in fake_push.primitives
+
+
+def test_stalled_sweep_falls_back_to_push_to_role_when_no_session(
+    project, fake_push,
+):
+    """When coord.yaml lacks session/window (rare; orphan config), the
+    sweep falls back to push_to_role — keeps the existing input_sock
+    nudge path functional."""
+    # Strip session from coord.yaml so press_enter can't address the pane.
+    cfg = _read_coord_yaml(project)
+    cfg.pop("session", None)
+    (project / "coord.yaml").write_text(yaml.safe_dump(cfg), encoding="utf-8")
+
+    _set_heartbeat(project, "developer", age_seconds=900)
+    cd._stalled_agent_sweep(project, _read_coord_yaml(project),
+                            threshold_seconds=600.0)
+    assert "push_to_role" in fake_push.primitives
+    assert "press_enter" not in fake_push.primitives

@@ -414,26 +414,89 @@ def _stalled_agent_sweep(
                     file=sys.stderr,
                 )
             continue
-        # Hand off to push_to_role for the actual socket write — pid-alive
-        # check (skips dead agents) and unix-socket I/O still run.
-        # `bypass_fresh_guard=True` because the sweep has already filtered
-        # by ``stalled_threshold_seconds`` (potentially < 60s); the
-        # fixed-60s PUSH_FRESH_GUARD_SEC would otherwise suppress every
-        # sub-60-second-threshold config and leave the agent unrescued.
-        if push_to_role(
-            coord, role_lower,
-            f"<stalled-sweep: heartbeat {age:.0f}s old>",
-            verbose,
-            bypass_fresh_guard=True,
-        ):
-            nudge_count += 1
-            if verbose:
-                print(
-                    f"  nudged stalled {role_upper} "
-                    f"(heartbeat {age:.0f}s old)",
-                    file=sys.stderr,
+        # task 0051 iter-6 (REVIEWER changes_requested): route through
+        # the unified press_enter primitive so AGENT_ENTER_KEYS, heartbeat
+        # verification, trust-prompt detection, and SIGSTOP rejection
+        # all reach the stalled-sweep path. Previously this called
+        # push_to_role directly, which bypassed those guards. The sweep
+        # has already filtered by `stalled_threshold_seconds` (heartbeat
+        # is necessarily stale at this point), so press_enter's lack of
+        # an explicit fresh-guard is correct — bypass-fresh semantics
+        # are met by the sweep's own gating.
+        session = coord_yaml.get("session")
+        window = _window_for_role(coord_yaml, role_upper)
+        registry_dir = coord / REGISTRY_DIR
+        reg = read_registry(registry_dir, role_lower)
+        agent_type = ((reg.get("tool") if isinstance(reg, dict) else None)
+                      or "claude").lower()
+        if session and window:
+            try:
+                from greatminds.cli._send_enter import press_enter
+                ok, diag = press_enter(
+                    coord, session, window, role_lower, agent_type,
+                    mode="wake",
+                    verify=True,
                 )
+                if ok:
+                    nudge_count += 1
+                    if verbose:
+                        print(
+                            f"  nudged stalled {role_upper} via press_enter "
+                            f"(heartbeat {age:.0f}s old): {diag}",
+                            file=sys.stderr,
+                        )
+                elif verbose:
+                    print(
+                        f"  stalled-sweep press_enter FAILED for {role_upper} "
+                        f"(heartbeat {age:.0f}s old): {diag}",
+                        file=sys.stderr,
+                    )
+            except Exception as exc:  # primitive itself is best-effort; don't crash sweep
+                if verbose:
+                    print(
+                        f"  stalled-sweep press_enter raised for {role_upper}: "
+                        f"{exc}; falling back to push_to_role",
+                        file=sys.stderr,
+                    )
+                if push_to_role(coord, role_lower,
+                                f"<stalled-sweep: heartbeat {age:.0f}s old>",
+                                verbose, bypass_fresh_guard=True):
+                    nudge_count += 1
+        else:
+            # No session/window in coord.yaml — press_enter can't address
+            # the pane, so fall back to push_to_role (which only uses the
+            # input_sock / tty channel; no tmux send-keys fallback).
+            if push_to_role(coord, role_lower,
+                            f"<stalled-sweep: heartbeat {age:.0f}s old>",
+                            verbose, bypass_fresh_guard=True):
+                nudge_count += 1
+                if verbose:
+                    print(
+                        f"  nudged stalled {role_upper} via push_to_role "
+                        f"fallback (heartbeat {age:.0f}s old; no session/window "
+                        f"in coord.yaml)",
+                        file=sys.stderr,
+                    )
     return nudge_count
+
+
+def _window_for_role(coord_yaml: dict, role_upper: str) -> str | None:
+    """Look up the tmux window name for ``role_upper`` from coord.yaml.
+
+    Returns ``None`` if coord.yaml has no windows list or no match.
+    Used by ``_stalled_agent_sweep`` to address capture-pane / send-keys.
+    """
+    windows = coord_yaml.get("windows")
+    if not isinstance(windows, list):
+        return None
+    for w in windows:
+        if not isinstance(w, dict):
+            continue
+        if (w.get("role") or "").upper() == role_upper:
+            name = w.get("name")
+            if isinstance(name, str) and name:
+                return name
+    return None
 
 
 def push_to_role(coord: Path, role: str, file_path: str, verbose: bool,

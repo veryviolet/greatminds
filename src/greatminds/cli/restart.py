@@ -282,6 +282,15 @@ def _restart_dead_agents(
     session: str,
 ) -> None:
     _log("==> agents: check + restart dead ones")
+    coord_dir = registry_dir.parent
+    # task 0051: per-window Enter goes through the unified primitive in
+    # _send_enter.press_enter so the same code path / capture-pane verify
+    # / per-agent-type key sequence is shared with coordd's stalled-sweep
+    # and journal-event wakes. The agent_type comes from coord.yaml's
+    # window definition (tool: claude|codex|cursor).
+    from greatminds.cli._send_enter import press_enter  # local import: avoid cycle
+    window_tool = {w.get("name"): (w.get("tool") or "claude")
+                   for w in windows if isinstance(w, dict) and w.get("name")}
     for name, role_lc in _iter_role_windows(windows):
         reg_path = registry_dir / f"{role_lc}.json"
         data = _load_registry(reg_path)
@@ -301,8 +310,20 @@ def _restart_dead_agents(
                     pass
                 needs_start = True
         if needs_start:
-            _log(f"    {name} ({role_lc}): sending Enter to (re)start")
-            _tmux("send-keys", "-t", f"{session}:{name}", "Enter")
+            agent_type = (window_tool.get(name) or "claude").lower()
+            _log(f"    {name} ({role_lc}): pressing Enter to (re)start "
+                 f"[agent_type={agent_type}]")
+            # mode="bare-enter": tmux ran the launcher shell with a
+            # pre-filled `greatminds start-agent` line; a bare Enter
+            # accepts it. No role heartbeat to poll — the agent isn't
+            # running yet. verify=False because the dedicated _verify()
+            # step below does the full pid+sock+trust check.
+            ok, diag = press_enter(
+                coord_dir, session, name, role_lc, agent_type,
+                mode="bare-enter",
+                verify=False,
+            )
+            _log(f"      {diag}")
             time.sleep(0.5)
         else:
             _log(f"    {name} ({role_lc}): pid={pid} alive, skip")
