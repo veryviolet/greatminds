@@ -79,6 +79,59 @@ def test_scalar_string_passes_through():
 
 
 # ---------------------------------------------------------------------------
+# task 0035: bracket-list syntax on LIST_FIELDS keys parses as a YAML list
+# (was previously stored as a list-of-one-string '[a.py]').
+# ---------------------------------------------------------------------------
+
+
+def test_files_bracket_list_parses_to_real_list():
+    """``--field files=[hello.py]`` must produce ``['hello.py']``,
+    not ``['[hello.py]']``."""
+    v = coerce_value("files", "[hello.py]")
+    assert v == ["hello.py"], v
+
+
+def test_files_bracket_list_multiple_items():
+    v = coerce_value("files", "[a.py, b.py, c.py]")
+    assert v == ["a.py", "b.py", "c.py"], v
+
+
+def test_test_files_empty_bracket_list_is_empty_list():
+    """``test_files=[]`` is the canonical 'no files' shape (TESTER
+    audit-only path) — must parse to ``[]``, not ``['[]']``."""
+    v = coerce_value("test_files", "[]")
+    assert v == [], v
+
+
+def test_dependencies_bracket_list_preserves_path_separators():
+    """Bracket parsing must not split on path separators."""
+    v = coerce_value("dependencies", "[feature_dev/0001.yaml, feature_dev/0002.yaml]")
+    assert v == ["feature_dev/0001.yaml", "feature_dev/0002.yaml"], v
+
+
+def test_bracket_list_only_applies_to_list_fields():
+    """Non-LIST_FIELDS keys must keep bracket text literal — prose values
+    like a stand_reason that happens to contain '[...]' must NOT be
+    silently turned into a list."""
+    v = coerce_value("stand_reason", "[POST /x, GET /y]")
+    assert isinstance(v, str)
+    assert v == "[POST /x, GET /y]"
+
+
+def test_malformed_bracket_falls_back_to_comma_split():
+    """Truly malformed bracket text (yaml.safe_load fails or returns
+    non-list) must NOT crash the call — fall back to comma split."""
+    # Unclosed bracket: yaml.safe_load tolerates this in flow style and
+    # returns the list anyway — covered above. The genuinely malformed
+    # case is e.g. nested unbalanced quotes that yaml refuses.
+    # Whatever happens, coerce_value must return *something* without
+    # raising.
+    v = coerce_value("files", "[a.py, b.py")  # unclosed
+    assert isinstance(v, list)
+    assert v  # non-empty
+
+
+# ---------------------------------------------------------------------------
 # 2. task append-block end-to-end: --body-file alias + --body @PATH
 # ---------------------------------------------------------------------------
 

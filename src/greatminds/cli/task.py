@@ -933,8 +933,30 @@ def coerce_value(key: str, v: str) -> Any:
     other fields stay as strings even if they contain commas or colons —
     so user-supplied prose like ``stand_reason="POST /node, then GET
     /health"`` isn't accidentally turned into a YAML list.
+
+    For LIST_FIELDS keys, YAML bracket-list syntax (``files=[a.py, b.py]``
+    or the empty form ``test_files=[]``) is parsed via yaml.safe_load
+    when the value starts with ``[``. This matches user expectation —
+    EXPLORER avatar dogfood (0035) found that bracket syntax was being
+    stored as a list of one literal string ``['[a.py]']``, which then
+    silently broke downstream validators reading ``files:`` as a list
+    of paths. yaml.safe_load failure falls back to the comma-split path,
+    so existing comma syntax keeps working.
     """
     if key in LIST_FIELDS:
+        stripped = v.strip()
+        if stripped.startswith("["):
+            try:
+                parsed = yaml.safe_load(stripped)
+            except yaml.YAMLError:
+                parsed = None
+            if isinstance(parsed, list):
+                # Stringify each item — schema validators expect strings
+                # (paths, hostnames, etc.). int/bool inside the bracket
+                # list (`files=[1, 2]`) is meaningless for these fields.
+                return [str(x).strip() for x in parsed if str(x).strip()]
+            # Fell through: not a real bracket-list — let the comma path
+            # handle it (raises later via validate_task if shape is wrong).
         if "," in v:
             return [x.strip() for x in v.split(",") if x.strip()]
         return [v] if v else []
