@@ -610,6 +610,54 @@ watchdog:
   task_stale_in_review_queue_seconds: 43200   # 12 h
 
 # ---------------------------------------------------------------------------
+# Inbox
+#
+# Inter-role messaging via per-role inbox/<role>/ mailboxes.
+# `allowed_kinds` is the closed set of message kinds the inbox CLI accepts;
+# any other value is rejected at send time. Mirrored in COORDINATE.md §10.
+# ---------------------------------------------------------------------------
+inbox:
+  allowed_kinds: [wake, ask, info]
+
+# ---------------------------------------------------------------------------
+# Git permissions
+#
+# Closed set of roles that may run `git commit` / `git push` in this
+# project. Enforced by a pre-commit hook (installed by `greatminds setup`)
+# that calls `greatminds check-git-permission commit` and exits non-zero
+# when $GREATMINDS_ROLE is not in the allowed list. Forbidden verbs are
+# `git` subcommands the project never wants any agent to use (force
+# operations, history rewrites). Task 0091 item 2.
+# ---------------------------------------------------------------------------
+git_permissions:
+  commit: [ARCHITECT-REVIEWER]
+  push: [ARCHITECT-REVIEWER]
+  forbidden_verbs:
+    - reset
+    - restore
+    - checkout
+    - stash
+    - rebase
+    - revert
+    - branch
+    - tag
+
+# ---------------------------------------------------------------------------
+# Tests block — required-field validation for stand_required tasks
+#
+# When plan.stand_required is true, the tests block MUST contain a
+# stand_evidence mapping with the three subfields below. Enforced by
+# validate_block in cli/task.py. Task 0091 item 3.
+# ---------------------------------------------------------------------------
+tests_block_validation:
+  stand_evidence:
+    required_subfields:
+      - reproduction_steps
+      - observed_without_fix
+      - observed_with_fix
+    required_when: plan.stand_required
+
+# ---------------------------------------------------------------------------
 # Filesystem layout
 #
 # Paths relative to <COORDINATION_DIR>. Used by bin/ scripts to locate

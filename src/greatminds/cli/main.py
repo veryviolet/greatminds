@@ -71,6 +71,7 @@ from . import stop_decide as _stop_decide_mod
 from . import pty_launch as _pty_launch_mod
 from . import start_agent as _start_agent_mod
 from . import plan as _plan_mod
+from . import git_check as _git_check_mod
 from . import gate_check as _gate_check_mod
 from . import restart as _restart_mod
 from . import report_upstream as _report_upstream_mod
@@ -94,6 +95,7 @@ cli.add_command(_stop_decide_mod.stop_decide, name="stop-decide")
 cli.add_command(_pty_launch_mod.pty_launch, name="pty-launch")
 cli.add_command(_start_agent_mod.start_agent, name="start-agent")
 cli.add_command(_plan_mod.plan)
+cli.add_command(_git_check_mod.check_git_permission, name="check-git-permission")
 cli.add_command(_gate_check_mod.gate_check, name="gate-check")
 cli.add_command(_restart_mod.restart)
 cli.add_command(_report_upstream_mod.report_upstream, name="report-upstream")

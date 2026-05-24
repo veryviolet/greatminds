@@ -38,9 +38,6 @@ from greatminds.core.paths import caller_role as _bare_caller_role
 from greatminds.core.paths import find_canon_dir, find_coord_dir
 from greatminds.core.util import now_iso
 
-KINDS = {"wake", "ask", "info"}
-
-
 _schema_cache: dict | None = None
 
 
@@ -59,6 +56,19 @@ def _schema() -> dict:
 
 def known_roles() -> set:
     return set((_schema().get("roles") or {}).keys())
+
+
+def allowed_kinds() -> set[str]:
+    """Inbox message kinds permitted by schema. Closed set."""
+    kinds = (_schema().get("inbox") or {}).get("allowed_kinds")
+    if not kinds:
+        # Defensive default if schema is missing the section — old fleets.
+        return {"wake", "ask", "info"}
+    return set(kinds)
+
+
+# Retained for backwards compatibility within this module.
+KINDS = {"wake", "ask", "info"}
 
 
 def caller_role() -> str:
@@ -119,7 +129,8 @@ def inbox() -> None:
 
 @inbox.command(name="send")
 @click.argument("to")
-@click.option("--kind", required=True, type=click.Choice(sorted(KINDS)))
+@click.option("--kind", required=True,
+              help="message kind (schema.inbox.allowed_kinds)")
 @click.option("--task", default=None, help="task id ref")
 @click.option("--body", default=None, help="literal | @file | - (stdin)")
 def inbox_send(to, kind, task, body) -> None:
@@ -128,6 +139,13 @@ def inbox_send(to, kind, task, body) -> None:
     to_role = to.upper()
     if to_role not in known_roles():
         raise GreatMindsError(f"unknown destination role: {to_role}")
+    kinds = allowed_kinds()
+    if kind not in kinds:
+        raise GreatMindsError(
+            f"unknown inbox kind: {kind!r} "
+            f"(allowed: {sorted(kinds)} per schema.inbox.allowed_kinds)",
+            exit_code=2,
+        )
 
     body_text = read_body(body) if body else ""
     if len(body_text) > 50_000:

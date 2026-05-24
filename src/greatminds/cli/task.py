@@ -992,7 +992,44 @@ def role_for_block_kind(role: str, kind: str, queue: str,
 
 def require_block_cross_state(new_block: dict[str, Any],
                               data: dict[str, Any]) -> None:
-    """A2: REVIEWER cannot approve when latest testing block is not pass."""
+    """Cross-block validation at append time.
+
+    A2: REVIEWER cannot approve when latest tests/reader block is not pass.
+    0091 item 3: tests block on a stand_required task must carry
+    `stand_evidence` as a mapping with reproduction_steps +
+    observed_without_fix + observed_with_fix subfields. Mirrors the
+    schema.tests_block_validation contract (required_when:
+    plan.stand_required is true).
+    """
+    # 0091 item 3 — stand_evidence subfields gate.
+    if new_block.get("kind") == "tests":
+        plan_blocks = [b for b in (data.get("blocks") or [])
+                       if isinstance(b, dict) and b.get("kind") == "plan"]
+        if plan_blocks and plan_blocks[-1].get("stand_required") is True:
+            ev = new_block.get("stand_evidence")
+            required_subfields = (
+                "reproduction_steps",
+                "observed_without_fix",
+                "observed_with_fix",
+            )
+            if not isinstance(ev, dict):
+                raise GreatMindsError(
+                    f"tests block on a stand_required task must set "
+                    f"stand_evidence as a mapping with the three required "
+                    f"subfields {list(required_subfields)} (task 0091 item 3; "
+                    f"schema.tests_block_validation). Got: "
+                    f"{type(ev).__name__}.",
+                    exit_code=2,
+                )
+            missing = [k for k in required_subfields
+                       if not (str(ev.get(k) or "").strip())]
+            if missing:
+                raise GreatMindsError(
+                    f"tests.stand_evidence missing required subfields: "
+                    f"{missing} (task 0091 item 3; mirrors COORDINATE.md §9).",
+                    exit_code=2,
+                )
+
     if new_block.get("kind") != "review":
         return
     if new_block.get("outcome") != "approved":
@@ -1157,6 +1194,20 @@ def coerce_value(key: str, v: str) -> Any:
         if "," in v:
             return [x.strip() for x in v.split(",") if x.strip()]
         return [v] if v else []
+    stripped = v.strip()
+    if stripped.startswith("{"):
+        # 0091 iter-N+M: support YAML/JSON mapping input via the CLI for
+        # fields like tests.stand_evidence (canon §9 / tests_block_validation
+        # requires it as a mapping with three subfields). Without this,
+        # the CLI couldn't produce a validator-passing tests block — the
+        # exact gap REVIEWER flagged.
+        try:
+            parsed = yaml.safe_load(stripped)
+        except yaml.YAMLError:
+            parsed = None
+        if isinstance(parsed, dict):
+            return parsed
+        # Not a real mapping — fall through to string path.
     if v.lower() in ("true", "false"):
         return v.lower() == "true"
     if v.isdigit():
