@@ -24,5 +24,6 @@ canon skill by providing a skill with the same `name:` frontmatter.
 To opt OUT of a canon skill without overriding it, set
 `skillOverrides: { "<skill-name>": "off" }` in `<project>/.claude/settings.local.json`.
 
-See `/opt/coordination/README.md` for the full bring-up procedure and
+See the greatminds documentation site at <https://veryviolet.github.io/greatminds/>
+for the full bring-up procedure (or the repo README) and
 `.claude-plugin/marketplace.json` for the plugin registry.

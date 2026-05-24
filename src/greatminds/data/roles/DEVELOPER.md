@@ -53,7 +53,7 @@ DEVELOPER implements backend/product-code tasks planned by ARCHITECT-PLANNER.
 This role loads the `role-developer` canon plugin (in addition to the
 shared `coordination-protocol` plugin). Procedural patterns and
 recipes are factored into auto-invocable skills under
-`/opt/coordination/plugins/role-developer/skills/`:
+`src/greatminds/data/plugins/role-developer/skills/`:
 
 - `grpc-protobuf` (`plugins/role-developer/skills/grpc-protobuf/SKILL.md`)
 - `python-backend` (`plugins/role-developer/skills/python-backend/SKILL.md`)

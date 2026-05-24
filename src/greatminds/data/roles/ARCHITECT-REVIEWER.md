@@ -54,7 +54,7 @@ product-work committer.
 This role loads the `role-architect-reviewer` canon plugin (in addition to the
 shared `coordination-protocol` plugin). Procedural patterns and
 recipes are factored into auto-invocable skills under
-`/opt/coordination/plugins/role-architect-reviewer/skills/`:
+`src/greatminds/data/plugins/role-architect-reviewer/skills/`:
 
 - `architectural-review` (`plugins/role-architect-reviewer/skills/architectural-review/SKILL.md`)
 - `commit-and-push-protocol` (`plugins/role-architect-reviewer/skills/commit-and-push-protocol/SKILL.md`)

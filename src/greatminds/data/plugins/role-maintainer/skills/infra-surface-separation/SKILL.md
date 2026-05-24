@@ -35,7 +35,7 @@ messages.
   MAINTAINER.
 
 ### 3. Canon
-The protocol itself — `/opt/coordination/` contents: schema.yaml,
+The protocol itself — `<GREATMINDS_REPO>/` contents: schema.yaml,
 bin/* scripts, COORDINATE.md, role docs, plugins/, mcp/, command_START.yaml,
 templates/, marketplace.json. The single source of truth that gets
 synced into every project that uses the coordination system.
@@ -76,7 +76,7 @@ When something goes wrong, the diagnostic question is "which surface?".
 # What surface am I looking at right now?
 echo "stand: $(curl -fsSL "${STAND_URL_A}/health" 2>&1 | head -1)"
 echo "fleet: $(greatminds watchdog --project-dir "${PROJECT_ROOT}" 2>&1 | grep -E 'STALE|stale|orphan' | head -3)"
-echo "canon: $(git -C /opt/coordination log -1 --oneline)"
+echo "canon: $(git -C <GREATMINDS_REPO> log -1 --oneline)"
 ```
 
 A green answer on all three: not an infra issue, look at product/plan.

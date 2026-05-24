@@ -72,7 +72,7 @@ intent/journal/heartbeat).
 This role loads the `role-reader` canon plugin (in addition to the
 shared `coordination-protocol` plugin). Procedural patterns and
 recipes are factored into auto-invocable skills under
-`/opt/coordination/plugins/role-reader/skills/`:
+`src/greatminds/data/plugins/role-reader/skills/`:
 
 - `audit-path-vs-post-write-path` (`plugins/role-reader/skills/audit-path-vs-post-write-path/SKILL.md`)
 - `fresh-user-perspective` (`plugins/role-reader/skills/fresh-user-perspective/SKILL.md`)

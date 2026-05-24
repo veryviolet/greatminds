@@ -81,7 +81,7 @@ discusses a new idea with the user, the reviewer closes pending work.
 This role loads the `role-architect-planner` canon plugin (in addition to the
 shared `coordination-protocol` plugin). Procedural patterns and
 recipes are factored into auto-invocable skills under
-`/opt/coordination/plugins/role-architect-planner/skills/`:
+`src/greatminds/data/plugins/role-architect-planner/skills/`:
 
 - `adr-template` (`plugins/role-architect-planner/skills/adr-template/SKILL.md`)
 - `task-decomposition` (`plugins/role-architect-planner/skills/task-decomposition/SKILL.md`)

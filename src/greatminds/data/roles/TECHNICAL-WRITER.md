@@ -51,7 +51,7 @@ ARCHITECT-PLANNER decides so.
 This role loads the `role-technical-writer` canon plugin (in addition to the
 shared `coordination-protocol` plugin). Procedural patterns and
 recipes are factored into auto-invocable skills under
-`/opt/coordination/plugins/role-technical-writer/skills/`:
+`src/greatminds/data/plugins/role-technical-writer/skills/`:
 
 - `assets-and-links` (`plugins/role-technical-writer/skills/assets-and-links/SKILL.md`)
 - `docs-structure` (`plugins/role-technical-writer/skills/docs-structure/SKILL.md`)

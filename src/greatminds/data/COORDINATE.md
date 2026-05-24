@@ -381,7 +381,7 @@ To audit the live coordination filesystem:
 ## Canon skill plugins
 
 Procedural detail (recipes, gotchas, examples) lives in **Claude Code
-Skills** under `/opt/coordination/plugins/`. Each role-X plugin is
+Skills** under `src/greatminds/data/plugins/`. Each role-X plugin is
 loaded only for the matching `GREATMINDS_ROLE`; the shared
 `coordination-protocol` plugin is loaded by every role.
 

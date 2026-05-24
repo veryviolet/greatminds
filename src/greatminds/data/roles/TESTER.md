@@ -61,7 +61,7 @@ tests block.
 This role loads the `role-tester` canon plugin (in addition to the
 shared `coordination-protocol` plugin). Procedural patterns and
 recipes are factored into auto-invocable skills under
-`/opt/coordination/plugins/role-tester/skills/`:
+`src/greatminds/data/plugins/role-tester/skills/`:
 
 - `api-and-db-probes` (`plugins/role-tester/skills/api-and-db-probes/SKILL.md`)
 - `probe-craft` (`plugins/role-tester/skills/probe-craft/SKILL.md`)

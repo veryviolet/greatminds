@@ -1,7 +1,7 @@
 # Canon MCP
 
 `canon.json` — universal MCP servers loaded by every Claude agent via
-`greatminds start-agent --mcp-config /opt/coordination/mcp/canon.json`.
+`greatminds start-agent --mcp-config src/greatminds/data/mcp/canon.json`.
 
 Projects may add or override servers by providing
 `<project>/coordination/mcp.local.json`; both files are passed to

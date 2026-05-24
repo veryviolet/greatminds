@@ -77,8 +77,8 @@ Some tasks touch both repos:
 For these, AR commits in BOTH repos and pushes BOTH in the same tick:
 
 ```bash
-# In /opt/coordination — canon commit + push
-cd /opt/coordination
+# In <GREATMINDS_REPO> — canon commit + push
+cd <GREATMINDS_REPO>
 git add <canon-paths-from-declared_files> && git commit -m "..." -- <canon-paths>
 canon_push=$(git push origin main 2>&1 | tail -1)
 canon_head=$(git rev-parse --short HEAD)

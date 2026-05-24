@@ -70,7 +70,7 @@ wants rapid iteration.
 This role loads the `role-ui-developer` canon plugin (in addition to the
 shared `coordination-protocol` plugin). Procedural patterns and
 recipes are factored into auto-invocable skills under
-`/opt/coordination/plugins/role-ui-developer/skills/`:
+`src/greatminds/data/plugins/role-ui-developer/skills/`:
 
 - `svelte-accessibility` (`plugins/role-ui-developer/skills/svelte-accessibility/SKILL.md`)
 - `svelte-component` (`plugins/role-ui-developer/skills/svelte-component/SKILL.md`)

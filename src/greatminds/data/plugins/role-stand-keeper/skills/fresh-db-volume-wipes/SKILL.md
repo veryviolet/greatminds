@@ -37,7 +37,7 @@ wipeable surfaces typically include:
 - Any cache state (redis, in-mem).
 
 **Out of bounds** even if authorised by an emphatic request:
-- Anything under `/opt/coordination/` — that's MAINTAINER's surface,
+- Anything under the canon tree `src/greatminds/data/` — that's MAINTAINER's surface,
   not stand's.
 - Anything in the project's git working tree (`<PROJECT_ROOT>` host
   paths) — destructive state lives in volumes / DBs, not the code

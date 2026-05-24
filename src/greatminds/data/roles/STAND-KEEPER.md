@@ -108,7 +108,7 @@ TESTER then runs the product checks after seeing your READY.
 This role loads the `role-stand-keeper` canon plugin (in addition to the
 shared `coordination-protocol` plugin). Procedural patterns and
 recipes are factored into auto-invocable skills under
-`/opt/coordination/plugins/role-stand-keeper/skills/`:
+`src/greatminds/data/plugins/role-stand-keeper/skills/`:
 
 - `fault-isolation-on-stand` (`plugins/role-stand-keeper/skills/fault-isolation-on-stand/SKILL.md`)
 - `fresh-db-volume-wipes` (`plugins/role-stand-keeper/skills/fresh-db-volume-wipes/SKILL.md`)

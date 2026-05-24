@@ -62,7 +62,7 @@ product**, not test output or doc text.
 This role loads the `role-explorer` canon plugin (in addition to the
 shared `coordination-protocol` plugin). Procedural patterns and
 recipes are factored into auto-invocable skills under
-`/opt/coordination/plugins/role-explorer/skills/`:
+`src/greatminds/data/plugins/role-explorer/skills/`:
 
 - `bug-as-mini-task` (`plugins/role-explorer/skills/bug-as-mini-task/SKILL.md`)
 - `exploratory-probing` (`plugins/role-explorer/skills/exploratory-probing/SKILL.md`)

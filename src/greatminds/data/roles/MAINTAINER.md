@@ -109,7 +109,7 @@ they self-resume the same way from their own `<role>.session-id`.
 This role loads the `role-maintainer` canon plugin (in addition to the
 shared `coordination-protocol` plugin). Procedural patterns and
 recipes are factored into auto-invocable skills under
-`/opt/coordination/plugins/role-maintainer/skills/`:
+`src/greatminds/data/plugins/role-maintainer/skills/`:
 
 - `agent-lifecycle-and-diagnostics` (`plugins/role-maintainer/skills/agent-lifecycle-and-diagnostics/SKILL.md`)
 - `canon-sync-and-cutover` (`plugins/role-maintainer/skills/canon-sync-and-cutover/SKILL.md`)

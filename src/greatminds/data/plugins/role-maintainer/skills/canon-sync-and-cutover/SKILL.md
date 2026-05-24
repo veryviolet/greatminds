@@ -1,11 +1,11 @@
 ---
 name: canon-sync-and-cutover
-description: Use when changes in canon (/opt/coordination — schema, bin/*, role docs, plugins, MCP config) need to propagate to running projects, when introducing a breaking protocol change requires fleet-wide cutover (silence → migrate → restart), or when a cutover failed and needs rollback. Trigger on "canon sync", "cutover", "schema change", "bin/* update", "fleet restart", "rollback", "migration", "coord-init sync".
+description: Use when changes in canon (<GREATMINDS_REPO> — schema, bin/*, role docs, plugins, MCP config) need to propagate to running projects, when introducing a breaking protocol change requires fleet-wide cutover (silence → migrate → restart), or when a cutover failed and needs rollback. Trigger on "canon sync", "cutover", "schema change", "bin/* update", "fleet restart", "rollback", "migration", "coord-init sync".
 ---
 
 # Canon sync and cutover
 
-Canon (`/opt/coordination`) is the single source of truth for the
+Canon (`<GREATMINDS_REPO>`) is the single source of truth for the
 protocol. Projects (`<project>/coordination/` and friends) inherit
 from it. When canon changes, projects need to be brought in sync — and
 sometimes that requires a fleet-wide cutover.
@@ -34,16 +34,16 @@ For non-breaking canon updates:
 
 ```bash
 # In canon repo
-cd /opt/coordination
+cd <GREATMINDS_REPO>
 git add <changed paths> && git commit -m "<message>" && git push origin main
 
 # Per project: pull canon to project's installed bin/ tree
 cd <project>
 # bin/ usually symlinks back to canon, so no project-side commit needed.
 # Verify:
-ls -la greatminds start-agent     # should be symlink → /opt/coordination/greatminds start-agent
+ls -la greatminds start-agent     # should be symlink → <GREATMINDS_REPO>/greatminds start-agent
 # If symlinks are stale, re-run coord-init to refresh:
-/opt/coordination/greatminds setup --project-dir "$(pwd)"
+<GREATMINDS_REPO>/greatminds setup --project-dir "$(pwd)"
 ```
 
 `coord-init` is idempotent: re-running it copies/links missing pieces
@@ -87,13 +87,13 @@ If step 3 lands in a broken state (agents won't start, tasks rejected
 en-masse):
 
 ```bash
-cd /opt/coordination
+cd <GREATMINDS_REPO>
 git log --oneline -5
 git revert <cutover-commit>     # creates a clean revert commit
 git push origin main
 
 cd <project>
-/opt/coordination/greatminds setup --project-dir "$(pwd)" --force  # reapply canon, with --force to clobber
+<GREATMINDS_REPO>/greatminds setup --project-dir "$(pwd)" --force  # reapply canon, with --force to clobber
 # Restart fleet on rolled-back schema (same C-c + greatminds launch --target tmux --recreate dance)
 ```
 
@@ -103,15 +103,15 @@ cd <project>
 ## Symlink discipline
 
 Project's `bin/` directory is expected to be a set of symlinks pointing
-back to `/opt/coordination/bin/<name>`. If you replace a script in
+back to `<GREATMINDS_REPO>/bin/<name>`. If you replace a script in
 canon, projects pick up the change at the next invocation
 automatically. If you find a project where `greatminds start-agent` is a
 **copy** (not symlink), that's a defect — fix with:
 
 ```bash
 cd <project>/bin
-ln -sf /opt/coordination/greatminds start-agent start_agent
-# Confirm: readlink start_agent → /opt/coordination/greatminds start-agent
+ln -sf <GREATMINDS_REPO>/greatminds start-agent start_agent
+# Confirm: readlink start_agent → <GREATMINDS_REPO>/greatminds start-agent
 ```
 
 **Tokens used:** none.
