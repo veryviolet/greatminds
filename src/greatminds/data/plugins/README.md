@@ -1,6 +1,6 @@
 # Canon plugins
 
-Layered plugin model for Claude Code agents in the Guardora coordination
+Layered plugin model for Claude Code agents in the greatminds coordination
 system. Each plugin lives in its own directory with the standard layout:
 
     <plugin>/
