@@ -60,6 +60,7 @@ from . import pty_launch as _pty_launch_mod
 from . import start_agent as _start_agent_mod
 from . import plan as _plan_mod
 from . import gate_check as _gate_check_mod
+from . import restart as _restart_mod
 
 cli.add_command(_task_mod.task)
 cli.add_command(_inbox_mod.inbox)
@@ -79,6 +80,7 @@ cli.add_command(_pty_launch_mod.pty_launch, name="pty-launch")
 cli.add_command(_start_agent_mod.start_agent, name="start-agent")
 cli.add_command(_plan_mod.plan)
 cli.add_command(_gate_check_mod.gate_check, name="gate-check")
+cli.add_command(_restart_mod.restart)
 
 
 if __name__ == "__main__":

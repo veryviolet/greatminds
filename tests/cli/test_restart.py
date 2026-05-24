@@ -1,0 +1,299 @@
+"""Unit tests for ``greatminds restart``.
+
+External effects (``systemctl``, ``tmux``, ``greatminds launch``,
+``os.kill``, ``time.sleep``) are mocked. We exercise the click command
+through ``CliRunner`` and assert on the recorded ``subprocess.run``
+call list plus exit codes.
+"""
+from __future__ import annotations
+
+import json
+import subprocess
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+import yaml
+from click.testing import CliRunner
+
+from greatminds.cli import restart as restart_mod
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+DEFAULT_WINDOWS = [
+    {"name": "planner", "role": "ARCHITECT-PLANNER", "tool": "claude", "mode": "loop"},
+    {"name": "dev", "role": "DEVELOPER", "tool": "claude", "mode": "loop"},
+    {"name": "ui", "role": "UI-DEVELOPER", "tool": "claude", "mode": "loop"},
+    {"name": "ops", "role": "", "tool": "bash"},
+]
+
+
+def _write_coord_yaml(
+    project_dir: Path,
+    windows: list[dict] | None = None,
+    session: str = "test-session",
+) -> Path:
+    cfg = {
+        "session": session,
+        "project_dir": str(project_dir),
+        "windows": windows if windows is not None else DEFAULT_WINDOWS,
+    }
+    p = project_dir / "coord.yaml"
+    p.write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    (project_dir / "coordination" / ".agent_registry").mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def _write_registry(
+    project_dir: Path,
+    role_lower: str,
+    pid: int,
+    with_sock: bool = True,
+) -> Path:
+    reg_dir = project_dir / "coordination" / ".agent_registry"
+    reg_dir.mkdir(parents=True, exist_ok=True)
+    payload: dict = {
+        "role": role_lower.upper(),
+        "tool": "claude",
+        "pid": pid,
+        "tty": "/dev/pts/0",
+        "started_at": "2026-05-24T00:00:00Z",
+    }
+    if with_sock:
+        payload["input_sock"] = str(reg_dir / f"{role_lower}.sock")
+    path = reg_dir / f"{role_lower}.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+class FakeSubprocess:
+    """Records subprocess.run calls; returns rc/stdout/stderr per matcher."""
+
+    def __init__(self) -> None:
+        self.calls: list[list[str]] = []
+        self.handlers: list = []  # list of (matcher, handler)
+        self.default = subprocess.CompletedProcess([], 0, "", "")
+
+    def set(self, prefix, rc: int = 0, stdout: str = "", stderr: str = "") -> None:
+        prefix_t = tuple(prefix)
+        cp = subprocess.CompletedProcess(list(prefix_t), rc, stdout, stderr)
+
+        def matcher(cmd, _pfx=prefix_t):
+            return tuple(cmd[: len(_pfx)]) == _pfx
+
+        def handler(_cmd, _cp=cp):
+            return _cp
+
+        self.handlers.append((matcher, handler))
+
+    def __call__(self, cmd, *args, **kwargs):
+        self.calls.append(list(cmd))
+        # Most-recently-added handler wins (so tests can override defaults).
+        for matcher, handler in reversed(self.handlers):
+            if matcher(cmd):
+                return handler(cmd)
+        return self.default
+
+    def find(self, *needles: str) -> list[list[str]]:
+        return [c for c in self.calls if all(n in c for n in needles)]
+
+
+@pytest.fixture
+def env(tmp_path, monkeypatch):
+    fake = FakeSubprocess()
+    # tmux/systemctl/greatminds all reach subprocess.run.
+    monkeypatch.setattr(restart_mod.subprocess, "run", fake)
+    monkeypatch.setattr(restart_mod.time, "sleep", lambda *_a, **_kw: None)
+
+    alive: set[int] = set()
+
+    def fake_kill(pid: int, sig: int) -> None:
+        if pid in alive:
+            return None
+        raise ProcessLookupError(pid)
+
+    monkeypatch.setattr(restart_mod.os, "kill", fake_kill)
+
+    # Sensible defaults: tmux session exists, coordd active; tests override.
+    fake.set(("tmux", "has-session"), rc=0)
+    fake.set(("systemctl", "--user", "is-active"), rc=0)
+    fake.set(("systemctl", "--user", "show"), rc=0, stdout="123\n")
+    fake.set(("tmux", "send-keys"), rc=0)
+    fake.set(("greatminds", "launch"), rc=0)
+
+    return SimpleNamespace(sub=fake, alive=alive, project_dir=tmp_path)
+
+
+def _run(env_, **kwargs) -> "CliRunner.invoke":
+    coord_yaml = env_.project_dir / "coord.yaml"
+    if not coord_yaml.is_file():
+        _write_coord_yaml(env_.project_dir, **kwargs)
+    return CliRunner().invoke(
+        restart_mod.restart,
+        ["--config", str(coord_yaml)],
+        catch_exceptions=False,
+    )
+
+
+# ---------------------------------------------------------------------------
+# coordd paths
+# ---------------------------------------------------------------------------
+
+
+def test_coordd_already_active_no_start_call(env):
+    _write_coord_yaml(env.project_dir)
+    env.sub.set(("systemctl", "--user", "is-active"), rc=0)
+    _run(env)
+    assert env.sub.find("systemctl", "is-active")
+    assert not env.sub.find("systemctl", "start", "coordd"), \
+        "systemctl --user start coordd must NOT be called when active"
+
+
+def test_coordd_inactive_then_started(env):
+    _write_coord_yaml(env.project_dir)
+    # Two is-active probes: first NO (rc=3), second YES (rc=0).
+    calls = {"n": 0}
+
+    def is_active_handler(cmd):
+        calls["n"] += 1
+        rc = 3 if calls["n"] == 1 else 0
+        return subprocess.CompletedProcess(list(cmd), rc, "", "")
+
+    env.sub.handlers.append((
+        lambda cmd: tuple(cmd[:3]) == ("systemctl", "--user", "is-active"),
+        is_active_handler,
+    ))
+    env.sub.set(("systemctl", "--user", "start", "coordd"), rc=0)
+
+    result = _run(env)
+    starts = env.sub.find("systemctl", "start", "coordd")
+    assert len(starts) == 1
+    # Verify exited 1 (registries empty), but coordd path succeeded.
+    assert "ERROR: coordd failed to start" not in result.output
+
+
+def test_coordd_fails_to_start(env):
+    _write_coord_yaml(env.project_dir)
+    # Both is-active probes return failure.
+    env.sub.set(("systemctl", "--user", "is-active"), rc=3)
+    env.sub.set(("systemctl", "--user", "start", "coordd"), rc=0)
+
+    result = _run(env)
+    assert result.exit_code == 1
+    assert "coordd failed to start" in result.output
+
+
+# ---------------------------------------------------------------------------
+# tmux session paths
+# ---------------------------------------------------------------------------
+
+
+def test_tmux_session_missing_calls_launch(env):
+    _write_coord_yaml(env.project_dir)
+    env.sub.set(("tmux", "has-session"), rc=1)
+    _run(env)
+    launches = env.sub.find("greatminds", "launch", "--target", "tmux")
+    assert len(launches) == 1
+
+
+def test_tmux_session_present_does_not_call_launch(env):
+    _write_coord_yaml(env.project_dir)
+    env.sub.set(("tmux", "has-session"), rc=0)
+    _run(env)
+    assert not env.sub.find("greatminds", "launch")
+
+
+# ---------------------------------------------------------------------------
+# Agent (re)start decisions
+# ---------------------------------------------------------------------------
+
+
+def test_registry_missing_sends_enter(env):
+    _write_coord_yaml(env.project_dir)
+    # No registry files at all.
+    _run(env)
+    send_keys_calls = env.sub.find("send-keys")
+    targets = {c[c.index("-t") + 1] for c in send_keys_calls if "-t" in c}
+    # Both planner and dev windows should get send-keys (ops skipped).
+    assert "test-session:planner" in targets
+    assert "test-session:dev" in targets
+    assert "test-session:ui" in targets
+    assert "test-session:ops" not in targets
+
+
+def test_pid_dead_sends_enter_and_unlinks_stale_registry(env):
+    _write_coord_yaml(env.project_dir)
+    # Dead pid (NOT in env.alive) → registry should be removed and Enter sent.
+    reg = _write_registry(env.project_dir, "developer", pid=9999, with_sock=True)
+    _run(env)
+    assert not reg.is_file(), "stale registry must be unlinked"
+    targets = {c[c.index("-t") + 1] for c in env.sub.find("send-keys") if "-t" in c}
+    assert "test-session:dev" in targets
+
+
+def test_pid_alive_does_not_send_enter_for_that_window(env):
+    _write_coord_yaml(env.project_dir)
+    env.alive.add(4242)
+    _write_registry(env.project_dir, "developer", pid=4242, with_sock=True)
+
+    _run(env)
+    targets = {c[c.index("-t") + 1] for c in env.sub.find("send-keys") if "-t" in c}
+    assert "test-session:dev" not in targets, \
+        "live agent must NOT be re-poked"
+    # Other roles (no registry) still get Enter.
+    assert "test-session:planner" in targets
+
+
+def test_ops_window_role_empty_is_skipped(env):
+    _write_coord_yaml(env.project_dir)
+    _run(env)
+    targets = {c[c.index("-t") + 1] for c in env.sub.find("send-keys") if "-t" in c}
+    assert "test-session:ops" not in targets
+
+
+# ---------------------------------------------------------------------------
+# Final verify
+# ---------------------------------------------------------------------------
+
+
+def test_verify_happy_path_exits_zero(env):
+    """All windows have live pids + input_sock → exit 0."""
+    _write_coord_yaml(
+        env.project_dir,
+        windows=[
+            {"name": "planner", "role": "ARCHITECT-PLANNER", "tool": "claude"},
+            {"name": "dev", "role": "DEVELOPER", "tool": "claude"},
+        ],
+    )
+    env.alive.update({101, 102})
+    _write_registry(env.project_dir, "architect-planner", pid=101, with_sock=True)
+    _write_registry(env.project_dir, "developer", pid=102, with_sock=True)
+
+    result = _run(env)
+    assert result.exit_code == 0, result.output
+    assert "ALL 2 agents up with input_sock bound" in result.output
+    # No send-keys should fire (both alive).
+    assert not env.sub.find("send-keys")
+
+
+def test_verify_partial_fail_missing_input_sock(env):
+    """Two roles; one is missing input_sock → exit 1."""
+    _write_coord_yaml(
+        env.project_dir,
+        windows=[
+            {"name": "planner", "role": "ARCHITECT-PLANNER", "tool": "claude"},
+            {"name": "dev", "role": "DEVELOPER", "tool": "claude"},
+        ],
+    )
+    env.alive.update({201, 202})
+    _write_registry(env.project_dir, "architect-planner", pid=201, with_sock=True)
+    _write_registry(env.project_dir, "developer", pid=202, with_sock=False)
+
+    result = _run(env)
+    assert result.exit_code == 1
+    assert "role(s) failed to come up clean" in result.output
+    assert "input_sock=NO" in result.output
