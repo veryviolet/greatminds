@@ -3,6 +3,6 @@
 See https://github.com/veryviolet/greatminds for full docs.
 """
 
-__version__ = "1.1.2"
+__version__ = "1.2.0"
 
 __all__ = ["__version__"]
