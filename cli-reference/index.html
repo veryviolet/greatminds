@@ -2899,6 +2899,9 @@ outside the terminal emulator. Disabled via <code>GREATMINDS_START_AGENT_NOPTY=1
 </code></pre></div>
 <p><strong>Options:</strong></p>
 <div class="highlight"><pre><span></span><code>  --mode [loop|chat]  loop = self-driving tick loop; chat = interactive
+  --dry-run           print the effective config (role, tool, plugin dirs, mcp
+                      layers, final argv) and exit 0 without writing to
+                      .agent_registry/ and without exec&#39;ing the tool.
   -h, --help          Show this message and exit.
 </code></pre></div>
 <h3 id="greatminds-stop-decide">greatminds stop-decide<a class="headerlink" href="#greatminds-stop-decide" title="Permanent link">&para;</a></h3>
