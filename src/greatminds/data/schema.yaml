@@ -307,30 +307,22 @@ transitions:
     to: archive
     by: EXPLORER
     requires: []
-  # Supersession/consolidation is recurrent: when PLANNER rules that a
-  # task is absorbed by another (e.g. 0397 folded into 0396), the
-  # superseded task sits in an implementer queue with nowhere to go.
-  # PLANNER may archive it directly out of the per-scope queues.
-  - from: feature_dev
-    to: archive
-    by: ARCHITECT-PLANNER
-    requires: []
-  - from: feature_ui_dev
-    to: archive
-    by: ARCHITECT-PLANNER
-    requires: []
-  - from: feature_docs
-    to: archive
-    by: ARCHITECT-PLANNER
-    requires: []
-  - from: feature_test
-    to: archive
-    by: ARCHITECT-PLANNER
-    requires: []
-  - from: feature_review
-    to: archive
-    by: ARCHITECT-PLANNER
-    requires: []
+  # Withdrawal path for in-lifecycle work (task 0100): PLANNER may NOT
+  # archive directly from per-scope implementer queues — that silently
+  # discards already-written impl/tests/review blocks. The canonical
+  # withdraw path is:
+  #   1. PLANNER appends a `blocked` block with reason "withdrawn" and
+  #      a sentinel `dependencies` that wake-check will never satisfy.
+  #   2. PLANNER mv → feature_blocked.
+  #   3. ARCHITECT-REVIEWER archives from feature_blocked (the existing
+  #      feature_blocked → archive transition by ARCHITECT-REVIEWER).
+  # Two roles must agree to terminate in-flight work, never one. The
+  # removed transitions used to be:
+  #   feature_dev   → archive   by ARCHITECT-PLANNER   requires: []
+  #   feature_ui_dev → archive  by ARCHITECT-PLANNER   requires: []
+  #   feature_docs   → archive  by ARCHITECT-PLANNER   requires: []
+  #   feature_test   → archive  by ARCHITECT-PLANNER   requires: []
+  #   feature_review → archive  by ARCHITECT-PLANNER   requires: []
   # REVIEWER may archive blocked tasks that USER decides not to unblock
   # (dependency was retracted, task obsoleted, etc).
   - from: feature_blocked
