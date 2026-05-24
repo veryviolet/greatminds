@@ -1,0 +1,72 @@
+site_name: greatminds
+site_url: https://veryviolet.github.io/greatminds/
+site_description: File-based multi-agent coordination for agent fleets and task pipelines.
+repo_url: https://github.com/veryviolet/greatminds
+repo_name: veryviolet/greatminds
+exclude_docs: README.md
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - mkdocs-click
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets:
+      base_path:
+        - .
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - First Project: getting-started/first-project.md
+      - Upgrading: getting-started/upgrading.md
+  - Concepts:
+      - Queues: concepts/queues.md
+      - Roles: concepts/roles.md
+      - Scenarios: concepts/scenarios.md
+      - Stand Gate: concepts/stand-gate.md
+      - Inbox: concepts/inbox.md
+  - CLI Reference: cli-reference/index.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Filesystem Layout: architecture/filesystem-layout.md
+      - Transitions: architecture/transitions.md
+      - Daemon and Agents: architecture/daemon-and-agents.md
+  - Recipes:
+      - Filing a Bug: recipes/filing-a-bug.md
+      - Planning a Feature: recipes/planning-a-feature.md
+      - E2E Testing: recipes/e2e-testing.md
+      - Cutting a Release: recipes/cutting-a-release.md
+  - Changelog: changelog.md
