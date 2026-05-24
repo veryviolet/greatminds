@@ -819,11 +819,24 @@ def require_block_cross_state(new_block: dict[str, Any],
             , exit_code=2)
         return
     if latest_reader is not None:
-        if latest_reader.get("outcome") != "pass":
-            raise GreatMindsError(
-                f"cannot approve: latest reader_review.outcome="
-                f"{latest_reader.get('outcome')!r} (expected 'pass')"
-            , exit_code=2)
+        # Audit-only tasks (plan.audit_only: true) treat 'partial' and
+        # 'fail' as legitimate audit conclusions — the findings get
+        # consumed by PLANNER spawning fixer tasks. For non-audit docs
+        # tasks, only 'pass' approves.
+        outcome = latest_reader.get("outcome")
+        if is_audit_only(data):
+            if outcome not in ("pass", "partial", "fail"):
+                raise GreatMindsError(
+                    f"cannot approve: latest reader_review.outcome="
+                    f"{outcome!r} (expected 'pass', 'partial', or 'fail' "
+                    f"for an audit-only task)"
+                , exit_code=2)
+        else:
+            if outcome != "pass":
+                raise GreatMindsError(
+                    f"cannot approve: latest reader_review.outcome="
+                    f"{outcome!r} (expected 'pass')"
+                , exit_code=2)
         return
     raise GreatMindsError(
         "cannot approve: no tests or reader_review block on this task"

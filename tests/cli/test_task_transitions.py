@@ -203,3 +203,68 @@ def test_no_transition_returns_clear_error(monkeypatch):
     msg = task_mod.can_role_move("DEVELOPER", "feature_dev", "archive", {})
     assert msg is not None
     assert "no transition feature_dev → archive in schema" in msg
+
+
+# ---------------------------------------------------------------------------
+# require_block_cross_state — audit_only relaxation (task 0025)
+# ---------------------------------------------------------------------------
+
+
+def _make_task_with_reader_outcome(audit_only: bool, outcome: str) -> dict:
+    """Build a minimal task dict with a plan + reader_review block."""
+    return {
+        "id": "9999-fixture",
+        "blocks": [
+            {"kind": "plan", "audit_only": audit_only},
+            {"kind": "reader_review", "outcome": outcome},
+        ],
+    }
+
+
+def _approve_block() -> dict:
+    return {"kind": "review", "outcome": "approved"}
+
+
+def test_audit_only_partial_outcome_approves(monkeypatch):
+    """REVIEWER may approve an audit-only task whose reader_review came
+    back with outcome=partial — that's the EXPECTED useful result for an
+    audit (findings consumed by PLANNER spawning fixer tasks)."""
+    data = _make_task_with_reader_outcome(audit_only=True, outcome="partial")
+    # No exception → approval would succeed.
+    task_mod.require_block_cross_state(_approve_block(), data)
+
+
+def test_audit_only_fail_outcome_approves(monkeypatch):
+    """Same as partial — fail is also a legitimate audit conclusion."""
+    data = _make_task_with_reader_outcome(audit_only=True, outcome="fail")
+    task_mod.require_block_cross_state(_approve_block(), data)
+
+
+def test_audit_only_pass_outcome_approves(monkeypatch):
+    """Pass still approves on the audit-only path (no regression)."""
+    data = _make_task_with_reader_outcome(audit_only=True, outcome="pass")
+    task_mod.require_block_cross_state(_approve_block(), data)
+
+
+def test_non_audit_partial_outcome_rejects(monkeypatch):
+    """Regression guard: non-audit docs tasks still REQUIRE pass."""
+    data = _make_task_with_reader_outcome(audit_only=False, outcome="partial")
+    with pytest.raises(task_mod.GreatMindsError) as exc_info:
+        task_mod.require_block_cross_state(_approve_block(), data)
+    assert "expected 'pass'" in str(exc_info.value)
+
+
+def test_non_audit_fail_outcome_rejects(monkeypatch):
+    """Regression guard: non-audit fail still blocks approval."""
+    data = _make_task_with_reader_outcome(audit_only=False, outcome="fail")
+    with pytest.raises(task_mod.GreatMindsError):
+        task_mod.require_block_cross_state(_approve_block(), data)
+
+
+def test_audit_only_garbage_outcome_still_rejects(monkeypatch):
+    """Even for audit-only, an unknown outcome value is rejected — the
+    relaxation accepts only {pass, partial, fail}, not arbitrary strings."""
+    data = _make_task_with_reader_outcome(audit_only=True, outcome="weird")
+    with pytest.raises(task_mod.GreatMindsError) as exc_info:
+        task_mod.require_block_cross_state(_approve_block(), data)
+    assert "audit-only" in str(exc_info.value)
