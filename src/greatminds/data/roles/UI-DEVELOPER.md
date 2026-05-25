@@ -28,7 +28,7 @@ wants rapid iteration.
    routed there by ARCHITECT-PLANNER — the `plan` block with
    `ready_for_implementation: true` is present; scope is `ui` by
    construction of the queue). Do NOT look at `feature_plan/`.
-2. Implements UI workflows using existing product design patterns.
+2. Implements UI workflows using existing product design patterns. `cd "$(greatminds worktree path <task-id>)"` before editing — each task lives in its own worktree per 0185.
 3. Runs focused UI sanity checks.
 4. For `plan.stand_required: true`, creates or references
    `stand_requests/` with `evidence_for: [<task-id>]` for

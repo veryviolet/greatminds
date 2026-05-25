@@ -65,6 +65,7 @@ from . import restart as _restart_mod
 from . import report_upstream as _report_upstream_mod
 from . import daemon as _daemon_mod
 from . import update as _update_mod
+from . import worktree as _worktree_mod
 
 cli.add_command(_task_mod.task)
 cli.add_command(_inbox_mod.inbox)
@@ -89,6 +90,7 @@ cli.add_command(_restart_mod.restart)
 cli.add_command(_report_upstream_mod.report_upstream, name="report-upstream")
 cli.add_command(_daemon_mod.daemon)
 cli.add_command(_update_mod.update)
+cli.add_command(_worktree_mod.worktree)
 
 
 if __name__ == "__main__":

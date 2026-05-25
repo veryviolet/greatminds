@@ -103,6 +103,25 @@ def stand_request(request_type, profile, title, hosts, evidence_for,
                   description, priority, reason) -> None:
     coord = find_coord_dir()
 
+    # 0185: when evidence_for points at a worktree-era task, resolve
+    # each task's worktree path so STAND-KEEPER's rsync source is the
+    # per-task tree, not the lock-era shared main worktree. Stand
+    # requests fire from feature_test BEFORE REVIEWER merges, so main
+    # HEAD does not yet carry the task's code — sourcing from main
+    # would verify stale code and produce false stand_done evidence.
+    worktree_sources: dict[str, str] = {}
+    if evidence_for:
+        try:
+            from greatminds.cli import worktree as wt_mod
+            policy = wt_mod.load_worktree_policy()
+            project_dir = coord.parent
+            for tid in evidence_for:
+                p = policy.worktree_path_for(project_dir, tid)
+                if p.exists():
+                    worktree_sources[tid] = str(p)
+        except Exception:
+            pass
+
     if evidence_for:
         missing = [tid for tid in evidence_for
                    if not task_exists_in_active(coord, tid)]
@@ -123,6 +142,22 @@ def stand_request(request_type, profile, title, hosts, evidence_for,
         priority=priority,
         reason=reason,
     )
+    # 0185: append the resolved worktree paths to the request file so
+    # STAND-KEEPER's rsync wrapper can pick them up without a second
+    # CLI call per task id. Empty when no evidence_for or no
+    # worktrees exist (greenfield projects, infra-only stand ops).
+    if worktree_sources:
+        import yaml as _yaml
+        try:
+            doc = _yaml.safe_load(
+                target_path.read_text(encoding="utf-8")) or {}
+            doc["worktree_sources"] = worktree_sources
+            target_path.write_text(
+                _yaml.safe_dump(doc, sort_keys=False),
+                encoding="utf-8",
+            )
+        except (OSError, _yaml.YAMLError):
+            pass  # best-effort; SK can fall back to `worktree path` CLI
     click.echo(f"created {target_path}")
 
 

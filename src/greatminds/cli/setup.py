@@ -717,6 +717,24 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     else:
         info("  .gitignore: exists")
 
+    # 0185: ensure project-root .gitignore excludes the worktree base.
+    # ``.worktrees/`` is git-internal state (one .git linked-worktree
+    # per task) and must NOT be staged. Idempotent: only appends if
+    # absent.
+    root_gi = project_dir / ".gitignore"
+    needed_line = ".worktrees/"
+    existing = (
+        root_gi.read_text(encoding="utf-8") if root_gi.is_file() else ""
+    )
+    if needed_line not in existing.splitlines():
+        suffix = "" if existing.endswith("\n") or not existing else "\n"
+        root_gi.write_text(
+            existing + suffix +
+            "\n# 0185: per-task worktrees\n" + needed_line + "\n",
+            encoding="utf-8",
+        )
+        info("  project .gitignore: appended .worktrees/")
+
     header("\nqueues:")
     for q in QUEUES:
         st = _ensure_dir(coord / q)

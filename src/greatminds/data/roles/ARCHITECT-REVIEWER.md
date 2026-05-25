@@ -40,8 +40,11 @@ product-work committer.
      the review block. If the verification limitation is unrelated
      to the fix, standard §9 applies and the task bounces back,
    - verifies `git status --short -- <declared paths>` matches,
-   - approves: `git add -- <files>`, `git commit`, appends review block,
-     `mv feature_review/X verified/X`, pushes if project policy requires.
+   - approves: `greatminds task mv <id> verified` — the CLI auto-runs
+     `git merge --no-ff task/<id>` from main per 0185 (worktree
+     lifecycle hook). On merge conflict the mv refuses + REVIEWER
+     hands back to `schema.yaml > worktrees.conflict_handback_to`
+     (default `feature_dev`). Pushes if project policy requires.
 3. On changes requested: appends review block, returns by scope to
    `feature_dev/`, `feature_ui_dev/`, or `feature_docs/`.
 4. On dependency-blocked review: appends `blocked` block with explicit

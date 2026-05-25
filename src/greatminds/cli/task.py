@@ -433,142 +433,10 @@ def intent_clear(intent_path: Path) -> None:
 
 TASK_FILE_LOCK_TIMEOUT_SEC = 30.0
 TASK_FILE_LOCK_POLL_SEC = 0.1
-# 0115: per-source-file lock to prevent two tasks from claiming the
-# same working-tree file at impl-block append time. Lock dir lives
-# next to .locks/ for symmetry with the per-task lock (0112).
-FILE_LOCKS_DIR_NAME = ".file_locks"
-# Queues into which a task can move to RELEASE its file locks
-# (the working-tree changes are settled — verified means commit done,
-# archive means abandoned).
-FILE_LOCK_RELEASE_QUEUES = frozenset({"verified", "archive"})
-
-
-def _file_lock_path(coord: Path, file_rel: str) -> Path:
-    """SHA-256 → 32 hex chars to avoid filesystem-illegal characters in
-    source paths (slashes etc) while staying collision-resistant."""
-    import hashlib
-    h = hashlib.sha256(file_rel.encode("utf-8")).hexdigest()[:32]
-    return coord / FILE_LOCKS_DIR_NAME / f"{h}.lock"
-
-
-def _canonical_task_id(coord: Path, task_id: str) -> str:
-    """0166: resolve ``task_id`` to its canonical full-slug form via
-    the unified ``find_task`` helper (0114).
-
-    Pre-0166 ``_acquire_file_locks_for_task`` stored whatever
-    ``task_id`` it was passed; callers used a short id (``0158``) at
-    append-block time and the full slug
-    (``0158-codex-per-role-instructions-...``) at mv-to-verified time.
-    The release exact-match failed → locks accumulated forever.
-
-    Both acquire and release now canonicalize at entry so the stored
-    holder string is stable across short-id and full-slug callers.
-
-    Returns the resolved full-slug stem when the task is found in any
-    queue; falls back to the caller's input verbatim when the task is
-    missing (e.g. the caller is releasing locks for an already-
-    archived task whose file is gone — the defensive numeric-prefix
-    fallback in the release path handles that case).
-    """
-    found = find_task(coord, task_id)
-    if found is not None:
-        path, _queue = found
-        return path.stem
-    return task_id
-
-
-def _acquire_file_locks_for_task(coord: Path, task_id: str,
-                                  files: list[str]) -> None:
-    """Claim per-file ownership for ``files`` under ``task_id``.
-
-    Two-pass: first verify no conflict (any existing lock is held by
-    a different task), then write. Within a single task, re-claiming
-    a file already owned is a no-op (idempotent re-runs are fine).
-
-    Raises ``GreatMindsError`` on conflict, naming the holder + queue.
-    """
-    canonical_id = _canonical_task_id(coord, task_id)
-    locks_dir = coord / FILE_LOCKS_DIR_NAME
-    locks_dir.mkdir(parents=True, exist_ok=True)
-    # Pass 1: detect conflicts.
-    for f in files:
-        if not isinstance(f, str) or not f.strip():
-            continue
-        lp = _file_lock_path(coord, f)
-        if not lp.exists():
-            continue
-        try:
-            holder = lp.read_text(encoding="utf-8").strip()
-        except OSError:
-            holder = ""
-        # 0166: also accept a holder that resolves to the same canonical
-        # id we're about to write (e.g. a pre-fix short-id lock written
-        # by an older greatminds install).
-        if not holder or holder == canonical_id or (
-            holder and _canonical_task_id(coord, holder) == canonical_id
-        ):
-            continue
-        # Conflict: name the holder's current queue for diagnosability.
-        holder_loc = find_task(coord, holder)
-        holder_queue = holder_loc[1] if holder_loc else "<unknown>"
-        raise GreatMindsError(
-            f"file {f!r} currently owned by task {holder} "
-            f"(in {holder_queue}); wait for it to verify, or "
-            f"coordinate via PLANNER depends_on before claiming "
-            f"the same working-tree file in parallel",
-            exit_code=2,
-        )
-    # Pass 2: claim. Write the CANONICAL id so the release path's
-    # exact-match works regardless of which id form the caller used.
-    for f in files:
-        if not isinstance(f, str) or not f.strip():
-            continue
-        lp = _file_lock_path(coord, f)
-        lp.write_text(canonical_id, encoding="utf-8")
-
-
-def _release_file_locks_for_task(coord: Path, task_id: str) -> None:
-    """Best-effort: remove every lock file whose content names this
-    task id. Called when a task moves into FILE_LOCK_RELEASE_QUEUES.
-
-    0166: canonicalize ``task_id`` at entry AND accept either-form
-    matches in the lock content. The defensive bidirectional match
-    handles pre-0166 stale locks (whose content might be short-id even
-    though the release call now passes the full slug, or vice versa).
-    """
-    locks_dir = coord / FILE_LOCKS_DIR_NAME
-    if not locks_dir.is_dir():
-        return
-    canonical_id = _canonical_task_id(coord, task_id)
-    # Numeric-prefix from the canonical id ("0158" from
-    # "0158-codex-..."). Used as a final defensive fallback for stale
-    # locks that store just the short id.
-    import re as _re
-    m = _re.match(r"^([0-9]{1,4})(?:-|$)", canonical_id)
-    short_id = m.group(1).zfill(4) if m else ""
-    for lp in locks_dir.glob("*.lock"):
-        try:
-            holder = lp.read_text(encoding="utf-8").strip()
-        except OSError:
-            continue
-        if not holder:
-            continue
-        # Match in priority order: exact canonical → exact input →
-        # holder's own canonicalization → numeric-prefix.
-        match = (
-            holder == canonical_id
-            or holder == task_id
-            or _canonical_task_id(coord, holder) == canonical_id
-        )
-        if not match and short_id:
-            holder_m = _re.match(r"^([0-9]{1,4})(?:-|$)", holder)
-            if holder_m and holder_m.group(1).zfill(4) == short_id:
-                match = True
-        if match:
-            try:
-                lp.unlink()
-            except OSError:
-                pass
+# 0185: per-source-file lock machinery (0115/0166) removed.
+# Replaced by per-task git worktree isolation — two tasks cannot
+# contaminate each other's working tree because each tasks edits in
+# its own ``.worktrees/<task-id>/`` directory. See cli/worktree.py.
 
 
 
@@ -1875,6 +1743,11 @@ def _do_move(coord: Path, role: str, task_id: str,
     intent_path = intent_write(coord, role, task_id, from_q, to_q, reason)
     intent_id = intent_path.stem.rsplit("-", 1)[-1]
 
+    # 0185: worktree-lifecycle hooks fire BEFORE the rename so a
+    # failed worktree operation (merge conflict, etc.) leaves the
+    # task in its source queue rather than half-moved.
+    _worktree_hook_pre_move(coord, role, task_id, data, from_q, to_q)
+
     dst_path = coord / to_q / src_path.name
     try:
         dst_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1893,12 +1766,111 @@ def _do_move(coord: Path, role: str, task_id: str,
         "reason": (reason or "")[:200],
         "intent_id": intent_id,
     })
-    # 0115: release per-file working-tree locks once the task reaches
-    # a terminal queue. verified = commit done, archive = abandoned.
-    if to_q in FILE_LOCK_RELEASE_QUEUES:
-        _release_file_locks_for_task(coord, task_id)
+    # 0185: post-move worktree cleanup (archive).
+    _worktree_hook_post_move(coord, task_id, data, to_q)
     touch_heartbeat(coord, role)
     return from_q
+
+
+# 0185: worktree-lifecycle hooks.
+#
+# Sites:
+#   * mv → feature_dev / feature_ui_dev / feature_docs  → worktree create
+#   * mv → verified by REVIEWER                          → worktree merge
+#   * mv → archive                                       → worktree remove
+#
+# Hooks are gated on:
+#   - schema's worktrees:required_for_task_kinds (so research/docs
+#     tasks bypass until USER adds them); and
+#   - successful import of the worktree CLI module (defensive: if
+#     git is missing, hooks silently no-op rather than crash the
+#     fleet).
+_IMPLEMENTER_QUEUES = {"feature_dev", "feature_ui_dev", "feature_docs"}
+
+
+def _worktree_hook_pre_move(coord: Path, role: str, task_id: str,
+                             data: dict[str, Any],
+                             from_q: str, to_q: str) -> None:
+    """Run worktree create / merge hooks before the file rename."""
+    try:
+        from greatminds.cli import worktree as wt_mod
+    except ImportError:
+        return
+    try:
+        policy = wt_mod.load_worktree_policy()
+    except Exception:
+        return
+    task_kind = data.get("kind")
+    if task_kind not in policy.required_for_task_kinds:
+        return
+    project_dir = coord.parent
+    # Skip cleanly on non-git projects (greenfield setup, test
+    # fixtures). Hooks are no-ops when the project isn't yet under
+    # version control — running `git init` is an operator decision.
+    if not (project_dir / ".git").exists():
+        return
+
+    if to_q in _IMPLEMENTER_QUEUES:
+        # Idempotent: returns the existing path on re-entry.
+        try:
+            wt_mod.worktree_create(project_dir, task_id)
+        except GreatMindsError as exc:
+            raise GreatMindsError(
+                f"0185: worktree create for {task_id} failed: {exc}",
+                exit_code=4,
+            )
+    elif to_q == "verified" and policy.cleanup_on_verified:
+        # REVIEWER merge-to-main path. Block the mv on conflict so
+        # main stays clean + REVIEWER can hand back to
+        # conflict_handback_to.
+        try:
+            result = wt_mod.worktree_merge(project_dir, task_id,
+                                           summary=f"{task_kind}({task_id})")
+        except GreatMindsError as exc:
+            raise GreatMindsError(
+                f"0185: worktree merge for {task_id} failed: {exc}",
+                exit_code=4,
+            )
+        if not result.ok:
+            raise GreatMindsError(
+                f"0185: merge of task/{task_id} into main conflicted; "
+                f"REVIEWER must hand back to {policy.conflict_handback_to} "
+                f"({len(result.conflicts)} file(s) in conflict). "
+                f"Conflicts: {', '.join(result.conflicts[:5])}",
+                exit_code=3,
+            )
+
+
+def _worktree_hook_post_move(coord: Path, task_id: str,
+                              data: dict[str, Any], to_q: str) -> None:
+    """Run worktree remove hook after the file rename."""
+    try:
+        from greatminds.cli import worktree as wt_mod
+    except ImportError:
+        return
+    try:
+        policy = wt_mod.load_worktree_policy()
+    except Exception:
+        return
+    task_kind = data.get("kind")
+    if task_kind not in policy.required_for_task_kinds:
+        return
+    project_dir = coord.parent
+    if not (project_dir / ".git").exists():
+        return
+
+    if to_q == "archive" and policy.cleanup_on_archive:
+        try:
+            wt_mod.worktree_remove(project_dir, task_id, force=True)
+        except Exception:
+            pass  # best-effort; orphaned worktree is harmless
+    elif to_q == "verified" and policy.cleanup_on_verified:
+        # Branch + worktree dir were consumed by the merge; remove
+        # leftover state.
+        try:
+            wt_mod.worktree_remove(project_dir, task_id, force=False)
+        except Exception:
+            pass
 
 
 def append_block(
@@ -1957,17 +1929,9 @@ def append_block(
         validate_block(data.get("stream") or "product", block)
         require_block_cross_state(block, data)
 
-        # 0115: claim per-file working-tree locks at impl-block append.
-        # Prevents two tasks from independently editing the same
-        # src/file.py and ending up with mixed hunks (the 0091+0103
-        # REVIEWER-had-to-slice incident).
-        if kind == "implementation":
-            decl_files = block.get("files") or []
-            if isinstance(decl_files, list):
-                _acquire_file_locks_for_task(
-                    coord, task_id,
-                    [str(f) for f in decl_files if isinstance(f, str)],
-                )
+        # 0185: file-lock acquisition removed. Per-task git worktree
+        # isolation makes working-tree contamination impossible — each
+        # task edits in its own ``.worktrees/<task-id>/`` directory.
 
         new_blocks = list(data.get("blocks") or []) + [block]
         new_data = dict(data)

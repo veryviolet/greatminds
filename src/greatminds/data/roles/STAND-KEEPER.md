@@ -36,6 +36,11 @@ Profile choice comes from `target.profile` in the stand request.
 2. Records `stand.status = RESTARTING` (or appropriate transitional state)
    before changing the stand.
 3. Performs the requested operation using the appropriate profile.
+   For stand_requests carrying `evidence_for: [<task-id>]`, the rsync
+   source is the task's worktree: `rsync .../<source>$(greatminds
+   worktree path <task-id>)/ <host>:<remote-path>/` (0185). For
+   infra-only requests with empty `evidence_for`, rsync the project
+   root as before. PROJECT.md's rsync recipe should branch on this.
 4. Runs **only** the readiness/infrastructure whitelist (see below).
 5. Records final `stand.status` (`READY | DEGRADED | DOWN | BLOCKED`).
 6. Appends a `stand_result` block with the required `evidence_for: [...]`

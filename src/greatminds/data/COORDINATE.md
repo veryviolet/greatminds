@@ -358,6 +358,21 @@ role resuming and touching its heartbeat again.
 
 ---
 
+## 12.5 Per-task worktrees (0185)
+
+Each task gets its own working tree under
+`<project_dir>/.worktrees/<task-id>/` on branch `task/<task-id>`.
+Implementers + TESTER `cd "$(greatminds worktree path <task-id>)"`
+before editing/testing — the CLI resolves the path from schema
+policy. The worktree is auto-created by `greatminds task mv ...
+feature_dev` (or `feature_ui_dev` / `feature_docs`) and merged into
+`main` by `greatminds task mv ... verified` (REVIEWER). STAND-KEEPER
+rsyncs the worktree (not the main project tree) when a stand_request
+carries `evidence_for: [<task-id>]`. Policy lives in `schema.yaml >
+worktrees:`. Before cutting the 1.2.x → 1.3 release, MAINTAINER runs
+`greatminds worktree assert-drained` to confirm no in-flight tasks
+straddle the lock-era → worktree-era boundary.
+
 ## 13. Git rules
 
 Default:

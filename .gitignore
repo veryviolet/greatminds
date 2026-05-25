@@ -35,3 +35,6 @@ coverage.xml
 # Local
 .env
 .env.local
+
+# 0185: per-task worktrees
+.worktrees/

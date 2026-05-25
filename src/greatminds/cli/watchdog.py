@@ -183,6 +183,47 @@ def watchdog(project_dir: Path | None, canon_dir: Path | None, quiet: bool) -> N
     elif not quiet:
         info("active queues: 0 stale tasks")
 
+    # ---- 0185: orphan worktree sweep
+    #
+    # A worktree at <base_path>/<task-id>/ whose task_id is no longer
+    # in any active queue is an orphan — left behind by an aborted
+    # mv, a crashed agent, or pre-cutover state. Report (don't auto-
+    # prune) so the operator sees the count + can run
+    # `greatminds worktree prune` deliberately.
+    orphan_worktrees: list[str] = []
+    try:
+        from greatminds.cli import worktree as wt_mod
+        policy = wt_mod.load_worktree_policy()
+        base = project_dir / policy.base_path
+        if base.is_dir():
+            active_ids: set[str] = set()
+            for q in coord.iterdir():
+                if not q.is_dir() or q.name.startswith("."):
+                    continue
+                if q.name in ("verified", "archive", "stand_done",
+                              "inbox", "intent"):
+                    continue
+                for f in q.iterdir():
+                    if f.suffix in (".yaml", ".md"):
+                        active_ids.add(f.stem)
+                        if len(f.stem) > 4:
+                            active_ids.add(f.stem[:4])
+            for child in sorted(base.iterdir()):
+                if child.is_dir() and child.name not in active_ids:
+                    orphan_worktrees.append(child.name)
+    except Exception:
+        pass
+
+    if orphan_worktrees:
+        findings += len(orphan_worktrees)
+        warn(f"ORPHAN WORKTREES ({len(orphan_worktrees)}):")
+        for name in orphan_worktrees:
+            warn(f"  .worktrees/{name} (no active task — "
+                 f"run `greatminds worktree prune`)")
+        click.echo()
+    elif not quiet:
+        info("worktrees: 0 orphans")
+
     if findings == 0 and not quiet:
         ok("\nAll clear.")
 

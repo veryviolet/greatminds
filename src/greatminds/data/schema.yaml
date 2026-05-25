@@ -808,6 +808,31 @@ stand_enums:
   results:       [ok, partial, fail]
   statuses:      [READY, DEGRADED, DOWN, BLOCKED]
 
+# ---------------------------------------------------------------------------
+# 0185: per-task git worktree policy (replaces 0115/0166 file-locks).
+#
+# Each task gets its own working tree under <project_dir>/<base_path>/
+# <task-id>/ on branch <branch_prefix><task-id>. Implementer agents
+# cd into their worktree at claim time. Working-tree contamination
+# becomes physically impossible across tasks; no locks needed.
+#
+# Lifecycle is wired into `greatminds task mv` transitions:
+#   * mv → feature_dev / feature_ui_dev / feature_docs  → worktree create
+#   * mv → verified by REVIEWER                          → worktree merge
+#   * mv → archive                                       → worktree remove
+#
+# All operator-facing operations are exposed by `greatminds worktree
+# {create|remove|merge|list|prune}`.
+# ---------------------------------------------------------------------------
+worktrees:
+  base_path: .worktrees                    # relative to project_dir; gitignored
+  branch_prefix: task/                     # task ids become task/<id> branches
+  merge_strategy: --no-ff                  # explicit per-task boundary in history
+  cleanup_on_archive: true
+  cleanup_on_verified: true                # after successful merge
+  conflict_handback_to: feature_dev        # where REVIEWER hands back on conflict
+  required_for_task_kinds: [feature, bugfix, ops]
+
 # 0175: USER-curated marketplace plugin lists for `greatminds setup`.
 # Verified 2026-05-25 against anthropics/claude-plugins-official.
 # Codex side deferred — operator hasn't curated yet, empty list per

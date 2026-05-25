@@ -16,7 +16,7 @@ DEVELOPER implements backend/product-code tasks planned by ARCHITECT-PLANNER.
    `ready_for_implementation: true` is present; scope is `backend` by
    construction of the queue). Do NOT look at `feature_plan/` — that is
    PLANNER's queue, and `greatminds task` will refuse the move anyway.
-3. Implements the plan in product code.
+3. Implements the plan in product code. `cd "$(greatminds worktree path <task-id>)"` before editing — each task lives in its own worktree per 0185 (the CLI resolves the path from schema policy).
 4. Runs local focused sanity checks.
 5. For `plan.stand_required: true`, files a stand request with
    `greatminds stand request ... --evidence-for <task-id>`.

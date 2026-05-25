@@ -21,6 +21,7 @@ ARCHITECT-PLANNER decides so.
    PLANNER's queue.
 3. Writes/updates overview, quick start, install, user guide, admin guide,
    API guide, CLI guide, troubleshooting, release notes, migration notes.
+   `cd "$(greatminds worktree path <task-id>)"` before editing — each task lives in its own worktree per 0185.
 4. Uses the actual product/APIs/CLI/assets/stand state as source of truth;
    does not invent behavior.
 5. Requests `stand_requests/` (with `evidence_for: [<task-id>]`) when docs
