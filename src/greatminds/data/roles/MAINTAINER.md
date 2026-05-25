@@ -45,6 +45,15 @@ MAINTAINER owns these one-shot operational commands:
 - `greatminds setup --session NAME` — fleet bootstrap; generates
   coord.yaml (init-style — never overwrites) and registers the
   project with the daemon.
+- `greatminds restart [--bootstrap]` — idempotent fleet restart
+  (coordd + tmux session + dead agents). `--bootstrap` (0137) goes
+  further: SIGTERMs every alive agent and clears its session-id
+  files, so the next launch reloads canon from disk through the
+  fresh-session code path (no `claude --resume`, no `codex resume
+  <sid>`). The post-PyPI-upgrade procedure is `pip install -U
+  greatminds && greatminds restart --bootstrap` — the default
+  `restart` would skip alive agents and leave the running fleet on
+  the old wheel.
 
 ## Does
 

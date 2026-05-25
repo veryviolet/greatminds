@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import subprocess
 import time
 from pathlib import Path
@@ -276,10 +277,55 @@ def _iter_role_windows(windows: list[dict]) -> list[tuple[str, str]]:
     return out
 
 
+def _sigterm_alive(pid: int) -> None:
+    """0137 ``--bootstrap``: kill an alive agent so its tmux wrapper
+    returns to the start-agent prompt.
+
+    Only meaningful for alive pids; the 1s sleep gives the wrapper
+    time to notice the child died. The verify step's 10s wait absorbs
+    any residual lag.
+    """
+    if not pid:
+        return
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError, OSError):
+        pass
+    time.sleep(1.0)
+
+
+def _clear_session_files_for_bootstrap(
+    registry_dir: Path,
+    role_lc: str,
+) -> None:
+    """0137 ``--bootstrap`` iter-2 (REVIEWER ask): clear the role's
+    pid registry AND tool-specific session-id files unconditionally —
+    for ALIVE, DEAD, and MISSING-registry roles alike.
+
+    With these cleared, the next ``start_agent`` reads no prior
+    session UUID for claude and no prior rollout for codex, so the
+    next launch goes through the fresh-session code path (no
+    ``--resume``, no ``codex resume <sid>``). Iter-1 only cleared
+    these for alive pids; that left the dead-pid bootstrap path
+    silently resuming the old conversation on the new wheel — the
+    opposite of what ``--bootstrap`` promises.
+    """
+    for fname in (
+        f"{role_lc}.json",                # pid + input_sock
+        f"{role_lc}.session-id",          # claude session UUID
+        f"{role_lc}.codex-session-id",    # codex rollout UUID
+    ):
+        try:
+            (registry_dir / fname).unlink()
+        except OSError:
+            pass
+
+
 def _restart_dead_agents(
     registry_dir: Path,
     windows: list[dict],
     session: str,
+    bootstrap: bool = False,
 ) -> None:
     _log("==> agents: check + restart dead ones")
     coord_dir = registry_dir.parent
@@ -309,6 +355,27 @@ def _restart_dead_agents(
                 except OSError:
                     pass
                 needs_start = True
+            elif bootstrap:
+                # 0137: --bootstrap forces re-launch even for alive
+                # agents. The default skip path is correct for normal
+                # restart (idempotent), but operators upgrading the
+                # greatminds package need a way to drop the in-memory
+                # agent and re-load canon from the new wheel.
+                _log(f"    {name} ({role_lc}): pid={pid} alive — "
+                     f"--bootstrap: SIGTERM + fresh re-launch")
+                _sigterm_alive(pid)
+                pid = 0
+                needs_start = True
+
+        # 0137 iter-2 (REVIEWER ask): when --bootstrap is set, force a
+        # fresh session for EVERY role being relaunched — alive, dead,
+        # or missing-registry. Iter-1 scoped session-file clearing to
+        # the alive-kill branch only, which left dead-pid + bootstrap
+        # silently resuming the old claude/codex conversation on the
+        # new wheel. Clear unconditionally inside the bootstrap branch
+        # so the promise of "fresh session" holds across all cases.
+        if needs_start and bootstrap:
+            _clear_session_files_for_bootstrap(registry_dir, role_lc)
         if needs_start:
             agent_type = (window_tool.get(name) or "claude").lower()
             _log(f"    {name} ({role_lc}): pressing Enter to (re)start "
@@ -411,7 +478,22 @@ def _verify(
     default=None,
     help="override config.project_dir / cwd",
 )
-def restart(config_path: Path | None, project_dir: Path | None) -> None:
+@click.option(
+    "--bootstrap",
+    is_flag=True,
+    default=False,
+    help=("force re-launch of every role's agent — even alive ones. "
+          "SIGTERMs each alive pid and clears its session-id files so "
+          "the next start-agent goes through the fresh path (no "
+          "claude --resume, no codex resume <sid>). Use after upgrading "
+          "the greatminds package so running agents reload canon from "
+          "the new wheel."),
+)
+def restart(
+    config_path: Path | None,
+    project_dir: Path | None,
+    bootstrap: bool,
+) -> None:
     if config_path is None:
         for p in (Path.cwd() / "coord.yaml",
                   Path.cwd() / "coordination" / "coord.yaml"):
@@ -440,7 +522,7 @@ def restart(config_path: Path | None, project_dir: Path | None) -> None:
 
     _ensure_coordd(session)
     _ensure_tmux_session(session, project_dir)
-    _restart_dead_agents(registry_dir, windows, session)
+    _restart_dead_agents(registry_dir, windows, session, bootstrap=bootstrap)
     rc = _verify(registry_dir, windows, VERIFY_WAIT_SEC, session)
     if rc != 0:
         raise click.exceptions.Exit(rc)

@@ -528,3 +528,219 @@ def test_verify_clean_when_no_pending_trust(env):
     assert result.exit_code == 0, result.output
     assert "trust=ok" in result.output
     assert "stuck at tool-trust prompt" not in result.output
+
+
+# ---------------------------------------------------------------------------
+# task 0137: --bootstrap forces re-launch of alive agents
+# ---------------------------------------------------------------------------
+
+
+def _run_bootstrap(env_) -> "CliRunner.invoke":
+    """Like _run but appends --bootstrap. Inlined here so the existing
+    _run helper stays signature-stable for the non-bootstrap tests."""
+    coord_yaml = env_.project_dir / "coord.yaml"
+    if not coord_yaml.is_file():
+        _write_coord_yaml(env_.project_dir)
+    return CliRunner().invoke(
+        restart_mod.restart,
+        ["--config", str(coord_yaml), "--bootstrap"],
+        catch_exceptions=False,
+    )
+
+
+def _seed_session_files(project_dir: Path, role_lower: str) -> tuple[Path, Path]:
+    """Drop both claude and codex session-id files for ``role_lower`` so
+    we can assert --bootstrap unlinks them."""
+    reg_dir = project_dir / "coordination" / ".agent_registry"
+    claude_sid = reg_dir / f"{role_lower}.session-id"
+    codex_sid = reg_dir / f"{role_lower}.codex-session-id"
+    claude_sid.write_text("11111111-2222-3333-4444-555555555555\n", encoding="utf-8")
+    codex_sid.write_text("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\n", encoding="utf-8")
+    return claude_sid, codex_sid
+
+
+def test_bootstrap_kills_alive_pid_and_sends_enter(env, monkeypatch):
+    """Default restart skips alive agents (idempotent). --bootstrap
+    SIGTERMs them and re-launches via the same Enter path the dead-pid
+    case uses. Closes 0137: post-upgrade refresh of a running fleet."""
+    _write_coord_yaml(env.project_dir,
+                      windows=[{"name": "dev", "role": "DEVELOPER",
+                                "tool": "claude"}])
+    env.alive.add(7777)
+    _write_registry(env.project_dir, "developer", pid=7777, with_sock=True)
+
+    kill_calls: list[tuple[int, int]] = []
+
+    def recording_kill(pid: int, sig: int) -> None:
+        kill_calls.append((pid, sig))
+        if sig == 0 and pid in env.alive:
+            return  # _pid_alive probe
+        if sig == 0:
+            raise ProcessLookupError(pid)
+        # SIGTERM: drop the pid from alive so the verify step sees
+        # it as dead (we don't go through the verify happy path
+        # here; tests assert before the re-launch completes).
+        env.alive.discard(pid)
+    monkeypatch.setattr(restart_mod.os, "kill", recording_kill)
+
+    _run_bootstrap(env)
+
+    # SIGTERM was sent to the alive agent (sig 15).
+    import signal
+    assert (7777, signal.SIGTERM) in kill_calls, kill_calls
+
+    # send-keys Enter was sent to dev's window — same wake path as the
+    # dead-pid case (start-agent line waiting in the tmux pane).
+    targets = {c[c.index("-t") + 1] for c in env.sub.find("send-keys")
+               if "-t" in c}
+    assert "test-session:dev" in targets
+
+
+def test_bootstrap_unlinks_session_id_files(env, monkeypatch):
+    """0137: --bootstrap must clear BOTH claude and codex session-id
+    files so the next start-agent reads no prior session — it picks
+    the fresh path (no claude --resume, no codex resume <sid>). Without
+    this, the new wheel's code path runs but the LLM context is still
+    the resumed one, defeating the bootstrap purpose."""
+    _write_coord_yaml(env.project_dir,
+                      windows=[{"name": "dev", "role": "DEVELOPER",
+                                "tool": "claude"}])
+    env.alive.add(8888)
+    reg = _write_registry(env.project_dir, "developer", pid=8888,
+                          with_sock=True)
+    claude_sid, codex_sid = _seed_session_files(env.project_dir, "developer")
+    assert claude_sid.is_file() and codex_sid.is_file()
+
+    # os.kill: accept anything (don't actually kill).
+    monkeypatch.setattr(restart_mod.os, "kill", lambda *_: None)
+
+    _run_bootstrap(env)
+
+    # Both session files removed; registry json removed too.
+    assert not claude_sid.is_file(), "claude session-id must be unlinked"
+    assert not codex_sid.is_file(), "codex session-id must be unlinked"
+    assert not reg.is_file(), "registry .json must be unlinked"
+
+
+def test_default_restart_does_not_unlink_alive_session_files(env):
+    """Negative pin: without --bootstrap, alive agents are left
+    completely untouched — no SIGTERM, no session-id unlink. The
+    bootstrap branch must NOT bleed into the default path."""
+    _write_coord_yaml(env.project_dir,
+                      windows=[{"name": "dev", "role": "DEVELOPER",
+                                "tool": "claude"}])
+    env.alive.add(9999)
+    _write_registry(env.project_dir, "developer", pid=9999, with_sock=True)
+    claude_sid, codex_sid = _seed_session_files(env.project_dir, "developer")
+
+    _run(env)  # no --bootstrap
+
+    assert claude_sid.is_file(), \
+        "alive agent's claude session-id must be preserved without --bootstrap"
+    assert codex_sid.is_file(), \
+        "alive agent's codex session-id must be preserved without --bootstrap"
+    # And no send-keys to the alive window.
+    targets = {c[c.index("-t") + 1] for c in env.sub.find("send-keys")
+               if "-t" in c}
+    assert "test-session:dev" not in targets
+
+
+def test_bootstrap_clears_session_files_for_dead_pid_too(env, monkeypatch):
+    """0137 iter-2 (REVIEWER ask): with --bootstrap, the promise is
+    'fresh session for every role being relaunched' — not just alive
+    ones. A dead-pid role + --bootstrap must ALSO clear the claude
+    and codex session-id files, otherwise the next launch silently
+    resumes the old conversation on the new wheel. Iter-1 left dead
+    agents resuming, contradicting the task contract.
+
+    SIGTERM is still NOT sent for dead pids (no-op).
+    """
+    _write_coord_yaml(env.project_dir,
+                      windows=[{"name": "dev", "role": "DEVELOPER",
+                                "tool": "claude"}])
+    # Pid 6666 NOT in env.alive → dead per the fixture's fake_kill.
+    reg = _write_registry(env.project_dir, "developer", pid=6666,
+                          with_sock=True)
+    claude_sid, codex_sid = _seed_session_files(env.project_dir, "developer")
+
+    kill_calls: list[tuple[int, int]] = []
+
+    def recording_kill(pid: int, sig: int) -> None:
+        kill_calls.append((pid, sig))
+        if pid in env.alive:
+            return
+        raise ProcessLookupError(pid)
+    monkeypatch.setattr(restart_mod.os, "kill", recording_kill)
+
+    _run_bootstrap(env)
+
+    assert not reg.is_file()
+    # SIGTERM is NOT sent to a dead pid (alive-only branch).
+    import signal
+    assert not any(sig == signal.SIGTERM for _pid, sig in kill_calls)
+    targets = {c[c.index("-t") + 1] for c in env.sub.find("send-keys")
+               if "-t" in c}
+    assert "test-session:dev" in targets
+    # Iter-2: session-id files must be cleared on bootstrap even for
+    # dead pids. Otherwise start_agent's next call would read the old
+    # claude session UUID and codex rollout SID, and the new launch
+    # would --resume / codex resume <sid> into the stale conversation.
+    assert not claude_sid.is_file(), (
+        "0137 iter-2: bootstrap must clear claude session-id even for dead pids"
+    )
+    assert not codex_sid.is_file(), (
+        "0137 iter-2: bootstrap must clear codex session-id even for dead pids"
+    )
+
+
+def test_bootstrap_clears_session_files_for_missing_registry(env, monkeypatch):
+    """0137 iter-2: when a role has NO registry entry (first start, or
+    registry was wiped) AND --bootstrap is set, any pre-existing
+    session-id files from a prior launch must be cleared so the new
+    launch is genuinely fresh. The missing-registry path also goes
+    through the 'needs_start' bootstrap branch."""
+    _write_coord_yaml(env.project_dir,
+                      windows=[{"name": "dev", "role": "DEVELOPER",
+                                "tool": "claude"}])
+    # No registry json at all, but session-id files left over from a
+    # prior session.
+    claude_sid, codex_sid = _seed_session_files(env.project_dir, "developer")
+
+    monkeypatch.setattr(restart_mod.os, "kill", lambda *_: None)
+    _run_bootstrap(env)
+
+    assert not claude_sid.is_file()
+    assert not codex_sid.is_file()
+    targets = {c[c.index("-t") + 1] for c in env.sub.find("send-keys")
+               if "-t" in c}
+    assert "test-session:dev" in targets
+
+
+def test_default_restart_preserves_session_files_for_dead_pid(env):
+    """Negative pin: without --bootstrap, dead-pid path preserves
+    session-id files. Crash recovery should keep claude --resume
+    semantics — only --bootstrap rotates the session."""
+    _write_coord_yaml(env.project_dir,
+                      windows=[{"name": "dev", "role": "DEVELOPER",
+                                "tool": "claude"}])
+    _write_registry(env.project_dir, "developer", pid=5555, with_sock=True)
+    claude_sid, codex_sid = _seed_session_files(env.project_dir, "developer")
+
+    _run(env)  # no --bootstrap
+
+    assert claude_sid.is_file(), (
+        "dead-pid recovery (no --bootstrap) must keep claude session "
+        "continuity"
+    )
+    assert codex_sid.is_file()
+
+
+def test_bootstrap_flag_help_mentions_post_upgrade_use(env):
+    """The --bootstrap help text must point operators at the upgrade
+    use case so the flag is discoverable from `greatminds restart
+    --help`. Without this hint, MAINTAINER might leave a running fleet
+    on the old code after pip install -U."""
+    result = CliRunner().invoke(restart_mod.restart, ["--help"])
+    assert "--bootstrap" in result.output
+    assert "alive" in result.output.lower()
+    assert "fresh" in result.output.lower() or "no claude --resume" in result.output
