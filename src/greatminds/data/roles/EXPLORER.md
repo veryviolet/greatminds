@@ -57,18 +57,11 @@ product**, not test output or doc text.
 
 `<PROJECT_ROOT>/greatminds render-role EXPLORER`
 
-## Canon skill plugin
+## Marketplace plugins
 
-This role loads the `role-explorer` canon plugin (in addition to the
-shared `coordination-protocol` plugin). Procedural patterns and
-recipes are factored into auto-invocable skills under
-`src/greatminds/data/plugins/role-explorer/skills/`:
-
-- `bug-as-mini-task` (`plugins/role-explorer/skills/bug-as-mini-task/SKILL.md`)
-- `exploratory-probing` (`plugins/role-explorer/skills/exploratory-probing/SKILL.md`)
-- `re-verify-loop` (`plugins/role-explorer/skills/re-verify-loop/SKILL.md`)
-
-When Claude detects the SKILL's `description` keywords in your
-working context, the skill body is loaded on-demand. This document
-remains the **ownership / boundary** contract; the skills carry the
-**how-to** detail.
+This role is a codex-host role. USER (2026-05-25) deferred codex
+marketplace curation pending investigation of codex's plugin ecosystem
+(`schema.yaml > plugins.codex_marketplace.EXPLORER` is the empty
+list). `greatminds setup` logs the deferral and skips plugin install.
+The role operates purely from this document + the shared coordination
+protocol until codex plugins are curated.

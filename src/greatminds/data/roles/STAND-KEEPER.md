@@ -103,18 +103,14 @@ TESTER then runs the product checks after seeing your READY.
 
 `<PROJECT_ROOT>/greatminds render-role STAND-KEEPER`
 
-## Canon skill plugin
+## Marketplace plugins
 
-This role loads the `role-stand-keeper` canon plugin (in addition to the
-shared `coordination-protocol` plugin). Procedural patterns and
-recipes are factored into auto-invocable skills under
-`src/greatminds/data/plugins/role-stand-keeper/skills/`:
+This role uses the curated marketplace plugins listed under
+`schema.yaml > plugins.claude_marketplace.STAND-KEEPER`. `greatminds
+setup` installs them via `claude plugin install <name>@claude-plugins-
+official`. Current list: `sentry`.
 
-- `fault-isolation-on-stand` (`plugins/role-stand-keeper/skills/fault-isolation-on-stand/SKILL.md`)
-- `fresh-db-volume-wipes` (`plugins/role-stand-keeper/skills/fresh-db-volume-wipes/SKILL.md`)
-- `stand-bring-up` (`plugins/role-stand-keeper/skills/stand-bring-up/SKILL.md`)
-
-When Claude detects the SKILL's `description` keywords in your
-working context, the skill body is loaded on-demand. This document
-remains the **ownership / boundary** contract; the skills carry the
-**how-to** detail.
+When Claude detects an installed plugin's `description` keywords in
+your working context, the skill body is loaded on-demand. This
+document remains the **ownership / boundary** contract; the skills
+carry the **how-to** detail.

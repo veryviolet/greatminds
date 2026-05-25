@@ -65,20 +65,15 @@ product-work committer.
 
 `<PROJECT_ROOT>/greatminds render-role ARCHITECT-REVIEWER`
 
-## Canon skill plugin
+## Marketplace plugins
 
-This role loads the `role-architect-reviewer` canon plugin (in addition to the
-shared `coordination-protocol` plugin). Procedural patterns and
-recipes are factored into auto-invocable skills under
-`src/greatminds/data/plugins/role-architect-reviewer/skills/`:
+This role uses the curated marketplace plugins listed under
+`schema.yaml > plugins.claude_marketplace.ARCHITECT-REVIEWER`.
+`greatminds setup` installs them via `claude plugin install
+<name>@claude-plugins-official`. Current list: `sourcegraph`,
+`sentry`.
 
-- `architectural-review` (`plugins/role-architect-reviewer/skills/architectural-review/SKILL.md`)
-- `commit-and-push-protocol` (`plugins/role-architect-reviewer/skills/commit-and-push-protocol/SKILL.md`)
-- `evidence-chain-verification` (`plugins/role-architect-reviewer/skills/evidence-chain-verification/SKILL.md`)
-- `review-block-craft` (`plugins/role-architect-reviewer/skills/review-block-craft/SKILL.md`)
-- `wake-and-unblock` (`plugins/role-architect-reviewer/skills/wake-and-unblock/SKILL.md`)
-
-When Claude detects the SKILL's `description` keywords in your
-working context, the skill body is loaded on-demand. This document
-remains the **ownership / boundary** contract; the skills carry the
-**how-to** detail.
+When Claude detects an installed plugin's `description` keywords in
+your working context, the skill body is loaded on-demand. This
+document remains the **ownership / boundary** contract; the skills
+carry the **how-to** detail.

@@ -100,18 +100,15 @@ discusses a new idea with the user, the reviewer closes pending work.
 
 `<PROJECT_ROOT>/greatminds render-role ARCHITECT-PLANNER`
 
-## Canon skill plugin
+## Marketplace plugins
 
-This role loads the `role-architect-planner` canon plugin (in addition to the
-shared `coordination-protocol` plugin). Procedural patterns and
-recipes are factored into auto-invocable skills under
-`src/greatminds/data/plugins/role-architect-planner/skills/`:
+This role uses the curated marketplace plugins listed under
+`schema.yaml > plugins.claude_marketplace.ARCHITECT-PLANNER`.
+`greatminds setup` installs them via `claude plugin install
+<name>@claude-plugins-official`. Current list: `sourcegraph`,
+`sentry`, `huggingface-skills`.
 
-- `adr-template` (`plugins/role-architect-planner/skills/adr-template/SKILL.md`)
-- `task-decomposition` (`plugins/role-architect-planner/skills/task-decomposition/SKILL.md`)
-- `trade-off-framework` (`plugins/role-architect-planner/skills/trade-off-framework/SKILL.md`)
-
-When Claude detects the SKILL's `description` keywords in your
-working context, the skill body is loaded on-demand. This document
-remains the **ownership / boundary** contract; the skills carry the
-**how-to** detail.
+When Claude detects an installed plugin's `description` keywords in
+your working context, the skill body is loaded on-demand. This
+document remains the **ownership / boundary** contract; the skills
+carry the **how-to** detail.

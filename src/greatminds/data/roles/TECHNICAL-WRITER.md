@@ -46,19 +46,11 @@ ARCHITECT-PLANNER decides so.
 
 `<PROJECT_ROOT>/greatminds render-role TECHNICAL-WRITER`
 
-## Canon skill plugin
+## Marketplace plugins
 
-This role loads the `role-technical-writer` canon plugin (in addition to the
-shared `coordination-protocol` plugin). Procedural patterns and
-recipes are factored into auto-invocable skills under
-`src/greatminds/data/plugins/role-technical-writer/skills/`:
-
-- `assets-and-links` (`plugins/role-technical-writer/skills/assets-and-links/SKILL.md`)
-- `docs-structure` (`plugins/role-technical-writer/skills/docs-structure/SKILL.md`)
-- `runnable-samples` (`plugins/role-technical-writer/skills/runnable-samples/SKILL.md`)
-- `technical-prose` (`plugins/role-technical-writer/skills/technical-prose/SKILL.md`)
-
-When Claude detects the SKILL's `description` keywords in your
-working context, the skill body is loaded on-demand. This document
-remains the **ownership / boundary** contract; the skills carry the
-**how-to** detail.
+This role is a codex-host role. USER (2026-05-25) deferred codex
+marketplace curation pending investigation of codex's plugin ecosystem
+(`schema.yaml > plugins.codex_marketplace.TECHNICAL-WRITER` is the
+empty list). `greatminds setup` logs the deferral and skips plugin
+install. The role operates purely from this document + the shared
+coordination protocol until codex plugins are curated.

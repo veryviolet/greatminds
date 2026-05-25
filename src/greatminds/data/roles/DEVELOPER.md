@@ -48,19 +48,15 @@ DEVELOPER implements backend/product-code tasks planned by ARCHITECT-PLANNER.
 
 `<PROJECT_ROOT>/greatminds render-role DEVELOPER`
 
-## Canon skill plugin
+## Marketplace plugins
 
-This role loads the `role-developer` canon plugin (in addition to the
-shared `coordination-protocol` plugin). Procedural patterns and
-recipes are factored into auto-invocable skills under
-`src/greatminds/data/plugins/role-developer/skills/`:
+This role uses the curated marketplace plugins listed under
+`schema.yaml > plugins.claude_marketplace.DEVELOPER`. `greatminds
+setup` installs them via `claude plugin install <name>@claude-plugins-
+official` (idempotent — re-runs skip already-installed names). Current
+list: `postman`.
 
-- `grpc-protobuf` (`plugins/role-developer/skills/grpc-protobuf/SKILL.md`)
-- `python-backend` (`plugins/role-developer/skills/python-backend/SKILL.md`)
-- `python-ml-math` (`plugins/role-developer/skills/python-ml-math/SKILL.md`)
-- `python-testing` (`plugins/role-developer/skills/python-testing/SKILL.md`)
-
-When Claude detects the SKILL's `description` keywords in your
-working context, the skill body is loaded on-demand. This document
+When Claude detects an installed plugin's `description` keywords in
+your working context, the skill body is loaded on-demand. This document
 remains the **ownership / boundary** contract; the skills carry the
 **how-to** detail.

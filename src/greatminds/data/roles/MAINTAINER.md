@@ -154,19 +154,10 @@ echo <intended-uuid> > coordination/.agent_registry/maintainer.session-id
 All other windows use the pre-filled `greatminds start-agent` line as-is —
 they self-resume the same way from their own `<role>.session-id`.
 
-## Canon skill plugin
+## Marketplace plugins
 
-This role loads the `role-maintainer` canon plugin (in addition to the
-shared `coordination-protocol` plugin). Procedural patterns and
-recipes are factored into auto-invocable skills under
-`src/greatminds/data/plugins/role-maintainer/skills/`:
-
-- `agent-lifecycle-and-diagnostics` (`plugins/role-maintainer/skills/agent-lifecycle-and-diagnostics/SKILL.md`)
-- `canon-sync-and-cutover` (`plugins/role-maintainer/skills/canon-sync-and-cutover/SKILL.md`)
-- `infra-surface-separation` (`plugins/role-maintainer/skills/infra-surface-separation/SKILL.md`)
-- `maintainer-vs-planner-routing` (`plugins/role-maintainer/skills/maintainer-vs-planner-routing/SKILL.md`)
-
-When Claude detects the SKILL's `description` keywords in your
-working context, the skill body is loaded on-demand. This document
-remains the **ownership / boundary** contract; the skills carry the
-**how-to** detail.
+USER (2026-05-25) has not curated marketplace plugins for this role
+(`schema.yaml > plugins.claude_marketplace.MAINTAINER` is the empty
+list). `greatminds setup` therefore skips plugin install for
+MAINTAINER. The role operates purely from this document + the shared
+coordination protocol.

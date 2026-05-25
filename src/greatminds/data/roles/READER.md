@@ -67,19 +67,10 @@ intent/journal/heartbeat).
 
 `<PROJECT_ROOT>/greatminds render-role READER`
 
-## Canon skill plugin
+## Marketplace plugins
 
-This role loads the `role-reader` canon plugin (in addition to the
-shared `coordination-protocol` plugin). Procedural patterns and
-recipes are factored into auto-invocable skills under
-`src/greatminds/data/plugins/role-reader/skills/`:
-
-- `audit-path-vs-post-write-path` (`plugins/role-reader/skills/audit-path-vs-post-write-path/SKILL.md`)
-- `fresh-user-perspective` (`plugins/role-reader/skills/fresh-user-perspective/SKILL.md`)
-- `reader-review-block-craft` (`plugins/role-reader/skills/reader-review-block-craft/SKILL.md`)
-- `reality-vs-docs-audit` (`plugins/role-reader/skills/reality-vs-docs-audit/SKILL.md`)
-
-When Claude detects the SKILL's `description` keywords in your
-working context, the skill body is loaded on-demand. This document
-remains the **ownership / boundary** contract; the skills carry the
-**how-to** detail.
+USER (2026-05-25) has not curated marketplace plugins for this role
+(`schema.yaml > plugins.claude_marketplace.READER` is the empty list).
+`greatminds setup` therefore skips plugin install for READER. The
+role operates purely from this document + the shared coordination
+protocol.

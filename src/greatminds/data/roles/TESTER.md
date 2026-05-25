@@ -71,18 +71,15 @@ tests block.
 
 `<PROJECT_ROOT>/greatminds render-role TESTER`
 
-## Canon skill plugin
+## Marketplace plugins
 
-This role loads the `role-tester` canon plugin (in addition to the
-shared `coordination-protocol` plugin). Procedural patterns and
-recipes are factored into auto-invocable skills under
-`src/greatminds/data/plugins/role-tester/skills/`:
+This role uses the curated marketplace plugins listed under
+`schema.yaml > plugins.claude_marketplace.TESTER`. `greatminds setup`
+installs them via `claude plugin install <name>@claude-plugins-
+official`. Current list: `playwright`, `sentry`, `postman`,
+`codspeed`.
 
-- `api-and-db-probes` (`plugins/role-tester/skills/api-and-db-probes/SKILL.md`)
-- `probe-craft` (`plugins/role-tester/skills/probe-craft/SKILL.md`)
-- `ui-visual-verification` (`plugins/role-tester/skills/ui-visual-verification/SKILL.md`)
-
-When Claude detects the SKILL's `description` keywords in your
-working context, the skill body is loaded on-demand. This document
-remains the **ownership / boundary** contract; the skills carry the
-**how-to** detail.
+When Claude detects an installed plugin's `description` keywords in
+your working context, the skill body is loaded on-demand. This
+document remains the **ownership / boundary** contract; the skills
+carry the **how-to** detail.

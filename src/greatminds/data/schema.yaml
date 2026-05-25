@@ -705,3 +705,123 @@ event_wake:
     keys: "check inbox and continue your tick"
     enter: true
     rate_limit_seconds: 5
+
+# ---------------------------------------------------------------------------
+# 0174: FSM single-source-of-truth tables.
+#
+# Pre-0174 these tables lived as hardcoded constants in cli/task.py:
+# STREAM_BLOCK_KINDS, BLOCK_KIND_ROLES, QUEUE_BLOCK_KINDS, IMPL_ROLE_BY_SCOPE,
+# PRODUCT_KINDS, PRODUCT_SCOPES, PRIORITIES, PLAN_KINDS, MODES, STAND_*,
+# TEST_RESULTS, GATE_CHECK_RESULTS, REVIEW_OUTCOMES, READER_OUTCOMES.
+#
+# 0174 moves the DATA here; cli/task.py loads + reads at module-import.
+# Validator FUNCTION bodies stay in code (registered by name in the
+# transitions[*].requires lists). Adding a new block_kind / scope /
+# enum value becomes a schema-only edit — no code change needed for
+# the data parts.
+# ---------------------------------------------------------------------------
+
+# Streams = top-level task categories. Each declares which block kinds
+# its tasks may carry + which header fields are required.
+streams:
+  product:
+    allowed_block_kinds:
+      [triage, plan, implementation, tests, reader_review, review, blocked]
+    intake_queues: [feature_inbox, user_feedback]
+  stand:
+    allowed_block_kinds: [stand_result, blocked]
+    intake_queues: [stand_requests]
+  review_session:
+    allowed_block_kinds: [session_iteration, blocked]
+    intake_queues: [review_sessions]
+
+# Block kinds. Each declares which roles may author it + per-block
+# enum constraints. `blocked` is special-cased in code (current owner
+# of the queue is the only allowed author) and intentionally omits
+# `authored_by` here.
+block_kinds:
+  triage:
+    authored_by: [ARCHITECT-PLANNER]
+  plan:
+    authored_by: [ARCHITECT-PLANNER]
+  implementation:
+    authored_by: [DEVELOPER, UI-DEVELOPER, TECHNICAL-WRITER]
+  tests:
+    authored_by: [TESTER]
+    allowed_test_results: [pass, fail, partial]
+    allowed_gate_check_results: [pass, fail, missing, "n/a"]
+  reader_review:
+    authored_by: [READER]
+    allowed_outcomes: [pass, fail, partial]
+  review:
+    authored_by: [ARCHITECT-REVIEWER]
+    allowed_outcomes: [approved, changes_requested]
+  stand_result:
+    authored_by: [STAND-KEEPER]
+    allowed_results: [ok, partial, fail]
+    allowed_statuses: [READY, DEGRADED, DOWN, BLOCKED]
+  session_iteration:
+    authored_by: [EXPLORER]
+  blocked:
+    # author = current owner of the queue, resolved at runtime
+
+# Which block kinds may be appended to a task currently sitting in
+# each queue. Terminal queues accept nothing (empty list). Mirrors
+# the prior cli/task.py:QUEUE_BLOCK_KINDS hardcode.
+queue_accepts_blocks:
+  feature_inbox:       [triage, blocked]
+  feature_plan:        [plan, blocked]
+  feature_dev:         [implementation, blocked]
+  feature_ui_dev:      [implementation, blocked]
+  feature_docs:        [implementation, blocked]
+  feature_test:        [tests, blocked]
+  feature_docs_review: [reader_review, blocked]
+  feature_review:      [review, blocked]
+  feature_blocked:     [blocked]
+  user_feedback:       [triage, blocked]
+  review_sessions:     [session_iteration, blocked]
+  stand_requests:      [blocked]
+  stand_wip:           [stand_result, blocked]
+  verified:            []
+  archive:             []
+  stand_done:          []
+
+# Implementation-block scope → which role's queue feeds it. Used by
+# 0134's intake-rejection + 0174's role-of-implementer dispatch.
+assignee_role_by_scope:
+  backend: DEVELOPER
+  ui:      UI-DEVELOPER
+  docs:    TECHNICAL-WRITER
+
+# Product-stream enums for validate_header + validate_block.
+product_enums:
+  kinds:      [feature, bugfix, docs, ops, research, release]
+  scopes:     [backend, ui, docs, stand, research, release]
+  priorities: [low, normal, high]
+  plan_kinds: [full, bugfix]
+  modes:      [A, B, C]
+
+# Stand-stream enums.
+stand_enums:
+  request_types: [deploy, restart, rebuild, smoke, remote_sync, gpu_check, teardown]
+  profiles:      [full-deploy, vite-dev]
+  results:       [ok, partial, fail]
+  statuses:      [READY, DEGRADED, DOWN, BLOCKED]
+
+# 0175: USER-curated marketplace plugin lists for `greatminds setup`.
+# Verified 2026-05-25 against anthropics/claude-plugins-official.
+# Codex side deferred — operator hasn't curated yet, empty list per
+# role logs deferral and continues.
+plugins:
+  claude_marketplace:
+    ARCHITECT-PLANNER:  [sourcegraph, sentry, huggingface-skills]
+    ARCHITECT-REVIEWER: [sourcegraph, sentry]
+    DEVELOPER:          [postman]
+    UI-DEVELOPER:       [playwright, chrome-devtools-mcp, postman]
+    TESTER:             [playwright, sentry, postman, codspeed]
+    STAND-KEEPER:       [sentry]
+    READER:             []
+    MAINTAINER:         []
+  codex_marketplace:
+    TECHNICAL-WRITER: []
+    EXPLORER:         []

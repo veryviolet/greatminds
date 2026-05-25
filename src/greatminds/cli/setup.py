@@ -23,6 +23,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -142,6 +143,46 @@ def _ensure_dir(p: Path) -> str:
     return "created"
 
 
+def _codex_skill_dirs_for_role(canon: Path, role: str) -> list[Path]:
+    """0162: enumerate canon SKILL.md directories codex should register
+    for ``role``.
+
+    Each returned path is the directory containing a ``SKILL.md`` file
+    (codex 0.130's ``skills.config.<index>.path`` semantics). Returned
+    in deterministic alphabetical order for stable config.toml output.
+
+    Two layers, in this order:
+      * Shared canon plugins (``canon/plugins/coordination-protocol/
+        skills/*/SKILL.md``) — installed for every codex role.
+      * Per-role plugins (``canon/plugins/role-<role-lower>/skills/*/
+        SKILL.md``) — installed only when the dir exists for this role.
+
+    Codex-specific exclusions: skill folders whose name ends in
+    ``-claude`` are skipped (claude-host skills don't apply to codex
+    agents). Pre-0162 the canon ``coordination-protocol-claude``
+    variant was already skipped at the plugin level; this preserves
+    that contract.
+    """
+    out: list[Path] = []
+    role_lower = role.lower()
+    plugin_dirs = [
+        canon / "plugins" / "coordination-protocol",
+        canon / "plugins" / f"role-{role_lower}",
+    ]
+    for pdir in plugin_dirs:
+        skills_dir = pdir / "skills"
+        if not skills_dir.is_dir():
+            continue
+        for sd in sorted(skills_dir.iterdir()):
+            if not sd.is_dir():
+                continue
+            if sd.name.endswith("-claude"):
+                continue
+            if (sd / "SKILL.md").is_file():
+                out.append(sd.resolve())
+    return out
+
+
 def _setup_codex_homes_per_role(canon: Path,
                                 project_dir: Path) -> tuple[int, int]:
     """0158: install per-role codex homes at
@@ -153,9 +194,22 @@ def _setup_codex_homes_per_role(canon: Path,
     ``[profiles.<role>]`` section within. start_agent.py sets
     ``CODEX_HOME=<project>/coordination/.codex-home/<role>`` at launch.
 
+    0162: after copying the shipped role profile, append
+    ``[[skills.config]]`` entries for canon SKILL.md folders so codex
+    0.130 registers them at startup. Without this, canon skills (e.g.
+    ``coordination-protocol/fsm-mechanics``, ``role-explorer/
+    exploratory-probing``) are physically installed in the wheel but
+    not visible in the agent's active skills list — auto-invocation by
+    description-keyword match cannot fire because codex never
+    registered them.
+
     Per-project, idempotent: an existing per-role ``config.toml`` is
-    NOT overwritten — the operator may have customized it. Returns
-    ``(written, skipped)`` for the setup summary.
+    NOT overwritten — the operator may have customized it. Skill
+    entries are appended only on FIRST write; later canon skill bumps
+    require operator to delete the per-role home and re-run setup
+    (the deliberate trade-off: preserve operator customizations).
+
+    Returns ``(written, skipped)`` for the setup summary.
     """
     src_dir = canon / "codex" / "profiles"
     if not src_dir.is_dir():
@@ -180,10 +234,185 @@ def _setup_codex_homes_per_role(canon: Path,
             continue
         try:
             shutil.copyfile(src, dst)
+            # 0162: append [[skills.config]] entries for canon skill
+            # folders. codex 0.130 reads these from config.toml and
+            # registers each path's SKILL.md at agent startup.
+            skill_dirs = _codex_skill_dirs_for_role(canon, role)
+            if skill_dirs:
+                with dst.open("a", encoding="utf-8") as f:
+                    f.write(
+                        "\n\n# 0162: canon skills (SKILL.md folders) "
+                        "registered for codex 0.130+ via the\n"
+                        "# ``skills.config`` array. Each entry's path "
+                        "points at a directory containing\n"
+                        "# SKILL.md; codex enumerates them at startup. "
+                        "These are operator-owned after\n"
+                        "# first write — to pick up new shipped skills, "
+                        "delete this file and re-run\n"
+                        "# `greatminds setup <project>`.\n"
+                    )
+                    for sd in skill_dirs:
+                        f.write("\n[[skills.config]]\n")
+                        f.write(f'path = "{sd}"\n')
+                        f.write("enabled = true\n")
             written += 1
         except OSError:
             continue
     return (written, skipped)
+
+
+def _load_curated_plugins(canon: Path) -> dict:
+    """0175: read the curated marketplace plugin list from schema.yaml.
+
+    Returns a dict like::
+
+        {
+          "claude_marketplace": {
+            "ARCHITECT-PLANNER": ["sourcegraph", "sentry", "huggingface-skills"],
+            ...
+          },
+          "codex_marketplace": {
+            "TECHNICAL-WRITER": [],
+            ...
+          },
+        }
+
+    The list lives under ``plugins:`` at schema.yaml's top level. USER
+    curated the names (no fabrication — every entry is a real plugin
+    on ``anthropics/claude-plugins-official``). Codex side is deferred
+    pending a separate USER curation.
+    """
+    import yaml
+    schema_path = canon / "schema.yaml"
+    if not schema_path.is_file():
+        return {}
+    try:
+        doc = yaml.safe_load(schema_path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        return {}
+    plugins = doc.get("plugins")
+    return plugins if isinstance(plugins, dict) else {}
+
+
+def _install_claude_plugins_for_role(role: str, plugins: list[str],
+                                     verbose: bool = False) -> tuple[int, int, int]:
+    """0175: install each curated claude plugin for a role.
+
+    Idempotent: skip a plugin if ``claude plugin list`` already reports
+    it. Per-plugin failure is non-fatal — log and continue. Returns
+    ``(installed, skipped, failed)`` counts for the setup summary.
+
+    Naming follows the marketplace convention: ``<name>@claude-plugins-
+    official``. The ``@<marketplace>`` suffix is what disambiguates
+    when a name exists in multiple registered marketplaces.
+    """
+    if not plugins:
+        return (0, 0, 0)
+    # One ``claude plugin list`` call per role to check existing state.
+    # Listing format: ``  ❯ <name>@<marketplace>`` (one per line, ❯
+    # is the install-status bullet claude emits). Strip the bullet and
+    # the ``@<marketplace>`` suffix so the set holds bare names that
+    # match the curated table entries.
+    try:
+        listing = subprocess.run(
+            ["claude", "plugin", "list"],
+            capture_output=True, text=True, timeout=15,
+        )
+        installed_names = set()
+        for raw in (listing.stdout or "").splitlines():
+            line = raw.strip()
+            if not line:
+                continue
+            if line.startswith("❯"):  # ❯ U+276F
+                line = line[1:].strip()
+            head = line.split(maxsplit=1)[0]
+            name = head.split("@", 1)[0]
+            if name and not name.endswith(":"):  # skip "Installed plugins:" hdr
+                installed_names.add(name)
+    except (OSError, subprocess.TimeoutExpired):
+        installed_names = set()
+
+    installed = 0
+    skipped = 0
+    failed = 0
+    for name in plugins:
+        if name in installed_names:
+            skipped += 1
+            continue
+        try:
+            cp = subprocess.run(
+                ["claude", "plugin", "install",
+                 f"{name}@claude-plugins-official"],
+                capture_output=True, text=True, timeout=60,
+            )
+            if cp.returncode == 0:
+                installed += 1
+            else:
+                failed += 1
+                if verbose:
+                    print(
+                        f"  claude plugin install {name} failed: "
+                        f"{cp.stderr.strip()[:120]}",
+                    )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            failed += 1
+            if verbose:
+                print(f"  claude plugin install {name} errored: {exc}")
+    return (installed, skipped, failed)
+
+
+def _install_role_plugins_per_host(canon: Path,
+                                   verbose: bool = False) -> tuple[int, int, int]:
+    """0175: install the curated set of marketplace plugins per role.
+
+    For every claude-host role with a curated plugin list (per
+    schema.yaml's ``plugins.claude_marketplace`` table), run
+    ``claude plugin install <name>@claude-plugins-official`` once per
+    plugin. Codex side is deferred (empty lists per USER directive);
+    setup logs the deferral and continues.
+
+    Returns aggregate ``(installed, skipped, failed)`` across all
+    roles, for the setup summary line.
+    """
+    # Opt-out for tests + CI hosts that don't want setup mutating the
+    # host's claude plugin registry. Production setup leaves this
+    # unset; the suite's conftest.py sets it so integration tests
+    # don't shell out to the real ``claude`` binary.
+    if os.environ.get("GREATMINDS_SKIP_PLUGIN_INSTALL"):
+        return (0, 0, 0)
+    curated = _load_curated_plugins(canon)
+    if not curated:
+        return (0, 0, 0)
+    total_installed = 0
+    total_skipped = 0
+    total_failed = 0
+
+    claude_table = curated.get("claude_marketplace") or {}
+    for role, plugins in claude_table.items():
+        if not plugins:
+            continue
+        ci, cs, cf = _install_claude_plugins_for_role(
+            role, list(plugins), verbose=verbose,
+        )
+        if verbose:
+            print(
+                f"  claude plugins for {role}: "
+                f"{ci} installed, {cs} skipped, {cf} failed",
+            )
+        total_installed += ci
+        total_skipped += cs
+        total_failed += cf
+
+    codex_table = curated.get("codex_marketplace") or {}
+    deferred = [r for r, p in codex_table.items()
+                if isinstance(p, list) and not p]
+    if verbose and deferred:
+        print(
+            f"  codex plugins deferred for {len(deferred)} role(s): "
+            f"{', '.join(sorted(deferred))} (awaiting USER curation)",
+        )
+
+    return (total_installed, total_skipped, total_failed)
 
 
 def _copy_if_missing(src: Path, dst: Path, force: bool = False) -> str:
@@ -588,6 +817,23 @@ def setup(project_dir: Path | None, force: bool, lang: str,
         info(
             f"  codex per-role homes → coordination/.codex-home/: "
             f"{written} written, {skipped} preserved (existing)"
+        )
+
+    # 0175: install curated marketplace plugins per claude-host role.
+    # The list lives in schema.yaml's ``plugins.claude_marketplace``
+    # table (USER-curated names verified against
+    # anthropics/claude-plugins-official). Codex side deferred per
+    # USER directive — empty lists log deferral, no install calls.
+    # Idempotent: per-plugin presence in ``claude plugin list`` skips
+    # the install. Per-plugin failure is non-fatal (log + continue).
+    plugins_installed, plugins_skipped, plugins_failed = (
+        _install_role_plugins_per_host(canon, verbose=False)
+    )
+    if plugins_installed or plugins_skipped or plugins_failed:
+        info(
+            f"  marketplace plugins: {plugins_installed} installed, "
+            f"{plugins_skipped} preserved, {plugins_failed} failed "
+            f"(see schema.yaml plugins:)"
         )
 
     # Git pre-commit hook (task 0091 item 2) — installs only if a

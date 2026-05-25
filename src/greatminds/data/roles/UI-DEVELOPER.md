@@ -65,20 +65,15 @@ wants rapid iteration.
 - Pipeline: `<PROJECT_ROOT>/greatminds render-role UI-DEVELOPER`
 - FAST:     `<PROJECT_ROOT>/greatminds render-role UI-DEVELOPER-FAST`
 
-## Canon skill plugin
+## Marketplace plugins
 
-This role loads the `role-ui-developer` canon plugin (in addition to the
-shared `coordination-protocol` plugin). Procedural patterns and
-recipes are factored into auto-invocable skills under
-`src/greatminds/data/plugins/role-ui-developer/skills/`:
+This role uses the curated marketplace plugins listed under
+`schema.yaml > plugins.claude_marketplace.UI-DEVELOPER`. `greatminds
+setup` installs them via `claude plugin install <name>@claude-plugins-
+official`. Current list: `playwright`, `chrome-devtools-mcp`,
+`postman`.
 
-- `svelte-accessibility` (`plugins/role-ui-developer/skills/svelte-accessibility/SKILL.md`)
-- `svelte-component` (`plugins/role-ui-developer/skills/svelte-component/SKILL.md`)
-- `svelte-styling` (`plugins/role-ui-developer/skills/svelte-styling/SKILL.md`)
-- `svelte-testing` (`plugins/role-ui-developer/skills/svelte-testing/SKILL.md`)
-- `sveltekit-app` (`plugins/role-ui-developer/skills/sveltekit-app/SKILL.md`)
-
-When Claude detects the SKILL's `description` keywords in your
-working context, the skill body is loaded on-demand. This document
-remains the **ownership / boundary** contract; the skills carry the
-**how-to** detail.
+When Claude detects an installed plugin's `description` keywords in
+your working context, the skill body is loaded on-demand. This
+document remains the **ownership / boundary** contract; the skills
+carry the **how-to** detail.
