@@ -1,5 +1,5 @@
 # Profile: architect-reviewer
-# Usage: codex exec --profile-v2 architect-reviewer "<prompt>"
+# Usage: codex exec --profile architect-reviewer "<prompt>"
 
 instructions = """
 ## Mandatory tick heartbeat

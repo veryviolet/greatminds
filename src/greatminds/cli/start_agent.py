@@ -46,7 +46,7 @@ What it does:
        Discovers the role's most recent rollout in
        ``~/.codex/sessions``; caches its UUID for ``codex resume``.
        Falls back to ``codex resume --last`` if no session found. Adds
-       ``--profile-v2 <role-lower>`` when
+       ``--profile <role-lower>`` when
        ``~/.codex/<role-lower>.config.toml`` exists.
 
    ``cursor``
@@ -265,7 +265,7 @@ def build_codex_argv(
     extra: list[str],
     prompt: str,
 ) -> list[str]:
-    """Compose ``codex [resume <SID>|] [profile-v2] EXTRA PROMPT``.
+    """Compose ``codex [resume <SID>|] [profile] EXTRA PROMPT``.
 
     Two-branch design driven by ``codex_sid`` (the per-role codex rollout
     UUID), NOT by ``session_new`` (which is the claude session-id concept;
@@ -300,7 +300,7 @@ def build_codex_argv(
     codex_profile_args: list[str] = []
     profile_path = Path.home() / ".codex" / f"{role_lower}.config.toml"
     if profile_path.is_file():
-        codex_profile_args = ["--profile-v2", role_lower]
+        codex_profile_args = ["--profile", role_lower]
 
     yolo = _yolo_args("codex")
 

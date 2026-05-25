@@ -1,5 +1,5 @@
 # Profile: ui-developer
-# Usage: codex exec --profile-v2 ui-developer "<prompt>"
+# Usage: codex exec --profile ui-developer "<prompt>"
 # Copied to ~/.codex/ui-developer.config.toml by `greatminds setup` and
 # picked up automatically by start_agent.py when the role is on codex.
 

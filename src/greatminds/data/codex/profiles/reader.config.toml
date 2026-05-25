@@ -1,5 +1,5 @@
 # Profile: reader
-# Usage: codex exec --profile-v2 reader "<prompt>"
+# Usage: codex exec --profile reader "<prompt>"
 # Copied to ~/.codex/reader.config.toml by `greatminds setup` and
 # picked up automatically by start_agent.py when the role is on codex.
 

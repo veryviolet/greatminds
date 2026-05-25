@@ -251,7 +251,7 @@ def test_shipped_codex_profiles_have_no_internal_brand_leaks():
 def test_shipped_codex_profiles_cover_loop_mode_roles():
     """Regression for task 0047 part C: every codex-realistic loop-mode
     role MUST have a shipped profile so the agent gets role guidance
-    when launched on codex via --profile-v2 <role-lower>."""
+    when launched on codex via --profile <role-lower>."""
     from greatminds.core.paths import find_canon_dir
     profiles_dir = find_canon_dir() / "codex" / "profiles"
     shipped = {p.stem.replace(".config", "") for p in

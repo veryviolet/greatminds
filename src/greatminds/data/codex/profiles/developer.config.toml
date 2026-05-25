@@ -1,7 +1,7 @@
 # Profile: developer
-# Usage: codex exec --profile-v2 developer "<prompt>"
+# Usage: codex exec --profile developer "<prompt>"
 # Copied to ~/.codex/developer.config.toml by `greatminds setup` and
-# picked up automatically by start_agent.py (--profile-v2 developer) when
+# picked up automatically by start_agent.py (--profile developer) when
 # the role is launched on codex.
 
 instructions = """

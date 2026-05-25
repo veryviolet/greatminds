@@ -464,7 +464,7 @@ role is launched on:
   shipped per-role profiles from `<canon>/codex/profiles/*.config.toml`
   to `~/.codex/<role>.config.toml` on first run (idempotent: existing
   user-customized files are preserved). `greatminds start-agent <ROLE>
-  codex` then adds `--profile-v2 <role-lower>` when the file is
+  codex` then adds `--profile <role-lower>` when the file is
   present. The profile body summarizes the role contract — it's not a
   full SKILL-format auto-invoke, but it brings the role-specific
   procedural posture into every codex session.

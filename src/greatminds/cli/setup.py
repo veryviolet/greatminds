@@ -149,7 +149,7 @@ def _copy_codex_profiles_if_missing(canon: Path) -> tuple[int, int]:
     overwritten — the user may have customized it. Returns
     ``(copied, skipped)`` counts for the setup summary.
 
-    start_agent.py picks these up automatically via ``--profile-v2 <role>``
+    start_agent.py picks these up automatically via ``--profile <role>``
     when ``~/.codex/<role>.config.toml`` exists (task 0047 wired the full
     path: shipped profiles → user-side config → codex agent).
     """
@@ -567,7 +567,7 @@ def setup(project_dir: Path | None, force: bool, lang: str,
         info("  .claude/settings.local.json: exists")
 
     # Codex profile copy (task 0047) — install shipped profiles into
-    # ~/.codex/<role>.config.toml so start_agent.py's --profile-v2 path
+    # ~/.codex/<role>.config.toml so start_agent.py's --profile path
     # actually finds them. Per-user, idempotent: existing files are NOT
     # overwritten (preserve user customizations).
     copied, skipped = _copy_codex_profiles_if_missing(canon)
