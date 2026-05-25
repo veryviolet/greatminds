@@ -111,6 +111,106 @@ STALLED_SWEEP_INTERVAL_DEFAULT = 300.0   # 5 min
 STALLED_THRESHOLD_DEFAULT      = 600.0   # 10 min
 
 
+# 0169: queue directories whose new-file events should wake coordd's
+# main loop. Inbox is the primary one; active claim queues are added
+# because a task landing in feature_dev/feature_test/etc. needs the
+# coordd cycle to fire notify_from_journal which then writes wake-*.md
+# into the right inbox.
+INOTIFY_QUEUE_DIRS: tuple[str, ...] = (
+    "inbox",
+    "feature_inbox",
+    "feature_plan",
+    "feature_dev",
+    "feature_ui_dev",
+    "feature_docs",
+    "feature_test",
+    "feature_docs_review",
+    "feature_review",
+    "feature_blocked",
+    "verified",
+    "stand_requests",
+    "stand_wip",
+    "stand_done",
+    "review_sessions",
+)
+
+
+class _InotifyWatcher:
+    """0169: thin wrapper around inotify_simple that exposes a single
+    ``read_or_timeout(timeout_s)`` method.
+
+    The watcher adds non-recursive watches on each of
+    ``coord/<queue>/`` directories listed in ``INOTIFY_QUEUE_DIRS``,
+    plus one level deeper for ``coord/inbox/<role>/`` (because new
+    inbox files land in per-role subdirs). Watch flags target CREATE,
+    MOVED_TO (atomic mv from intent staging), and CLOSE_WRITE (the
+    end of a normal file write). Reading drains pending events; the
+    main loop only cares 'did anything change since last tick',
+    not the per-event details.
+    """
+
+    def __init__(self, coord: Path, verbose: bool = False):
+        from inotify_simple import INotify, flags
+        self._inotify = INotify()
+        self._flags = flags.CREATE | flags.MOVED_TO | flags.CLOSE_WRITE
+        self._verbose = verbose
+        self._add_initial_watches(coord)
+
+    def _add_initial_watches(self, coord: Path) -> None:
+        for sub in INOTIFY_QUEUE_DIRS:
+            d = coord / sub
+            if not d.is_dir():
+                continue
+            try:
+                self._inotify.add_watch(str(d), self._flags)
+            except OSError:
+                # Watch budget exhausted, dir gone mid-init, etc.
+                # Soft-degrade: skip this dir; polling still covers it.
+                pass
+            # Inbox has per-role subdirs that new files land in. Add
+            # one level deeper for each existing role subdir.
+            if sub == "inbox":
+                for role_dir in d.iterdir():
+                    if not role_dir.is_dir():
+                        continue
+                    try:
+                        self._inotify.add_watch(str(role_dir), self._flags)
+                    except OSError:
+                        pass
+
+    def read_or_timeout(self, timeout_s: float) -> list:
+        """Block up to ``timeout_s`` seconds. Return the (possibly
+        empty) list of events. Returning early on event delivery is
+        the latency win — the main loop's next iteration runs as soon
+        as something interesting happens."""
+        timeout_ms = max(0, int(timeout_s * 1000))
+        try:
+            return self._inotify.read(timeout=timeout_ms)
+        except OSError:
+            # Inotify FD closed under us; degrade to a plain sleep.
+            time.sleep(timeout_s)
+            return []
+
+
+def _make_inotify_watcher(coord: Path, verbose: bool):
+    """0169: optional inotify watcher. Returns None when the dep is
+    missing (non-Linux) or when watch-add fails for every candidate
+    dir — caller falls back to the plain polling path."""
+    try:
+        watcher = _InotifyWatcher(coord, verbose=verbose)
+    except (ImportError, OSError) as exc:
+        if verbose:
+            print(
+                f"coordd: inotify watcher unavailable ({exc!r}); "
+                f"falling back to polling-only.",
+                file=sys.stderr,
+            )
+        return None
+    if verbose:
+        print("coordd: inotify watcher armed", file=sys.stderr)
+    return watcher
+
+
 def scan_inbox_files(inbox_dir: Path) -> set[str]:
     """Find pending inbox messages across all roles. After R8 bin/inbox
     writes .yaml; legacy .md is still recognised. Already-processed
@@ -793,13 +893,27 @@ def coordd(project_dir: Path | None, project_name: str | None,
             file=sys.stderr,
         )
 
-    # Push exactly once per inbox file. If the push lands but the agent
-    # doesn't react, that's on the agent — coordd is not the place to
-    # retry; agents have their own ScheduleWakeup/sleep loop for that.
+    # 0169: inotify-driven wake. The pre-0169 main loop blocked on
+    # ``time.sleep(interval)`` between scans, so reaction latency was
+    # bounded below by ``interval`` (default 1.0s; minimum 0.2s). With
+    # inotify_simple watching ``coord/inbox/*`` and the active queue
+    # dirs, the loop wakes within milliseconds of any new file. The
+    # polling tick remains as a safety net for fs-quirks (NFS, fuse,
+    # symlink races) and for the periodic checks that don't depend on
+    # file events (stale-kick, dead-pid watch).
+    #
+    # Linux-only — inotify_simple has no fallback on macOS/Windows.
+    # If the import fails or watch-add fails, we fall through to
+    # plain polling (the pre-0169 contract).
+    inotify_watcher = _make_inotify_watcher(coord, verbose)
+    poll_or_event_wait = (
+        inotify_watcher.read_or_timeout if inotify_watcher is not None
+        else lambda timeout_s: (time.sleep(timeout_s), [])[-1]
+    )
     known: set[str] = set(baseline)
     while not stop["flag"]:
         try:
-            time.sleep(interval)
+            poll_or_event_wait(interval)
 
             # Step 1: run notify_from_journal — writes inbox messages for any
             # new journal lines. Idempotent (state file tracks last offset).

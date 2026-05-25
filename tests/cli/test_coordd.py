@@ -30,10 +30,20 @@ def _isolate_paths(tmp_path, monkeypatch):
 def _stub_loop(monkeypatch):
     """Cut the coordd main loop short. Patch the signal install so the
     test process isn't trapped, and force the first iteration to
-    KeyboardInterrupt out of the loop."""
+    KeyboardInterrupt out of the loop.
+
+    0169: also stub ``_make_inotify_watcher`` to return None. With the
+    inotify path active, coordd's main loop calls
+    ``inotify.read(timeout=...)`` instead of ``time.sleep(...)`` — the
+    ``time.sleep`` monkeypatch below wouldn't catch the loop. The
+    ``None`` return forces the polling fallback which goes through the
+    stubbed ``time.sleep``.
+    """
     import signal
 
     monkeypatch.setattr(signal, "signal", lambda *_a, **_kw: None)
+    monkeypatch.setattr(coordd_mod, "_make_inotify_watcher",
+                        lambda *_a, **_kw: None)
 
     iterations = {"n": 0}
 
