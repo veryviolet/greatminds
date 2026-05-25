@@ -249,7 +249,20 @@ def notify_journal(project_dir: Path | None, canon_dir: Path | None, once: bool)
             continue
         if not isinstance(entry, dict):
             continue
+        # 0152: suppress self-wake. If a role's own action (e.g. PLANNER
+        # appending a triage block or running ``greatminds plan``)
+        # writes journal lines whose claimer is the same role, we'd
+        # bombard PLANNER's own inbox with wake-*.md files for actions
+        # they just performed. They already know — they did it. The
+        # stop-decide hook then nudges them with stale self-wakes for
+        # the next ~N ticks. Other interested roles (REVIEWER for
+        # transitions touching their queues, etc.) still get notified.
+        # System events (actor='', e.g. notify-journal backfill) wake
+        # all targets — there's no self to subtract.
+        actor = (entry.get("actor") or "").strip().upper()
         for to_role, reason, task in determine_wakeups(schema, coord, entry):
+            if actor and actor == to_role.upper():
+                continue
             try:
                 write_inbox(
                     coord,
