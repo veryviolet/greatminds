@@ -60,81 +60,11 @@ JOURNAL_NAME = "journal.ndjson"
 HEARTBEAT_PREFIX = "heartbeat."
 ID_RE = re.compile(r"^[0-9]{4}-[a-z0-9][a-z0-9\-]*$")
 
-# Stream → set of block kinds it allows.
-STREAM_BLOCK_KINDS: dict[str, set[str]] = {
-    "product": {
-        "triage",
-        "plan",
-        "implementation",
-        "tests",
-        "reader_review",
-        "review",
-        "blocked",
-    },
-    "stand": {"stand_result", "blocked"},
-    "review_session": {"session_iteration", "blocked"},
-}
-
-# F1: only these roles may produce each block kind. ``blocked`` is special-
-# cased — the current owner of the queue where the task sits is the only
-# role allowed to mark it blocked.
-BLOCK_KIND_ROLES: dict[str, set[str]] = {
-    "triage":            {"ARCHITECT-PLANNER"},
-    "plan":              {"ARCHITECT-PLANNER"},
-    "implementation":    {"DEVELOPER", "UI-DEVELOPER", "TECHNICAL-WRITER"},
-    "tests":             {"TESTER"},
-    "reader_review":     {"READER"},
-    "review":            {"ARCHITECT-REVIEWER"},
-    "stand_result":      {"STAND-KEEPER"},
-    "session_iteration": {"EXPLORER"},
-    # ``blocked`` handled in role_for_block_kind via current_owner
-}
-
-# For ``implementation``, the caller role must match the task's ``scope:``.
-IMPL_ROLE_BY_SCOPE: dict[str, str] = {
-    "backend": "DEVELOPER",
-    "ui":      "UI-DEVELOPER",
-    "docs":    "TECHNICAL-WRITER",
-}
-
-# F5: which block kinds may be APPENDED to a task currently sitting in
-# each queue. Terminal queues accept nothing.
-QUEUE_BLOCK_KINDS: dict[str, set[str]] = {
-    "feature_inbox":         {"triage", "blocked"},
-    "feature_plan":          {"plan", "blocked"},
-    "feature_dev":           {"implementation", "blocked"},
-    "feature_ui_dev":        {"implementation", "blocked"},
-    "feature_docs":          {"implementation", "blocked"},
-    "feature_test":          {"tests", "blocked"},
-    "feature_docs_review":   {"reader_review", "blocked"},
-    "feature_review":        {"review", "blocked"},
-    "feature_blocked":       {"blocked"},
-    "user_feedback":         {"triage", "blocked"},
-    "review_sessions":       {"session_iteration", "blocked"},
-    "stand_requests":        {"blocked"},
-    "stand_wip":             {"stand_result", "blocked"},
-    # terminal:
-    "verified":              set(),
-    "archive":               set(),
-    "stand_done":            set(),
-}
-
-PRODUCT_KINDS = {"feature", "bugfix", "docs", "ops", "research"}
-PRODUCT_SCOPES = {"backend", "ui", "docs", "stand", "research"}
-PRIORITIES = {"low", "normal", "high"}
-PLAN_KINDS = {"full", "bugfix"}
-MODES = {"A", "B", "C"}
-STAND_REQUEST_TYPES = {
-    "deploy", "restart", "rebuild", "smoke",
-    "remote_sync", "gpu_check", "teardown",
-}
-STAND_PROFILES = {"full-deploy", "vite-dev"}
-STAND_RESULTS = {"ok", "partial", "fail"}
-STAND_STATUSES = {"READY", "DEGRADED", "DOWN", "BLOCKED"}
-TEST_RESULTS = {"pass", "fail", "partial"}
-GATE_CHECK_RESULTS = {"pass", "fail", "missing", "n/a"}
-REVIEW_OUTCOMES = {"approved", "changes_requested"}
-READER_OUTCOMES = {"pass", "fail", "partial"}
+# 0174: FSM tables now load from schema.yaml at module-import. The
+# constants are populated below, AFTER the schema() function is
+# defined. Other call sites read them as plain dicts/sets — that API
+# is preserved. Adding a new block_kind / scope / enum becomes a
+# schema-only edit; no code change needed for the data parts.
 
 TITLE_MAX_LEN = 200
 
@@ -186,6 +116,86 @@ def role_meta(role: str) -> dict[str, Any]:
     if not isinstance(r, dict):
         raise GreatMindsError(f"unknown role: {role}")
     return r
+
+
+def _load_fsm_tables_from_schema() -> dict[str, Any]:
+    """0174: build FSM-validation tables from schema.yaml.
+
+    Called once at module-import (right below). If the schema is
+    malformed or missing required sections, raises GreatMindsError —
+    the CLI cannot function without these tables and silent fallbacks
+    would hide breakage.
+    """
+    doc = schema()
+
+    streams_data = doc.get("streams") or {}
+    block_kinds_data = doc.get("block_kinds") or {}
+    queue_accepts_data = doc.get("queue_accepts_blocks") or {}
+    assignee_data = doc.get("assignee_role_by_scope") or {}
+    product_enums = doc.get("product_enums") or {}
+    stand_enums = doc.get("stand_enums") or {}
+
+    if not streams_data or not block_kinds_data or not queue_accepts_data:
+        raise GreatMindsError(
+            "schema.yaml missing one of: streams, block_kinds, "
+            "queue_accepts_blocks (post-0174 these are required)"
+        )
+
+    out: dict[str, Any] = {}
+    out["STREAM_BLOCK_KINDS"] = {
+        name: set(meta.get("allowed_block_kinds") or [])
+        for name, meta in streams_data.items()
+    }
+    out["BLOCK_KIND_ROLES"] = {
+        name: set(meta.get("authored_by") or [])
+        for name, meta in block_kinds_data.items()
+        if meta and meta.get("authored_by")
+    }
+    out["IMPL_ROLE_BY_SCOPE"] = dict(assignee_data)
+    out["QUEUE_BLOCK_KINDS"] = {
+        q: set(blocks or [])
+        for q, blocks in queue_accepts_data.items()
+    }
+    out["PRODUCT_KINDS"] = set(product_enums.get("kinds") or [])
+    out["PRODUCT_SCOPES"] = set(product_enums.get("scopes") or [])
+    out["PRIORITIES"] = set(product_enums.get("priorities") or [])
+    out["PLAN_KINDS"] = set(product_enums.get("plan_kinds") or [])
+    out["MODES"] = set(product_enums.get("modes") or [])
+    out["STAND_REQUEST_TYPES"] = set(stand_enums.get("request_types") or [])
+    out["STAND_PROFILES"] = set(stand_enums.get("profiles") or [])
+    out["STAND_RESULTS"] = set(stand_enums.get("results") or [])
+    out["STAND_STATUSES"] = set(stand_enums.get("statuses") or [])
+
+    tests_meta = block_kinds_data.get("tests") or {}
+    out["TEST_RESULTS"] = set(tests_meta.get("allowed_test_results") or [])
+    out["GATE_CHECK_RESULTS"] = set(
+        tests_meta.get("allowed_gate_check_results") or [])
+    out["REVIEW_OUTCOMES"] = set(
+        (block_kinds_data.get("review") or {}).get("allowed_outcomes") or [])
+    out["READER_OUTCOMES"] = set(
+        (block_kinds_data.get("reader_review") or {}).get("allowed_outcomes")
+        or [])
+    return out
+
+
+_FSM = _load_fsm_tables_from_schema()
+STREAM_BLOCK_KINDS:  dict[str, set[str]] = _FSM["STREAM_BLOCK_KINDS"]
+BLOCK_KIND_ROLES:    dict[str, set[str]] = _FSM["BLOCK_KIND_ROLES"]
+IMPL_ROLE_BY_SCOPE:  dict[str, str]      = _FSM["IMPL_ROLE_BY_SCOPE"]
+QUEUE_BLOCK_KINDS:   dict[str, set[str]] = _FSM["QUEUE_BLOCK_KINDS"]
+PRODUCT_KINDS:       set[str] = _FSM["PRODUCT_KINDS"]
+PRODUCT_SCOPES:      set[str] = _FSM["PRODUCT_SCOPES"]
+PRIORITIES:          set[str] = _FSM["PRIORITIES"]
+PLAN_KINDS:          set[str] = _FSM["PLAN_KINDS"]
+MODES:               set[str] = _FSM["MODES"]
+STAND_REQUEST_TYPES: set[str] = _FSM["STAND_REQUEST_TYPES"]
+STAND_PROFILES:      set[str] = _FSM["STAND_PROFILES"]
+STAND_RESULTS:       set[str] = _FSM["STAND_RESULTS"]
+STAND_STATUSES:      set[str] = _FSM["STAND_STATUSES"]
+TEST_RESULTS:        set[str] = _FSM["TEST_RESULTS"]
+GATE_CHECK_RESULTS:  set[str] = _FSM["GATE_CHECK_RESULTS"]
+REVIEW_OUTCOMES:     set[str] = _FSM["REVIEW_OUTCOMES"]
+READER_OUTCOMES:     set[str] = _FSM["READER_OUTCOMES"]
 
 
 def transitions_for(from_q: str, to_q: str) -> list[dict[str, Any]]:
