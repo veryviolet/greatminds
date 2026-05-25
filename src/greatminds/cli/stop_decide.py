@@ -46,7 +46,16 @@ def load_schema(canon_dir: Path) -> dict:
 
 
 def inbox_pending(coord: Path, role: str) -> list[str]:
-    """Unprocessed inbox messages for ``role`` (wake-*.md only).
+    """Unprocessed inbox messages for ``role``.
+
+    Surfaces both ``.md`` (daemon journal-notify wakes) and ``.yaml``
+    (role-to-role ``greatminds inbox send`` asks/infos). 0143 fix:
+    iter-1 only matched ``.md``, so direct role-to-role asks and infos
+    written as ``.yaml`` never reached the claude stop-hook — the
+    claude-host PLANNER stayed idle after EXPLORER's
+    ``greatminds inbox send ARCHITECT-PLANNER --kind info``. Loop-mode
+    hosts (codex/cursor) were unaffected because their tick uses an
+    FS-watch over the whole inbox dir.
 
     Excludes ``.gitkeep`` (dir-tracker stub) and ``processed-*`` files
     (acked breadcrumbs renamed by ``greatminds inbox ack``).
@@ -58,7 +67,7 @@ def inbox_pending(coord: Path, role: str) -> list[str]:
     for f in sorted(inbox.iterdir()):
         if not f.is_file():
             continue
-        if f.suffix != ".md":
+        if f.suffix not in (".md", ".yaml"):
             continue
         if f.name == ".gitkeep" or f.name.startswith("processed-"):
             continue
@@ -97,7 +106,7 @@ def stop_decide(role: str, host: str, project_dir: Path | None,
         click.echo("{}")
         return
 
-    msg = f"continue your tick: inbox/{role.lower()}/ has {len(inbox_msgs)} new wake message(s)"
+    msg = f"continue your tick: inbox/{role.lower()}/ has {len(inbox_msgs)} pending inbox message(s)"
     if host == "claude":
         click.echo(json.dumps({
             "decision": "block",
