@@ -2941,7 +2941,7 @@ tool process replaces this script via <code>os.execvp</code>.</p>
        Discovers the role's most recent rollout in
        <code>~/.codex/sessions</code>; caches its UUID for <code>codex resume</code>.
        Falls back to <code>codex resume --last</code> if no session found. Adds
-       <code>--profile-v2 &lt;role-lower&gt;</code> when
+       <code>--profile &lt;role-lower&gt;</code> when
        <code>~/.codex/&lt;role-lower&gt;.config.toml</code> exists.</p>
 <p><code>cursor</code>
        Wrapped in <code>systemd-run --user --scope</code> with memory/CPU caps
