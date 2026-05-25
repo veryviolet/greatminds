@@ -670,18 +670,6 @@ def coordd(project_dir: Path | None, project_name: str | None,
         click.echo(f"coordd: error: {coord} not found", err=True)
         raise click.exceptions.Exit(1)
 
-    # Drift marker for `greatminds update` (task 0009): record the daemon's
-    # running version so any CLI invocation can compare its own __version__
-    # against this file and warn on mismatch (= post-pip restart needed).
-    try:
-        from greatminds import __version__ as _gm_version
-        version_path = coord / ".daemon_version"
-        version_path.write_text(f"{_gm_version}\n", encoding="utf-8")
-    except OSError:
-        # Non-fatal — if we can't write the marker, just log and continue.
-        if verbose:
-            click.echo("coordd: warning: could not write .daemon_version",
-                       err=True)
     inbox = coord / "inbox"
     inbox.mkdir(parents=True, exist_ok=True)
     registry = coord / REGISTRY_DIR

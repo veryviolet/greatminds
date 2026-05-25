@@ -32,22 +32,10 @@ from .. import __version__
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 @click.version_option(__version__, prog_name="greatminds")
-@click.pass_context
-def cli(ctx: click.Context) -> None:
+def cli() -> None:
     """File-based multi-agent coordination protocol — fleet orchestration,
     task pipeline, agent launcher.
     """
-    # Version-drift detection (task 0009): if the running CLI's version
-    # disagrees with the recorded daemon version, warn USER (silent for
-    # agents). Never blocks — purely advisory. Skip when the invoked
-    # subcommand is `update` itself: `greatminds update` IS the fix, so
-    # nagging here is noise.
-    if ctx.invoked_subcommand and ctx.invoked_subcommand != "update":
-        try:
-            from greatminds._version_check import maybe_warn
-            maybe_warn()
-        except Exception:  # noqa: BLE001 — must never block the parent command
-            pass
 
 
 # Sub-group registration. Each module exposes a top-level ``click.Group``
