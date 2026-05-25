@@ -423,6 +423,84 @@ def intent_clear(intent_path: Path) -> None:
 
 TASK_FILE_LOCK_TIMEOUT_SEC = 30.0
 TASK_FILE_LOCK_POLL_SEC = 0.1
+# 0115: per-source-file lock to prevent two tasks from claiming the
+# same working-tree file at impl-block append time. Lock dir lives
+# next to .locks/ for symmetry with the per-task lock (0112).
+FILE_LOCKS_DIR_NAME = ".file_locks"
+# Queues into which a task can move to RELEASE its file locks
+# (the working-tree changes are settled — verified means commit done,
+# archive means abandoned).
+FILE_LOCK_RELEASE_QUEUES = frozenset({"verified", "archive"})
+
+
+def _file_lock_path(coord: Path, file_rel: str) -> Path:
+    """SHA-256 → 32 hex chars to avoid filesystem-illegal characters in
+    source paths (slashes etc) while staying collision-resistant."""
+    import hashlib
+    h = hashlib.sha256(file_rel.encode("utf-8")).hexdigest()[:32]
+    return coord / FILE_LOCKS_DIR_NAME / f"{h}.lock"
+
+
+def _acquire_file_locks_for_task(coord: Path, task_id: str,
+                                  files: list[str]) -> None:
+    """Claim per-file ownership for ``files`` under ``task_id``.
+
+    Two-pass: first verify no conflict (any existing lock is held by
+    a different task), then write. Within a single task, re-claiming
+    a file already owned is a no-op (idempotent re-runs are fine).
+
+    Raises ``GreatMindsError`` on conflict, naming the holder + queue.
+    """
+    locks_dir = coord / FILE_LOCKS_DIR_NAME
+    locks_dir.mkdir(parents=True, exist_ok=True)
+    # Pass 1: detect conflicts.
+    for f in files:
+        if not isinstance(f, str) or not f.strip():
+            continue
+        lp = _file_lock_path(coord, f)
+        if not lp.exists():
+            continue
+        try:
+            holder = lp.read_text(encoding="utf-8").strip()
+        except OSError:
+            holder = ""
+        if not holder or holder == task_id:
+            continue
+        # Conflict: name the holder's current queue for diagnosability.
+        holder_loc = find_task(coord, holder)
+        holder_queue = holder_loc[1] if holder_loc else "<unknown>"
+        raise GreatMindsError(
+            f"file {f!r} currently owned by task {holder} "
+            f"(in {holder_queue}); wait for it to verify, or "
+            f"coordinate via PLANNER depends_on before claiming "
+            f"the same working-tree file in parallel",
+            exit_code=2,
+        )
+    # Pass 2: claim (write our task id into each lock file).
+    for f in files:
+        if not isinstance(f, str) or not f.strip():
+            continue
+        lp = _file_lock_path(coord, f)
+        lp.write_text(task_id, encoding="utf-8")
+
+
+def _release_file_locks_for_task(coord: Path, task_id: str) -> None:
+    """Best-effort: remove every lock file whose content names this
+    task id. Called when a task moves into FILE_LOCK_RELEASE_QUEUES."""
+    locks_dir = coord / FILE_LOCKS_DIR_NAME
+    if not locks_dir.is_dir():
+        return
+    for lp in locks_dir.glob("*.lock"):
+        try:
+            holder = lp.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if holder == task_id:
+            try:
+                lp.unlink()
+            except OSError:
+                pass
+
 
 
 @contextmanager
@@ -1677,6 +1755,10 @@ def _do_move(coord: Path, role: str, task_id: str,
         "reason": (reason or "")[:200],
         "intent_id": intent_id,
     })
+    # 0115: release per-file working-tree locks once the task reaches
+    # a terminal queue. verified = commit done, archive = abandoned.
+    if to_q in FILE_LOCK_RELEASE_QUEUES:
+        _release_file_locks_for_task(coord, task_id)
     touch_heartbeat(coord, role)
     return from_q
 
@@ -1736,6 +1818,18 @@ def append_block(
 
         validate_block(data.get("stream") or "product", block)
         require_block_cross_state(block, data)
+
+        # 0115: claim per-file working-tree locks at impl-block append.
+        # Prevents two tasks from independently editing the same
+        # src/file.py and ending up with mixed hunks (the 0091+0103
+        # REVIEWER-had-to-slice incident).
+        if kind == "implementation":
+            decl_files = block.get("files") or []
+            if isinstance(decl_files, list):
+                _acquire_file_locks_for_task(
+                    coord, task_id,
+                    [str(f) for f in decl_files if isinstance(f, str)],
+                )
 
         new_blocks = list(data.get("blocks") or []) + [block]
         new_data = dict(data)
