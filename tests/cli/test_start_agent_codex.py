@@ -39,7 +39,7 @@ def _disable_yolo(monkeypatch):
 
 def test_codex_argv_starts_fresh_when_no_codex_sid_found(tmp_path, monkeypatch):
     """No prior rollout → fresh session; --last must NOT appear."""
-    monkeypatch.setattr(sa_mod, "discover_codex_session", lambda role: "")
+    monkeypatch.setattr(sa_mod, "discover_codex_session", lambda role, **_kw: "")
     registry = tmp_path / "registry"
     registry.mkdir()
 
@@ -110,7 +110,7 @@ def test_codex_argv_discovers_rollout_and_persists_sid(tmp_path, monkeypatch):
     """When no sid file exists but discover_codex_session finds a rollout,
     the discovered sid is persisted to the registry for next time."""
     monkeypatch.setattr(sa_mod, "discover_codex_session",
-                        lambda role: "discovered-sid-1234")
+                        lambda role, **_kw: "discovered-sid-1234")
 
     argv = sa_mod.build_codex_argv(
         role="DEVELOPER", registry_dir=tmp_path,
@@ -126,7 +126,7 @@ def test_codex_argv_discovers_rollout_and_persists_sid(tmp_path, monkeypatch):
 def test_codex_argv_extra_args_pass_through_before_prompt(tmp_path, monkeypatch):
     """User-supplied EXTRA args (e.g. --model X) sit between codex/yolo
     args and the trailing prompt."""
-    monkeypatch.setattr(sa_mod, "discover_codex_session", lambda role: "")
+    monkeypatch.setattr(sa_mod, "discover_codex_session", lambda role, **_kw: "")
     argv = sa_mod.build_codex_argv(
         role="DEVELOPER", registry_dir=tmp_path,
         session_new=True, extra=["--model", "gpt-5"], prompt="prompt-text",
@@ -138,7 +138,7 @@ def test_codex_argv_extra_args_pass_through_before_prompt(tmp_path, monkeypatch)
 def test_codex_argv_explorer_repro_no_last_branch(tmp_path, monkeypatch):
     """Exact EXPLORER repro shape: second launch after codex self-update,
     sid file empty (cleared), session_new=False. Must NOT emit --last."""
-    monkeypatch.setattr(sa_mod, "discover_codex_session", lambda role: "")
+    monkeypatch.setattr(sa_mod, "discover_codex_session", lambda role, **_kw: "")
     # No sid file in registry.
     argv = sa_mod.build_codex_argv(
         role="DEVELOPER", registry_dir=tmp_path,

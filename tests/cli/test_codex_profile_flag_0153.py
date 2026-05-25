@@ -55,7 +55,7 @@ def test_codex_argv_emits_profile_not_profile_v2(tmp_path, monkeypatch, fake_hom
     ``--profile-v2``. Pre-fix the latter would produce ``error:
     unexpected argument '--profile-v2' found`` from codex-cli 0.130+
     and stall every fresh start-agent."""
-    monkeypatch.setattr(sa_mod, "discover_codex_session", lambda role: "")
+    monkeypatch.setattr(sa_mod, "discover_codex_session", lambda role, **_kw: "")
     registry = tmp_path / "registry"
     registry.mkdir()
     _seed_profile_toml(fake_home, "developer")
@@ -80,7 +80,7 @@ def test_codex_argv_profile_followed_by_role_lower(tmp_path, monkeypatch, fake_h
     not ``ARCHITECT-REVIEWER``). codex looks up
     ``~/.codex/<role-lower>.config.toml`` by that name; uppercase
     would fail the file lookup."""
-    monkeypatch.setattr(sa_mod, "discover_codex_session", lambda role: "")
+    monkeypatch.setattr(sa_mod, "discover_codex_session", lambda role, **_kw: "")
     registry = tmp_path / "registry"
     registry.mkdir()
     _seed_profile_toml(fake_home, "architect-reviewer")
@@ -104,7 +104,7 @@ def test_codex_argv_no_profile_when_no_config_toml(tmp_path, monkeypatch, fake_h
     pin it again so a 0153-style 'rename --profile-v2 to --profile'
     refactor can't accidentally start emitting --profile unconditionally.
     """
-    monkeypatch.setattr(sa_mod, "discover_codex_session", lambda role: "")
+    monkeypatch.setattr(sa_mod, "discover_codex_session", lambda role, **_kw: "")
     registry = tmp_path / "registry"
     registry.mkdir()
     # No stub seeded in fake_home → file genuinely absent.

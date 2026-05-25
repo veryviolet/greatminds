@@ -80,13 +80,34 @@ def _launch_command(launcher: str, role: str, tool: str, mode: str) -> str:
     return cmd
 
 
+CIRCUIT_BREAKER_FAILS = 3
+CIRCUIT_BREAKER_WINDOW_SEC = 30
+
+
 def _wrapper_loop(launch_cmd: str, role: str) -> str:
     """0160: bash one-liner that loops on Enter and re-execs the agent.
 
-    Wrapper shape::
+    Wrapper shape (one line, no embedded newlines)::
 
-      while true; do printf 'press Enter to (re)start <ROLE>...';
-        read -r _ </dev/tty; <launch_cmd>; done
+      while true; do
+        printf 'press Enter to (re)start <ROLE>...';
+        read -r _ </dev/tty;
+        t0=$(date +%s);
+        <launch_cmd>;
+        rc=$?;
+        if [ "$rc" -ne 0 ]; then
+          # 0164 circuit breaker
+          now=$(date +%s);
+          if [ $((now - last_fail_window_start)) -gt 30 ]; then
+            last_fail_window_start=$now; fails=0;
+          fi;
+          fails=$((fails + 1));
+          if [ "$fails" -ge 3 ]; then
+            printf 'agent failed %s times in %ss; STOPPING wrapper. '...;
+            exit 1;
+          fi;
+        fi;
+      done
 
     Pre-0160 ``_emit_tmux`` pre-typed ``<launch_cmd>`` with no Enter,
     and the operator typed Enter once to start the agent. When the
@@ -94,19 +115,41 @@ def _wrapper_loop(launch_cmd: str, role: str) -> str:
     command to re-execute, and ``greatminds restart``'s
     ``tmux send-keys Enter`` had nothing to trigger.
 
-    With this wrapper installed, ``restart``'s Enter into the pane
-    lands at the wrapper's ``read``, and the next iteration of the
-    loop re-runs the agent. Operator-visible: pane shows
-    ``press Enter to (re)start <ROLE>...`` after every agent exit.
+    0164: added a circuit-breaker that exits the loop after
+    ``CIRCUIT_BREAKER_FAILS`` consecutive non-zero exits within a
+    ``CIRCUIT_BREAKER_WINDOW_SEC`` window. Without this, a chronically
+    broken agent (missing codex binary, stale session UUID before the
+    discover_codex_session fix landed, etc.) spammed the pane and the
+    operator's logs forever. With the breaker, the pane stops with a
+    clear recovery hint after 3 rapid failures.
 
     Single line (no embedded newlines) so ``tmux send-keys`` delivers
     it as one keystroke sequence — bash then enters the loop on Enter.
     """
+    n = CIRCUIT_BREAKER_FAILS
+    w = CIRCUIT_BREAKER_WINDOW_SEC
     return (
+        f"fails=0; last_fail_window_start=0; "
         f"while true; do "
         f"printf 'press Enter to (re)start {role}...'; "
         f"read -r _ </dev/tty; "
         f"{launch_cmd}; "
+        f"rc=$?; "
+        f"if [ \"$rc\" -ne 0 ]; then "
+        f"now=$(date +%s); "
+        f"if [ $((now - last_fail_window_start)) -gt {w} ]; then "
+        f"last_fail_window_start=$now; fails=0; "
+        f"fi; "
+        f"fails=$((fails + 1)); "
+        f"if [ \"$fails\" -ge {n} ]; then "
+        f"printf 'agent {role} failed %s times in %ss; STOPPING wrapper. "
+        f"To force fresh session: GREATMINDS_FRESH=1 greatminds start-agent "
+        f"{role} <TOOL> --mode loop\\n' \"$fails\" \"{w}\"; "
+        f"exit 1; "
+        f"fi; "
+        f"else "
+        f"fails=0; "
+        f"fi; "
         f"done"
     )
 

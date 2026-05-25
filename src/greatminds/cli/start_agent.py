@@ -158,40 +158,86 @@ def tty_path() -> str:
         return "none"
 
 
-def discover_codex_session(role: str) -> str:
-    """Find the most recent ``~/.codex/sessions/.../rollout-*.jsonl`` whose
-    head contains ``"You are <ROLE> agent"`` — that's the bootstrap-intro phrase
-    we send on first launch, so any file containing it belongs to this role.
+def discover_codex_session(role: str,
+                           project_dir: Path | None = None) -> str:
+    """Find the most recent ``rollout-*.jsonl`` for this role.
 
-    Returns the rollout's session UUID (extracted from the filename), or an
-    empty string if none found.
+    0164: post-0158, codex launches with ``CODEX_HOME=<project>/
+    coordination/.codex-home/<role>/`` and writes rollouts under
+    ``<CODEX_HOME>/sessions/`` — NOT under ``~/.codex/sessions/``.
+    The pre-0164 discovery walked ``~/.codex/sessions/``, found OLD
+    pre-0158 rollouts (or unrelated ones), wrote their SIDs to the
+    role's ``.codex-session-id`` cache, and the next launch issued
+    ``codex resume <stale-sid>`` against the new per-role codex_home
+    where that SID doesn't exist. codex returned ``No saved session
+    found`` and the wrapper-loop respawned forever.
+
+    Fix: walk the per-role ``<CODEX_HOME>/sessions/`` when the post-0158
+    home exists. Legacy ``~/.codex/sessions/`` is still consulted as a
+    fallback for projects not yet re-run through 0158 ``setup``.
+
+    The head-content check (``"You are <ROLE> agent"``) is still useful
+    when multiple roles share a codex home in pathological installs;
+    keeping it as a per-file filter.
+
+    Returns the rollout's session UUID (extracted from the filename),
+    or an empty string if none found.
     """
-    root = Path.home() / ".codex" / "sessions"
-    if not root.is_dir():
+    # 0164 iter-2 (REVIEWER ask): the legacy fallback fires ONLY when
+    # this is a pre-0158 install (no per-role codex_home root exists
+    # at all). Once ``coordination/.codex-home/<role>/`` is on disk,
+    # this is a 0158-era install — even an empty ``sessions/`` subdir
+    # must NOT leak to ``~/.codex/sessions/``. PLANNER's spec:
+    # "drop discovery entirely on 0158-era installs". The gate is the
+    # codex_home root, not its sessions subdir.
+    roots: list[Path] = []
+    is_0158_era = False
+    if project_dir is not None:
+        codex_home = (project_dir / "coordination" / ".codex-home"
+                      / role.lower())
+        if codex_home.is_dir():
+            is_0158_era = True
+            sessions = codex_home / "sessions"
+            if sessions.is_dir():
+                roots.append(sessions)
+    if not is_0158_era:
+        # Pre-0158 install: walk legacy.
+        legacy = Path.home() / ".codex" / "sessions"
+        if legacy.is_dir():
+            roots.append(legacy)
+    if not roots:
         return ""
+
     needle = f"You are {role} agent".encode("utf-8")
     name_re = re.compile(r"rollout-[0-9T-]+-([0-9a-f-]+)\.jsonl$")
     best_mtime = 0.0
     best_sid = ""
-    for dirpath, _dirs, files in os.walk(root):
-        for fname in files:
-            if not fname.endswith(".jsonl"):
-                continue
-            m = name_re.search(fname)
-            if not m:
-                continue
-            fp = Path(dirpath) / fname
-            try:
-                with fp.open("rb") as f:
-                    head = f.read(131072)
-                if needle not in head:
+    for root in roots:
+        for dirpath, _dirs, files in os.walk(root):
+            for fname in files:
+                if not fname.endswith(".jsonl"):
                     continue
-                mt = fp.stat().st_mtime
-            except OSError:
-                continue
-            if mt > best_mtime:
-                best_mtime = mt
-                best_sid = m.group(1)
+                m = name_re.search(fname)
+                if not m:
+                    continue
+                fp = Path(dirpath) / fname
+                try:
+                    with fp.open("rb") as f:
+                        head = f.read(131072)
+                    if needle not in head:
+                        continue
+                    mt = fp.stat().st_mtime
+                except OSError:
+                    continue
+                if mt > best_mtime:
+                    best_mtime = mt
+                    best_sid = m.group(1)
+        # 0164: stop at the FIRST root that yielded a hit. If the
+        # per-role home produced a rollout, do NOT also consider the
+        # legacy ``~/.codex/sessions/`` — those would be older, stale,
+        # and codex wouldn't recognize them after the 0158 cutover.
+        if best_sid:
+            break
     return best_sid
 
 
@@ -293,7 +339,12 @@ def build_codex_argv(
     if codex_session_file.is_file() and codex_session_file.stat().st_size > 0:
         codex_sid = codex_session_file.read_text(encoding="utf-8").strip()
     else:
-        codex_sid = discover_codex_session(role)
+        # 0164: pass project_dir so discover walks the per-role
+        # post-0158 codex home FIRST. Without this, pre-0158
+        # ``~/.codex/sessions/`` rollouts can leak into the cache and
+        # the next launch fails ``codex resume <stale-sid>``.
+        project_dir = registry_dir.parent.parent
+        codex_sid = discover_codex_session(role, project_dir=project_dir)
         if codex_sid:
             codex_session_file.write_text(codex_sid + "\n", encoding="utf-8")
 
