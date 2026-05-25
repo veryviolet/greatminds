@@ -103,15 +103,13 @@ def test_canon_keeps_loop_invariant_unchanged():
     assert "Never end your own" in text
 
 
-# ---------- 0176 iter-2: re-read canon every tick ----------
+# ---------- 0178 supersedes 0176 iter-2: timeout vs event-wake re-read ----------
 
 
 def test_canon_no_read_once_per_session_directive():
-    """0176 iter-2 negative pin: pre-0176 canon told agents to read
-    static docs ``ONCE per session, not every tick`` and cache them in
-    memory. USER's iter-2 directive: re-read EVERY tick because
-    canon CAN change between ticks (MAINTAINER edits, PLANNER
-    revisions, PROJECT.md updates)."""
+    """Negative pin: pre-0176 canon told agents to read static docs
+    ``ONCE per session, not every tick`` and cache them in memory.
+    0176 banned that disaster; 0178 keeps the ban."""
     text = _command_start_text()
     forbidden = [
         "ONCE per session",
@@ -120,16 +118,39 @@ def test_canon_no_read_once_per_session_directive():
     ]
     for sig in forbidden:
         assert sig not in text, (
-            f"0176 iter-2: pre-0176 read-once directive remains: {sig!r}"
+            f"pre-0176 read-once directive remains: {sig!r}"
         )
 
 
-def test_canon_directs_every_tick_re_read():
-    """0176 iter-2 positive pin: canon must direct re-read of static
-    docs at the start of every tick."""
+def test_canon_distinguishes_timeout_vs_event_wake_ticks():
+    """0178 contract: canon must name the two tick types explicitly.
+    Iter-2 said 'every tick re-read' which burns tokens on every
+    event-wake; iter-3 (this task) splits timeout (re-read) from
+    event-wake (no re-read)."""
     text = _command_start_text()
-    assert "every tick" in text.lower() or "EVERY tick" in text
-    # The four canonical re-read files must be named.
+    assert "Timeout tick" in text, (
+        "0178: canon must name 'Timeout tick' as the re-read trigger"
+    )
+    assert "Event-wake tick" in text, (
+        "0178: canon must name 'Event-wake tick' as the no-re-read case"
+    )
+
+
+def test_canon_event_wake_does_not_re_read():
+    """0178 positive pin: explicit 'DO NOT re-read static docs' clause
+    in the event-wake branch. Without this, a careful reader might
+    still interpret the canon as 'always re-read'."""
+    text = _command_start_text()
+    assert "DO NOT re-read" in text, (
+        "0178: canon must instruct the event-wake branch NOT to "
+        "re-read static docs"
+    )
+
+
+def test_canon_timeout_tick_lists_four_static_files():
+    """0178: when the timeout-tick branch fires, all four static
+    docs must be re-read. Pin each filename explicitly."""
+    text = _command_start_text()
     for needle in (
         "COORDINATE.md",
         "schema.yaml",
@@ -137,25 +158,49 @@ def test_canon_directs_every_tick_re_read():
         "ROLE.md",
     ):
         assert needle in text, (
-            f"0176 iter-2: every-tick re-read must name {needle}"
+            f"0178: timeout-tick re-read must name {needle}"
+        )
+
+
+def test_canon_no_ambiguous_every_tick_wording():
+    """0178 negative pin: the iter-2 ambiguous phrasing 'EVERY tick
+    re-read' / 'by timeout OR by coordd' must be gone. They conflated
+    the two tick types which is precisely what 0178 fixes."""
+    text = _command_start_text()
+    forbidden = [
+        "Re-read static docs at the start of EVERY tick",
+        "by timeout OR by coordd",
+    ]
+    for sig in forbidden:
+        assert sig not in text, (
+            f"0178: iter-2 ambiguous phrasing remains: {sig!r}"
         )
 
 
 def test_canon_no_in_memory_caching_directive():
-    """Negative pin: ``keep them in memory`` was the pre-0176
-    instruction; iter-2 forbids in-memory caching. A future canon
-    edit that re-adds 'cache in memory' wording must trip this."""
+    """Negative pin: pre-0176 in-memory caching directive must stay
+    banned. (The 0178 split — re-read on timeout, NOT on event-wake —
+    is NOT in-memory caching: each timeout tick re-reads fresh.)"""
     text = _command_start_text()
-    # Forbidden phrases that, in directive form, instruct caching.
-    # "No in-memory caching" is the explicit negation and is allowed.
     forbidden = [
         "keep them in memory",
         "cache in memory",
     ]
     for sig in forbidden:
         assert sig not in text, (
-            f"0176 iter-2: pre-0176 in-memory caching directive remains: {sig!r}"
+            f"pre-0176 in-memory caching directive remains: {sig!r}"
         )
+
+
+def test_canon_explains_how_to_distinguish_tick_types():
+    """0178: the canon must tell the agent HOW to know which tick type
+    fired. The mechanism is the `bash sleep`'s SIGINT vs clean exit:
+    SIGINT'd → event-wake; cleanly expired → timeout. Without this
+    operational detail, the agent can't apply the rule."""
+    text = _command_start_text()
+    assert "SIGINT" in text
+    # The wrapper-sleep mechanism explanation must be present.
+    assert "bash sleep" in text.lower() or "Bash sleep" in text
 
 
 # ---------- claude branch ----------

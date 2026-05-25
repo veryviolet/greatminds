@@ -28,13 +28,30 @@ version: 1
 # and schema.yaml.
 # ---------------------------------------------------------------------------
 common: |
-  **Re-read static docs at the start of EVERY tick.** Whether the tick
-  fires by timeout OR by coordd's SIGINT-wake, read
-  `<PROJECT_ROOT>/COORDINATE.md`, `<PROJECT_ROOT>/schema.yaml`,
-  `<COORDINATION_DIR>/PROJECT.md` and your ROLE.md as the first
-  action. They WILL have changed between ticks — MAINTAINER can edit
-  canon, PLANNER can revise role contracts, USER can update PROJECT.md.
-  No in-memory caching. Operate on fresh canon each tick.
+  **Static-doc re-read contract** (0178 supersedes 0176's "every
+  tick" wording). Two tick types, different obligations:
+
+  - **Timeout tick** (your 7200s `bash sleep` expired): start the
+    tick by re-reading `<PROJECT_ROOT>/COORDINATE.md`,
+    `<PROJECT_ROOT>/schema.yaml`, `<COORDINATION_DIR>/PROJECT.md`
+    and your ROLE.md. They WILL have changed across a 2-hour
+    window — MAINTAINER edits canon, PLANNER revises role
+    contracts, USER updates PROJECT.md. Operate on fresh canon
+    for this tick.
+  - **Event-wake tick** (coordd SIGINT'd your sleep sub-second on
+    an inbox / queue change — 0150 path): DO NOT re-read static
+    docs. Act on the event. Static canon barely shifts in the
+    seconds between events; the last timeout tick already
+    refreshed it. Re-reading on every event burns USER's token
+    budget for nothing.
+
+  How to distinguish: maintain a per-process flag set when the
+  wrapper's `bash sleep 7200` returned without a SIGINT having been
+  delivered to the deepest descendant. If sleep exited cleanly
+  (timer fully expired): timeout tick → re-read. If sleep was
+  SIGINT'd: event-wake tick → no re-read. The 0093 SIGINT primitive
+  already lands on the deepest descendant; the wrapper script's
+  sleep is that descendant.
 
   **ALL mutations to files under `coordination/` go through the
   `greatminds` CLI.** No bare `mv` / `Edit` / `Write` on task files or
