@@ -849,6 +849,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#greatminds-check-git-permission" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check-git-permission
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#greatminds-coordd" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1755,6 +1766,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#greatminds-check-git-permission" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check-git-permission
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#greatminds-coordd" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2276,6 +2298,26 @@ task pipeline, agent launcher.</p>
 <div class="highlight"><pre><span></span><code>  --version   Show the version and exit.
   -h, --help  Show this message and exit.
 </code></pre></div>
+<h3 id="greatminds-check-git-permission">greatminds check-git-permission<a class="headerlink" href="#greatminds-check-git-permission" title="Permanent link">&para;</a></h3>
+<p>greatminds check-git-permission — gate <code>git commit</code> / <code>git push</code> by role.</p>
+<p>Installed by <code>greatminds setup</code> as a pre-commit hook. Reads
+<code>schema.yaml</code> <code>git_permissions</code> and refuses if <code>$GREATMINDS_ROLE</code>
+is not in the allowed list for the given verb.</p>
+<p>Usage::</p>
+<pre><code>greatminds check-git-permission commit
+greatminds check-git-permission push
+</code></pre>
+<p>Exit codes:
+    0  allowed (or GREATMINDS_ROLE is in git_permissions.<verb>)
+    2  $GREATMINDS_ROLE unset or not allowed for this verb
+    3  schema lookup failed (missing section or unreadable file)</p>
+<p>Task 0091 item 2.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds check-git-permission [OPTIONS] {commit|push}
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  -h, --help  Show this message and exit.
+</code></pre></div>
 <h3 id="greatminds-coordd">greatminds coordd<a class="headerlink" href="#greatminds-coordd" title="Permanent link">&para;</a></h3>
 <p>coordd — optional coordination daemon. Closes the ScheduleWakeup gap.</p>
 <p>Two responsibilities, run every <interval> seconds:</p>
@@ -2470,10 +2512,10 @@ supported; the reader picks the right parser per file.</p>
 <div class="highlight"><pre><span></span><code>greatminds inbox send [OPTIONS] TO
 </code></pre></div>
 <p><strong>Options:</strong></p>
-<div class="highlight"><pre><span></span><code>  --kind [ask|info|wake]  [required]
-  --task TEXT             task id ref
-  --body TEXT             literal | @file | - (stdin)
-  -h, --help              Show this message and exit.
+<div class="highlight"><pre><span></span><code>  --kind TEXT  message kind (schema.inbox.allowed_kinds)  [required]
+  --task TEXT  task id ref
+  --body TEXT  literal | @file | - (stdin)
+  -h, --help   Show this message and exit.
 </code></pre></div>
 <h4 id="greatminds-inbox-show">greatminds inbox show<a class="headerlink" href="#greatminds-inbox-show" title="Permanent link">&para;</a></h4>
 <p><strong>Usage:</strong></p>
@@ -2797,6 +2839,14 @@ lives on PATH; per-project shims are unnecessary.</p>
                            (default: basename of project_dir). Must match
                            [A-Za-z0-9_.-]{1,64}; used as the systemd template
                            instance and the tmux session name.
+  --pre-trust              pre-accept Claude Code&#39;s &#39;Do you trust this
+                           folder?&#39; and codex&#39;s &#39;Allow Codex to run&#39; dialogs
+                           for this project. Writes a single per-project entry
+                           into ~/.claude.json and ~/.codex/config.toml;
+                           idempotent; never touches other projects&#39; entries.
+                           Intended for toy / test fleets where TESTER /
+                           STAND-KEEPER cannot walk dialogs interactively
+                           (task 0076).
   -h, --help               Show this message and exit.
 </code></pre></div>
 <h3 id="greatminds-stand">greatminds stand<a class="headerlink" href="#greatminds-stand" title="Permanent link">&para;</a></h3>
