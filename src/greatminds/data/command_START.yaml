@@ -28,13 +28,13 @@ version: 1
 # and schema.yaml.
 # ---------------------------------------------------------------------------
 common: |
-  **Read the static docs ONCE per session, not every tick.** On the very
-  first tick after start, read `<PROJECT_ROOT>/COORDINATE.md`,
-  `<PROJECT_ROOT>/schema.yaml`, `<COORDINATION_DIR>/PROJECT.md` and your
-  ROLE.md — and keep them in memory. These files don't change between
-  ticks; re-read them ONLY when an inbox message `kind: ask` arrives
-  from MAINTAINER saying "contract changed / re-read". Re-reading ~32KB
-  of static docs every idle tick burns tokens for nothing.
+  **Re-read static docs at the start of EVERY tick.** Whether the tick
+  fires by timeout OR by coordd's SIGINT-wake, read
+  `<PROJECT_ROOT>/COORDINATE.md`, `<PROJECT_ROOT>/schema.yaml`,
+  `<COORDINATION_DIR>/PROJECT.md` and your ROLE.md as the first
+  action. They WILL have changed between ticks — MAINTAINER can edit
+  canon, PLANNER can revise role contracts, USER can update PROJECT.md.
+  No in-memory caching. Operate on fresh canon each tick.
 
   **ALL mutations to files under `coordination/` go through the
   `greatminds` CLI.** No bare `mv` / `Edit` / `Write` on task files or
@@ -131,69 +131,38 @@ common: |
   and gone idle, the consumer hook will NOT wake you — wake-up
   requires either fresh user input or your own `ScheduleWakeup`.
 
-  **Therefore at the end of every tick, schedule a wake-up using the
-  adaptive backoff below.**
+  **Therefore at the end of every tick, schedule a long sleep — coordd
+  is the real wake signal.**
 
-  **Adaptive backoff is a mandatory policy, not an option.** Count
-  consecutive IDLE ticks (a tick where the inbox is empty AND none of
-  your `claims_from` queues have your work AND you moved nothing):
-
-  - 0 idle in a row (just had real work) → next sleep **60s**
-  - 1–2 idle → **120s**
-  - 3–5 idle → **300s**
-  - 6+ idle → **600s** (idle ceiling)
-  - ANY non-idle tick (claimed / replied to inbox / did an mv) → reset
-    counter to 0, next sleep is **60s** again
-
-  Active periods stay snappy (60s latency when work is actually
-  happening); long idles stop burning tokens. Latency only grows when
-  there's no work anyway — acceptable.
+  **Sleep length: 7200s (2h) default.** Post-0150 coordd's event-driven
+  SIGINT-routing wakes you sub-second on any new inbox / queue-file
+  event (it walks ``/proc/<your-pid>/task/*/children`` to find your
+  ``sleep`` descendant and SIGINTs it; bash unblocks; your next tick
+  fires). The 7200s value is a safety upper bound only — coordd's
+  poll-tick (0.2s) is the real reaction time. Pre-0150 (and pre-0176)
+  agents short-polled every 5s burning API tokens on idle ticks for
+  no reason; that mechanism is obsolete.
 
   - **If you have the `ScheduleWakeup` tool** (claude) — `delaySeconds`
-    per the backoff table above (60/120/300/600).
-  - **If `ScheduleWakeup` is unavailable** (codex, cursor) — DO NOT
-    issue a single synchronous `Bash sleep <N>` as the inter-tick
-    backoff. codex/cursor execute `sleep <N>` as a long-running tool
-    call that **blocks pty input**: coordd's input-socket nudges and
-    restart Enter keystrokes reach the prompt but cannot interrupt
-    the sleep, so reaction latency = N. Instead **short-poll**:
-    repeatedly run
-
-      ``greatminds inbox list && greatminds task list <one of your claims_from queues>``
-
-    and ``Bash sleep 5`` between iterations. **Important sentinel
-    semantics:** ``greatminds inbox list`` prints the literal token
-    ``(empty)`` (parentheses included) when the inbox has no
-    messages — that line is NOT work. Same shape for
-    ``greatminds task list <queue>``: it prints nothing or just a
-    header when the queue is empty. The break-out condition is
-    therefore **actual work content**, not "non-empty stdout":
-    treat the cycle as having new work only if the output mentions
-    a real ``<id>.yaml`` task filename, a real ``<id>.md`` inbox
-    message, or an explicit ``ask|wake|info`` kind tag — NOT the
-    ``(empty)`` sentinel and NOT a bare header line. If actual work
-    appears — tick immediately. Otherwise continue the 5-second
-    poll cycle for at most ``N // 5`` iterations (so the total
-    backoff window matches the table). Each ``greatminds`` CLI
-    call also refreshes the heartbeat as a side effect, so coordd
-    / watchdog / stalled-sweep see the role as alive throughout.
-    Maximum end-of-tick reaction latency is then ~5s regardless of
-    which backoff tier you're in.
+    7200 (or the tool's max, whichever is shorter). Claude's host
+    scheduler doesn't see coordd's SIGINT, but it does see fresh
+    user input — the long sleep is a token-cost safety net, not the
+    primary wake mechanism on claude.
+  - **If `ScheduleWakeup` is unavailable** (codex, cursor) — issue a
+    single synchronous ``Bash sleep 7200`` as the inter-tick backoff.
+    coordd's 0150 SIGINT-routing breaks the sleep on any new event
+    targeted at your role. End-of-tick reaction latency is therefore
+    coordd's poll interval (≤0.2s), NOT your sleep value.
 
   **CRITICAL: you are in an infinite loop.** When sleep/ScheduleWakeup
-  returns, the next tick starts from scratch: heartbeat (`greatminds task`
+  returns (either because the timer fired OR coordd SIGINT'd your
+  sleep), the next tick starts from scratch: heartbeat (`greatminds task`
   / `greatminds inbox` do it for you) → inbox → claim queues → act or
-  idle → recompute backoff → sleep again. **Never end your own
-  session**, even if everything is empty. End only when the user
-  explicitly says "stop".
+  idle → sleep 7200s again. **Never end your own session**, even if
+  everything is empty. End only when the user explicitly says "stop".
 
-  Mental model — `while true; do tick; sleep backoff(idle_count); done`.
-
-  **Important about latency:** the coordd nudge does NOT punch through
-  sleep/ScheduleWakeup (bytes buffer in the pty until the timer fires).
-  Your current backoff interval = the maximum reaction latency.
-  That's why a reset to 60s on any real work is mandatory — otherwise
-  you'll be stuck on 600s in the middle of an active phase.
+  Mental model — `while true; do tick; sleep 7200; done` (coordd
+  decides when 7200s actually elapses).
 
   **User-facing language.** Communicate with the USER (chat replies,
   console-status summaries, error messages shown to the user) in
@@ -320,7 +289,7 @@ roles:
       2. `greatminds task list feature_dev` — if there's a task, take it
          (already triaged, planned, scope:backend by queue construction,
          `plan.ready_for_implementation: true`). If empty — idle, sleep
-         per adaptive backoff. Do NOT poke `feature_plan`.
+         per 7200s sleep (coordd SIGINT-wakes you sub-second on events). Do NOT poke `feature_plan`.
       3. Implement the plan. Do NOT write tests as TESTER and do NOT
          validate the feature on a deployed stand — that's TESTER's job
          out of `feature_test/`.
@@ -361,8 +330,9 @@ roles:
       1. `greatminds inbox list` — answer, `greatminds inbox ack`.
       2. `greatminds task list feature_ui_dev` — if there's a task, take it
          (already triaged, planned, scope:ui by queue construction,
-         `plan.ready_for_implementation: true`). Empty — idle, sleep per
-         adaptive backoff. Do NOT poke `feature_plan`.
+         `plan.ready_for_implementation: true`). Empty — idle, sleep
+         7200s (coordd SIGINT-wakes you sub-second on events). Do NOT
+         poke `feature_plan`.
       3. Implement the UI, preserving the existing UX / design language.
       4. Do NOT touch backend/API; for stand operations — `greatminds stand request`.
       5. If `plan.stand_required: true` — `greatminds stand request ...
@@ -432,7 +402,7 @@ roles:
       1. `greatminds inbox list` — answer, `greatminds inbox ack`.
       2. `greatminds task list feature_docs` — if there's a task, take it
          (already triaged, planned, scope:docs by queue construction).
-         Empty — idle, sleep per adaptive backoff. Do NOT poke
+         Empty — idle, sleep per 7200s sleep (coordd SIGINT-wakes you sub-second on events). Do NOT poke
          `feature_plan`.
       3. Update docs against the actual product (default MkDocs Material;
          follow the existing stack if one exists).
