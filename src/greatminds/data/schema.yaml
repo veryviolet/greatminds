@@ -310,16 +310,20 @@ transitions:
     to: archive
     by: ARCHITECT-PLANNER
     requires: []
+  # Task 0102: review_sessions archive requires terminal-state evidence
+  # (at least one session_iteration block, or a blocked block whose
+  # reason names "withdrawn"/"abandoned"/"obsoleted"). Prevents a
+  # single role silently wiping an empty or in-progress session.
   - from: review_sessions
     to: archive
     by: ARCHITECT-PLANNER
-    requires: []
+    requires: [review_session_terminal_block]
   # F: EXPLORER may self-close its own review session when the review
   # campaign is complete (instead of only signalling PLANNER via inbox).
   - from: review_sessions
     to: archive
     by: EXPLORER
-    requires: []
+    requires: [review_session_terminal_block]
   # Withdrawal path for in-lifecycle work (task 0100): PLANNER may NOT
   # archive directly from per-scope implementer queues — that silently
   # discards already-written impl/tests/review blocks. The canonical
@@ -338,16 +342,21 @@ transitions:
   #   feature_review → archive  by ARCHITECT-PLANNER   requires: []
   # REVIEWER may archive blocked tasks that USER decides not to unblock
   # (dependency was retracted, task obsoleted, etc).
+  # Task 0102 (3): latest blocked.reason must name a withdrawn-class
+  # token; refuses single-role wipe of waiting-but-recoverable work.
   - from: feature_blocked
     to: archive
     by: ARCHITECT-REVIEWER
-    requires: []
+    requires: [feature_blocked_withdrawn_reason]
   # MAINTAINER may archive completed stand evidence to keep the
   # stand_done queue scannable.
+  # Task 0102 (4): refuse the sweep when any feature_blocked task lists
+  # this stand_done file in its blocked.dependencies — that would
+  # silently stall wake-check.
   - from: stand_done
     to: archive
     by: MAINTAINER
-    requires: []
+    requires: [stand_done_no_active_dependents]
   # Entering feature_plan needs a triage block (the plan block is
   # written IN feature_plan, then it routes OUT to a per-scope queue).
   - from: feature_inbox
@@ -442,10 +451,13 @@ transitions:
     requires: []
   # D: a stale/obsolete/withdrawn stand request can be cancelled by
   # ARCHITECT-PLANNER instead of forcing STAND-KEEPER to process it.
+  # Task 0102 (5): refuse if STAND-KEEPER has already claimed
+  # (stand_wip/<id>.yaml exists); otherwise PLANNER wipes a
+  # mid-claim request out from under STAND-KEEPER.
   - from: stand_requests
     to: archive
     by: ARCHITECT-PLANNER
-    requires: []
+    requires: [stand_request_not_yet_claimed]
   - from: stand_wip
     to: stand_done
     by: STAND-KEEPER

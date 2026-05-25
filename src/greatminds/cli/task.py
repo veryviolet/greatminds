@@ -935,6 +935,137 @@ def _noop_existing(data: dict[str, Any], from_q: str, to_q: str) -> str | None:
     return None
 
 
+# ---------------------------------------------------------------------------
+# 0102 validators: close 4 single-role archive holes by adding real
+# preconditions (review_sessions → archive, feature_blocked → archive,
+# stand_done → archive, stand_requests → archive).
+# ---------------------------------------------------------------------------
+
+_WITHDRAWN_REASON_TOKENS = ("withdrawn", "abandoned", "obsoleted")
+
+
+def _latest_block_of_kind(data: dict[str, Any], kind: str) -> dict[str, Any] | None:
+    for b in reversed(data.get("blocks") or []):
+        if isinstance(b, dict) and b.get("kind") == kind:
+            return b
+    return None
+
+
+def _has_block_of_kind(data: dict[str, Any], kind: str) -> bool:
+    return _latest_block_of_kind(data, kind) is not None
+
+
+def _check_review_session_terminal(data: dict[str, Any],
+                                   from_q: str, to_q: str) -> str | None:
+    """0102 (1)+(2): review_sessions → archive requires evidence the
+    session reached a terminal state — either at least one
+    ``session_iteration`` block (EXPLORER iterated) OR a ``blocked``
+    block whose reason names a withdrawn-class token. An empty
+    review_session may not be silently archived."""
+    if _has_block_of_kind(data, "session_iteration"):
+        return None
+    blocked = _latest_block_of_kind(data, "blocked")
+    if blocked is not None:
+        reason = str(blocked.get("reason") or "").lower()
+        if any(t in reason for t in _WITHDRAWN_REASON_TOKENS):
+            return None
+    return (
+        "review_session_terminal_block: review_session has no "
+        "session_iteration block and no blocked block with a "
+        "withdrawn/abandoned/obsoleted reason; either record at least "
+        "one iteration or file a withdrawn-blocked block first"
+    )
+
+
+def _check_feature_blocked_withdrawn(data: dict[str, Any],
+                                     from_q: str, to_q: str) -> str | None:
+    """0102 (3): feature_blocked → archive by ARCHITECT-REVIEWER requires
+    the latest ``blocked`` block to carry a withdrawn-class reason.
+    Without this guard REVIEWER alone can wipe in-flight work."""
+    blocked = _latest_block_of_kind(data, "blocked")
+    if blocked is None:
+        return (
+            "feature_blocked_withdrawn_reason: task has no blocked block "
+            "(unexpected — feature_blocked entry should have one)"
+        )
+    reason = str(blocked.get("reason") or "").lower()
+    if any(t in reason for t in _WITHDRAWN_REASON_TOKENS):
+        return None
+    return (
+        f"feature_blocked_withdrawn_reason: latest blocked.reason "
+        f"{blocked.get('reason')!r} does not contain a withdrawn-class "
+        f"token ({list(_WITHDRAWN_REASON_TOKENS)}); refuse to archive "
+        f"in-flight work"
+    )
+
+
+def _check_stand_done_no_active_dependents(data: dict[str, Any],
+                                            from_q: str, to_q: str) -> str | None:
+    """0102 (4): stand_done → archive by MAINTAINER requires that no
+    feature_blocked task currently depends on this stand_done file via
+    its blocked.dependencies list. Otherwise wake-check would silently
+    stall when MAINTAINER sweeps."""
+    task_id_full = data.get("id") or ""
+    if not task_id_full:
+        return None  # Defensive: id missing is its own error class.
+    try:
+        coord = find_coord_dir()
+    except Exception:
+        return None  # Outside a project — let other layers complain.
+    blocked_dir = coord / "feature_blocked"
+    if not blocked_dir.is_dir():
+        return None
+    target = f"stand_done/{task_id_full}.yaml"
+    dependents: list[str] = []
+    for f in sorted(blocked_dir.glob("*.yaml")):
+        try:
+            other = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
+        except (yaml.YAMLError, OSError):
+            continue
+        for b in (other.get("blocks") or []):
+            if not isinstance(b, dict) or b.get("kind") != "blocked":
+                continue
+            deps = b.get("dependencies") or []
+            if not isinstance(deps, list):
+                continue
+            if any(str(d) == target for d in deps):
+                dependents.append(f.stem)
+                break
+    if dependents:
+        return (
+            f"stand_done_no_active_dependents: feature_blocked tasks "
+            f"depend on this stand_done via wake-check: "
+            f"{sorted(dependents)}; resolve those first or wait for "
+            f"REVIEWER to wake them"
+        )
+    return None
+
+
+def _check_stand_request_not_yet_claimed(data: dict[str, Any],
+                                          from_q: str, to_q: str) -> str | None:
+    """0102 (5): stand_requests → archive by ARCHITECT-PLANNER requires
+    that STAND-KEEPER hasn't already claimed it (i.e., no stand_wip
+    file with the same id exists). Otherwise PLANNER wipes a
+    mid-claim request out from under STAND-KEEPER."""
+    task_id_full = data.get("id") or ""
+    if not task_id_full:
+        return None
+    try:
+        coord = find_coord_dir()
+    except Exception:
+        return None
+    wip = coord / "stand_wip" / f"{task_id_full}.yaml"
+    if wip.exists():
+        return (
+            f"stand_request_not_yet_claimed: STAND-KEEPER already "
+            f"claimed this request (stand_wip/{task_id_full}.yaml "
+            f"exists); ask STAND-KEEPER to release or wait for "
+            f"stand_done"
+        )
+    return None
+
+
+# ---------------------------------------------------------------------------
 SCHEMA_REQUIRES_VALIDATORS: dict[str, "callable"] = {
     # Empty pre-condition is always satisfied.
     # (Schema entries with `requires: []` are still validated for role/
@@ -959,6 +1090,11 @@ SCHEMA_REQUIRES_VALIDATORS: dict[str, "callable"] = {
     # 0103 real-enforcement: re-evaluate gate-check rather than trust
     # tests.gate_check_result.
     "gate_check_pass_if_stand_required": _check_gate_for_stand_required,
+    # 0102 real-enforcement: archive-hole guards.
+    "review_session_terminal_block": _check_review_session_terminal,
+    "feature_blocked_withdrawn_reason": _check_feature_blocked_withdrawn,
+    "stand_done_no_active_dependents": _check_stand_done_no_active_dependents,
+    "stand_request_not_yet_claimed": _check_stand_request_not_yet_claimed,
 }
 
 
