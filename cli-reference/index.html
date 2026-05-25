@@ -2803,6 +2803,13 @@ Python implementation. Same external behavior, same order:</p>
 <p><strong>Options:</strong></p>
 <div class="highlight"><pre><span></span><code>  --config FILE            path to coord.yaml (default: &lt;project&gt;/coord.yaml)
   --project-dir DIRECTORY  override config.project_dir / cwd
+  --bootstrap              force re-launch of every role&#39;s agent — even alive
+                           ones. SIGTERMs each alive pid and clears its
+                           session-id files so the next start-agent goes
+                           through the fresh path (no claude --resume, no
+                           codex resume &lt;sid&gt;). Use after upgrading the
+                           greatminds package so running agents reload canon
+                           from the new wheel.
   -h, --help               Show this message and exit.
 </code></pre></div>
 <h3 id="greatminds-setup">greatminds setup<a class="headerlink" href="#greatminds-setup" title="Permanent link">&para;</a></h3>
