@@ -441,6 +441,32 @@ def _file_lock_path(coord: Path, file_rel: str) -> Path:
     return coord / FILE_LOCKS_DIR_NAME / f"{h}.lock"
 
 
+def _canonical_task_id(coord: Path, task_id: str) -> str:
+    """0166: resolve ``task_id`` to its canonical full-slug form via
+    the unified ``find_task`` helper (0114).
+
+    Pre-0166 ``_acquire_file_locks_for_task`` stored whatever
+    ``task_id`` it was passed; callers used a short id (``0158``) at
+    append-block time and the full slug
+    (``0158-codex-per-role-instructions-...``) at mv-to-verified time.
+    The release exact-match failed → locks accumulated forever.
+
+    Both acquire and release now canonicalize at entry so the stored
+    holder string is stable across short-id and full-slug callers.
+
+    Returns the resolved full-slug stem when the task is found in any
+    queue; falls back to the caller's input verbatim when the task is
+    missing (e.g. the caller is releasing locks for an already-
+    archived task whose file is gone — the defensive numeric-prefix
+    fallback in the release path handles that case).
+    """
+    found = find_task(coord, task_id)
+    if found is not None:
+        path, _queue = found
+        return path.stem
+    return task_id
+
+
 def _acquire_file_locks_for_task(coord: Path, task_id: str,
                                   files: list[str]) -> None:
     """Claim per-file ownership for ``files`` under ``task_id``.
@@ -451,6 +477,7 @@ def _acquire_file_locks_for_task(coord: Path, task_id: str,
 
     Raises ``GreatMindsError`` on conflict, naming the holder + queue.
     """
+    canonical_id = _canonical_task_id(coord, task_id)
     locks_dir = coord / FILE_LOCKS_DIR_NAME
     locks_dir.mkdir(parents=True, exist_ok=True)
     # Pass 1: detect conflicts.
@@ -464,7 +491,12 @@ def _acquire_file_locks_for_task(coord: Path, task_id: str,
             holder = lp.read_text(encoding="utf-8").strip()
         except OSError:
             holder = ""
-        if not holder or holder == task_id:
+        # 0166: also accept a holder that resolves to the same canonical
+        # id we're about to write (e.g. a pre-fix short-id lock written
+        # by an older greatminds install).
+        if not holder or holder == canonical_id or (
+            holder and _canonical_task_id(coord, holder) == canonical_id
+        ):
             continue
         # Conflict: name the holder's current queue for diagnosability.
         holder_loc = find_task(coord, holder)
@@ -476,26 +508,53 @@ def _acquire_file_locks_for_task(coord: Path, task_id: str,
             f"the same working-tree file in parallel",
             exit_code=2,
         )
-    # Pass 2: claim (write our task id into each lock file).
+    # Pass 2: claim. Write the CANONICAL id so the release path's
+    # exact-match works regardless of which id form the caller used.
     for f in files:
         if not isinstance(f, str) or not f.strip():
             continue
         lp = _file_lock_path(coord, f)
-        lp.write_text(task_id, encoding="utf-8")
+        lp.write_text(canonical_id, encoding="utf-8")
 
 
 def _release_file_locks_for_task(coord: Path, task_id: str) -> None:
     """Best-effort: remove every lock file whose content names this
-    task id. Called when a task moves into FILE_LOCK_RELEASE_QUEUES."""
+    task id. Called when a task moves into FILE_LOCK_RELEASE_QUEUES.
+
+    0166: canonicalize ``task_id`` at entry AND accept either-form
+    matches in the lock content. The defensive bidirectional match
+    handles pre-0166 stale locks (whose content might be short-id even
+    though the release call now passes the full slug, or vice versa).
+    """
     locks_dir = coord / FILE_LOCKS_DIR_NAME
     if not locks_dir.is_dir():
         return
+    canonical_id = _canonical_task_id(coord, task_id)
+    # Numeric-prefix from the canonical id ("0158" from
+    # "0158-codex-..."). Used as a final defensive fallback for stale
+    # locks that store just the short id.
+    import re as _re
+    m = _re.match(r"^([0-9]{1,4})(?:-|$)", canonical_id)
+    short_id = m.group(1).zfill(4) if m else ""
     for lp in locks_dir.glob("*.lock"):
         try:
             holder = lp.read_text(encoding="utf-8").strip()
         except OSError:
             continue
-        if holder == task_id:
+        if not holder:
+            continue
+        # Match in priority order: exact canonical → exact input →
+        # holder's own canonicalization → numeric-prefix.
+        match = (
+            holder == canonical_id
+            or holder == task_id
+            or _canonical_task_id(coord, holder) == canonical_id
+        )
+        if not match and short_id:
+            holder_m = _re.match(r"^([0-9]{1,4})(?:-|$)", holder)
+            if holder_m and holder_m.group(1).zfill(4) == short_id:
+                match = True
+        if match:
             try:
                 lp.unlink()
             except OSError:
