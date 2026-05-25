@@ -35,12 +35,16 @@ SCOPE_QUEUE = {
 
 
 def find_task_queue(coord: Path, task_id: str) -> str | None:
-    for q in coord.iterdir():
-        if not q.is_dir() or q.name.startswith("."):
-            continue
-        if (q / f"{task_id}.yaml").is_file():
-            return q.name
-    return None
+    """Thin wrapper around the unified ``find_task`` (0114).
+
+    Accepts full slug, short-numeric (``0109``), or slug-prefix.
+    """
+    from greatminds.cli.task import find_task as _find_task
+
+    found = _find_task(coord, task_id)
+    if found is None:
+        return None
+    return found[1]
 
 
 @click.command(

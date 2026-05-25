@@ -159,16 +159,21 @@ def parse_task_file(path: Path, verbose_errors: bool = False) -> dict:
 
 
 def find_task_file(project_dir: Path, task_id: str, queues: list[str]) -> Path | None:
+    """Delegate to the unified task.find_task (0114) then filter by the
+    product-pipeline queue allowlist gate-check intentionally restricts
+    to. Keeps gate-check's narrower scope (no stand_*/bot_*) while
+    eliminating the resolution divergence REVIEWER flagged."""
+    from greatminds.cli.task import find_task as _unified_find_task
+
     coord = project_dir / "coordination"
-    # Normalize: if just seq given, accept any file starting with "<seq>-".
-    seq_only = re.fullmatch(r"\d{1,4}", task_id)
-    for q in queues:
-        for f in _candidate_files(coord / q):
-            if f.stem == task_id:
-                return f
-            if seq_only and f.stem.startswith(f"{int(task_id):04d}-"):
-                return f
-    return None
+    allowed = set(queues)
+    found = _unified_find_task(coord, task_id)
+    if found is None:
+        return None
+    path, q = found
+    if q not in allowed:
+        return None
+    return path
 
 
 def load_schema_queues(canon_dir: Path) -> list[str]:

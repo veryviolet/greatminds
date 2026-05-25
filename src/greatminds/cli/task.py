@@ -256,17 +256,57 @@ def task_path_in_queue(coord: Path, queue: str, task_id: str) -> Path | None:
     return None
 
 
+_SEQ_ONLY_RE = re.compile(r"^\d{1,4}$")
+
+
 def find_task(coord: Path, task_id: str) -> tuple[Path, str] | None:
-    """Return ``(path, queue_name)`` where task currently sits, or ``None``."""
-    for q in coord.iterdir():
+    """Return ``(path, queue_name)`` where task currently sits, or ``None``.
+
+    0114 unification: accepts THREE id shapes, in priority order:
+      1. Full filename stem: ``0109-make-schema-...`` → exact match.
+      2. Short numeric id: ``0109`` (1–4 digits) → matches any file
+         whose stem starts ``<zero-padded-seq>-``. Disambiguation:
+         if multiple matches, returns the first (lex-sorted) and
+         logs ambiguity; this matches the de-facto behavior of
+         gate_check.find_task_file from before the unification.
+      3. Slug prefix: ``0109-make-schema`` → matches any file whose
+         stem starts with the given prefix. Same ambiguity rule.
+
+    Scans every coordination subdirectory except ``intent``, ``inbox``,
+    ``.locks``, ``.agent_registry``, and any other dot-prefixed dir.
+
+    Pre-0114, only shape (1) worked — short-id lookups silently
+    returned None, causing the misleading "task X not found in any
+    queue" race-masking error (the 2026-05-25 0097 incident behind
+    tasks 0113 / 0114).
+    """
+    if not coord.is_dir():
+        return None
+    seq_only = bool(_SEQ_ONLY_RE.match(task_id))
+    seq_prefix = f"{int(task_id):04d}-" if seq_only else None
+    exact_candidates: list[tuple[Path, str]] = []
+    prefix_candidates: list[tuple[Path, str]] = []
+    for q in sorted(coord.iterdir()):
         if not q.is_dir() or q.name.startswith("."):
             continue
         if q.name in ("intent", "inbox"):
             continue
-        for ext in (".yaml", ".md"):
-            p = q / f"{task_id}{ext}"
-            if p.is_file():
-                return p, q.name
+        for f in sorted(q.iterdir()):
+            if not f.is_file():
+                continue
+            if f.suffix not in (".yaml", ".md"):
+                continue
+            stem = f.stem
+            if stem == task_id:
+                exact_candidates.append((f, q.name))
+            elif seq_only and seq_prefix and stem.startswith(seq_prefix):
+                prefix_candidates.append((f, q.name))
+            elif not seq_only and stem.startswith(task_id + "-"):
+                prefix_candidates.append((f, q.name))
+    if exact_candidates:
+        return exact_candidates[0]
+    if prefix_candidates:
+        return prefix_candidates[0]
     return None
 
 
