@@ -142,39 +142,48 @@ def _ensure_dir(p: Path) -> str:
     return "created"
 
 
-def _copy_codex_profiles_if_missing(canon: Path) -> tuple[int, int]:
-    """Copy shipped codex profiles to ``~/.codex/<basename>.config.toml``.
+def _setup_codex_homes_per_role(canon: Path,
+                                project_dir: Path) -> tuple[int, int]:
+    """0158: install per-role codex homes at
+    ``<project>/coordination/.codex-home/<role>/config.toml``.
 
-    Per-user, idempotent: if a destination file already exists it is NOT
-    overwritten — the user may have customized it. Returns
-    ``(copied, skipped)`` counts for the setup summary.
+    Replaces the pre-0158 ``~/.codex/<role>.config.toml`` mechanism that
+    codex 0.130.0 silently stopped reading. codex 0.130+ only loads
+    ``$CODEX_HOME/config.toml``; ``--profile <role>`` then selects the
+    ``[profiles.<role>]`` section within. start_agent.py sets
+    ``CODEX_HOME=<project>/coordination/.codex-home/<role>`` at launch.
 
-    start_agent.py picks these up automatically via ``--profile <role>``
-    when ``~/.codex/<role>.config.toml`` exists (task 0047 wired the full
-    path: shipped profiles → user-side config → codex agent).
+    Per-project, idempotent: an existing per-role ``config.toml`` is
+    NOT overwritten — the operator may have customized it. Returns
+    ``(written, skipped)`` for the setup summary.
     """
     src_dir = canon / "codex" / "profiles"
     if not src_dir.is_dir():
         return (0, 0)
-    dst_dir = Path.home() / ".codex"
+    homes_root = project_dir / "coordination" / ".codex-home"
     try:
-        dst_dir.mkdir(parents=True, exist_ok=True)
+        homes_root.mkdir(parents=True, exist_ok=True)
     except OSError:
         return (0, 0)
-    copied = 0
+    written = 0
     skipped = 0
     for src in sorted(src_dir.glob("*.config.toml")):
-        dst = dst_dir / src.name
+        role = src.stem.replace(".config", "")
+        role_home = homes_root / role
+        try:
+            role_home.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            continue
+        dst = role_home / "config.toml"
         if dst.is_file():
             skipped += 1
             continue
         try:
             shutil.copyfile(src, dst)
-            copied += 1
+            written += 1
         except OSError:
-            # Per-profile failure is non-fatal — keep going.
             continue
-    return (copied, skipped)
+    return (written, skipped)
 
 
 def _copy_if_missing(src: Path, dst: Path, force: bool = False) -> str:
@@ -566,15 +575,19 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     else:
         info("  .claude/settings.local.json: exists")
 
-    # Codex profile copy (task 0047) — install shipped profiles into
-    # ~/.codex/<role>.config.toml so start_agent.py's --profile path
-    # actually finds them. Per-user, idempotent: existing files are NOT
-    # overwritten (preserve user customizations).
-    copied, skipped = _copy_codex_profiles_if_missing(canon)
-    if copied or skipped:
+    # Codex per-role homes (task 0158, supersedes 0047) — install
+    # shipped profiles into ``<project>/coordination/.codex-home/<role>/
+    # config.toml``. codex 0.130+ reads ``$CODEX_HOME/config.toml`` and
+    # selects ``[profiles.<role>]`` within it; the previous
+    # ``~/.codex/<role>.config.toml`` location is no longer read by
+    # codex. start_agent.py sets ``CODEX_HOME`` per role at launch.
+    # Per-project, idempotent: existing per-role config.toml is NOT
+    # overwritten.
+    written, skipped = _setup_codex_homes_per_role(canon, project_dir)
+    if written or skipped:
         info(
-            f"  codex profiles → ~/.codex/: {copied} copied, "
-            f"{skipped} preserved (existing)"
+            f"  codex per-role homes → coordination/.codex-home/: "
+            f"{written} written, {skipped} preserved (existing)"
         )
 
     # Git pre-commit hook (task 0091 item 2) — installs only if a

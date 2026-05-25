@@ -161,74 +161,13 @@ def test_generated_json_is_valid(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# task 0047: setup copies shipped codex profiles to ~/.codex/<role>.config.toml.
-# Idempotent: existing files are NOT overwritten (preserve user edits).
+# task 0047: shipped codex profile copy to ~/.codex/<role>.config.toml.
+# OBSOLETED by 0158: codex 0.130 stopped reading ~/.codex/<role>.config.toml;
+# greatminds setup now installs per-role $CODEX_HOME dirs at
+# <project>/coordination/.codex-home/<role>/ instead. The 0047 helper
+# (``_copy_codex_profiles_if_missing``) was removed; 0158 coverage lives
+# in tests/cli/test_codex_home_setup_0158.py.
 # ---------------------------------------------------------------------------
-
-
-def _fake_canon(tmp_path: Path, profile_names: list[str]) -> Path:
-    """Build a synthetic canon dir with codex/profiles/ entries."""
-    canon = tmp_path / "canon"
-    (canon / "codex" / "profiles").mkdir(parents=True)
-    for name in profile_names:
-        p = canon / "codex" / "profiles" / name
-        p.write_text(f'instructions = """\nrole content for {name}\n"""\n',
-                     encoding="utf-8")
-    return canon
-
-
-def test_codex_profile_copy_first_run(tmp_path, monkeypatch):
-    """Fresh ~/.codex/ → all shipped profiles copied with their content intact."""
-    home = tmp_path / "home"
-    home.mkdir()
-    monkeypatch.setattr(setup_mod.Path, "home", classmethod(lambda cls: home))
-    canon = _fake_canon(tmp_path, [
-        "architect-reviewer.config.toml",
-        "developer.config.toml",
-        "tester.config.toml",
-    ])
-
-    copied, skipped = setup_mod._copy_codex_profiles_if_missing(canon)
-
-    assert copied == 3
-    assert skipped == 0
-    for name in ("architect-reviewer", "developer", "tester"):
-        dst = home / ".codex" / f"{name}.config.toml"
-        assert dst.is_file(), f"missing {dst}"
-        assert f"role content for {name}.config.toml" in dst.read_text(encoding="utf-8")
-
-
-def test_codex_profile_copy_preserves_user_edits(tmp_path, monkeypatch):
-    """A user-customized ~/.codex/<role>.config.toml is NOT overwritten."""
-    home = tmp_path / "home"
-    (home / ".codex").mkdir(parents=True)
-    monkeypatch.setattr(setup_mod.Path, "home", classmethod(lambda cls: home))
-    canon = _fake_canon(tmp_path, ["developer.config.toml",
-                                    "tester.config.toml"])
-
-    user_edit = "instructions = \"\"\"\nMY USER OVERRIDE\n\"\"\"\n"
-    (home / ".codex" / "developer.config.toml").write_text(
-        user_edit, encoding="utf-8",
-    )
-
-    copied, skipped = setup_mod._copy_codex_profiles_if_missing(canon)
-
-    assert copied == 1   # tester only
-    assert skipped == 1  # developer was preserved
-    # User edit must remain intact.
-    assert (home / ".codex" / "developer.config.toml").read_text(encoding="utf-8") == user_edit
-
-
-def test_codex_profile_copy_no_canon_dir(tmp_path, monkeypatch):
-    """Canon without codex/profiles/ → (0, 0), no crash."""
-    home = tmp_path / "home"
-    home.mkdir()
-    monkeypatch.setattr(setup_mod.Path, "home", classmethod(lambda cls: home))
-    canon = tmp_path / "canon"
-    canon.mkdir()  # exists but no codex/ subtree
-
-    copied, skipped = setup_mod._copy_codex_profiles_if_missing(canon)
-    assert (copied, skipped) == (0, 0)
 
 
 def test_shipped_codex_profiles_have_no_internal_brand_leaks():

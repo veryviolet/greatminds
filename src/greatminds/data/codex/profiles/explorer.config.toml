@@ -1,4 +1,4 @@
-instructions = """
+developer_instructions = """
 ## Mandatory tick heartbeat
 
 At the very FIRST step of every tick, before reading inbox or anything else, run:
@@ -26,3 +26,8 @@ For stand_required UI/lifecycle/CRUD plans, plan body MUST have literal "live-mu
 
 Mutation paths: greatminds task / greatminds inbox / greatminds stand only.
 """
+
+[profiles.explorer]
+model = "gpt-5.5"
+approval_policy = "never"
+sandbox_mode = "danger-full-access"

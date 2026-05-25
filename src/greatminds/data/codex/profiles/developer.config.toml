@@ -4,7 +4,7 @@
 # picked up automatically by start_agent.py (--profile developer) when
 # the role is launched on codex.
 
-instructions = """
+developer_instructions = """
 ## Mandatory tick heartbeat
 
 At the very FIRST step of every tick, before reading inbox or anything else, run:
@@ -37,3 +37,8 @@ Mutation paths: greatminds task / greatminds inbox / greatminds stand only. No b
 
 Forbidden: stand.status writes, deploy/restart/rsync, commit/push, claiming ui/docs/stand tasks, product validation on the stand instead of TESTER, reading or moving from feature_plan/.
 """
+
+[profiles.developer]
+model = "gpt-5.5"
+approval_policy = "never"
+sandbox_mode = "danger-full-access"

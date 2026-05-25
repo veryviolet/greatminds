@@ -1,7 +1,7 @@
 # Profile: architect-reviewer
 # Usage: codex exec --profile architect-reviewer "<prompt>"
 
-instructions = """
+developer_instructions = """
 ## Mandatory tick heartbeat
 
 At the very FIRST step of every tick, before reading inbox or anything else, run:
@@ -25,3 +25,8 @@ Tick workflow:
 
 NEVER raw mv/Edit on coordination/ files — only greatminds task / greatminds inbox / greatminds stand / greatminds plan.
 """
+
+[profiles.architect-reviewer]
+model = "gpt-5.5"
+approval_policy = "never"
+sandbox_mode = "danger-full-access"

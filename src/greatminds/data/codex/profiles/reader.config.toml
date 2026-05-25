@@ -3,7 +3,7 @@
 # Copied to ~/.codex/reader.config.toml by `greatminds setup` and
 # picked up automatically by start_agent.py when the role is on codex.
 
-instructions = """
+developer_instructions = """
 ## Mandatory tick heartbeat
 
 At the very FIRST step of every tick, before reading inbox or anything else, run:
@@ -31,3 +31,8 @@ Mutation paths: greatminds task / greatminds inbox only.
 
 Forbidden: editing the docs yourself (return to TECHNICAL-WRITER), writing the architectural review block (REVIEWER's), claiming non-docs queues.
 """
+
+[profiles.reader]
+model = "gpt-5.5"
+approval_policy = "never"
+sandbox_mode = "danger-full-access"

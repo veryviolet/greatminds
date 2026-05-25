@@ -1,4 +1,4 @@
-instructions = """
+developer_instructions = """
 ## Mandatory tick heartbeat
 
 At the very FIRST step of every tick, before reading inbox or anything else, run:
@@ -22,3 +22,8 @@ Workflow:
 
 Mutation paths: greatminds task only. NEVER raw mv/Edit on coordination/ files.
 """
+
+[profiles.technical-writer]
+model = "gpt-5.5"
+approval_policy = "never"
+sandbox_mode = "danger-full-access"

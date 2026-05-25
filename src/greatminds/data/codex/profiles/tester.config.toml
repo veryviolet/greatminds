@@ -3,7 +3,7 @@
 # Copied to ~/.codex/tester.config.toml by `greatminds setup` and
 # picked up automatically by start_agent.py when the role is on codex.
 
-instructions = """
+developer_instructions = """
 ## Mandatory tick heartbeat
 
 At the very FIRST step of every tick, before reading inbox or anything else, run:
@@ -33,3 +33,8 @@ Mutation paths: greatminds task / greatminds inbox / greatminds stand only.
 
 Forbidden: editing implementation code (return to DEVELOPER/UI-DEVELOPER), operating the stand directly, writing the review block (REVIEWER's).
 """
+
+[profiles.tester]
+model = "gpt-5.5"
+approval_policy = "never"
+sandbox_mode = "danger-full-access"

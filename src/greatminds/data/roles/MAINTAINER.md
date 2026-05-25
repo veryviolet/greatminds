@@ -43,8 +43,15 @@ MAINTAINER owns these one-shot operational commands:
   project in `~/.config/greatminds/projects.json`; `migrate --yes`
   retires any legacy singleton `coordd.service`.
 - `greatminds setup --session NAME` — fleet bootstrap; generates
-  coord.yaml (init-style — never overwrites) and registers the
-  project with the daemon.
+  coord.yaml (init-style — never overwrites), registers the project
+  with the daemon, and (0158) installs per-role codex homes at
+  `<project>/coordination/.codex-home/<role>/config.toml`. codex
+  0.130+ reads `$CODEX_HOME/config.toml` (selecting `[profiles.<role>]`
+  via `--profile`); `start_agent` exports `CODEX_HOME` per role at
+  launch. After every `greatminds update`, re-run `greatminds setup
+  <PROJECT>` (idempotent — preserves operator-edited per-role
+  config.toml files) to refresh the codex home dirs against shipped
+  profile updates.
 - `greatminds restart [--bootstrap | --reset]` — idempotent fleet
   restart (coordd + tmux session + dead agents). Two opt-in modes
   for handling alive agents:
