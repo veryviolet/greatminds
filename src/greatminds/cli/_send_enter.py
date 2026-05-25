@@ -186,6 +186,93 @@ _KEY_TO_BYTES: dict[str, bytes] = {
 }
 
 
+def _all_children(pid_int: int) -> list[int]:
+    """Return ALL child pids spawned by ANY thread of ``pid_int``.
+
+    ``/proc/<pid>/task/<pid>/children`` only lists children spawned by
+    the main thread (tid == pid). Multi-threaded processes (codex,
+    claude with worker threads, anything Go-based) may spawn
+    subprocesses from a non-main thread — those children live under
+    ``/proc/<pid>/task/<other_tid>/children`` and the single-thread
+    walk misses them entirely.
+
+    Aggregate across every ``task/<tid>`` directory to find the actual
+    child set. Returns an empty list if /proc is unreadable.
+    """
+    task_dir = f"/proc/{pid_int}/task"
+    try:
+        tids = os.listdir(task_dir)
+    except OSError:
+        return []
+    out: list[int] = []
+    for tid_name in tids:
+        if not tid_name.isdigit():
+            continue
+        try:
+            with open(f"{task_dir}/{tid_name}/children",
+                      "r", encoding="utf-8") as f:
+                raw = f.read().strip()
+        except OSError:
+            continue
+        out.extend(int(s) for s in raw.split() if s.isdigit())
+    return out
+
+
+def _deepest_descendant(pid_int: int) -> int | None:
+    """Walk children-of-all-threads from ``pid_int`` down to the leaf.
+
+    For an agent (claude / codex / cursor) that has spawned ``Bash sleep N``
+    as a tool call, the leaf is the ``sleep`` process itself. Sending SIGINT
+    to that leaf interrupts the blocking sleep syscall; bash sees the
+    non-zero return; the agent's tool call resolves; the next tick runs.
+
+    For an agent with no live tool subprocess (claude sleeping its own
+    event loop via ScheduleWakeup), the leaf is the agent process itself.
+
+    Returns the deepest descendant pid, or None if /proc is unreadable
+    (e.g. non-Linux host) or pid_int is dead.
+
+    REVIEWER 0093 iter: hardened to walk children of EVERY thread of
+    the agent process (``/proc/<pid>/task/*/children``), not just the
+    main thread. Multi-threaded agents like codex spawn their bash
+    subprocess from a worker thread, so the main-thread-only walk
+    returned the agent itself and the SIGINT was skipped (leaf ==
+    pid_int guard).
+    """
+    if not os.path.isdir(f"/proc/{pid_int}"):
+        return None
+    current = pid_int
+    # Bounded loop — guard against arbitrary descendant depth or cycles.
+    for _ in range(64):
+        kids = _all_children(current)
+        if not kids:
+            return current
+        # The pty foreground process group's leader is usually the youngest.
+        # Follow the last child — closest to "what the agent is doing now".
+        current = kids[-1]
+    return current
+
+
+def _send_sigint(pid_int: int) -> bool:
+    """SIGINT ``pid_int`` if alive. Returns True iff the signal was sent
+    (process existed); False if the pid was gone or signaling failed."""
+    try:
+        import signal
+        os.kill(pid_int, signal.SIGINT)
+        return True
+    except (ProcessLookupError, PermissionError, OSError):
+        return False
+
+
+def _process_comm(pid_int: int) -> str:
+    """Return /proc/<pid>/comm contents (process name) or empty string."""
+    try:
+        with open(f"/proc/{pid_int}/comm", "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+
 def _heartbeat_mtime(coord_dir: Path, role_lower: str) -> float | None:
     """Return mtime of ``coord/heartbeat.<role-lower>``, or None if
     the file is absent / unreadable. None means "no heartbeat signal
@@ -259,6 +346,30 @@ def press_enter(
         return (False, f"pid {pid_int} not alive — agent is dead, "
                 f"need fresh launch (restart), not Enter")
 
+    # Interrupt the agent's blocking tool subprocess if any. This is the
+    # critical mechanism that 0093 introduces: ``tmux send-keys Enter``
+    # puts \r bytes in the pty buffer, but a blocking ``sleep`` syscall
+    # never reads stdin, so the keystroke sits queued until the sleep
+    # finishes. Sending SIGINT to the deepest descendant of the agent
+    # process actually breaks the syscall: ``sleep`` exits, ``bash`` sees
+    # the non-zero return, the tool call resolves, and the next tick
+    # runs against the buffered Enter. For claude (no live tool
+    # subprocess; ScheduleWakeup is internal), the deepest descendant is
+    # the agent process itself — the SIGINT may or may not interrupt
+    # claude's internal wait depending on its signal handling; the
+    # send-keys Enter below is the secondary signal that handles that
+    # case via claude's TUI input loop.
+    interrupt_diag = ""
+    if mode == "wake" and pid_int is not None:
+        leaf = _deepest_descendant(pid_int)
+        if leaf is not None and leaf != pid_int:
+            leaf_comm = _process_comm(leaf)
+            if _send_sigint(leaf):
+                interrupt_diag = f" (SIGINT pid={leaf} comm={leaf_comm!r})"
+                # Brief gap so the bash subprocess can collect the signal
+                # and return control to the agent before we deliver Enter.
+                time.sleep(0.05)
+
     hb_baseline = _heartbeat_mtime(coord_dir, role_lower) if mode == "wake" else None
     # Pane baseline: capture in bare-enter mode AND in the wake mode's
     # no-heartbeat-baseline fallback path. The wake-no-heartbeat path
@@ -311,7 +422,7 @@ def press_enter(
             continue
 
         if not verify:
-            return (True, f"{channel} (no verify)")
+            return (True, f"{channel}{interrupt_diag} (no verify)")
 
         # Verification path 1: heartbeat-mtime polling (mode="wake").
         if mode == "wake":
@@ -356,7 +467,7 @@ def press_enter(
             if advanced:
                 new_mtime = _heartbeat_mtime(coord_dir, role_lower) or 0
                 delta = new_mtime - hb_baseline
-                return (True, f"{channel} (heartbeat advanced "
+                return (True, f"{channel}{interrupt_diag} (heartbeat advanced "
                         f"+{delta:.1f}s within {verify_timeout_s:.0f}s)")
             attempts.append(f"{channel}: heartbeat did not advance within "
                             f"{verify_timeout_s:.0f}s")

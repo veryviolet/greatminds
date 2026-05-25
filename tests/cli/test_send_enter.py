@@ -397,3 +397,162 @@ def test_verify_false_returns_after_first_send_no_polling(coord_dir, tmux):
     # No capture-pane / no heartbeat-poll in verify=False mode.
     cp = [c for c in tmux.calls if c[:2] == ["tmux", "capture-pane"]]
     assert cp == []
+
+
+# ---------------------------------------------------------------------------
+# 0093: SIGINT to deepest descendant (the real wake mechanism)
+# ---------------------------------------------------------------------------
+
+
+def test_wake_sends_sigint_to_deepest_descendant(coord_dir, tmux, monkeypatch):
+    """0093: ``tmux send-keys Enter`` only buffers \\r in the pty input.
+    A blocking ``sleep`` syscall never reads stdin, so the keystroke
+    sits queued until the sleep finishes. The primitive must SIGINT the
+    deepest descendant (the actual ``sleep`` process) to interrupt the
+    blocking call. Mocked /proc traversal, mocked os.kill."""
+    _write_registry(coord_dir, "tester", pid=999, tool="codex")
+    _write_heartbeat(coord_dir, "tester", mtime=1000.0)
+
+    # Mock the descendant walk: 999 -> 1000 -> 1001 (leaf).
+    monkeypatch.setattr(se, "_deepest_descendant", lambda pid: 1001)
+    monkeypatch.setattr(se, "_process_comm", lambda pid: "sleep")
+    killed: list[int] = []
+
+    def _fake_send_sigint(pid: int) -> bool:
+        killed.append(pid)
+        return True
+
+    monkeypatch.setattr(se, "_send_sigint", _fake_send_sigint)
+    monkeypatch.setattr(
+        se, "_poll_heartbeat_advance",
+        lambda *_a, **_k: True,
+    )
+    monkeypatch.setattr(
+        se, "_heartbeat_mtime",
+        lambda cd, role: 1001.0 if killed else 1000.0,
+    )
+
+    ok, diag = se.press_enter(
+        coord_dir, "s", "dev", "tester", "codex",
+        mode="wake", verify_timeout_s=1.0,
+    )
+    assert ok, f"wake should succeed when heartbeat advances post-SIGINT; diag={diag}"
+    assert killed == [1001], (
+        f"SIGINT should fire on the deepest descendant pid=1001; got {killed!r}"
+    )
+    assert "SIGINT" in diag, f"diag should mention SIGINT path; got {diag!r}"
+    assert "sleep" in diag, f"diag should include leaf comm; got {diag!r}"
+
+
+def test_deepest_descendant_finds_child_under_non_main_thread() -> None:
+    """REVIEWER 0093 iter regression: multi-threaded agents (codex,
+    Go-based tools) spawn subprocesses from non-main threads. The leaf
+    walk must read /proc/<pid>/task/<TID>/children for every TID, not
+    just <pid>/<pid>. Otherwise _deepest_descendant returns the agent
+    itself even when a sleep child exists, causing the SIGINT path to
+    be skipped (leaf == agent guard).
+
+    Real-subprocess test: parent launches a worker thread that spawns
+    a long-running sleep. The main thread does nothing. Verify the
+    walk finds the sleep pid.
+    """
+    if not Path("/proc").is_dir():
+        pytest.skip("Linux /proc not available")
+    import sys
+    import textwrap
+    import signal as _signal
+    import time as _time
+
+    parent_script = textwrap.dedent("""
+        import os, threading, subprocess, time, sys
+        def worker():
+            # Spawn a long sleep from a non-main thread.
+            p = subprocess.Popen(['sleep', '60'])
+            sys.stdout.write(f"SLEEP_PID {p.pid}\\n")
+            sys.stdout.flush()
+            p.wait()
+        t = threading.Thread(target=worker, daemon=True)
+        t.start()
+        # Block the main thread on its OWN sleep to keep the process alive.
+        # (Use a sleep different from the worker's so we can tell them apart;
+        # main-thread sleep is python-level, not a subprocess.)
+        time.sleep(300)
+    """)
+    proc = subprocess.Popen(
+        [sys.executable, "-c", parent_script],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    try:
+        # Wait for the worker thread to spawn the sleep.
+        line = proc.stdout.readline().strip()
+        assert line.startswith("SLEEP_PID "), (
+            f"parent script didn't announce sleep pid: {line!r} "
+            f"stderr={proc.stderr.read()!r}"
+        )
+        sleep_pid = int(line.split()[1])
+        # Give the kernel a beat to wire the children list.
+        _time.sleep(0.1)
+        # Sanity: the legacy main-thread-only path used to MISS this child.
+        try:
+            with open(f"/proc/{proc.pid}/task/{proc.pid}/children",
+                      "r", encoding="utf-8") as f:
+                main_thread_children = f.read().split()
+        except OSError:
+            main_thread_children = []
+        # The all-threads walk MUST find it.
+        all_kids = se._all_children(proc.pid)
+        assert sleep_pid in all_kids, (
+            f"_all_children must include the sleep child (pid={sleep_pid}); "
+            f"got {all_kids!r}; main-thread-only={main_thread_children!r}"
+        )
+        leaf = se._deepest_descendant(proc.pid)
+        # On Linux, subprocess.Popen child is reparented to its launcher;
+        # the sleep should be the (only) leaf reachable from proc.pid.
+        assert leaf == sleep_pid, (
+            f"_deepest_descendant must reach the sleep child via the "
+            f"worker-thread's task dir; got leaf={leaf}, expected {sleep_pid}"
+        )
+    finally:
+        try:
+            proc.send_signal(_signal.SIGTERM)
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+
+
+def test_wake_skips_sigint_when_leaf_is_agent_itself(coord_dir, tmux, monkeypatch):
+    """If the agent's own pid is the leaf (no live tool subprocess —
+    e.g. claude sleeping its internal ScheduleWakeup timer), SIGINT
+    should NOT be sent to the agent process itself (would interrupt
+    the agent's main loop, not just a tool). The primitive falls back
+    to plain send-keys; verification still proceeds via heartbeat."""
+    _write_registry(coord_dir, "developer", pid=999, tool="claude")
+    _write_heartbeat(coord_dir, "developer", mtime=1000.0)
+
+    # Leaf == agent pid → no descendant to SIGINT.
+    monkeypatch.setattr(se, "_deepest_descendant", lambda pid: 999)
+    killed: list[int] = []
+
+    def _fake_send_sigint(pid: int) -> bool:
+        killed.append(pid)
+        return True
+
+    monkeypatch.setattr(se, "_send_sigint", _fake_send_sigint)
+    monkeypatch.setattr(
+        se, "_poll_heartbeat_advance",
+        lambda *_a, **_k: True,
+    )
+    monkeypatch.setattr(
+        se, "_heartbeat_mtime", lambda cd, role: 1001.0,
+    )
+
+    ok, diag = se.press_enter(
+        coord_dir, "s", "dev", "developer", "claude",
+        mode="wake", verify_timeout_s=1.0,
+    )
+    assert ok, diag
+    assert killed == [], (
+        f"SIGINT must NOT target the agent pid itself when it IS the leaf; "
+        f"got {killed!r}"
+    )
