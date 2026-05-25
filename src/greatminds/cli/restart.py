@@ -9,8 +9,14 @@ Python implementation. Same external behavior, same order:
   3. For each window in ``coord.yaml`` with a non-empty ``role``,
      resolve ``coordination/.agent_registry/<role-lowercase>.json``:
        - missing / pid dead / no pid → ``tmux send-keys Enter`` to
-         (re)launch the agent (its window already runs a wrapper that
-         waits on Enter).
+         (re)launch the agent. ``greatminds launch`` (since 0160)
+         installs a bash wrapper-loop in each pane that prints
+         ``press Enter to (re)start <ROLE>...`` and blocks at
+         ``read -r _ </dev/tty`` after each agent exit; ``restart``'s
+         Enter lands on that ``read`` and the wrapper re-execs the
+         agent. Pre-0160 ``launch.py`` pre-typed the start-agent
+         command with no Enter and ``restart`` was a no-op for any
+         pane whose agent had already exited.
        - alive → skip.
   4. Wait 10s, then re-read each registry. A role passes if the file
      exists, ``pid`` is alive (``os.kill(pid, 0)``), and ``input_sock``

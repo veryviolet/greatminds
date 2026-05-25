@@ -80,6 +80,37 @@ def _launch_command(launcher: str, role: str, tool: str, mode: str) -> str:
     return cmd
 
 
+def _wrapper_loop(launch_cmd: str, role: str) -> str:
+    """0160: bash one-liner that loops on Enter and re-execs the agent.
+
+    Wrapper shape::
+
+      while true; do printf 'press Enter to (re)start <ROLE>...';
+        read -r _ </dev/tty; <launch_cmd>; done
+
+    Pre-0160 ``_emit_tmux`` pre-typed ``<launch_cmd>`` with no Enter,
+    and the operator typed Enter once to start the agent. When the
+    agent exited, the pane reverted to a bare bash prompt with no
+    command to re-execute, and ``greatminds restart``'s
+    ``tmux send-keys Enter`` had nothing to trigger.
+
+    With this wrapper installed, ``restart``'s Enter into the pane
+    lands at the wrapper's ``read``, and the next iteration of the
+    loop re-runs the agent. Operator-visible: pane shows
+    ``press Enter to (re)start <ROLE>...`` after every agent exit.
+
+    Single line (no embedded newlines) so ``tmux send-keys`` delivers
+    it as one keystroke sequence — bash then enters the loop on Enter.
+    """
+    return (
+        f"while true; do "
+        f"printf 'press Enter to (re)start {role}...'; "
+        f"read -r _ </dev/tty; "
+        f"{launch_cmd}; "
+        f"done"
+    )
+
+
 def _emit_tmux(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
                recreate: bool) -> None:
     session = cfg.get("session") or "agents"
@@ -119,9 +150,10 @@ def _emit_tmux(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
 
         # bash/no-role windows just open a project shell with env activated.
         if tool == "bash" or not role:
-            prefill = ""
+            wrapper = ""
         else:
-            prefill = _launch_command(launcher, role, tool, mode)
+            launch_cmd = _launch_command(launcher, role, tool, mode)
+            wrapper = _wrapper_loop(launch_cmd, role)
 
         if first:
             cp = _tmux("new-session", "-d", "-s", session, "-n", name,
@@ -142,9 +174,18 @@ def _emit_tmux(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
         if setup.activation:
             _tmux("send-keys", "-t", f"{session}:{name}",
                   setup.activation, "Enter")
-        # 3. Pre-type the launcher line (no Enter) — user reviews + confirms.
-        if prefill:
-            _tmux("send-keys", "-t", f"{session}:{name}", prefill)
+        # 3. 0160: install the wrapper loop and start it (with trailing
+        # Enter). The wrapper prints ``press Enter to (re)start ...``
+        # and blocks at ``read -r _ </dev/tty``. Operator's first Enter
+        # launches the first agent; subsequent Enter (manual OR from
+        # ``greatminds restart``'s send-keys) launches each successive
+        # instance after the previous one exits. Pre-0160 this path
+        # pre-typed ``launch_cmd`` with NO trailing Enter — which made
+        # ``restart`` a no-op for any pane whose agent had already
+        # exited (the pane reverted to a bare bash prompt with no
+        # command to re-execute).
+        if wrapper:
+            _tmux("send-keys", "-t", f"{session}:{name}", wrapper, "Enter")
 
     _tmux("select-window", "-t", f"{session}:0")
 
@@ -153,8 +194,11 @@ def _emit_tmux(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
     info(f"  detach:   Ctrl+B d")
     info(f"  switch:   Ctrl+B <num>   or   Ctrl+B w (list)")
     info(f"\neach window: env activated ({setup.env_type or 'system'}), "
-         f"'{launcher} <ROLE> <tool>' pre-typed.")
-    info("press Enter in each window to start.")
+         f"wrapper-loop installed that re-runs '{launcher} <ROLE> <tool>' "
+         f"on Enter.")
+    info("press Enter in each window to start the first agent. "
+         "Subsequent agent exits print 'press Enter to (re)start ...' "
+         "and wait — `greatminds restart` lands on that prompt.")
 
 
 def _emit_vscode(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
