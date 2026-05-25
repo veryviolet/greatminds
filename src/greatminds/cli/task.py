@@ -1112,6 +1112,70 @@ def _noop_existing(data: dict[str, Any], from_q: str, to_q: str) -> str | None:
     return None
 
 
+def _check_stand_result_block(data: dict[str, Any],
+                              from_q: str, to_q: str) -> str | None:
+    """0170: stand_wip → stand_done must carry a stand_result block.
+
+    Pre-0170 the schema row had ``requires: [stand_result_block,
+    evidence_for_if_related_product_task]`` but both validators were
+    ``_noop_existing`` placeholders. STAND-KEEPER could ``task mv
+    <id> stand_done`` without ever appending a stand_result block →
+    orphan task in stand_done with no result, evidence_for, or
+    commit. This validator closes the hole.
+    """
+    blocks = data.get("blocks") or []
+    has_result = any(
+        isinstance(b, dict) and b.get("kind") == "stand_result"
+        for b in blocks
+    )
+    if has_result:
+        return None
+    return (
+        "stand_result_block: stand_wip → stand_done requires at least "
+        "one stand_result block on the task. Append "
+        "`greatminds task append-block stand_result --id <X> --field "
+        "result=ok|partial|fail --field stand_status=READY|... --field "
+        "commit=<sha> --field profile=<profile> ...` before mv."
+    )
+
+
+def _check_review_block_approved(data: dict[str, Any],
+                                 from_q: str, to_q: str) -> str | None:
+    """0171: feature_review → verified must carry a review block whose
+    latest entry has ``outcome: approved``.
+
+    Pre-0171 the schema row had ``requires: [review_block_approved,
+    gate_check_pass_if_stand_required]`` but only the gate-check
+    validator was real (0103). ARCHITECT-REVIEWER could ``task mv
+    <id> verified`` without appending a review block at all, or with
+    ``outcome != approved``. This validator closes the hole.
+
+    Latest-wins semantics: a task can ping-pong feature_review ↔
+    feature_dev across iterations, accumulating review blocks. Only
+    the LATEST one decides whether this verify is allowed.
+    """
+    blocks = data.get("blocks") or []
+    reviews = [b for b in blocks
+               if isinstance(b, dict) and b.get("kind") == "review"]
+    if not reviews:
+        return (
+            "review_block_approved: feature_review → verified requires "
+            "a review block with outcome=approved. Append "
+            "`greatminds task append-block review --id <X> --field "
+            "outcome=approved ...` before mv."
+        )
+    outcome = reviews[-1].get("outcome")
+    if outcome == "approved":
+        return None
+    return (
+        f"review_block_approved: latest review block has "
+        f"outcome={outcome!r}, expected 'approved'. Either append a "
+        f"fresh review block with outcome=approved (post-fix iteration), "
+        f"or route the task back to the appropriate per-scope queue "
+        f"with outcome=changes_requested."
+    )
+
+
 # ---------------------------------------------------------------------------
 # 0102 validators: close 4 single-role archive holes by adding real
 # preconditions (review_sessions → archive, feature_blocked → archive,
@@ -1258,11 +1322,16 @@ SCHEMA_REQUIRES_VALIDATORS: dict[str, "callable"] = {
     "tests_block_fail_or_partial": _noop_existing,
     "reader_block_pass": _noop_existing,
     "reader_block_fail_or_partial": _noop_existing,
-    "review_block_approved": _noop_existing,
+    # 0171 real-enforcement: require_target_readiness no longer trusts
+    # the bare presence of a review block; the latest one must carry
+    # outcome=approved.
+    "review_block_approved": _check_review_block_approved,
     "review_block_changes_requested": _noop_existing,
     "blocked_block_with_dependencies_and_resume_to": _noop_existing,
     "all_dependencies_exist_per_wake_check": _noop_existing,
-    "stand_result_block": _noop_existing,
+    # 0170 real-enforcement: stand_wip → stand_done requires at least
+    # one stand_result block on the task.
+    "stand_result_block": _check_stand_result_block,
     "evidence_for_if_related_product_task": _noop_existing,
     # 0103 real-enforcement: re-evaluate gate-check rather than trust
     # tests.gate_check_result.
