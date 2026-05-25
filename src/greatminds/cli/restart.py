@@ -277,9 +277,67 @@ def _iter_role_windows(windows: list[dict]) -> list[tuple[str, str]]:
     return out
 
 
+def _soft_inject_render_role(
+    session: str,
+    window: str,
+    role: str,
+) -> tuple[bool, str]:
+    """0147 ``--bootstrap`` (soft): inject the role's freshly-rendered
+    canon into the live tmux pane and submit with Enter. The agent
+    keeps running; its next reply incorporates the new canon.
+    Session-id files are NOT touched; the agent's pid is NOT killed;
+    claude ``--resume`` / codex resume continuity is preserved.
+
+    Mechanism: shell out to ``greatminds render-role <ROLE>`` to
+    capture the rendered prompt (the same text the agent saw on its
+    original bootstrap), load it into a uniquely-named tmux buffer,
+    and ``paste-buffer -p`` (bracketed paste) into the pane. Then
+    ``send-keys Enter`` submits. Bracketed paste preserves multi-line
+    text as a single paste — without ``-p`` each embedded newline
+    might be interpreted as the agent's submit key, fragmenting the
+    canon across many turns.
+
+    Returns ``(ok, diag)``. Soft-inject failures are non-fatal — the
+    caller logs and continues to the next role; this is operator
+    convenience, not a correctness gate.
+    """
+    proc = subprocess.run(
+        ["greatminds", "render-role", role],
+        capture_output=True, text=True,
+    )
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return False, (
+            f"render-role {role} failed: rc={proc.returncode} "
+            f"stderr={proc.stderr.strip()[:120]}"
+        )
+    rendered = proc.stdout.rstrip() + "\n"
+    buf_name = f"gm-bootstrap-{role.lower()}"
+    load = subprocess.run(
+        ["tmux", "load-buffer", "-b", buf_name, "-"],
+        input=rendered, text=True, capture_output=True,
+    )
+    if load.returncode != 0:
+        return False, f"tmux load-buffer failed: {load.stderr.strip()[:120]}"
+    paste = subprocess.run(
+        ["tmux", "paste-buffer", "-b", buf_name, "-t",
+         f"{session}:{window}", "-p"],
+        capture_output=True, text=True,
+    )
+    if paste.returncode != 0:
+        return False, f"tmux paste-buffer failed: {paste.stderr.strip()[:120]}"
+    submit = subprocess.run(
+        ["tmux", "send-keys", "-t", f"{session}:{window}", "Enter"],
+        capture_output=True, text=True,
+    )
+    if submit.returncode != 0:
+        return False, f"tmux send-keys Enter failed: {submit.stderr.strip()[:120]}"
+    return True, f"render-role injected ({len(rendered)} chars) + Enter"
+
+
 def _sigterm_alive(pid: int) -> None:
-    """0137 ``--bootstrap``: kill an alive agent so its tmux wrapper
-    returns to the start-agent prompt.
+    """0147 ``--reset`` (the destructive path, formerly ``--bootstrap``
+    in 0137): kill an alive agent so its tmux wrapper returns to the
+    start-agent prompt.
 
     Only meaningful for alive pids; the 1s sleep gives the wrapper
     time to notice the child died. The verify step's 10s wait absorbs
@@ -298,17 +356,15 @@ def _clear_session_files_for_bootstrap(
     registry_dir: Path,
     role_lc: str,
 ) -> None:
-    """0137 ``--bootstrap`` iter-2 (REVIEWER ask): clear the role's
-    pid registry AND tool-specific session-id files unconditionally —
-    for ALIVE, DEAD, and MISSING-registry roles alike.
+    """0147 ``--reset`` (the destructive path, formerly ``--bootstrap``
+    in 0137): clear the role's pid registry AND tool-specific
+    session-id files unconditionally for every role being relaunched.
 
     With these cleared, the next ``start_agent`` reads no prior
     session UUID for claude and no prior rollout for codex, so the
     next launch goes through the fresh-session code path (no
-    ``--resume``, no ``codex resume <sid>``). Iter-1 only cleared
-    these for alive pids; that left the dead-pid bootstrap path
-    silently resuming the old conversation on the new wheel — the
-    opposite of what ``--bootstrap`` promises.
+    ``--resume``, no ``codex resume <sid>``). The soft ``--bootstrap``
+    path never calls this — soft preserves session continuity.
     """
     for fname in (
         f"{role_lc}.json",                # pid + input_sock
@@ -326,6 +382,7 @@ def _restart_dead_agents(
     windows: list[dict],
     session: str,
     bootstrap: bool = False,
+    reset: bool = False,
 ) -> None:
     _log("==> agents: check + restart dead ones")
     coord_dir = registry_dir.parent
@@ -356,25 +413,46 @@ def _restart_dead_agents(
                     pass
                 needs_start = True
             elif bootstrap:
-                # 0137: --bootstrap forces re-launch even for alive
-                # agents. The default skip path is correct for normal
-                # restart (idempotent), but operators upgrading the
-                # greatminds package need a way to drop the in-memory
-                # agent and re-load canon from the new wheel.
+                # 0147 ``--bootstrap`` (soft): the alive agent is NOT
+                # killed. Inject the freshly-rendered role canon into
+                # the live tmux pane and submit; the agent's next
+                # reply reads the new canon. Session-id files stay
+                # put → claude --resume / codex resume continuity
+                # preserved across this operation. The role with this
+                # branch does NOT need_start (the agent is already
+                # running; we just nudged it).
+                ok, diag = _soft_inject_render_role(session, name,
+                                                   role_lc.upper())
+                if ok:
+                    _log(f"    {name} ({role_lc}): pid={pid} alive — "
+                         f"--bootstrap (soft): {diag}")
+                else:
+                    _log(f"    {name} ({role_lc}): pid={pid} alive — "
+                         f"--bootstrap (soft) FAILED: {diag}")
+                continue
+            elif reset:
+                # 0147 ``--reset`` (the destructive path, formerly
+                # 0137 ``--bootstrap``): SIGTERM the alive pid; the
+                # session-file clearing below + Enter relaunch gives a
+                # genuinely fresh agent. Use case: agent context
+                # unrecoverably corrupt, canon-format-incompatible
+                # version bump, intentional state-bust. NOT the
+                # default upgrade procedure — that's --bootstrap.
                 _log(f"    {name} ({role_lc}): pid={pid} alive — "
-                     f"--bootstrap: SIGTERM + fresh re-launch")
+                     f"--reset: SIGTERM + fresh re-launch")
                 _sigterm_alive(pid)
                 pid = 0
                 needs_start = True
 
-        # 0137 iter-2 (REVIEWER ask): when --bootstrap is set, force a
-        # fresh session for EVERY role being relaunched — alive, dead,
-        # or missing-registry. Iter-1 scoped session-file clearing to
-        # the alive-kill branch only, which left dead-pid + bootstrap
-        # silently resuming the old claude/codex conversation on the
-        # new wheel. Clear unconditionally inside the bootstrap branch
-        # so the promise of "fresh session" holds across all cases.
-        if needs_start and bootstrap:
+        # 0147: --reset (destructive) is the only path that clears
+        # session-id files. --bootstrap (soft) preserves them by
+        # design — the alive branch above returns before reaching
+        # here, and the dead/missing-registry branches inside
+        # --bootstrap don't need fresh sessions either (the agent is
+        # already gone; the next launch just bootstraps as it would
+        # for any newly-started role, using whatever session-id
+        # already exists or rolling a new one if absent).
+        if needs_start and reset:
             _clear_session_files_for_bootstrap(registry_dir, role_lc)
         if needs_start:
             agent_type = (window_tool.get(name) or "claude").lower()
@@ -482,17 +560,32 @@ def _verify(
     "--bootstrap",
     is_flag=True,
     default=False,
-    help=("force re-launch of every role's agent — even alive ones. "
-          "SIGTERMs each alive pid and clears its session-id files so "
-          "the next start-agent goes through the fresh path (no "
-          "claude --resume, no codex resume <sid>). Use after upgrading "
-          "the greatminds package so running agents reload canon from "
-          "the new wheel."),
+    help=("soft canon refresh for alive agents (0147). Renders the "
+          "role canon via `greatminds render-role` and pastes it into "
+          "the live tmux pane via bracketed paste, then submits with "
+          "Enter. The agent keeps running — session-id files are NOT "
+          "touched, pid is NOT killed, claude --resume / codex resume "
+          "continuity is preserved. This is the canonical post-PyPI-"
+          "upgrade procedure: `pip install -U greatminds && greatminds "
+          "restart --bootstrap`. Mutually exclusive with --reset."),
+)
+@click.option(
+    "--reset",
+    is_flag=True,
+    default=False,
+    help=("destructive re-launch (0147, formerly 0137 --bootstrap). "
+          "SIGTERMs each alive pid and clears claude/codex session-id "
+          "files so the next start-agent goes through the fresh-session "
+          "path. Use when the agent's context is unrecoverably corrupt "
+          "or a canon-format-incompatible version bump requires a "
+          "genuine state-bust. NOT the default upgrade procedure — "
+          "that's --bootstrap. Mutually exclusive with --bootstrap."),
 )
 def restart(
     config_path: Path | None,
     project_dir: Path | None,
     bootstrap: bool,
+    reset: bool,
 ) -> None:
     if config_path is None:
         for p in (Path.cwd() / "coord.yaml",
@@ -520,9 +613,17 @@ def restart(
 
     registry_dir = project_dir / "coordination" / ".agent_registry"
 
+    if bootstrap and reset:
+        raise click.UsageError(
+            "--bootstrap and --reset are mutually exclusive. Pick one: "
+            "--bootstrap (soft canon refresh, preserves session) or "
+            "--reset (destructive re-launch, drops session).",
+        )
+
     _ensure_coordd(session)
     _ensure_tmux_session(session, project_dir)
-    _restart_dead_agents(registry_dir, windows, session, bootstrap=bootstrap)
+    _restart_dead_agents(registry_dir, windows, session,
+                         bootstrap=bootstrap, reset=reset)
     rc = _verify(registry_dir, windows, VERIFY_WAIT_SEC, session)
     if rc != 0:
         raise click.exceptions.Exit(rc)

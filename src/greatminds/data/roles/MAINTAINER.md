@@ -45,15 +45,23 @@ MAINTAINER owns these one-shot operational commands:
 - `greatminds setup --session NAME` — fleet bootstrap; generates
   coord.yaml (init-style — never overwrites) and registers the
   project with the daemon.
-- `greatminds restart [--bootstrap]` — idempotent fleet restart
-  (coordd + tmux session + dead agents). `--bootstrap` (0137) goes
-  further: SIGTERMs every alive agent and clears its session-id
-  files, so the next launch reloads canon from disk through the
-  fresh-session code path (no `claude --resume`, no `codex resume
-  <sid>`). The post-PyPI-upgrade procedure is `pip install -U
-  greatminds && greatminds restart --bootstrap` — the default
-  `restart` would skip alive agents and leave the running fleet on
-  the old wheel.
+- `greatminds restart [--bootstrap | --reset]` — idempotent fleet
+  restart (coordd + tmux session + dead agents). Two opt-in modes
+  for handling alive agents:
+  * `--bootstrap` (soft, 0147) — pastes the freshly-rendered role
+    canon into the live tmux pane via bracketed paste and submits
+    with Enter. The agent's next reply incorporates the new canon.
+    Session-id files are NOT touched; pid is unchanged; claude
+    `--resume` / codex resume continuity is preserved. **This is
+    the canonical post-PyPI-upgrade procedure:** `pip install -U
+    greatminds && greatminds restart --bootstrap`.
+  * `--reset` (destructive, 0147 — was 0137 `--bootstrap`) —
+    SIGTERMs every alive agent and clears its claude/codex
+    session-id files so the next launch goes through the
+    fresh-session path. The nuclear option: use only when the
+    agent's context is unrecoverably corrupt or a canon-format-
+    incompatible version bump requires a genuine state-bust. Mutually
+    exclusive with `--bootstrap`.
 
 ## Does
 

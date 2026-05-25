@@ -531,13 +531,27 @@ def test_verify_clean_when_no_pending_trust(env):
 
 
 # ---------------------------------------------------------------------------
-# task 0137: --bootstrap forces re-launch of alive agents
+# task 0147: --bootstrap (soft canon refresh) + --reset (destructive)
+#
+# 0137 shipped --bootstrap as destructive (SIGTERM + clear session files +
+# fresh re-launch). MAINTAINER's first 1.2.5 upgrade attempt caught that
+# this loses agent context — useless as a default upgrade procedure. 0147
+# splits the flag:
+#
+#   --bootstrap  soft: tmux-paste render-role into the live pane via
+#                bracketed paste, submit with Enter; agent's next reply
+#                reads the new canon. Session-id files preserved, pid
+#                unchanged, claude --resume / codex resume continuity
+#                kept. The canonical post-PyPI-upgrade procedure.
+#   --reset      destructive: the formerly-0137 behavior. SIGTERMs the
+#                alive pid, clears claude/codex session-id files, fresh
+#                re-launch. The nuclear option — explicit operator
+#                choice only, not the default.
 # ---------------------------------------------------------------------------
 
 
 def _run_bootstrap(env_) -> "CliRunner.invoke":
-    """Like _run but appends --bootstrap. Inlined here so the existing
-    _run helper stays signature-stable for the non-bootstrap tests."""
+    """Like _run but appends --bootstrap (soft canon refresh)."""
     coord_yaml = env_.project_dir / "coord.yaml"
     if not coord_yaml.is_file():
         _write_coord_yaml(env_.project_dir)
@@ -548,9 +562,20 @@ def _run_bootstrap(env_) -> "CliRunner.invoke":
     )
 
 
+def _run_reset(env_) -> "CliRunner.invoke":
+    """Like _run but appends --reset (destructive re-launch)."""
+    coord_yaml = env_.project_dir / "coord.yaml"
+    if not coord_yaml.is_file():
+        _write_coord_yaml(env_.project_dir)
+    return CliRunner().invoke(
+        restart_mod.restart,
+        ["--config", str(coord_yaml), "--reset"],
+        catch_exceptions=False,
+    )
+
+
 def _seed_session_files(project_dir: Path, role_lower: str) -> tuple[Path, Path]:
-    """Drop both claude and codex session-id files for ``role_lower`` so
-    we can assert --bootstrap unlinks them."""
+    """Drop both claude and codex session-id files for ``role_lower``."""
     reg_dir = project_dir / "coordination" / ".agent_registry"
     claude_sid = reg_dir / f"{role_lower}.session-id"
     codex_sid = reg_dir / f"{role_lower}.codex-session-id"
@@ -559,10 +584,39 @@ def _seed_session_files(project_dir: Path, role_lower: str) -> tuple[Path, Path]
     return claude_sid, codex_sid
 
 
-def test_bootstrap_kills_alive_pid_and_sends_enter(env, monkeypatch):
-    """Default restart skips alive agents (idempotent). --bootstrap
-    SIGTERMs them and re-launches via the same Enter path the dead-pid
-    case uses. Closes 0137: post-upgrade refresh of a running fleet."""
+# ---------- --bootstrap soft path (0147) ----------
+
+
+def test_bootstrap_soft_preserves_session_files_for_alive_agent(env, monkeypatch):
+    """0147 contract: --bootstrap (soft) does NOT touch claude/codex
+    session-id files for alive agents. claude --resume continuity
+    must survive the canon refresh."""
+    _write_coord_yaml(env.project_dir,
+                      windows=[{"name": "dev", "role": "DEVELOPER",
+                                "tool": "claude"}])
+    env.alive.add(7777)
+    _write_registry(env.project_dir, "developer", pid=7777, with_sock=True)
+    claude_sid, codex_sid = _seed_session_files(env.project_dir, "developer")
+
+    # Stub the soft-inject helper so the test doesn't shell out to
+    # `greatminds render-role` or tmux paste-buffer.
+    monkeypatch.setattr(
+        restart_mod, "_soft_inject_render_role",
+        lambda session, name, role: (True, "stubbed render-role inject"),
+    )
+
+    _run_bootstrap(env)
+
+    assert claude_sid.is_file(), \
+        "0147: --bootstrap (soft) must preserve claude session-id"
+    assert codex_sid.is_file(), \
+        "0147: --bootstrap (soft) must preserve codex session-id"
+
+
+def test_bootstrap_soft_does_not_sigterm_alive_agent(env, monkeypatch):
+    """0147: --bootstrap must NOT kill alive agents. The agent
+    pid is unchanged after the operation; its in-memory state is
+    preserved by design."""
     _write_coord_yaml(env.project_dir,
                       windows=[{"name": "dev", "role": "DEVELOPER",
                                 "tool": "claude"}])
@@ -574,58 +628,192 @@ def test_bootstrap_kills_alive_pid_and_sends_enter(env, monkeypatch):
     def recording_kill(pid: int, sig: int) -> None:
         kill_calls.append((pid, sig))
         if sig == 0 and pid in env.alive:
-            return  # _pid_alive probe
+            return
         if sig == 0:
             raise ProcessLookupError(pid)
-        # SIGTERM: drop the pid from alive so the verify step sees
-        # it as dead (we don't go through the verify happy path
-        # here; tests assert before the re-launch completes).
         env.alive.discard(pid)
     monkeypatch.setattr(restart_mod.os, "kill", recording_kill)
+    monkeypatch.setattr(
+        restart_mod, "_soft_inject_render_role",
+        lambda *_a, **_kw: (True, "stubbed"),
+    )
 
     _run_bootstrap(env)
 
-    # SIGTERM was sent to the alive agent (sig 15).
     import signal
-    assert (7777, signal.SIGTERM) in kill_calls, kill_calls
+    assert not any(sig == signal.SIGTERM for _pid, sig in kill_calls), (
+        "0147: --bootstrap (soft) must NOT SIGTERM alive agents"
+    )
 
-    # send-keys Enter was sent to dev's window — same wake path as the
-    # dead-pid case (start-agent line waiting in the tmux pane).
+
+def test_bootstrap_soft_calls_render_role_inject_for_alive_agent(env, monkeypatch):
+    """0147 contract: --bootstrap drives _soft_inject_render_role for
+    every alive role. This is the canon-refresh mechanism — pin the
+    invocation so it can't silently no-op in a future refactor."""
+    _write_coord_yaml(
+        env.project_dir,
+        windows=[
+            {"name": "dev", "role": "DEVELOPER", "tool": "claude"},
+            {"name": "planner", "role": "ARCHITECT-PLANNER", "tool": "claude"},
+        ],
+    )
+    env.alive.update({4001, 4002})
+    _write_registry(env.project_dir, "developer", pid=4001, with_sock=True)
+    _write_registry(env.project_dir, "architect-planner", pid=4002,
+                    with_sock=True)
+
+    inject_calls: list[tuple[str, str, str]] = []
+
+    def recording_inject(session: str, name: str, role: str):
+        inject_calls.append((session, name, role))
+        return True, "stubbed"
+    monkeypatch.setattr(restart_mod, "_soft_inject_render_role",
+                        recording_inject)
+
+    _run_bootstrap(env)
+
+    assert ("test-session", "dev", "DEVELOPER") in inject_calls
+    assert ("test-session", "planner", "ARCHITECT-PLANNER") in inject_calls
+
+
+def test_bootstrap_soft_skips_inject_for_dead_pid(env, monkeypatch):
+    """Dead-pid role goes through the existing dead-pid relaunch path
+    (which always uses fresh prompt anyway). The soft-inject helper
+    is for alive panes only — calling it on a dead pid would paste
+    canon into a shell prompt, not an agent."""
+    _write_coord_yaml(env.project_dir,
+                      windows=[{"name": "dev", "role": "DEVELOPER",
+                                "tool": "claude"}])
+    # Pid 6666 NOT in env.alive → dead.
+    _write_registry(env.project_dir, "developer", pid=6666, with_sock=True)
+
+    inject_calls: list = []
+    monkeypatch.setattr(
+        restart_mod, "_soft_inject_render_role",
+        lambda *a, **kw: (inject_calls.append(a) or (True, "stubbed")),
+    )
+
+    _run_bootstrap(env)
+
+    assert inject_calls == [], (
+        "--bootstrap must NOT call _soft_inject_render_role for dead pids"
+    )
+
+
+def test_bootstrap_soft_does_not_clear_session_files_dead_pid(env):
+    """Dead-pid + --bootstrap (soft): session-id files are preserved.
+    The next start-agent will --resume / codex resume into the prior
+    conversation, which is what we want when the agent simply
+    crashed. Use --reset if you want a genuine state-bust."""
+    _write_coord_yaml(env.project_dir,
+                      windows=[{"name": "dev", "role": "DEVELOPER",
+                                "tool": "claude"}])
+    _write_registry(env.project_dir, "developer", pid=6666, with_sock=True)
+    claude_sid, codex_sid = _seed_session_files(env.project_dir, "developer")
+
+    _run_bootstrap(env)
+
+    assert claude_sid.is_file()
+    assert codex_sid.is_file()
+
+
+# ---------- --reset destructive path (0147, formerly 0137 --bootstrap) ----------
+
+
+def test_reset_sigterms_alive_pid_and_sends_enter(env, monkeypatch):
+    """--reset (formerly 0137 --bootstrap) SIGTERMs alive agents and
+    re-launches via the dead-pid Enter path. Same destructive
+    semantics as 0137 shipped — just under a different flag name."""
+    _write_coord_yaml(env.project_dir,
+                      windows=[{"name": "dev", "role": "DEVELOPER",
+                                "tool": "claude"}])
+    env.alive.add(7777)
+    _write_registry(env.project_dir, "developer", pid=7777, with_sock=True)
+
+    kill_calls: list[tuple[int, int]] = []
+
+    def recording_kill(pid: int, sig: int) -> None:
+        kill_calls.append((pid, sig))
+        if sig == 0 and pid in env.alive:
+            return
+        if sig == 0:
+            raise ProcessLookupError(pid)
+        env.alive.discard(pid)
+    monkeypatch.setattr(restart_mod.os, "kill", recording_kill)
+
+    _run_reset(env)
+
+    import signal
+    assert (7777, signal.SIGTERM) in kill_calls
     targets = {c[c.index("-t") + 1] for c in env.sub.find("send-keys")
                if "-t" in c}
     assert "test-session:dev" in targets
 
 
-def test_bootstrap_unlinks_session_id_files(env, monkeypatch):
-    """0137: --bootstrap must clear BOTH claude and codex session-id
-    files so the next start-agent reads no prior session — it picks
-    the fresh path (no claude --resume, no codex resume <sid>). Without
-    this, the new wheel's code path runs but the LLM context is still
-    the resumed one, defeating the bootstrap purpose."""
+def test_reset_unlinks_session_id_files_for_alive(env, monkeypatch):
+    """--reset clears claude/codex session-id files for alive roles,
+    so the post-kill re-launch goes through the fresh-session path."""
     _write_coord_yaml(env.project_dir,
                       windows=[{"name": "dev", "role": "DEVELOPER",
                                 "tool": "claude"}])
     env.alive.add(8888)
-    reg = _write_registry(env.project_dir, "developer", pid=8888,
-                          with_sock=True)
+    _write_registry(env.project_dir, "developer", pid=8888, with_sock=True)
     claude_sid, codex_sid = _seed_session_files(env.project_dir, "developer")
-    assert claude_sid.is_file() and codex_sid.is_file()
 
-    # os.kill: accept anything (don't actually kill).
     monkeypatch.setattr(restart_mod.os, "kill", lambda *_: None)
+    _run_reset(env)
 
-    _run_bootstrap(env)
-
-    # Both session files removed; registry json removed too.
-    assert not claude_sid.is_file(), "claude session-id must be unlinked"
-    assert not codex_sid.is_file(), "codex session-id must be unlinked"
-    assert not reg.is_file(), "registry .json must be unlinked"
+    assert not claude_sid.is_file()
+    assert not codex_sid.is_file()
 
 
-def test_default_restart_does_not_unlink_alive_session_files(env):
-    """Negative pin: without --bootstrap, alive agents are left
-    completely untouched — no SIGTERM, no session-id unlink. The
-    bootstrap branch must NOT bleed into the default path."""
+def test_reset_clears_session_files_for_dead_pid_too(env, monkeypatch):
+    """--reset preserves the 0137-iter-2 semantics: dead-pid + --reset
+    also clears session-id files so the relaunch is genuinely fresh
+    (not a --resume into the stale conversation). This is the
+    'fresh session for every role being relaunched' invariant from
+    0137 iter-2 — moved under --reset by 0147."""
+    _write_coord_yaml(env.project_dir,
+                      windows=[{"name": "dev", "role": "DEVELOPER",
+                                "tool": "claude"}])
+    _write_registry(env.project_dir, "developer", pid=6666, with_sock=True)
+    claude_sid, codex_sid = _seed_session_files(env.project_dir, "developer")
+
+    monkeypatch.setattr(restart_mod.os, "kill",
+                        lambda pid, sig: None if pid in env.alive
+                        else (_ for _ in ()).throw(ProcessLookupError(pid)))
+    _run_reset(env)
+
+    assert not claude_sid.is_file()
+    assert not codex_sid.is_file()
+
+
+# ---------- mutual exclusion ----------
+
+
+def test_bootstrap_and_reset_mutually_exclusive(env):
+    """0147: --bootstrap and --reset name opposite intents (preserve
+    vs drop session). Combining them is operator confusion; reject
+    at click level with a clear UsageError so MAINTAINER picks one
+    explicitly."""
+    coord_yaml = env.project_dir / "coord.yaml"
+    _write_coord_yaml(env.project_dir)
+    result = CliRunner().invoke(
+        restart_mod.restart,
+        ["--config", str(coord_yaml), "--bootstrap", "--reset"],
+        catch_exceptions=False,
+    )
+    assert result.exit_code != 0
+    assert "mutually exclusive" in result.output
+
+
+# ---------- default-restart untouched-by-bootstrap pin ----------
+
+
+def test_default_restart_does_not_touch_alive_session_files(env):
+    """Negative pin: without --bootstrap or --reset, alive agents
+    are skipped entirely — no SIGTERM, no session-id unlink, no
+    send-keys, no soft inject. The default is idempotent."""
     _write_coord_yaml(env.project_dir,
                       windows=[{"name": "dev", "role": "DEVELOPER",
                                 "tool": "claude"}])
@@ -633,114 +821,107 @@ def test_default_restart_does_not_unlink_alive_session_files(env):
     _write_registry(env.project_dir, "developer", pid=9999, with_sock=True)
     claude_sid, codex_sid = _seed_session_files(env.project_dir, "developer")
 
-    _run(env)  # no --bootstrap
+    _run(env)
 
-    assert claude_sid.is_file(), \
-        "alive agent's claude session-id must be preserved without --bootstrap"
-    assert codex_sid.is_file(), \
-        "alive agent's codex session-id must be preserved without --bootstrap"
-    # And no send-keys to the alive window.
+    assert claude_sid.is_file()
+    assert codex_sid.is_file()
     targets = {c[c.index("-t") + 1] for c in env.sub.find("send-keys")
                if "-t" in c}
     assert "test-session:dev" not in targets
 
 
-def test_bootstrap_clears_session_files_for_dead_pid_too(env, monkeypatch):
-    """0137 iter-2 (REVIEWER ask): with --bootstrap, the promise is
-    'fresh session for every role being relaunched' — not just alive
-    ones. A dead-pid role + --bootstrap must ALSO clear the claude
-    and codex session-id files, otherwise the next launch silently
-    resumes the old conversation on the new wheel. Iter-1 left dead
-    agents resuming, contradicting the task contract.
-
-    SIGTERM is still NOT sent for dead pids (no-op).
-    """
-    _write_coord_yaml(env.project_dir,
-                      windows=[{"name": "dev", "role": "DEVELOPER",
-                                "tool": "claude"}])
-    # Pid 6666 NOT in env.alive → dead per the fixture's fake_kill.
-    reg = _write_registry(env.project_dir, "developer", pid=6666,
-                          with_sock=True)
-    claude_sid, codex_sid = _seed_session_files(env.project_dir, "developer")
-
-    kill_calls: list[tuple[int, int]] = []
-
-    def recording_kill(pid: int, sig: int) -> None:
-        kill_calls.append((pid, sig))
-        if pid in env.alive:
-            return
-        raise ProcessLookupError(pid)
-    monkeypatch.setattr(restart_mod.os, "kill", recording_kill)
-
-    _run_bootstrap(env)
-
-    assert not reg.is_file()
-    # SIGTERM is NOT sent to a dead pid (alive-only branch).
-    import signal
-    assert not any(sig == signal.SIGTERM for _pid, sig in kill_calls)
-    targets = {c[c.index("-t") + 1] for c in env.sub.find("send-keys")
-               if "-t" in c}
-    assert "test-session:dev" in targets
-    # Iter-2: session-id files must be cleared on bootstrap even for
-    # dead pids. Otherwise start_agent's next call would read the old
-    # claude session UUID and codex rollout SID, and the new launch
-    # would --resume / codex resume <sid> into the stale conversation.
-    assert not claude_sid.is_file(), (
-        "0137 iter-2: bootstrap must clear claude session-id even for dead pids"
-    )
-    assert not codex_sid.is_file(), (
-        "0137 iter-2: bootstrap must clear codex session-id even for dead pids"
-    )
-
-
-def test_bootstrap_clears_session_files_for_missing_registry(env, monkeypatch):
-    """0137 iter-2: when a role has NO registry entry (first start, or
-    registry was wiped) AND --bootstrap is set, any pre-existing
-    session-id files from a prior launch must be cleared so the new
-    launch is genuinely fresh. The missing-registry path also goes
-    through the 'needs_start' bootstrap branch."""
-    _write_coord_yaml(env.project_dir,
-                      windows=[{"name": "dev", "role": "DEVELOPER",
-                                "tool": "claude"}])
-    # No registry json at all, but session-id files left over from a
-    # prior session.
-    claude_sid, codex_sid = _seed_session_files(env.project_dir, "developer")
-
-    monkeypatch.setattr(restart_mod.os, "kill", lambda *_: None)
-    _run_bootstrap(env)
-
-    assert not claude_sid.is_file()
-    assert not codex_sid.is_file()
-    targets = {c[c.index("-t") + 1] for c in env.sub.find("send-keys")
-               if "-t" in c}
-    assert "test-session:dev" in targets
-
-
 def test_default_restart_preserves_session_files_for_dead_pid(env):
-    """Negative pin: without --bootstrap, dead-pid path preserves
-    session-id files. Crash recovery should keep claude --resume
-    semantics — only --bootstrap rotates the session."""
+    """Negative pin: without --bootstrap/--reset, dead-pid path
+    preserves session-id files. Crash recovery keeps claude --resume
+    continuity — only --reset rotates the session."""
     _write_coord_yaml(env.project_dir,
                       windows=[{"name": "dev", "role": "DEVELOPER",
                                 "tool": "claude"}])
     _write_registry(env.project_dir, "developer", pid=5555, with_sock=True)
     claude_sid, codex_sid = _seed_session_files(env.project_dir, "developer")
 
-    _run(env)  # no --bootstrap
+    _run(env)
 
-    assert claude_sid.is_file(), (
-        "dead-pid recovery (no --bootstrap) must keep claude session "
-        "continuity"
-    )
+    assert claude_sid.is_file()
     assert codex_sid.is_file()
 
 
-def test_bootstrap_flag_help_mentions_post_upgrade_use(env):
-    """The --bootstrap help text must point operators at the upgrade
-    use case so the flag is discoverable from `greatminds restart
-    --help`. Without this hint, MAINTAINER might leave a running fleet
-    on the old code after pip install -U."""
+# ---------- help text discoverability ----------
+
+
+def test_bootstrap_help_mentions_soft_and_session_preservation(env):
+    """The --bootstrap help text must surface (a) it's the post-PyPI-
+    upgrade procedure, (b) it preserves sessions. MAINTAINER discovers
+    the flag from `--help`, not from src."""
     result = CliRunner().invoke(restart_mod.restart, ["--help"])
     assert "--bootstrap" in result.output
-    assert "alive" in result.output.lower()
-    assert "fresh" in result.output.lower() or "no claude --resume" in result.output
+    assert "upgrade" in result.output.lower() or "pip install -U" in result.output
+
+
+def test_reset_help_mentions_destructive_and_session_drop(env):
+    """The --reset help text must surface (a) it's destructive, (b)
+    it's NOT the default upgrade procedure. Avoids MAINTAINER
+    accidentally reaching for it."""
+    result = CliRunner().invoke(restart_mod.restart, ["--help"])
+    assert "--reset" in result.output
+    out = result.output.lower()
+    assert "destructive" in out or "fresh" in out
+
+
+# ---------- _soft_inject_render_role helper ----------
+
+
+def test_soft_inject_loads_buffer_pastes_and_submits(monkeypatch):
+    """Pin the soft-inject mechanism: calls greatminds render-role
+    <ROLE>, loads stdout into a tmux buffer, paste-buffer -p, then
+    send-keys Enter. The -p (bracketed paste) flag is load-bearing —
+    without it multi-line render-role text would submit fragments
+    on every newline."""
+    import subprocess as _sub
+
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, *args, **kwargs):
+        calls.append(list(cmd))
+        if cmd[:2] == ["greatminds", "render-role"]:
+            return _sub.CompletedProcess(
+                list(cmd), 0,
+                "ROLE PROMPT LINE 1\nROLE PROMPT LINE 2\n",
+                "",
+            )
+        return _sub.CompletedProcess(list(cmd), 0, "", "")
+
+    monkeypatch.setattr(restart_mod.subprocess, "run", fake_run)
+    ok, diag = restart_mod._soft_inject_render_role(
+        "test-session", "dev", "DEVELOPER",
+    )
+    assert ok, diag
+    # Three calls in order: render-role, load-buffer, paste-buffer -p, send-keys Enter.
+    assert calls[0][:2] == ["greatminds", "render-role"]
+    assert calls[0][2] == "DEVELOPER"
+    assert calls[1][:2] == ["tmux", "load-buffer"]
+    paste_call = [c for c in calls if c[:2] == ["tmux", "paste-buffer"]][0]
+    assert "-p" in paste_call, "bracketed paste -p flag required (0147)"
+    assert "test-session:dev" in paste_call
+    submit = [c for c in calls if c[:2] == ["tmux", "send-keys"]][0]
+    assert submit[-1] == "Enter"
+
+
+def test_soft_inject_returns_false_when_render_role_fails(monkeypatch):
+    """render-role failure (unknown role, missing canon) must be
+    non-fatal — caller logs the diag and continues. Don't crash
+    --bootstrap because one role's canon broke."""
+    import subprocess as _sub
+
+    def fake_run(cmd, *args, **kwargs):
+        if cmd[:2] == ["greatminds", "render-role"]:
+            return _sub.CompletedProcess(list(cmd), 2, "",
+                                         "role NOPE not found")
+        return _sub.CompletedProcess(list(cmd), 0, "", "")
+
+    monkeypatch.setattr(restart_mod.subprocess, "run", fake_run)
+    ok, diag = restart_mod._soft_inject_render_role(
+        "test-session", "dev", "NOPE",
+    )
+    assert ok is False
+    assert "render-role NOPE failed" in diag
