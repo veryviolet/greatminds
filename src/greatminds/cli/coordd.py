@@ -499,6 +499,57 @@ def _window_for_role(coord_yaml: dict, role_upper: str) -> str | None:
     return None
 
 
+def sigint_sleeping_descendant(coord: Path, role: str,
+                               verbose: bool = False) -> bool:
+    """0150: SIGINT the deepest sleep descendant of ``role``'s agent.
+
+    When a new file lands in ``inbox/<role>/`` or a claim queue, the
+    natural agent-wake is gated on the sleep timer's expiry (60s to
+    600s depending on adaptive backoff). SIGINTing the agent's
+    deepest descendant aborts a blocking ``sleep`` syscall: bash sees
+    the non-zero return, the agent's tool call resolves, the next
+    tick runs against the now-present inbox file. End-to-end latency
+    drops from "remaining sleep window" to "coordd poll interval +
+    one signal" (≤0.2s in practice).
+
+    Safe by construction (0093 primitive's guard):
+      - leaf == agent_pid (no descendants → agent is not asleep,
+        possibly mid-thought) → return without signaling.
+      - registry missing / pid dead → no-op.
+
+    Returns True iff a SIGINT was delivered.
+    """
+    from greatminds.cli._send_enter import (
+        _deepest_descendant,
+        _pid_alive,
+        _send_sigint,
+    )
+
+    reg = read_registry(coord / REGISTRY_DIR, role)
+    if reg is None:
+        return False
+    pid = reg.get("pid")
+    try:
+        pid_int = int(pid) if pid is not None else None
+    except (TypeError, ValueError):
+        pid_int = None
+    if pid_int is None or not _pid_alive(pid_int):
+        return False
+    leaf = _deepest_descendant(pid_int)
+    if leaf is None or leaf == pid_int:
+        # No sleep descendant → agent isn't asleep on a tool subprocess.
+        # SIGINTing the agent itself would be hostile; skip.
+        return False
+    ok = _send_sigint(leaf)
+    if ok and verbose:
+        print(
+            f"  event-wake: role={role} SIGINT pid={leaf} "
+            f"(parent agent pid={pid_int})",
+            file=sys.stderr,
+        )
+    return ok
+
+
 def push_to_role(coord: Path, role: str, file_path: str, verbose: bool,
                  bypass_fresh_guard: bool = False) -> bool:
     """Attempt to nudge the role. Prefers writing to the unix socket
@@ -789,6 +840,17 @@ def coordd(project_dir: Path | None, project_name: str | None,
                               f"role={role} file={Path(path).name}",
                               file=sys.stderr)
                     continue
+                # 0150: event-driven wake. SIGINT the deepest sleep
+                # descendant FIRST — if the agent is asleep on a tool
+                # subprocess, this aborts the sleep so the next tick
+                # runs immediately against the new file. Safe if the
+                # agent is not sleeping (the descendant walk returns
+                # the agent itself and the helper refuses to signal).
+                # push_to_role still fires below for the keystroke
+                # channel; the two are complementary — SIGINT wakes a
+                # sleeping agent, keystroke injection covers the
+                # active-but-stuck case the existing push handles.
+                sigint_sleeping_descendant(coord, role, verbose)
                 push_to_role(coord, role, path, verbose)
             # Drop known entries for files agents have processed and deleted.
             known &= current
