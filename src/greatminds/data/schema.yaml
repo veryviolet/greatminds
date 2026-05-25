@@ -681,3 +681,27 @@ layout:
   inbox_dir: inbox/
   heartbeat_glob: 'heartbeat.*'
   stand_status: stand.status
+
+# ---------------------------------------------------------------------------
+# Event-wake dispatch table (task 0186)
+#
+# coord.yaml's ``tool:`` field per window selects which wake mechanism
+# coordd uses for that role on inbox/queue events. Pre-0186 chat-mode
+# (claude) roles had no event-wake at all — inbox messages to PLANNER
+# / MAINTAINER never auto-triggered a tick. 0186 adds the tmux-send-
+# keys mechanism that injects a literal keystroke + Enter into the
+# chat-mode pane, identical to operator-typed input.
+#
+# Mechanisms live as functions in cli/coordd.py
+# (sigint_sleeping_descendant, tmux_send_keys_wake). This table maps
+# tool → mechanism name; the dispatcher picks the function by name.
+# ---------------------------------------------------------------------------
+event_wake:
+  by_tool:
+    codex:  sigint_deepest_descendant   # existing 0150 path
+    cursor: sigint_deepest_descendant
+    claude: tmux_send_keys              # 0186: chat-mode nudge
+  tmux_send_keys:
+    keys: "check inbox and continue your tick"
+    enter: true
+    rate_limit_seconds: 5

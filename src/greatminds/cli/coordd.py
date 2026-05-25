@@ -36,6 +36,7 @@ from __future__ import annotations
 import json
 import os
 import signal
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -599,6 +600,169 @@ def _window_for_role(coord_yaml: dict, role_upper: str) -> str | None:
     return None
 
 
+# 0186: per-role per-process timestamp of the last tmux send-keys
+# nudge. Rate-limits chat-mode wakes so a burst of inbox writes
+# doesn't flood the claude pane with N "check inbox" lines within a
+# few seconds. Coalesces to one nudge per ``event_wake.tmux_send_keys.
+# rate_limit_seconds`` window.
+_LAST_TMUX_NUDGE: dict[str, float] = {}
+
+
+def _read_coord_yaml(project_dir: Path) -> dict | None:
+    """0186: read ``<project>/coord.yaml`` to look up a role's tmux
+    window + tool. Cached behavior is deliberately omitted — coord.yaml
+    is small and operator edits during runtime should be picked up on
+    the next nudge (rate-limited anyway). Returns None on missing/
+    malformed file."""
+    for cand in (
+        project_dir / "coord.yaml",
+        project_dir / "coordination" / "coord.yaml",
+    ):
+        if cand.is_file():
+            try:
+                doc = yaml.safe_load(cand.read_text(encoding="utf-8"))
+            except (OSError, yaml.YAMLError):
+                return None
+            return doc if isinstance(doc, dict) else None
+    return None
+
+
+def _window_and_tool_for_role(coord_yaml: dict | None,
+                              role: str) -> tuple[str, str] | None:
+    """Return ``(window_name, tool)`` for a role per coord.yaml's
+    ``windows:`` list, or None when the role isn't declared (e.g.
+    role-less ``ops`` bash window, or coord.yaml absent)."""
+    if not coord_yaml:
+        return None
+    role_upper = role.upper()
+    for w in coord_yaml.get("windows") or []:
+        if not isinstance(w, dict):
+            continue
+        if (w.get("role") or "").upper() == role_upper:
+            return ((w.get("name") or "").strip(),
+                    (w.get("tool") or "").strip().lower())
+    return None
+
+
+def tmux_send_keys_wake(coord: Path, role: str,
+                       verbose: bool = False) -> bool:
+    """0186: chat-mode wake via ``tmux send-keys`` for claude panes.
+
+    Pre-0186 chat-mode roles (claude PLANNER + MAINTAINER) had NO
+    event-wake mechanism — they sat in NO_KEYSTROKE_INJECT_ROLES so
+    push_to_role was skipped, and coordd's sigint primitive can't
+    reach a claude process the same way it can SIGINT a codex
+    wrapper's sleep (claude is the user-facing tool, not a sleep-
+    descendant of a bash wrapper). Result: inbox messages to PLANNER /
+    MAINTAINER never auto-triggered a tick.
+
+    Mechanism: read coord.yaml for this role's tmux window; send the
+    literal keystroke ``check inbox and continue your tick`` + Enter
+    into that pane via ``tmux send-keys``. Claude's UI buffers the
+    text the same way as if the operator typed it, runs the tick on
+    Enter.
+
+    Rate-limited per role per coordd process so a burst of N inbox
+    writes within ``rate_limit_seconds`` only nudges claude once.
+    """
+    project_dir = coord.parent
+    coord_yaml = _read_coord_yaml(project_dir)
+    located = _window_and_tool_for_role(coord_yaml, role)
+    if located is None:
+        if verbose:
+            print(f"  tmux-wake: role={role} not declared in coord.yaml; skip",
+                  file=sys.stderr)
+        return False
+    window, _tool = located
+    if not window:
+        if verbose:
+            print(f"  tmux-wake: role={role} has empty window name; skip",
+                  file=sys.stderr)
+        return False
+    session = (coord_yaml.get("session") or "").strip()
+    if not session:
+        if verbose:
+            print(f"  tmux-wake: no session in coord.yaml; skip", file=sys.stderr)
+        return False
+
+    # Rate-limit per role per process.
+    rate_limit = 5.0  # default if schema absent (defensive)
+    try:
+        schema = _read_event_wake_schema(coord)
+        rate_limit = float(schema.get("rate_limit_seconds") or rate_limit)
+    except (OSError, KeyError, TypeError, ValueError):
+        pass
+
+    now = time.time()
+    last = _LAST_TMUX_NUDGE.get(role, 0.0)
+    if now - last < rate_limit:
+        if verbose:
+            print(
+                f"  tmux-wake: role={role} rate-limited "
+                f"(last nudge {now - last:.1f}s ago < {rate_limit:.0f}s); skip",
+                file=sys.stderr,
+            )
+        return False
+
+    cp = subprocess.run(
+        ["tmux", "send-keys", "-t", f"{session}:{window}",
+         "check inbox and continue your tick", "Enter"],
+        capture_output=True, text=True,
+    )
+    if cp.returncode != 0:
+        if verbose:
+            print(
+                f"  tmux-wake: role={role} tmux send-keys failed: "
+                f"{cp.stderr.strip()[:200]}",
+                file=sys.stderr,
+            )
+        return False
+    _LAST_TMUX_NUDGE[role] = now
+    if verbose:
+        print(
+            f"  event-wake: role={role} tmux send-keys to "
+            f"{session}:{window}",
+            file=sys.stderr,
+        )
+    return True
+
+
+def _read_event_wake_schema(coord: Path) -> dict:
+    """0186: read ``event_wake:`` section from schema.yaml. Returns the
+    ``tmux_send_keys`` sub-mapping or an empty dict on absence — the
+    caller has hard-coded defaults so missing/malformed schema is
+    non-fatal."""
+    from greatminds.core.paths import find_canon_dir
+    schema_path = find_canon_dir() / "schema.yaml"
+    doc = yaml.safe_load(schema_path.read_text(encoding="utf-8")) or {}
+    section = (doc.get("event_wake") or {}).get("tmux_send_keys") or {}
+    return section if isinstance(section, dict) else {}
+
+
+def _wake_mechanism_for_tool(tool: str) -> str:
+    """0186: schema-driven dispatch table. ``coord.yaml``'s ``tool:``
+    field per window selects which wake mechanism coordd uses for
+    that role. Defaults preserve pre-0186 behavior: codex/cursor →
+    sigint (the 0150 path); claude → tmux_send_keys (NEW). Other
+    tools → None (no event wake, falls back to natural ScheduleWakeup
+    / interval polling)."""
+    try:
+        from greatminds.core.paths import find_canon_dir
+        doc = yaml.safe_load(
+            (find_canon_dir() / "schema.yaml").read_text(encoding="utf-8")
+        ) or {}
+        table = (doc.get("event_wake") or {}).get("by_tool") or {}
+    except (OSError, yaml.YAMLError):
+        table = {}
+    # Sensible defaults if schema doesn't carry the table yet.
+    defaults = {
+        "codex": "sigint_deepest_descendant",
+        "cursor": "sigint_deepest_descendant",
+        "claude": "tmux_send_keys",
+    }
+    return table.get(tool.lower(), defaults.get(tool.lower(), ""))
+
+
 def sigint_sleeping_descendant(coord: Path, role: str,
                                verbose: bool = False) -> bool:
     """0150: SIGINT the deepest sleep descendant of ``role``'s agent.
@@ -918,7 +1082,6 @@ def coordd(project_dir: Path | None, project_name: str | None,
             # Step 1: run notify_from_journal — writes inbox messages for any
             # new journal lines. Idempotent (state file tracks last offset).
             try:
-                import subprocess
                 subprocess.run(
                     [
                         *notify_invocation,
@@ -946,26 +1109,40 @@ def coordd(project_dir: Path | None, project_name: str | None,
                 known.add(path)  # mark BEFORE attempt — never retry-spam
                 if role is None:
                     continue
-                if role in NO_KEYSTROKE_INJECT_ROLES:
-                    # chat-driven role: deliver the file (already on disk),
-                    # but do NOT type into its live session.
+                # 0186: schema-driven event-wake dispatch by tool.
+                # coord.yaml's tool: field per window selects which
+                # wake mechanism applies:
+                #   codex/cursor → sigint_deepest_descendant (0150 path)
+                #   claude       → tmux_send_keys (NEW for chat-mode)
+                # Pre-0186: claude chat-mode roles (PLANNER, MAINTAINER)
+                # were silently skipped — inbox messages to them
+                # never auto-triggered a tick. This dispatcher closes
+                # the hole.
+                project_dir = coord.parent
+                coord_yaml_doc = _read_coord_yaml(project_dir)
+                located = _window_and_tool_for_role(coord_yaml_doc, role)
+                tool = (located[1] if located else "").lower()
+                mechanism = _wake_mechanism_for_tool(tool)
+                if mechanism == "sigint_deepest_descendant":
+                    sigint_sleeping_descendant(coord, role, verbose)
+                    push_to_role(coord, role, path, verbose)
+                elif mechanism == "tmux_send_keys":
+                    # Chat-mode pane: nudge via tmux send-keys only.
+                    # No SIGINT (claude isn't a bash-wrapper descendant)
+                    # and no push_to_role keystroke (claude has no
+                    # input_sock; the tmux pane IS the input channel).
+                    tmux_send_keys_wake(coord, role, verbose)
+                else:
+                    # No event-wake mechanism registered for this tool
+                    # (e.g. an exotic / future tool, or NO_KEYSTROKE_
+                    # INJECT_ROLES legacy semantic for a role with no
+                    # window). Deliver-only — file is on disk; agent
+                    # picks it up on its own next tick.
                     if verbose:
-                        print(f"  deliver-only (chat role, no keystroke): "
-                              f"role={role} file={Path(path).name}",
+                        print(f"  deliver-only (no event-wake mechanism "
+                              f"for tool={tool!r}): role={role} "
+                              f"file={Path(path).name}",
                               file=sys.stderr)
-                    continue
-                # 0150: event-driven wake. SIGINT the deepest sleep
-                # descendant FIRST — if the agent is asleep on a tool
-                # subprocess, this aborts the sleep so the next tick
-                # runs immediately against the new file. Safe if the
-                # agent is not sleeping (the descendant walk returns
-                # the agent itself and the helper refuses to signal).
-                # push_to_role still fires below for the keystroke
-                # channel; the two are complementary — SIGINT wakes a
-                # sleeping agent, keystroke injection covers the
-                # active-but-stuck case the existing push handles.
-                sigint_sleeping_descendant(coord, role, verbose)
-                push_to_role(coord, role, path, verbose)
             # Drop known entries for files agents have processed and deleted.
             known &= current
 
