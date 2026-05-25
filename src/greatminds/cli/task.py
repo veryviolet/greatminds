@@ -1541,18 +1541,66 @@ def move_task(*, task_id: str, to_queue: str, reason: str | None = None) -> str:
         return _do_move(coord, role, task_id, to_queue, reason or "")
 
 
+def _role_can_reach_target(role: str, to_q: str) -> tuple[bool, list[str]]:
+    """0113: does this role have ANY authorized schema row landing in
+    ``to_q`` (any from_q)?
+
+    Returns (allowed, permitted_role_list). If allowed is False, the
+    role wouldn't have been authorized to mv to ``to_q`` even from
+    the right source queue — surfacing this as the primary error is
+    more diagnostic than 'task not found'.
+    """
+    permitted: set[str] = set()
+    role_ok = False
+    for t in schema().get("transitions") or []:
+        if not isinstance(t, dict) or t.get("to") not in (to_q, "any_resume_to_queue"):
+            continue
+        by = t.get("by")
+        if isinstance(by, str):
+            if by == "current_owner":
+                # current_owner row authorizes based on from_q ownership;
+                # we don't know from_q here, so treat as "may apply".
+                role_ok = True
+                permitted.add("current_owner")
+            else:
+                permitted.add(by)
+                if by == role:
+                    role_ok = True
+    return role_ok, sorted(permitted)
+
+
 def _do_move(coord: Path, role: str, task_id: str,
              to_q: str, reason: str) -> str:
+    if to_q not in (schema().get("queues") or {}):
+        raise GreatMindsError(f"unknown destination queue: {to_q}")
+
     found = find_task(coord, task_id)
     if found is None:
-        raise GreatMindsError(f"task {task_id} not found in any queue")
+        # 0113: enrich the not-found error. If the role has no
+        # authorized path to to_q at all, surface that as the primary
+        # cause — it's a more accurate diagnosis than "not found" in
+        # cases like the 0097 race incident where the user wouldn't
+        # have been allowed even without the race.
+        role_ok, permitted = _role_can_reach_target(role, to_q)
+        if not role_ok:
+            permitted_str = " or ".join(permitted) if permitted else "no role"
+            raise GreatMindsError(
+                f"task {task_id} not found in any queue, AND role "
+                f"{role} has no authorized transition into {to_q} "
+                f"regardless of source queue (only "
+                f"{permitted_str} may land tasks in {to_q})",
+                exit_code=3,
+            )
+        raise GreatMindsError(
+            f"task {task_id} not found in any queue (may have been "
+            f"moved by another agent between your last check and "
+            f"this mv; rerun greatminds task list / wake-check / "
+            f"watchdog to refresh state)"
+        )
     src_path, from_q = found
 
     if from_q == to_q:
         raise GreatMindsError(f"task already in {to_q}")
-
-    if to_q not in (schema().get("queues") or {}):
-        raise GreatMindsError(f"unknown destination queue: {to_q}")
 
     data = load_task(src_path)
     if data.get("_legacy_md"):
@@ -1620,10 +1668,14 @@ def append_block(
             raise GreatMindsError(f"task {task_id} is legacy .md; migrate first", exit_code=2)
         data = load_task(src_path)
 
-        require_block_acceptable_in_queue(queue, kind)
+        # 0113: role check BEFORE queue-acceptance check. If the caller
+        # is not allowed to produce this block kind regardless, that's
+        # the primary error — saying "block kind X is not acceptable in
+        # queue Y" misleads users who'd never have been allowed anyway.
         err = role_for_block_kind(role, kind, queue, data)
         if err is not None:
             raise GreatMindsError(err, exit_code=3)
+        require_block_acceptable_in_queue(queue, kind)
 
         block: dict[str, Any] = {
             "kind": kind,
