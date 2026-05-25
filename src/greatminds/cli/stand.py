@@ -37,7 +37,14 @@ from greatminds.cli.task import (
 
 
 # Queues where a product task can still be "active" (i.e. wanting evidence).
-ACTIVE_PRODUCT_QUEUES = (
+# Active queues that a stand's --evidence-for argument may reference.
+# 0149: ``review_sessions`` joined the allow-list. The product pipeline
+# queues are the original set (a stand records evidence for in-flight
+# work); review-session tasks (e.g. ``0007-explorer-...``) are also
+# legitimate evidence targets — STAND-KEEPER's run of a smoke/deploy
+# stand is evidence that EXPLORER's scenario found nothing fresh, and
+# the pre-0149 validator rejected them as ``not in any active queue``.
+EVIDENCE_FOR_ACTIVE_QUEUES = (
     "feature_inbox",
     "feature_plan",
     "feature_dev",
@@ -47,12 +54,13 @@ ACTIVE_PRODUCT_QUEUES = (
     "feature_docs_review",
     "feature_review",
     "feature_blocked",
+    "review_sessions",
 )
 
 
 def task_exists_in_active(coord: Path, task_id: str) -> bool:
     """``True`` if a task with this id (or id-prefix) sits in any active queue."""
-    for q in ACTIVE_PRODUCT_QUEUES:
+    for q in EVIDENCE_FOR_ACTIVE_QUEUES:
         for ext in (".yaml", ".md"):
             if (coord / q / f"{task_id}{ext}").is_file():
                 return True
