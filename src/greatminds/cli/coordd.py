@@ -135,9 +135,10 @@ INOTIFY_QUEUE_DIRS: tuple[str, ...] = (
     "feature_review",
     "feature_blocked",
     "verified",
-    "stand_requests",
-    "stand_wip",
-    "stand_done",
+    # 0258 / 0247 (1.3.0 BREAKING): stand_requests / stand_wip /
+    # stand_done queues REMOVED — the lease-based singleton stand
+    # resource at ``.stand/state.yaml`` watches its own state via the
+    # ``.stand`` subdir below (added by 0245).
     "review_sessions",
     # 0245 (0242c / Phase 3 of 0242): SK polls the singleton stand
     # resource state via inotify on ``coordination/.stand/`` so

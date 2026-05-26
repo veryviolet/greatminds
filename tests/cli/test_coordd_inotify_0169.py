@@ -23,7 +23,7 @@ from greatminds.cli import coordd as coordd_mod
 def _make_coord(tmp_path: Path) -> Path:
     coord = tmp_path / "coordination"
     coord.mkdir()
-    for sub in ("inbox", "feature_dev", "stand_requests"):
+    for sub in ("inbox", "feature_dev", "review_sessions"):
         (coord / sub).mkdir()
     return coord
 
@@ -44,9 +44,14 @@ def test_inotify_queue_dirs_covers_inbox_and_active_queues() -> None:
               "feature_docs_review", "feature_review",
               "feature_blocked", "verified"):
         assert q in queues, f"0169: queue dir {q!r} missing from watch list"
-    # Stand pipeline.
+    # 0258 / 0247 (1.3.0 BREAKING): stand_requests / stand_wip /
+    # stand_done queues REMOVED — the singleton stand resource at
+    # ``.stand/state.yaml`` watches its own state instead.
     for q in ("stand_requests", "stand_wip", "stand_done"):
-        assert q in queues, f"0169: queue dir {q!r} missing from watch list"
+        assert q not in queues, (
+            f"0258: queue dir {q!r} must NOT be in watch list "
+            "(0247 removed the queue model)"
+        )
     # Review sessions.
     assert "review_sessions" in queues
 

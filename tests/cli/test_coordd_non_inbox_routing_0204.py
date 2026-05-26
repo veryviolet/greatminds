@@ -237,13 +237,15 @@ def test_inotify_watcher_records_wd_to_queue_mapping(
     inotify state."""
     pytest.importorskip("inotify_simple")
     coord = tmp_path / "coord"
-    for q in ("inbox", "feature_dev", "stand_requests"):
+    # 0258 / 0247 (1.3.0 BREAKING): stand_requests / stand_wip /
+    # stand_done queues REMOVED. Use review_sessions as the
+    # non-feature_dev watch target.
+    for q in ("inbox", "feature_dev", "review_sessions"):
         (coord / q).mkdir(parents=True)
     w = coordd_mod._InotifyWatcher(coord, verbose=False)
-    # At least one wd points at feature_dev and one at stand_requests.
     queues_seen = set(w._wd_to_queue.values())
     assert "feature_dev" in queues_seen
-    assert "stand_requests" in queues_seen
+    assert "review_sessions" in queues_seen
 
 
 def test_inotify_watcher_queue_for_returns_none_for_unknown_wd(

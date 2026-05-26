@@ -106,16 +106,10 @@ def test_feature_inbox_intake_still_requires_role_env(tmp_path: Path):
     assert "caller role unknown" in (cp.stderr + cp.stdout)
 
 
-def test_stand_intake_still_requires_role_env(tmp_path: Path):
-    """Stand-stream intake must also remain strict (STAND-KEEPER fleet path)."""
-    proj = _setup_project(tmp_path)
-    cp = _gm_no_role(proj, "task", "new",
-                     "--stream", "stand",
-                     "--request-type", "deploy",
-                     "--profile", "full-deploy",
-                     "--title", "Stand intake — must fail")
-    assert cp.returncode != 0, cp.stderr
-    assert "caller role unknown" in (cp.stderr + cp.stdout)
+# 0258 / 0247 (1.3.0 BREAKING): ``stand`` stream removed.
+# ``test_stand_intake_still_requires_role_env`` retired alongside the
+# stream — see ``tests/cli/test_task_new_stream_validator_0258.py``
+# for the new "stream=stand is rejected" pin.
 
 
 def test_user_feedback_intake_with_role_env_uses_that_role(tmp_path: Path):
