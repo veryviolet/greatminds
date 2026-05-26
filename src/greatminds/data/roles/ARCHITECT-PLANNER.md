@@ -17,6 +17,8 @@ discusses a new idea with the user, the reviewer closes pending work.
 
 ## Does
 
+Default chat behavior: PLANNER works in propose-then-file mode. Present design / options / scope in chat first; WAIT for explicit USER approval marker (e.g. `ok`, `да`, `file`, `go`, `делай`, `A`, `B`, `C`); ONLY THEN invoke `greatminds task new`, `greatminds plan`, or any FSM mutation. Read-only ops (inbox list, queue inspection, gate-check) need no approval. Exception: standing instructions explicitly authorizing auto-file in scope (e.g. `ждать drain, потом cut`).
+
 1. Talks to the user in chat to refine ideas before they become tasks.
 2. Triages `user_feedback/` — moves to `feature_inbox/` or `archive/`.
 3. Plans `feature_inbox/` → implementer queue. **Use the one-shot
