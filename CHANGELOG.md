@@ -4,6 +4,68 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.3.2 — 2026-05-27
+
+Followup cut after the 1.3.0 BREAKING stand-stream redesign + 1.3.1
+emergency wake fix. Five verified tasks merged on local main; all
+empirically validated via real avatar SSH stand probes (no shape-only
+evidence).
+
+### Fixed
+
+- **0258 — complete BREAKING removal of stand-stream runtime.**
+  CLI now rejects `--stream stand` and `--kind stand_request` with
+  rc=2 + `stream=stand removed in 1.3.0` message; `greatminds setup`
+  no longer scaffolds `stand_{requests,wip,done}/` directories;
+  `coordd._build_inotify_dirs` drops the legacy queue watches; new
+  `greatminds migrate-stand-history` CLI moves pre-1.3.0
+  `stand_done/*` artifacts under `coordination/archive/stand-history/`
+  (idempotent, supports `--dry-run`).
+
+- **0268 — `_evaluate_gate_check` reads lease evidence first.**
+  Pre-fix, a lease-evidence-carrying task could see `gate-check`
+  return `pass` from the lease while `_check_gate_for_stand_required`
+  returned `missing` from the same task data (the latter only knew
+  about removed `stand_done/<id>.yaml` files). Now
+  `extract_lease_evidence_from_tests` is probed first; the legacy
+  `find_stand_evidence` path remains as a fall-through for any
+  in-flight pre-migration tasks.
+
+- **0267 — `greatminds setup` bakes `autoMode.allow` + ops perms from
+  schema canon.** `data/schema.yaml` now declares the full
+  `claude_settings.autoMode.allow` (`Bash(git push origin main:*)` +
+  `--follow-tags` variants) and `claude_settings.permissions.allow`
+  (ssh / scp / rsync / git revert) under one source of truth.
+  `_build_settings_local_json` populates `autoMode.allow` from schema
+  instead of a hardcoded list; `_ensure_claude_settings_local`
+  additively merges new canonical entries on existing fleets — the
+  operator's own additions and Stop/UserPromptSubmit hooks are
+  preserved; repeat runs report `unchanged`.
+
+- **0269 — coordd inotify `.stand` events route to STAND-KEEPER.**
+  `.stand` was an `INOTIFY_QUEUE_DIRS` entry but not listed in
+  `schema.queues`, so `_owning_role_for_queue('.stand')` returned
+  `None` and `_route_queue_event` silently dropped state.yaml writes.
+  Schema now declares `.stand` with `owner: STAND-KEEPER`,
+  `writers: [STAND-KEEPER, TESTER, ARCHITECT-PLANNER, MAINTAINER]`,
+  `kind: state`. Lease delivery latency drops from waiting on SK's
+  own ScheduleWakeup tick to coordd-pushed via `press_enter` on the
+  input_sock. The `kind: state` marker keeps `watchdog` (active-only)
+  and `wake_check` (terminal-only) iterations untouched.
+
+- **0271 — `greatminds stand lease` enforces per-task worktree at
+  acquire.** Pre-fix the only worktree enforcement was SK's runtime
+  whitelist; the CLI accepted any `--worktree`, flipped state.yaml to
+  `preparing`, and only SK rejected later with a self-modify reason,
+  leaving an orphaned lease. Now schema declares
+  `stand.resource.lease.worktree_constraint` (pattern
+  `{project_dir}/.worktrees/{seq}[-slug]`, `enforced_by: cli`) and
+  `stand.py:_validate_lease_worktree` rejects at acquire with rc=2 +
+  named-rule errors: empty/None, main-tree (with paste-ready
+  `git worktree add` recipe), wrong parent, wrong basename. Relative
+  paths resolve via `Path(...).resolve(strict=False)`. state.yaml is
+  not mutated on reject.
+
 ## 1.3.1 — 2026-05-26
 
 Emergency cut. Single fix: 0259 — coordd's chat-mode inotify wake
