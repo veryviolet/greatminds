@@ -53,6 +53,48 @@ BODY_SIZE_CAP = 7000
 JOURNAL_TAIL_LINES = 50
 
 
+def _check_role_permission() -> None:
+    """0198: role-gate ``greatminds report-upstream`` per schema.
+
+    Reads ``schema.report_upstream.permissions.invoke`` (a list of
+    role names) and refuses for any agent whose ``GREATMINDS_ROLE``
+    is set but not in that list. Operator-mode invocations (no
+    GREATMINDS_ROLE env var) are allowed — the gate is for agent-
+    fleet safety, not a hard lock.
+
+    Without this gate, any role in a /loop session could call
+    report-upstream and flood the public upstream repo with
+    duplicate / low-quality bug reports.
+    """
+    role = (os.environ.get("GREATMINDS_ROLE") or "").strip()
+    if not role:
+        return  # operator-mode (no agent context) — allowed
+    try:
+        from greatminds.core.paths import find_canon_dir
+        import yaml as _yaml
+        doc = _yaml.safe_load(
+            (find_canon_dir() / "schema.yaml").read_text(encoding="utf-8")
+        ) or {}
+    except Exception:
+        return  # schema unreadable — fail open; CLI shouldn't block
+    ru = doc.get("report_upstream") or {}
+    allow = ((ru.get("permissions") or {}).get("invoke") or [])
+    if not allow:
+        return  # no allow-list configured → fail open
+    if role.upper() not in {str(r).upper() for r in allow}:
+        from greatminds.core.errors import GreatMindsError
+        raise GreatMindsError(
+            f"report-upstream not allowed for role {role!r}; "
+            f"allowed roles per schema.report_upstream.permissions."
+            f"invoke: {sorted(allow)}. To file an upstream bug, send "
+            f"a bug-suspect ask to MAINTAINER via "
+            f"`greatminds inbox send MAINTAINER --kind ask --task "
+            f"<ref> --body '<repro + diagnostics>'`. MAINTAINER "
+            f"vets and files the upstream issue.",
+            exit_code=3,
+        )
+
+
 def _load_coord_yaml(project_root: Path) -> dict:
     for p in (project_root / "coord.yaml",
               project_root / "coordination" / "coord.yaml"):
@@ -430,6 +472,10 @@ def report_upstream(
     no_diagnostics: bool,
     project_dir: Path | None,
 ) -> None:
+    # 0198: role-gate to schema.report_upstream.permissions.invoke.
+    # Operator invoking outside agent context (GREATMINDS_ROLE unset)
+    # is allowed — the gate is for agent-mode safety, not a hard lock.
+    _check_role_permission()
     # Body source: --body OR --body-file (mutually exclusive), or stub.
     if body_inline is not None and body_file is not None:
         err("--body and --body-file are mutually exclusive")

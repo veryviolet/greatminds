@@ -922,6 +922,16 @@ visual_events:
 # structured-config-first directive. Operator may extend per-project
 # by editing settings.local.json directly; setup merges via union,
 # never overwriting existing operator entries.
+# 0198: gate `greatminds report-upstream` to MAINTAINER only. Other
+# roles file bug-suspects via `greatminds inbox send MAINTAINER
+# --kind ask`. CLI refuses for non-allowed agent roles; operator-
+# mode (no GREATMINDS_ROLE) bypasses the gate.
+report_upstream:
+  permissions:
+    invoke: [MAINTAINER]
+  triage_inbox_target: MAINTAINER
+  upstream_repo_required: true
+
 claude_settings:
   permissions:
     allow:

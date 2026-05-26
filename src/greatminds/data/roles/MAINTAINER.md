@@ -86,6 +86,13 @@ MAINTAINER owns these one-shot operational commands:
    change: sync canon → project, migrate legacy task files, restart
    agents (`greatminds update --post-pip` is the wrapper).
 3. Maintain documentation (`COORDINATE.md`, `README.md`, role docs).
+4. **Upstream bug funnel (0198):** MAINTAINER is the sole role
+   authorized to call `greatminds report-upstream`. Other roles
+   file bug-suspects via `greatminds inbox send MAINTAINER --kind
+   ask --task <ref> --body "<repro + diagnostics>"`. MAINTAINER
+   vets, deduplicates, then files the upstream GitHub issue. The
+   CLI refuses for non-allowed roles per
+   `schema.report_upstream.permissions.invoke`.
 
 ## Never
 

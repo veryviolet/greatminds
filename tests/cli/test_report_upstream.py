@@ -19,6 +19,17 @@ from click.testing import CliRunner
 from greatminds.cli import report_upstream as ru_mod
 
 
+# 0198: the role-gate in report_upstream refuses non-MAINTAINER
+# agent invocations. These tests exercise the body-building +
+# submit-mode dispatch logic that's unrelated to the role gate;
+# run them in operator-mode (env unset) so the gate stays out of
+# the way. The gate itself is covered by
+# tests/cli/test_report_upstream_role_gate_0198.py.
+@pytest.fixture(autouse=True)
+def _clear_greatminds_role(monkeypatch):
+    monkeypatch.delenv("GREATMINDS_ROLE", raising=False)
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
