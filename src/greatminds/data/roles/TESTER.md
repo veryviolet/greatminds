@@ -18,13 +18,13 @@ tests block.
 3. Adds or updates focused tests when needed.
 4. Runs relevant test suites. `cd "$(greatminds worktree path <task-id>)"` first — each task's code lives in its own worktree per 0185, so tests must run against that tree, not the main branch.
    **0228: you execute test scenarios on the prepared stand.** SK's
-   `stand_result.observed_with_fix` is infra-readiness (UP, version,
-   `/health` 200), NOT a test result. Record your OWN
-   `tests.functional_probes` (curl/psql/UI per scope) and
-   `tests.stand_evidence.tester_observations` (verbatim probe
-   output, DISTINCT from SK's text). The CLI rejects rubber-stamps.
-5. **Post-0245 (1.3.0) lease workflow.** Request deployed-stand
-   readiness via the lease API:
+   readiness signal is infra-readiness (UP, version, `/health` 200),
+   NOT a test result. Record your OWN `tests.functional_probes`
+   (curl/psql/UI per scope) and `tests.stand_evidence.
+   tester_observations` (verbatim probe output, DISTINCT from SK's
+   text). The CLI rejects rubber-stamps.
+5. **Lease workflow (1.3.0).** Request deployed-stand readiness via
+   the lease API:
    ```
    greatminds stand lease --task <task-id> --worktree <path> --profile <enum>
    # → returns lease_id (UUID)
@@ -35,22 +35,23 @@ tests block.
    doesn't receive what you plan to test (information asymmetry by
    construction, 0244 §7).
 
-   Then wait for SK's inbox-info («stand lease <id> ready») —
-   coordd auto-fires it when SK runs `stand ready --lease-id <id>`.
-   On wake, probe the deployed stand yourself (curl / psql / UI
-   per scope). When done:
+   Then wait for SK's inbox-info (`stand lease <id> ready`) - coordd
+   auto-fires it when SK runs `stand ready --lease-id <id>`. On wake,
+   probe the deployed stand yourself (curl / psql / UI per scope).
+   Record the lease evidence in this task's `tests` block:
+   `stand_evidence.lease_id`, result, commit, worktree fingerprint,
+   `functional_probes`, and `stand_evidence.tester_observations`.
+   When done:
    ```
    greatminds stand release --lease-id <id> --result pass|fail|partial
    ```
    The release result is a closed enum, NOT a report. Prose lives
-   ONLY in the product-task's `tests` block
-   (`functional_probes`, `stand_evidence.tester_observations`).
-
-   Pre-0245 the request lived in `stand_requests/` with an
-   `evidence_for: [<task-id>]` field — that path is deprecated;
-   0247 removes the queues.
+   only in the product task's `tests` block. The old
+   `stand_requests/` -> `stand_wip/` -> `stand_done/` path is removed
+   from the active workflow.
 6. For `plan.stand_required: true`:
-   - waits for matching `stand_done/Y.md` with `evidence_for: [<task-id>]`,
+   - waits for its lease to become ready via SK's inbox-info,
+   - probes the stand directly and records lease-based stand evidence,
    - runs `<PROJECT_ROOT>/greatminds gate-check <task-id>` and captures the
      result (`pass | fail | missing | n/a`),
    - records `gate_check_result`, `gate_check_at`, `gate_check_commit` in
@@ -63,13 +64,12 @@ tests block.
      `partial` (or `fail`) and the task bounces to `feature_dev/` /
      `feature_ui_dev/`. Pytest with mocks is necessary but NOT
      sufficient — see COORDINATE.md §9.
-   - **§9.1 fix-for-self-blocker carve-out**: if the associated
-     `stand_done` carries `result=partial` or `result=fail` ONLY
-     because of a verification-infrastructure limitation that THIS
-     task's fix demonstrably removes, TESTER MUST explicitly cite the
-     chicken-and-egg in the tests block notes (which infra gap
-     blocked STAND-KEEPER, and how this fix closes it). Doing so lets
-     REVIEWER invoke the §9.1 carve-out and approve without
+   - **§9.1 fix-for-self-blocker carve-out**: if lease-based stand
+     evidence cannot pass only because of a verification-infrastructure
+     limitation that THIS task's fix demonstrably removes, TESTER MUST
+     explicitly cite the chicken-and-egg in the tests block notes (which
+     infra gap blocked verification, and how this fix closes it). Doing
+     so lets REVIEWER invoke the §9.1 carve-out and approve without
      `gate_check_result=pass`. Omitting the citation forfeits the
      carve-out and the standard §9 rule applies.
 7. On test pass + gate pass: `feature_test/X -> feature_review/X`.

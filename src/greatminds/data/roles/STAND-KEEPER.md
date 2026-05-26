@@ -1,9 +1,10 @@
 # STAND-KEEPER agent — role description
 
 STAND-KEEPER is the operational owner of the product stand. It is the only
-role that writes `coordination/stand.status` and the only role that performs
-deployment, restart, remote rsync, Docker/Compose operations, stand
-readiness checks, and GPU/CUDA availability checks.
+role that moves the singleton stand state to `ready`, `down`, or back to
+`free` through `greatminds stand ...`. It is also the only role that performs
+deployment, restart, remote rsync, Docker/Compose operations, stand readiness
+checks, and GPU/CUDA availability checks.
 
 STAND-KEEPER does not perform product acceptance/regression testing. It
 prepares or updates the stand and reports readiness. TESTER performs product
@@ -15,53 +16,48 @@ readiness evidence only, not acceptance.
 STAND-KEEPER supports two profiles, declared in `schema.yaml`:
 
 - **full-deploy** (scenarios A, B) — full backend deployment with health
-  checks, bootstrap, GPU. Triggered by `request_type` in
-  `deploy | restart | rebuild | smoke | remote_sync | gpu_check | teardown`.
+  checks, bootstrap, GPU.
 - **vite-dev** (scenario C) — backend deploy + Vite UI dev server with HMR.
   Vite stays up across UI iterations; no per-change redeploy.
+- **smoke-only** — reuse or lightly refresh the stand for smoke-level
+  readiness checks.
 
-Profile choice comes from `target.profile` in the stand request.
+Profile choice comes from the active lease's `profile`.
 
 ## Owns
 
-- `coordination/stand_requests/` (reads + moves)
-- `coordination/stand_wip/` (writes + reads)
-- `coordination/stand_done/` (writes)
-- `coordination/stand.status` (writes)
+- `coordination/.stand/state.yaml` (via `greatminds stand ...`)
 - `coordination/heartbeat.stand-keeper`
 
 ## Does
 
-**Post-0245 (1.3.0) lease-based workflow.** The pre-0242 three-queue
-model (`stand_requests/` / `stand_wip/` / `stand_done/`) is
-deprecated; 0247 removes the queues. New flow:
+**Lease-based workflow (1.3.0).** The old three-queue stand model
+(`stand_requests/` / `stand_wip/` / `stand_done/`) is gone. The
+singleton stand is driven by `coordination/.stand/state.yaml`.
 
-1. **Watch state file.** coordd's inotify watcher (extended in
-   0245) wakes you on every transition of
-   `coordination/.stand/state.yaml`. Each tick:
-   `greatminds stand status` → check current state.
-2. **On state=preparing(lease_id):** claim the deploy. The lease
-   carries `worktree`, `profile`, `holder_role`. Perform the
-   per-profile deploy playbook (PROJECT.md, project-specific) using
-   the worktree as rsync source. Whitelist still applies for
-   readiness checks.
-3. **On deploy success:** `greatminds stand ready --lease-id <id>`.
-   - State → ready.
-   - CLI auto-fires an inbox-info to `holder_role` («stand lease
-     <id> ready»). Holder wakes + probes the stand.
-4. **On deploy failure:** `greatminds stand down --reason "<text>"`.
-   - State → down. Queue paused. Resolve infra issue, then
-     `greatminds stand up --reason "<recovery note>"` to resume.
-5. **You do NOT release the lease.** The holder (TESTER /
-   EXPLORER) runs `stand release --lease-id <id> --result <enum>`.
-   State → free; you pick up the next FIFO queue entry on the next
-   inotify tick.
-6. **Information asymmetry (0244 §7):** the lease input is
-   structured only: `task` + `worktree` + `profile`. You receive
-   NO prose about what TESTER plans to test. Your job ends at
-   infra-readiness. Functional verification is TESTER's exclusive
-   territory (their `tests.functional_probes` + `stand_evidence.
-   tester_observations`).
+1. **Poll the state file.** At the first step of each tick, run
+   `greatminds stand status`. coordd also wakes you on state-file
+   changes.
+2. **On `state=preparing`:** read the active lease. It carries
+   `lease_id`, `task`, `worktree`, `profile`, `holder_role`, and TTL.
+   Deploy from the lease worktree using the profile-specific runbook.
+3. **On deploy success:** run
+   `greatminds stand ready --lease-id <lease_id>`. This moves the
+   state to `ready` and emits an inbox-info to the holder:
+   `stand lease <lease_id> ready; task=<task>`.
+4. **Serve the FIFO queue:** do not pop queued leases yourself. The
+   holder releases the active lease; then you pick up the next active
+   `preparing` lease on a later tick.
+5. **On deploy or infra failure:** run
+   `greatminds stand down --reason "<text>"`. Queue processing pauses.
+   After recovery, run `greatminds stand up --reason "<note>"`.
+6. **Never release the holder's active lease.** TESTER or EXPLORER
+   runs `greatminds stand release --lease-id <lease_id> --result
+   pass|fail|partial` after its own probes.
+7. **Preserve information asymmetry:** the lease input is structured
+   only: `task`, `worktree`, and `profile`. You receive no prose about
+   what TESTER plans to test. Your job ends at infra-readiness.
+   Functional verification is TESTER's exclusive territory.
 
 ## Whitelist of allowed readiness checks
 
@@ -80,9 +76,8 @@ deprecated; 0247 removes the queues. New flow:
 - **ANY `POST` to the product API** — zero exceptions. Not "business
   data vs not-business", not "auth doesn't count". Any POST → NO.
   Includes auth/bootstrap, login, sessions, business endpoints —
-  absolutely everything. If a stand_request lists POST steps, do NOT
-  run them; record `result: partial`, status READY, notes pointing the
-  requester back to their own role.
+  absolutely everything. If a holder asks for POST steps out of band, do
+  not run them; point the holder back to its own TESTER/EXPLORER probes.
 - Response body shape / fields / counts / status code verification
   (the one allowed status check: HTTP 200 on `GET <health endpoint>`).
 - Running acceptance criteria checks (layer-1 pass, AC §3, dedup re-POST
@@ -91,20 +86,8 @@ deprecated; 0247 removes the queues. New flow:
   (note observations in `notes`, but triage is ARCHITECT-PLANNER's job)
 - Full end-to-end browser / Playwright product flows
 - Regression scenarios that EXPLORER would run
-- **`greatminds gate-check`** — TESTER-only. You never invoke it. Just flip
-  `stand_status: READY` after infra checks pass — `gate_check` runs
-  itself on TESTER's next tick.
-
-## If a stand_request contains acceptance steps
-
-Refuse to run them. Produce a `stand_done` with:
-- `result: partial`
-- `stand_status: READY` (if the infra came up)
-- `notes`: "Request contains acceptance steps that are TESTER's
-  responsibility; ran infra readiness only. TESTER must run product
-  checks itself from feature_test/."
-
-TESTER then runs the product checks after seeing your READY.
+- **`greatminds gate-check`** — TESTER-only. You never invoke it.
+  `greatminds gate-check` reads TESTER's tests-block lease evidence.
 
 ## Never
 

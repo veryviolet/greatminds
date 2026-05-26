@@ -16,14 +16,11 @@ coordination/
   feature_blocked/
   verified/
   archive/
-  stand_requests/
-  stand_wip/
-  stand_done/
+  .stand/
   inbox/
   intent/
   journal.ndjson
   heartbeat.<role>
-  stand.status
 ```
 
 The task file path is meaningful. For example, a product task in
@@ -43,7 +40,8 @@ the worktree.
 - `intent/`: short-lived files written before moves and removed after moves.
 - `inbox/`: role mailboxes.
 - `heartbeat.*`: role liveness files.
-- `stand.status`: current stand summary.
+- `.stand/state.yaml`: singleton stand state, active lease, FIFO queue, and
+  recent transition history.
 - `.worktrees/<task-id>/`: in-flight code for a task. This replaces the older
   file-lock and lock-release model; operators should inspect worktrees instead
   of lock files.

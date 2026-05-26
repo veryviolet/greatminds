@@ -57,6 +57,7 @@ nav:
       - Roles: concepts/roles.md
       - Codex Profiles: concepts/codex-profiles.md
       - Scenarios: concepts/scenarios.md
+      - Stand Operations: concepts/stand-operations.md
       - Stand Gate: concepts/stand-gate.md
       - Inbox: concepts/inbox.md
   - CLI Reference: cli-reference/index.md

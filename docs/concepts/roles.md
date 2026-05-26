@@ -13,7 +13,7 @@ Product roles:
 - `READER`: reviews documentation as a fresh reader.
 - `ARCHITECT-REVIEWER`: final review, blocked-task wake-up, commit policy.
 - `EXPLORER`: live exploratory review and bug filing.
-- `STAND-KEEPER`: stand requests, deployment evidence, and stand status.
+- `STAND-KEEPER`: stand lease readiness, deployment, and recovery.
 
 System and entry roles:
 
