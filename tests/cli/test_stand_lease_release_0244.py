@@ -64,9 +64,12 @@ def test_lease_on_free_transitions_to_preparing(tmp_path, monkeypatch) -> None:
     profile/holder."""
     coord = tmp_path / "coordination"
     coord.mkdir()
+    # 0271: worktree must be project_dir/.worktrees/<seq>[-slug].
+    wt = tmp_path / ".worktrees" / "0099"
+    wt.mkdir(parents=True)
     result = _invoke(
         ["lease", "--task", "0099-test",
-         "--worktree", "/tmp/wt", "--profile", "full-deploy"],
+         "--worktree", str(wt), "--profile", "full-deploy"],
         tmp_path, monkeypatch=monkeypatch,
     )
     assert result.exit_code == 0, result.output
@@ -75,7 +78,7 @@ def test_lease_on_free_transitions_to_preparing(tmp_path, monkeypatch) -> None:
     state = ss.read_stand_state(coord)
     assert state["state"] == "preparing"
     assert state["active_lease"]["task"] == "0099-test"
-    assert state["active_lease"]["worktree"] == "/tmp/wt"
+    assert state["active_lease"]["worktree"] == str(wt)
     assert state["active_lease"]["profile"] == "full-deploy"
     assert state["active_lease"]["holder_role"] == "TESTER"
 
@@ -102,6 +105,9 @@ def test_lease_returns_unique_lease_ids(tmp_path, monkeypatch) -> None:
     against accidental same-token regression."""
     coord = tmp_path / "coordination"
     coord.mkdir()
+    # 0271: per-task worktree convention; both tasks share seq=0099.
+    wt = tmp_path / ".worktrees" / "0099"
+    wt.mkdir(parents=True)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GREATMINDS_ROLE", "TESTER")
     runner = CliRunner()
@@ -109,7 +115,7 @@ def test_lease_returns_unique_lease_ids(tmp_path, monkeypatch) -> None:
     ids = []
     for task in ("0099-a", "0099-b"):
         result = runner.invoke(stand_mod.stand, [
-            "lease", "--task", task, "--worktree", "/tmp/wt",
+            "lease", "--task", task, "--worktree", str(wt),
             "--profile", "full-deploy",
         ])
         assert result.exit_code == 0, result.output
@@ -126,18 +132,21 @@ def test_lease_on_busy_enqueues(tmp_path, monkeypatch) -> None:
     stays preparing; queue length grows."""
     coord = tmp_path / "coordination"
     coord.mkdir()
+    # 0271: both tasks share seq=0099 → same worktree path is valid.
+    wt = tmp_path / ".worktrees" / "0099"
+    wt.mkdir(parents=True)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GREATMINDS_ROLE", "TESTER")
     runner = CliRunner()
 
     # First lease.
     runner.invoke(stand_mod.stand, [
-        "lease", "--task", "0099-a", "--worktree", "/tmp/wt",
+        "lease", "--task", "0099-a", "--worktree", str(wt),
         "--profile", "full-deploy",
     ])
     # Second lease while busy.
     runner.invoke(stand_mod.stand, [
-        "lease", "--task", "0099-b", "--worktree", "/tmp/wt2",
+        "lease", "--task", "0099-b", "--worktree", str(wt),
         "--profile", "vite-dev",
     ])
 
@@ -370,6 +379,9 @@ def test_concurrent_lease_calls_serialize_via_fcntl(tmp_path) -> None:
     is deterministic + valid."""
     coord = tmp_path / "coordination"
     coord.mkdir()
+    # 0271: per-task worktree convention; both tasks share seq=0099.
+    wt = tmp_path / ".worktrees" / "0099"
+    wt.mkdir(parents=True)
     monkeypatch_env = {"GREATMINDS_ROLE": "TESTER"}
 
     def fire_lease(task: str, profile: str) -> None:
@@ -380,7 +392,7 @@ def test_concurrent_lease_calls_serialize_via_fcntl(tmp_path) -> None:
         try:
             runner = CliRunner()
             runner.invoke(stand_mod.stand, [
-                "lease", "--task", task, "--worktree", "/tmp/wt",
+                "lease", "--task", task, "--worktree", str(wt),
                 "--profile", profile,
             ])
         finally:
@@ -409,12 +421,15 @@ def test_lease_release_recorded_in_history(tmp_path, monkeypatch) -> None:
     transition entries for `stand status`'s history tail."""
     coord = tmp_path / "coordination"
     coord.mkdir()
+    # 0271: per-task worktree convention.
+    wt = tmp_path / ".worktrees" / "0099"
+    wt.mkdir(parents=True)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GREATMINDS_ROLE", "TESTER")
     runner = CliRunner()
 
     out = runner.invoke(stand_mod.stand, [
-        "lease", "--task", "0099", "--worktree", "/tmp/wt",
+        "lease", "--task", "0099", "--worktree", str(wt),
         "--profile", "full-deploy",
     ])
     lid = out.output.strip().split("lease_id:")[1].strip()

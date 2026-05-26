@@ -99,6 +99,66 @@ def stand() -> None:
 #     --result pass|fail|partial` (replaces `stand result`).
 
 
+def _validate_lease_worktree(task_id: str, worktree: str,
+                              project_dir: Path) -> None:
+    """0271: enforce schema.stand.resource.lease.worktree_constraint.
+
+    Reject any path that is not ``<project_dir>/.worktrees/<seq>[-...]``.
+    The main fleet tree (``project_dir`` itself) is rejected with the
+    most explicit error because it is the deployment foot-gun that
+    motivated this task — passing it would direct STAND-KEEPER to
+    deploy onto the running host's own checkout.
+    """
+    if not worktree or not isinstance(worktree, str):
+        raise GreatMindsError(
+            "stand lease --worktree must be a non-empty path",
+            exit_code=2,
+        )
+
+    try:
+        wt = Path(worktree).resolve(strict=False)
+    except (OSError, RuntimeError):
+        raise GreatMindsError(
+            f"stand lease --worktree {worktree!r} cannot be resolved",
+            exit_code=2,
+        )
+
+    project_resolved = project_dir.resolve(strict=False)
+    if wt == project_resolved:
+        raise GreatMindsError(
+            "stand lease --worktree must be a per-task isolated branch "
+            "checkout under "
+            f"{project_resolved}/.worktrees/<seq>[-slug], NOT the main "
+            "fleet tree itself (deploying onto the running host would "
+            "self-modify the very processes the lease serves). Create "
+            f"the worktree with: git worktree add "
+            f"{project_resolved}/.worktrees/{task_id.split('-')[0]} "
+            f"task/{task_id}",
+            exit_code=2,
+        )
+
+    expected_parent = project_resolved / ".worktrees"
+    if wt.parent != expected_parent:
+        raise GreatMindsError(
+            f"stand lease --worktree {worktree!r} must live under "
+            f"{expected_parent}/ (got parent {wt.parent}); per-task "
+            "isolated branch is required by schema.stand.resource."
+            "lease.worktree_constraint",
+            exit_code=2,
+        )
+
+    seq = task_id.split("-", 1)[0]
+    name = wt.name
+    if name != seq and not name.startswith(f"{seq}-"):
+        raise GreatMindsError(
+            f"stand lease --worktree {worktree!r}: basename {name!r} "
+            f"must equal task seq {seq!r} or start with {seq + '-'!r}. "
+            f"The full task id is {task_id!r}; expected one of: "
+            f"{expected_parent / seq} or {expected_parent / task_id}",
+            exit_code=2,
+        )
+
+
 def _allowed_profiles() -> list[str]:
     """0244: read ``stand.profiles_allowed`` from schema. Default to
     the plan-documented enum if absent (defensive)."""
@@ -192,6 +252,14 @@ def stand_lease(task_id: str, worktree: str, profile: str,
             f"profiles_allowed: {allowed}",
             exit_code=2,
         )
+
+    # 0271: enforce per-task worktree isolation at acquire-time so
+    # the mistake never reaches state.yaml. Pre-0271 a wrong path
+    # would orphan TESTER's lease in preparing/ until SK's whitelist
+    # rejected it on the next tick — a confusing failure mode the
+    # CLI is now the first line of defense against.
+    project_dir = find_coord_dir().parent
+    _validate_lease_worktree(task_id, worktree, project_dir)
 
     # Read schema's default ttl.
     if ttl_seconds is None:
