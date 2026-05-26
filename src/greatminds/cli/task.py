@@ -1628,6 +1628,89 @@ def role_for_block_kind(role: str, kind: str, queue: str,
     return None
 
 
+def _enforce_tests_functional_probes_per_scope(
+    new_block: dict[str, Any], data: dict[str, Any],
+) -> None:
+    """0228: TESTER must run own functional probes on the prepared
+    stand. STAND-KEEPER's ``observed_with_fix`` records infra-
+    readiness (container UP, /health 200, version match). TESTER's
+    ``tests.functional_probes`` + ``tests.stand_evidence.
+    tester_observations`` record behavior verification. These are
+    distinct activities by distinct roles; rubber-stamping SK's
+    observation as the test result is what this validator catches.
+
+    Schema-driven: schema.tests_block_validation.required_for_scopes
+    lists which scopes require which fields; exempt_scopes lists
+    scopes where this validator is a no-op (docs, research).
+    """
+    scope = data.get("scope") or ""
+    if not isinstance(scope, str) or not scope:
+        return
+
+    # Schema lookup.
+    try:
+        cfg = (schema().get("tests_block_validation") or {})
+    except Exception:
+        return
+    exempt = set(cfg.get("exempt_scopes") or [])
+    if scope in exempt:
+        return
+    required_table = cfg.get("required_for_scopes") or {}
+    required = required_table.get(scope)
+    if not required:
+        return
+
+    # functional_probes — non-empty list.
+    probes = new_block.get("functional_probes")
+    if "functional_probes" in required:
+        if not isinstance(probes, list) or not probes:
+            raise GreatMindsError(
+                f"tests block on scope={scope!r} requires non-empty "
+                f"functional_probes list (TESTER's own commands ran "
+                f"AGAINST the prepared stand — curl/psql/UI per scope). "
+                f"stand_result is SK's infra-readiness, not your test "
+                f"result. See COORDINATE.md §9 + 0228.",
+                exit_code=2,
+            )
+
+    # tester_observations under stand_evidence — non-empty + distinct
+    # from SK's stand_result.observed_with_fix.
+    if "stand_evidence.tester_observations" in required:
+        ev = new_block.get("stand_evidence") or {}
+        if not isinstance(ev, dict):
+            ev = {}
+        tester_obs = ev.get("tester_observations")
+        if not (isinstance(tester_obs, str) and tester_obs.strip()):
+            raise GreatMindsError(
+                f"tests block on scope={scope!r} requires "
+                f"stand_evidence.tester_observations (TESTER's own "
+                f"probe output — DISTINCT from SK's "
+                f"stand_result.observed_with_fix). See 0228.",
+                exit_code=2,
+            )
+        # Anti-rubber-stamp pin: string-equality against the latest
+        # stand_result block's observed_with_fix. If TESTER copied
+        # SK's text verbatim, that's the failure mode 0228 closes.
+        latest_stand_result = next(
+            (b for b in reversed(data.get("blocks") or [])
+             if isinstance(b, dict) and b.get("kind") == "stand_result"),
+            None,
+        )
+        if latest_stand_result is not None:
+            sk_obs = (latest_stand_result.get("observed_with_fix")
+                      or "")
+            if (isinstance(sk_obs, str) and sk_obs.strip()
+                and tester_obs.strip() == sk_obs.strip()):
+                raise GreatMindsError(
+                    "tests.stand_evidence.tester_observations is "
+                    "VERBATIM identical to stand_result.observed_with_"
+                    "fix. SK observed infra-readiness; TESTER must "
+                    "record DIFFERENT observations from own functional "
+                    "probes (0228 rubber-stamp guard).",
+                    exit_code=2,
+                )
+
+
 def require_block_cross_state(new_block: dict[str, Any],
                               data: dict[str, Any]) -> None:
     """Cross-block validation at append time.
@@ -1667,6 +1750,11 @@ def require_block_cross_state(new_block: dict[str, Any],
                     f"{missing} (task 0091 item 3; mirrors COORDINATE.md §9).",
                     exit_code=2,
                 )
+        # 0228: TESTER-vs-SK role boundary — tests block on a
+        # backend/ui task must carry TESTER's own functional probes
+        # + tester_observations distinct from SK's infra-readiness.
+        _enforce_tests_functional_probes_per_scope(new_block, data)
+
     if new_block.get("kind") != "review":
         return
     if new_block.get("outcome") != "approved":

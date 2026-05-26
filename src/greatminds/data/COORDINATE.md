@@ -244,6 +244,20 @@ task bounces back to DEVELOPER / PLANNER. The §8 `gate_check_pass`
 rule still applies; this strict definition is **on top of**
 `gate_check_pass`, not in place of it.
 
+**0228: TESTER vs STAND-KEEPER role boundary.** `stand_result.
+observed_with_fix` records SK's infra-readiness only (container
+UP, version, `/health` 200, schema sane). It is NOT a test result.
+TESTER's `tests` block on a `scope: backend|ui` task MUST also
+record:
+- `tests.functional_probes` — list of commands TESTER ran AGAINST
+  the prepared stand (curl, psql, UI clicks per scope).
+- `tests.stand_evidence.tester_observations` — TESTER's verbatim
+  probe output, DISTINCT from SK's `observed_with_fix`. Verbatim
+  copies of SK's text are rejected at the CLI level (rubber-stamp
+  guard).
+Scopes `docs` and `research` are exempt: READER review and audit
+findings cover those.
+
 `ARCHITECT-REVIEWER` refuses to approve a `stand_required: true` task
 whose tests block lacks these three fields. Reviewer cites this
 COORDINATE.md section in the handback.

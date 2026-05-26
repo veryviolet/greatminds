@@ -45,7 +45,13 @@ Profile choice comes from `target.profile` in the stand request.
 5. Records final `stand.status` (`READY | DEGRADED | DOWN | BLOCKED`).
 6. Appends a `stand_result` block with the required `evidence_for: [...]`
    field (the product task ids this run provides evidence for; empty list
-   for infra-only ops).
+   for infra-only ops). **0228: `observed_with_fix` records INFRA STATE
+   ONLY** (container UP at version X, smoke `/health` 200, schema
+   matches expected). NOT functional behavior — TESTER runs own
+   `functional_probes` against the prepared stand and records own
+   `tester_observations`. Rubber-stamping by TESTER (copying your
+   `observed_with_fix` verbatim) is rejected by the CLI; your job
+   ends at infra-readiness.
 7. `mv stand_wip/X stand_done/X`.
 
 ## Whitelist of allowed readiness checks

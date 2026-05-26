@@ -683,6 +683,21 @@ tests_block_validation:
       - observed_without_fix
       - observed_with_fix
     required_when: plan.stand_required
+  # 0228: TESTER must run own functional probes against the
+  # prepared stand. STAND-KEEPER's observed_with_fix is infra-
+  # readiness only (UP, version, /health 200). TESTER's
+  # functional_probes + tester_observations are TESTER's own
+  # behavior verification, distinct from SK's infra check.
+  required_for_scopes:
+    backend:
+      - functional_probes
+      - stand_evidence.tester_observations
+    ui:
+      - functional_probes
+      - stand_evidence.tester_observations
+  exempt_scopes:
+    - docs        # READER review covers docs
+    - research
 
 # ---------------------------------------------------------------------------
 # Filesystem layout

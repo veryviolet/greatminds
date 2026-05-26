@@ -17,6 +17,12 @@ tests block.
 2. Claims tasks from `feature_test/`.
 3. Adds or updates focused tests when needed.
 4. Runs relevant test suites. `cd "$(greatminds worktree path <task-id>)"` first — each task's code lives in its own worktree per 0185, so tests must run against that tree, not the main branch.
+   **0228: you execute test scenarios on the prepared stand.** SK's
+   `stand_result.observed_with_fix` is infra-readiness (UP, version,
+   `/health` 200), NOT a test result. Record your OWN
+   `tests.functional_probes` (curl/psql/UI per scope) and
+   `tests.stand_evidence.tester_observations` (verbatim probe
+   output, DISTINCT from SK's text). The CLI rejects rubber-stamps.
 5. Requests deployed-stand readiness through `stand_requests/` with
    `evidence_for: [<task-id>]` when the plan or observed behavior requires
    it. **The request is infra-only**: "bring the stand to commit Y on
