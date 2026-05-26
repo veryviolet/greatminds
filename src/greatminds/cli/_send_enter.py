@@ -95,7 +95,7 @@ _HEARTBEAT_POLL_INTERVAL_S = 0.25
 # Wake recipe: text first, then Enter. Mirrors WAKE_TEXT / WAKE_ENTER in
 # coordd.push_to_role — the only proven-in-prod "make agent act" recipe.
 _WAKE_TEXT = b"continue your tick"
-_WAKE_GAP_S = 0.2
+_WAKE_GAP_S = 0.35  # mirrors coordd.WAKE_GAP_SECONDS — production-proven via push_to_role
 
 
 def _has_trust_prompt(text: str) -> bool:
@@ -180,7 +180,10 @@ def _pid_stopped(pid_int: int) -> bool:
 
 
 _KEY_TO_BYTES: dict[str, bytes] = {
-    "Enter": b"\r",
+    # 0259-followup: Enter as CRLF (\r\n) — mirrors coordd.WAKE_ENTER,
+    # the production-proven submit sequence for claude/codex TUI. Bare
+    # \r intermittently fails to fire claude's submit on input_sock.
+    "Enter": b"\r\n",
     "C-m":   b"\r",
     "C-j":   b"\n",
 }
