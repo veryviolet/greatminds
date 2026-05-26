@@ -180,6 +180,42 @@ def _step_migrate_legacy_coordd() -> None:
     ok("    ✓ coordd.service stopped + disabled + removed")
 
 
+def _step_ensure_template_unit_installed() -> None:
+    """0202: install the per-session template unit if missing.
+
+    Migration gap: pre-0008 fleets had ``coordd.service`` (legacy
+    singleton). 0008 introduced ``greatminds-daemon@<session>.service``
+    (template unit). ``greatminds update`` removed the legacy unit
+    but assumed the template unit was already installed — fresh
+    pre-0008 fleets had it absent, so the subsequent restart step
+    failed and operators had to hand-run ``greatminds daemon install``
+    to recover.
+
+    Now ``greatminds update`` detects the missing template and runs
+    ``greatminds daemon install`` automatically before the restart
+    step. Idempotent: already-installed unit → skip without warning.
+    """
+    from greatminds.cli.daemon import SYSTEMD_USER_DIR, TEMPLATE_UNIT_NAME
+
+    template = SYSTEMD_USER_DIR / TEMPLATE_UNIT_NAME
+    if template.is_file():
+        return  # already installed; nothing to do
+
+    info("==> template unit not found; running daemon install to "
+         "migrate to per-session daemon model")
+    new_bin = _greatminds_bin().split()
+    cp = subprocess.run(new_bin + ["daemon", "install"])
+    if cp.returncode != 0:
+        err(
+            "daemon install failed; check `systemctl --user enable "
+            "greatminds-daemon@<name>.service` and re-run "
+            "`greatminds update --post-pip`. Ensure systemd-user is "
+            "enabled for this account (loginctl enable-linger)."
+        )
+        raise click.exceptions.Exit(cp.returncode)
+    ok("    ✓ template unit installed")
+
+
 def _step_restart_daemon(project_name: str | None) -> None:
     """Invoke `greatminds daemon restart` via the freshly-installed CLI."""
     new_bin = _greatminds_bin().split()  # may be `<py> -m greatminds.cli.main`
@@ -263,6 +299,7 @@ def update(post_pip: bool, check: bool, dry_run: bool, major: bool,
 
     # --post-pip phase (idempotent; called by self-replace or by user).
     _step_migrate_legacy_coordd()
+    _step_ensure_template_unit_installed()  # 0202: fill the migration gap
     _step_restart_daemon(project_name)
     _step_restart_agents()
     ok(f"==> done: greatminds at {__version__}")
