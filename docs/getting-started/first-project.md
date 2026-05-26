@@ -12,6 +12,38 @@ local agent configuration files, and copies the canon project templates. It does
 not overwrite an existing `coord.yaml`; edit that file when you want different
 tools, windows, or launch modes.
 
+## Claude marketplace plugins
+
+During setup, greatminds installs curated Claude marketplace plugins for each
+Claude-hosted role from `schema.yaml` under `plugins.claude_marketplace`.
+For example, the shipped schema can assign plugins such as `playwright`,
+`sentry`, `postman`, or `sourcegraph` to the roles that use them.
+
+The install step runs the equivalent of `claude plugin install <name>` for each
+plugin assigned to that role. It is idempotent: plugins already present in
+`claude plugin list` are preserved, failed installs are reported in the setup
+summary, and setup continues with the remaining plugins.
+
+To change the curated set for a project, edit `schema.yaml`:
+
+```yaml
+plugins:
+  claude_marketplace:
+    DEVELOPER: [postman]
+    UI-DEVELOPER: [playwright, chrome-devtools-mcp, postman]
+    TESTER: [playwright, sentry, postman, codspeed]
+```
+
+Keep empty lists for roles that should not receive marketplace plugins. Codex
+marketplace lists are currently empty by design; Codex roles use generated
+per-role `CODEX_HOME` configs instead of Claude marketplace plugin installs.
+
+After setup, verify the installed Claude plugins with:
+
+```bash
+claude plugin list
+```
+
 ## Start the daemon
 
 The daemon is the process that watches inboxes and pushes wake text into idle
