@@ -702,6 +702,23 @@ stand:
       ttl_seconds_default: 14400        # 4h
       ttl_warn_window_seconds: 300      # 5min warn before auto-release
       auto_release_on_no_response: true
+      # 0271: worktree-path constraint. Stand deploys MUST come from a
+      # per-task isolated branch checkout under .worktrees/<seq>; the
+      # main fleet tree would self-modify the running host (the very
+      # processes we're deploying). Pre-0271 SK's whitelist rejected
+      # the wrong path at runtime — leaving TESTER's lease orphaned
+      # in preparing/. Now the CLI validates at acquire-time so the
+      # mistake never reaches state.yaml.
+      worktree_constraint:
+        pattern: "{project_dir}/.worktrees/{seq}[-<slug>]"
+        description: |
+          Resolved worktree path's parent dir must be
+          ``<project_dir>/.worktrees`` AND its basename must equal the
+          task's seq prefix or start with ``<seq>-`` (the slug variant
+          ``git worktree add`` produces by default). The CLI rejects
+          any other path — including the project_dir itself — with
+          exit_code=2 + a message naming the correct path.
+        enforced_by: cli
     queue: fifo
     access_control:
       operations:
