@@ -1787,93 +1787,6 @@ def _do_move(coord: Path, role: str, task_id: str,
 #     fleet).
 _IMPLEMENTER_QUEUES = {"feature_dev", "feature_ui_dev", "feature_docs"}
 
-# 0192: visual feedback event dispatch.
-_CLAIM_SOURCE_QUEUES = {"feature_inbox", "feature_plan", "feature_blocked"}
-_FINISH_TARGET_QUEUES = {"feature_test", "feature_docs_review"}
-_REJECT_SOURCE_QUEUES = {"feature_test", "feature_docs_review", "feature_review"}
-
-
-def _emit_visual_event(event_name: str, **context: Any) -> None:
-    """0192: render one schema-driven visual line to stderr.
-
-    No-op when the schema has no ``visual_events`` section, no entry
-    for ``event_name``, or the template references a missing key in
-    ``context`` — visual decoration must never block an action.
-    """
-    try:
-        events = (schema().get("visual_events") or {})
-        entry = events.get(event_name)
-        if not isinstance(entry, dict):
-            return
-        template = entry.get("template")
-        color = entry.get("color", "cyan")
-        if not isinstance(template, str):
-            return
-        line = template.format(**{k: ("" if v is None else v)
-                                  for k, v in context.items()})
-    except (KeyError, IndexError, ValueError):
-        return
-    try:
-        from greatminds.cli._colors import visual
-        visual(line, color)
-    except Exception:
-        pass
-
-
-def _emit_visual_for_mv(task_id: str, from_q: str, to_q: str,
-                         reason: str) -> None:
-    """0192: classify a successful mv and emit the matching visual."""
-    role = (os.environ.get("GREATMINDS_ROLE") or "").upper() or "UNKNOWN"
-    if to_q == "verified":
-        _emit_visual_event(
-            "accepted", role=role, task_id=task_id,
-            from_queue=from_q, to_queue=to_q,
-        )
-        return
-    if from_q in _CLAIM_SOURCE_QUEUES and to_q in _IMPLEMENTER_QUEUES:
-        _emit_visual_event(
-            "claimed", role=role, task_id=task_id,
-            from_queue=from_q, to_queue=to_q,
-        )
-        return
-    if from_q in _IMPLEMENTER_QUEUES and to_q in _FINISH_TARGET_QUEUES:
-        _emit_visual_event(
-            "finished", role=role, task_id=task_id,
-            from_queue=from_q, to_queue=to_q,
-        )
-        return
-    # Rejected = hand back from review/test/reader-review into an
-    # implementer queue. The "from_role" + reason come from the
-    # latest review/tests block on the task (load post-move).
-    if from_q in _REJECT_SOURCE_QUEUES and to_q in _IMPLEMENTER_QUEUES:
-        coord = find_coord_dir()
-        from_role = role
-        rej_reason = reason
-        try:
-            located = find_task(coord, task_id)
-            if located:
-                path, _q = located
-                data = load_task(path)
-                for block in reversed(data.get("blocks") or []):
-                    if not isinstance(block, dict):
-                        continue
-                    if block.get("kind") in ("review", "tests"):
-                        from_role = (block.get("by") or role)
-                        if not rej_reason:
-                            rej_reason = (
-                                block.get("outcome")
-                                or block.get("test_result")
-                                or ""
-                            )
-                        break
-        except Exception:
-            pass
-        _emit_visual_event(
-            "rejected", role=role, task_id=task_id,
-            from_queue=from_q, to_queue=to_q,
-            from_role=from_role, reason=rej_reason or "(no reason)",
-        )
-
 
 def _worktree_hook_pre_move(coord: Path, role: str, task_id: str,
                              data: dict[str, Any],
@@ -2159,13 +2072,6 @@ def task_new(stream, title, reporter, priority, kind, scope,
 def task_mv(task_id, to_queue, reason) -> None:
     from_q = move_task(task_id=task_id, to_queue=to_queue, reason=reason)
     click.echo(f"moved {task_id}: {from_q} → {to_queue}")
-    # 0192: visual-feedback emission post-journal so the colored line
-    # is the last thing in stderr for this action. Lookup is best-
-    # effort; never blocks the mv.
-    try:
-        _emit_visual_for_mv(task_id, from_q, to_queue, reason or "")
-    except Exception:
-        pass
 
 
 @task.command(name="append-block")
