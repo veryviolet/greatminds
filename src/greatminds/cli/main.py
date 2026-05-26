@@ -53,6 +53,7 @@ from . import watchdog as _watchdog_mod
 from . import render_role as _render_role_mod
 from . import lint_tokens as _lint_tokens_mod
 from . import migrate_task as _migrate_task_mod
+from . import migrate_stand_history as _migrate_stand_history_mod
 from . import intent_clean as _intent_clean_mod
 from . import notify_from_journal as _notify_journal_mod
 from . import stop_decide as _stop_decide_mod
@@ -78,6 +79,8 @@ cli.add_command(_watchdog_mod.watchdog)
 cli.add_command(_render_role_mod.render_role, name="render-role")
 cli.add_command(_lint_tokens_mod.lint_tokens, name="lint-tokens")
 cli.add_command(_migrate_task_mod.migrate_task, name="migrate-task")
+cli.add_command(_migrate_stand_history_mod.migrate_stand_history,
+                name="migrate-stand-history")
 cli.add_command(_intent_clean_mod.intent_clean, name="intent-clean")
 cli.add_command(_notify_journal_mod.notify_journal, name="notify-journal")
 cli.add_command(_stop_decide_mod.stop_decide, name="stop-decide")

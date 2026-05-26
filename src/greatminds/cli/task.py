@@ -69,9 +69,10 @@ ID_RE = re.compile(r"^[0-9]{4}-[a-z0-9][a-z0-9\-]*$")
 TITLE_MAX_LEN = 200
 
 # B5: ``--in-queue`` is restricted to known intake queues per stream.
+# 0258 / 0247 (1.3.0 BREAKING): ``stand`` stream removed. The lease-
+# based singleton stand resource replaces stand_requests intake.
 ALLOWED_INTAKE_QUEUES: dict[str, set[str]] = {
     "product":         {"feature_inbox", "user_feedback"},
-    "stand":           {"stand_requests"},
     "review_session":  {"review_sessions"},
 }
 
@@ -555,9 +556,11 @@ def must_id(value: Any) -> None:
 
 def validate_header(data: dict[str, Any]) -> None:
     stream = data.get("stream")
-    if stream not in ("product", "stand", "review_session"):
+    # 0258 / 0247 (1.3.0 BREAKING): ``stand`` stream removed; use the
+    # lease API via ``greatminds stand lease``.
+    if stream not in ("product", "review_session"):
         raise GreatMindsError(
-            f"stream must be product|stand|review_session, got: {stream!r}"
+            f"stream must be product|review_session, got: {stream!r}"
         , exit_code=2)
     must_id(data.get("id"))
     must_str("title", data.get("title"))
@@ -568,9 +571,6 @@ def validate_header(data: dict[str, Any]) -> None:
     if stream == "product":
         must_enum("kind", data.get("kind"), PRODUCT_KINDS)
         must_enum("scope", data.get("scope"), PRODUCT_SCOPES)
-    # 0247 (1.3.0): stand stream removed. Lease-based singleton
-    # stand resource replaces stand-stream task files; no more
-    # ``stream: stand`` headers in the FSM.
     elif stream == "review_session":
         if data.get("kind") != "review_session":
             raise GreatMindsError(
@@ -1703,9 +1703,9 @@ def require_block_acceptable_in_queue(queue: str, kind: str) -> None:
 
 
 def default_intake_queue(stream: str) -> str:
+    # 0258 / 0247 (1.3.0 BREAKING): ``stand`` stream removed.
     return {
         "product": "feature_inbox",
-        "stand": "stand_requests",
         "review_session": "review_sessions",
     }[stream]
 
@@ -1855,15 +1855,28 @@ def create_task(
     """
     coord = find_coord_dir()
 
-    if stream not in ("product", "stand", "review_session"):
-        raise GreatMindsError("--stream must be product|stand|review_session")
+    # 0258 / 0247 (1.3.0 BREAKING): ``stand`` stream removed.
+    if stream not in ("product", "review_session"):
+        raise GreatMindsError(
+            "--stream must be product|review_session "
+            "(stand stream removed in 1.3.0; use `greatminds stand lease`)"
+        )
+    # Defense in depth: catch a stand-era ``--kind=stand_request`` even if
+    # someone bypasses --stream validation via the library API.
+    if kind == "stand_request":
+        raise GreatMindsError(
+            "--kind=stand_request removed in 1.3.0 (0247 BREAKING); "
+            "use `greatminds stand lease --task <id> --worktree <path> "
+            "--profile <enum>` for the new lease API.",
+            exit_code=2,
+        )
 
     # USER intake is the only flow where the caller is genuinely human and
     # outside the agent fleet — there is no role launcher exporting
     # GREATMINDS_ROLE for them. Schema says ``user_feedback.writers: [USER]``,
     # so when the destination is user_feedback and no role is set, default
-    # to USER. Every other intake (feature_inbox, stand_requests, review
-    # sessions) is fleet-driven and keeps the strict env-var requirement.
+    # to USER. Every other fleet intake (feature_inbox, review sessions)
+    # is fleet-driven and keeps the strict env-var requirement.
     _resolved_in_q = in_queue or default_intake_queue(stream)
     if _resolved_in_q == "user_feedback" and not (os.environ.get("GREATMINDS_ROLE") or "").strip():
         role = "USER"
@@ -1903,15 +1916,6 @@ def create_task(
             raise GreatMindsError("product stream needs --kind and --scope")
         data["kind"] = kind
         data["scope"] = scope
-    elif stream == "stand":
-        # 0247 (1.3.0): stand stream task creation removed. Use
-        # ``greatminds stand lease`` for the singleton resource.
-        raise GreatMindsError(
-            "stream=stand removed in 1.3.0 — use `greatminds stand "
-            "lease --task <id> --worktree <path> --profile <enum>` "
-            "for the new lease API.",
-            exit_code=2,
-        )
     elif stream == "review_session":
         data["kind"] = "review_session"
         data["mode"] = mode or "B"
@@ -2325,7 +2329,7 @@ def _split_multivalue(ctx, param, value):
 
 @task.command(name="new")
 @click.option("--stream", required=True,
-              type=click.Choice(["product", "stand", "review_session"]))
+              type=click.Choice(["product", "review_session"]))
 @click.option("--title", required=True)
 @click.option("--reporter", default=None)
 @click.option("--priority", default=None, type=click.Choice(sorted(PRIORITIES)))
