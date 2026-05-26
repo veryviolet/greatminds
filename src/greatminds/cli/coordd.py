@@ -986,15 +986,35 @@ def tmux_send_keys_wake(coord: Path, role: str,
             )
         return False
 
+    # 0237: split text + Enter into TWO send-keys calls with the
+    # ``WAKE_GAP_SECONDS`` gap between them — same pattern codex's
+    # push_to_role uses (lines 51–58 of this module). When text +
+    # Enter arrive in one bytes-blast some TUIs (claude included)
+    # classify it as a paste and DON'T fire the prompt-submit event
+    # on the trailing CR. Splitting registers the Enter as a
+    # discrete keypress, which is what triggers the agent's turn.
+    target = f"{session}:{window}"
     cp = subprocess.run(
-        ["tmux", "send-keys", "-t", f"{session}:{window}",
-         "check inbox and continue your tick", "Enter"],
+        ["tmux", "send-keys", "-t", target, WAKE_TEXT],
         capture_output=True, text=True,
     )
     if cp.returncode != 0:
         if verbose:
             print(
-                f"  tmux-wake: role={role} tmux send-keys failed: "
+                f"  tmux-wake: role={role} tmux send-keys text failed: "
+                f"{cp.stderr.strip()[:200]}",
+                file=sys.stderr,
+            )
+        return False
+    time.sleep(WAKE_GAP_SECONDS)
+    cp = subprocess.run(
+        ["tmux", "send-keys", "-t", target, "Enter"],
+        capture_output=True, text=True,
+    )
+    if cp.returncode != 0:
+        if verbose:
+            print(
+                f"  tmux-wake: role={role} tmux send-keys Enter failed: "
                 f"{cp.stderr.strip()[:200]}",
                 file=sys.stderr,
             )

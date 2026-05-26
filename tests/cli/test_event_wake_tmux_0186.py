@@ -107,10 +107,11 @@ def test_wake_mechanism_unknown_tool_returns_empty() -> None:
 
 def test_tmux_send_keys_wake_runs_tmux_command(tmp_path: Path,
                                                  monkeypatch) -> None:
-    """Happy path: the helper invokes ``tmux send-keys -t
-    session:window "<keys>" Enter`` with the correct args."""
+    """Happy path: 0237 splits text + Enter into TWO send-keys
+    calls separated by ``WAKE_GAP_SECONDS`` (claude classifies a
+    text+Enter blast as a paste and doesn't fire prompt-submit).
+    Both calls target the same session:window."""
     coord = _make_project(tmp_path)
-    # Reset rate-limit state so this test isn't gated by previous nudges.
     coordd_mod._LAST_TMUX_NUDGE.clear()
 
     calls: list[list[str]] = []
@@ -120,27 +121,31 @@ def test_tmux_send_keys_wake_runs_tmux_command(tmp_path: Path,
         calls.append(list(cmd))
         return subprocess.CompletedProcess(list(cmd), 0, "", "")
     monkeypatch.setattr(coordd_mod.subprocess, "run", fake_run)
+    monkeypatch.setattr(coordd_mod.time, "sleep", lambda _s: None)
 
     ok = coordd_mod.tmux_send_keys_wake(coord, "ARCHITECT-PLANNER")
 
     assert ok is True
-    assert calls, "tmux send-keys was never invoked"
-    cmd = calls[0]
-    assert cmd[:2] == ["tmux", "send-keys"]
-    assert "-t" in cmd
-    target = cmd[cmd.index("-t") + 1]
-    assert target == "test-session:planner"
-    # The literal keystroke is the second-to-last arg, Enter is last.
-    assert "check inbox and continue your tick" in cmd
-    assert cmd[-1] == "Enter"
+    send_keys = [c for c in calls if c[:2] == ["tmux", "send-keys"]]
+    assert len(send_keys) == 2, (
+        "0237: text and Enter must be split into two send-keys calls "
+        f"(got {len(send_keys)})"
+    )
+    # Both calls target the same window.
+    for cmd in send_keys:
+        assert "-t" in cmd
+        target = cmd[cmd.index("-t") + 1]
+        assert target == "test-session:planner"
+    # First call: text. Second call: Enter.
+    assert "check inbox and continue your tick" in send_keys[0]
+    assert send_keys[1][-1] == "Enter"
 
 
 def test_tmux_send_keys_wake_rate_limits(tmp_path: Path, monkeypatch) -> None:
-    """0186: a burst of N nudges within rate_limit_seconds must
-    collapse to ONE tmux send-keys call. Without this, a flurry of
-    inbox writes (e.g. PLANNER fanning out info messages) would
-    flood the chat pane and the operator gets a wall of 'check
-    inbox' lines."""
+    """0186 + 0237: a burst of N nudges within rate_limit_seconds
+    must collapse to ONE wake — but the wake itself is two send-
+    keys calls (text then Enter). Pin against accidental fan-out
+    where each rate-limited call still issued only the text."""
     coord = _make_project(tmp_path)
     coordd_mod._LAST_TMUX_NUDGE.clear()
 
@@ -150,6 +155,7 @@ def test_tmux_send_keys_wake_rate_limits(tmp_path: Path, monkeypatch) -> None:
         calls.append(list(cmd))
         return subprocess.CompletedProcess(list(cmd), 0, "", "")
     monkeypatch.setattr(coordd_mod.subprocess, "run", fake_run)
+    monkeypatch.setattr(coordd_mod.time, "sleep", lambda _s: None)
 
     # Three rapid-fire nudges to the same role.
     coordd_mod.tmux_send_keys_wake(coord, "ARCHITECT-PLANNER")
@@ -157,8 +163,11 @@ def test_tmux_send_keys_wake_rate_limits(tmp_path: Path, monkeypatch) -> None:
     coordd_mod.tmux_send_keys_wake(coord, "ARCHITECT-PLANNER")
 
     send_keys_calls = [c for c in calls if c[:2] == ["tmux", "send-keys"]]
-    assert len(send_keys_calls) == 1, (
-        f"0186: expected 1 nudge after rate-limit; got {len(send_keys_calls)}"
+    # One wake = two calls (text + Enter); rate-limit means subsequent
+    # nudges add ZERO calls.
+    assert len(send_keys_calls) == 2, (
+        f"0186 + 0237: expected 2 send-keys calls (text+Enter) for "
+        f"ONE wake after rate-limit; got {len(send_keys_calls)}"
     )
 
 
