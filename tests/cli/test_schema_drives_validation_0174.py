@@ -69,7 +69,9 @@ def test_schema_has_queue_accepts_blocks() -> None:
     assert "implementation" in q["feature_dev"]
     assert "tests" in q["feature_test"]
     assert "review" in q["feature_review"]
-    assert q["verified"] == []  # terminal
+    # 0195: verified now accepts `rollback` blocks (withdraw/revisit
+    # marker for verified tasks reverted at the code level).
+    assert q["verified"] == ["rollback"]
     assert q["archive"] == []
     assert q["stand_done"] == []
 

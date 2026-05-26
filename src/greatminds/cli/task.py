@@ -635,6 +635,15 @@ def validate_block(stream: str, block: dict[str, Any]) -> None:
         # hand-back, nothing was committed.
         if block.get("outcome") == "approved":
             must_str("commit", block.get("commit"))
+    elif kind == "rollback":
+        # 0195: rollback block — REVIEWER's withdraw/revisit marker
+        # for a task in verified/. Must carry non-empty reason.
+        reason = block.get("reason")
+        if not isinstance(reason, str) or not reason.strip():
+            raise GreatMindsError(
+                "rollback block requires non-empty 'reason' field",
+                exit_code=2,
+            )
     elif kind == "blocked":
         must_str("reason", block.get("reason"))
         deps = block.get("dependencies") or []
@@ -826,6 +835,12 @@ def require_target_readiness(data: dict[str, Any],
             block_kind, flag = "reader_review", "ready_for_architect"
         elif from_q == "feature_blocked":
             return
+        elif from_q == "verified":
+            # 0195: verified → feature_review (revisit path) is gated
+            # by the schema's `rollback_block_with_reason` validator,
+            # not by ready-for-review/ready-for-architect flags. Let
+            # the schema-requires check do its job.
+            return
         else:
             raise GreatMindsError(
                 f"mv {from_q} → feature_review not allowed; route via "
@@ -1014,6 +1029,41 @@ def _check_stand_result_block(data: dict[str, Any],
         "`greatminds task append-block stand_result --id <X> --field "
         "result=ok|partial|fail --field stand_status=READY|... --field "
         "commit=<sha> --field profile=<profile> ...` before mv."
+    )
+
+
+def _check_rollback_block_with_reason(data: dict[str, Any],
+                                       from_q: str, to_q: str) -> str | None:
+    """0195: verified → {archive, feature_review} must carry a rollback
+    block whose latest entry has a non-empty ``reason``.
+
+    The rollback block is REVIEWER's withdraw/revisit marker for a
+    verified task whose work was reverted at the code level (or needs
+    further amendment). Without this gate, anyone could silently exit
+    a task from verified/ — losing the WHY behind the rollback in
+    the FSM record.
+
+    Latest-wins: a task may accumulate multiple rollback blocks over
+    its lifetime; the LATEST one decides whether THIS mv is allowed.
+    """
+    blocks = data.get("blocks") or []
+    rollbacks = [b for b in blocks
+                 if isinstance(b, dict) and b.get("kind") == "rollback"]
+    if not rollbacks:
+        return (
+            "rollback_block_with_reason: verified → {archive,"
+            "feature_review} requires a rollback block with non-empty "
+            "reason. Append `greatminds task append-block rollback "
+            "--id <X> --field reason='<why this is rolled back>'` "
+            "before mv."
+        )
+    reason = rollbacks[-1].get("reason")
+    if isinstance(reason, str) and reason.strip():
+        return None
+    return (
+        "rollback_block_with_reason: latest rollback block has empty "
+        "reason. Append a fresh rollback block with a non-empty "
+        "reason explaining why the verified task is being rolled back."
     )
 
 
@@ -1219,6 +1269,9 @@ SCHEMA_REQUIRES_VALIDATORS: dict[str, "callable"] = {
     "feature_blocked_withdrawn_reason": _check_feature_blocked_withdrawn,
     "stand_done_no_active_dependents": _check_stand_done_no_active_dependents,
     "stand_request_not_yet_claimed": _check_stand_request_not_yet_claimed,
+    # 0195: verified → archive/feature_review must carry a rollback
+    # block with non-empty reason. Restores the 0105 intent.
+    "rollback_block_with_reason": _check_rollback_block_with_reason,
 }
 
 
