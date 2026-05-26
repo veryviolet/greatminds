@@ -1142,6 +1142,137 @@ def _check_reader_block_fail_or_partial(data: dict[str, Any],
     )
 
 
+def _check_tests_block_fail_or_partial(data: dict[str, Any],
+                                         from_q: str,
+                                         to_q: str) -> str | None:
+    """0225: feature_test → implementer hand-back path requires a
+    ``tests`` block whose latest entry has ``test_result`` in
+    {fail, partial}. Pre-0225 noop'd; a task could be punted back
+    to DEVELOPER without TESTER ever recording the failure."""
+    blocks = data.get("blocks") or []
+    tests = [b for b in blocks
+             if isinstance(b, dict) and b.get("kind") == "tests"]
+    if not tests:
+        return (
+            "tests_block_fail_or_partial: feature_test → "
+            "{feature_dev, feature_ui_dev} hand-back requires a tests "
+            "block with test_result in {fail, partial}. Append "
+            "`greatminds task append-block tests --id <X> --field "
+            "test_result=fail ...` before mv."
+        )
+    result = tests[-1].get("test_result")
+    if result in ("fail", "partial"):
+        return None
+    return (
+        f"tests_block_fail_or_partial: latest tests block has "
+        f"test_result={result!r}, expected 'fail' or 'partial'. The "
+        f"hand-back transition fires only when TESTER found a "
+        f"failure. For pass, route via feature_test → feature_review."
+    )
+
+
+def _check_review_block_changes_requested(data: dict[str, Any],
+                                            from_q: str,
+                                            to_q: str) -> str | None:
+    """0225: feature_review → implementer hand-back requires a
+    ``review`` block whose latest entry has ``outcome=changes_requested``.
+    Pre-0225 noop'd; REVIEWER could send a task back without leaving
+    a review block recording the rejection rationale."""
+    blocks = data.get("blocks") or []
+    reviews = [b for b in blocks
+               if isinstance(b, dict) and b.get("kind") == "review"]
+    if not reviews:
+        return (
+            "review_block_changes_requested: feature_review → "
+            "{feature_dev, feature_ui_dev, feature_docs} hand-back "
+            "requires a review block with outcome=changes_requested. "
+            "Append `greatminds task append-block review --id <X> "
+            "--field outcome=changes_requested ...` before mv."
+        )
+    outcome = reviews[-1].get("outcome")
+    if outcome == "changes_requested":
+        return None
+    return (
+        f"review_block_changes_requested: latest review block has "
+        f"outcome={outcome!r}, expected 'changes_requested'. The "
+        f"hand-back transition fires only on rejection."
+    )
+
+
+def _check_all_dependencies_exist(data: dict[str, Any],
+                                    from_q: str,
+                                    to_q: str) -> str | None:
+    """0225: feature_blocked → any_resume_to_queue requires that all
+    declared dependencies actually exist at the named paths. Pre-
+    0225 noop'd at mv (the same check happened via `greatminds wake-
+    check` but only if REVIEWER ran it; not enforced inline).
+
+    Resolves dependency strings from the latest blocked block and
+    checks each against ``coord/<path>``. Missing dep → reject."""
+    blocks = data.get("blocks") or []
+    blockeds = [b for b in blocks
+                if isinstance(b, dict) and b.get("kind") == "blocked"]
+    if not blockeds:
+        return (
+            "all_dependencies_exist_per_wake_check: feature_blocked "
+            "→ any_resume_to_queue requires a blocked block listing "
+            "the dependencies that satisfied the wake."
+        )
+    deps = blockeds[-1].get("dependencies") or []
+    if not isinstance(deps, list):
+        return (
+            "all_dependencies_exist_per_wake_check: latest blocked "
+            "block has non-list dependencies field"
+        )
+    coord = find_coord_dir()
+    missing: list[str] = []
+    for d in deps:
+        if not isinstance(d, str):
+            continue
+        if not (coord / d).exists():
+            missing.append(d)
+    if missing:
+        return (
+            f"all_dependencies_exist_per_wake_check: {len(missing)} "
+            f"dependency(s) still missing: "
+            f"{', '.join(missing[:3])}"
+            + (" …" if len(missing) > 3 else "")
+            + ". Run `greatminds wake-check` for the full picture."
+        )
+    return None
+
+
+def _check_evidence_for_if_related_product_task(
+    data: dict[str, Any], from_q: str, to_q: str,
+) -> str | None:
+    """0225: stand_wip → stand_done requires that, when the latest
+    stand_result block names a ``related_product_task``, the task's
+    header carries a non-empty ``evidence_for`` listing that task.
+
+    Without the check, STAND-KEEPER could declare evidence for a
+    task that the request itself didn't promise to cover — breaking
+    the gate-check evidence chain."""
+    blocks = data.get("blocks") or []
+    results = [b for b in blocks
+               if isinstance(b, dict) and b.get("kind") == "stand_result"]
+    if not results:
+        return None  # stand_result_block validator handles this case
+    latest = results[-1]
+    related = latest.get("related_product_task")
+    if not (isinstance(related, str) and related.strip()):
+        return None  # no related task declared → constraint vacuous
+    ef = data.get("evidence_for") or []
+    if not isinstance(ef, list) or not ef:
+        return (
+            f"evidence_for_if_related_product_task: stand_result "
+            f"names related_product_task={related!r} but the request "
+            f"header has empty evidence_for. The stand_done evidence "
+            f"chain requires the request to have promised coverage "
+            f"of {related!r} when it was filed."
+        )
+    return None
+
+
 def _check_rollback_block_with_reason(data: dict[str, Any],
                                        from_q: str, to_q: str) -> str | None:
     """0195: verified → {archive, feature_review} must carry a rollback
@@ -1353,10 +1484,20 @@ SCHEMA_REQUIRES_VALIDATORS: dict[str, "callable"] = {
     # → {feature_inbox, archive} carries a triage block with non-empty
     # notes (EXPLORER stand_done/0205 found the hole).
     "triage_block": _check_triage_block,
+    # 0225 doc: ``plan_block`` is named in
+    # ``feature_inbox → feature_plan`` requires but the plan block
+    # itself lands AFTER the mv (PLANNER appends inside feature_plan).
+    # Documentary — there is no mv-time prerequisite to enforce.
     "plan_block": _noop_existing,
+    # 0225 doc: scope_* names are gates for routing decisions enforced
+    # by ``require_scope_match_on_routing`` (a separate pre-schema
+    # gate). The schema-level requires entry is documentary; the real
+    # check fires in cli/task.py:require_scope_match_on_routing.
     "scope_backend": _noop_existing,
     "scope_ui": _noop_existing,
     "scope_docs": _noop_existing,
+    # 0225 doc: plan.audit_only enforced by validate_block's plan
+    # branch on the plan block. Documentary at mv level.
     "plan.audit_only": _noop_existing,
     # 0225 doc: implementation_block / tests_block names appear in
     # ``feature_plan → feature_dev`` and ``feature_dev → feature_test``
@@ -1367,7 +1508,8 @@ SCHEMA_REQUIRES_VALIDATORS: dict[str, "callable"] = {
     # on the prior block. Documentary here.
     "implementation_block": _noop_existing,
     "tests_block": _noop_existing,
-    "tests_block_fail_or_partial": _noop_existing,
+    # 0225: real validator for the test-handback path.
+    "tests_block_fail_or_partial": _check_tests_block_fail_or_partial,
     # 0222: real validators for the docs-review verdict gates.
     "reader_block_pass": _check_reader_block_pass,
     "reader_block_fail_or_partial": _check_reader_block_fail_or_partial,
@@ -1375,13 +1517,23 @@ SCHEMA_REQUIRES_VALIDATORS: dict[str, "callable"] = {
     # the bare presence of a review block; the latest one must carry
     # outcome=approved.
     "review_block_approved": _check_review_block_approved,
-    "review_block_changes_requested": _noop_existing,
+    # 0225: real validator for the review-handback path.
+    "review_block_changes_requested": _check_review_block_changes_requested,
+    # 0225 doc: ``blocked_block_with_dependencies_and_resume_to`` is
+    # enforced by validate_block's `blocked` branch (non-empty deps +
+    # known resume_to queue). The mv-time validator would be
+    # redundant; the field shape is already gated. Documentary.
     "blocked_block_with_dependencies_and_resume_to": _noop_existing,
-    "all_dependencies_exist_per_wake_check": _noop_existing,
+    # 0225: real validator — feature_blocked → any_resume_to requires
+    # every dependency file actually exists at its declared path.
+    "all_dependencies_exist_per_wake_check": _check_all_dependencies_exist,
     # 0170 real-enforcement: stand_wip → stand_done requires at least
     # one stand_result block on the task.
     "stand_result_block": _check_stand_result_block,
-    "evidence_for_if_related_product_task": _noop_existing,
+    # 0225: real validator — when stand_result names a
+    # related_product_task, the request's header must carry that
+    # task in evidence_for (closes the evidence-chain hole).
+    "evidence_for_if_related_product_task": _check_evidence_for_if_related_product_task,
     # 0103 real-enforcement: re-evaluate gate-check rather than trust
     # tests.gate_check_result.
     "gate_check_pass_if_stand_required": _check_gate_for_stand_required,
@@ -1515,7 +1667,6 @@ def require_block_cross_state(new_block: dict[str, Any],
                     f"{missing} (task 0091 item 3; mirrors COORDINATE.md §9).",
                     exit_code=2,
                 )
-
     if new_block.get("kind") != "review":
         return
     if new_block.get("outcome") != "approved":
