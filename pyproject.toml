@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "greatminds"
-version = "1.2.9"
+version = "1.2.10"
 description = "File-based multi-agent coordination protocol — per-role queues, layered plugin set for Claude Code, profile-v2 for OpenAI Codex"
 readme = "README.md"
 requires-python = ">=3.11"
