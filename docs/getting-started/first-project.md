@@ -43,6 +43,24 @@ plugin assigned to that role. It is idempotent: plugins already present in
 `claude plugin list` are preserved, failed installs are reported in the setup
 summary, and setup continues with the remaining plugins.
 
+Setup resolves the `claude` binary from `PATH` first, then checks common npm
+install locations: `~/.local/bin/claude`, `~/.npm-global/bin/claude`, and
+`/usr/local/bin/claude`. This covers non-login shells, SSH launches, and daemon
+contexts where the interactive shell profile that adds npm binaries to `PATH`
+has not been loaded.
+
+If setup reports `claude binary not found in PATH or common locations`, plugin
+installation is skipped for the affected roles and the plugin names are counted
+as failed. Add Claude Code to `PATH`, or install it with
+`npm install -g @anthropic-ai/claude-code`, then run `greatminds setup` again.
+
+The setup summary separates marketplace plugin results into `installed`,
+`pre-existing`, `dedupe-this-run`, and `failed`. `pre-existing` means the plugin
+was already present before setup started; `dedupe-this-run` means another role
+installed it earlier in the same setup run. Failed installs include the plugin
+name in the summary, and setup also prints the first stderr line from the
+underlying `claude plugin install` command.
+
 To change the curated set for a project, edit `schema.yaml`:
 
 ```yaml
