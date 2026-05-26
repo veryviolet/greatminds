@@ -232,7 +232,9 @@ QUEUES = [
     "feature_docs", "feature_test", "feature_docs_review",
     "feature_review", "feature_blocked", "verified", "archive",
     "user_feedback", "review_sessions",
-    "stand_requests", "stand_wip", "stand_done",
+    # 0247 (1.3.0): stand_requests, stand_wip, stand_done REMOVED.
+    # Lease-based singleton stand resource (.stand/state.yaml)
+    # replaces them.
     "bot_inbox", "bot_wip", "bot_done", "bot_verified", "bot_archive",
 ]
 

@@ -568,18 +568,9 @@ def validate_header(data: dict[str, Any]) -> None:
     if stream == "product":
         must_enum("kind", data.get("kind"), PRODUCT_KINDS)
         must_enum("scope", data.get("scope"), PRODUCT_SCOPES)
-    elif stream == "stand":
-        if data.get("kind") != "stand_request":
-            raise GreatMindsError("stand-stream tasks must have kind: stand_request", exit_code=2)
-        must_enum("request_type", data.get("request_type"), STAND_REQUEST_TYPES)
-        target = data.get("target") or {}
-        if not isinstance(target, dict):
-            raise GreatMindsError("target must be a mapping", exit_code=2)
-        must_enum("target.profile", target.get("profile"), STAND_PROFILES)
-        must_list_of_str("target.hosts", target.get("hosts") or [])
-        ef = data.get("evidence_for")
-        if ef is not None:
-            must_list_of_str("evidence_for", ef)
+    # 0247 (1.3.0): stand stream removed. Lease-based singleton
+    # stand resource replaces stand-stream task files; no more
+    # ``stream: stand`` headers in the FSM.
     elif stream == "review_session":
         if data.get("kind") != "review_session":
             raise GreatMindsError(
@@ -674,11 +665,11 @@ def validate_block(stream: str, block: dict[str, Any]) -> None:
             raise GreatMindsError(
                 f"resume_to: {block.get('resume_to')!r} is not a known queue"
             , exit_code=2)
-    elif kind == "stand_result":
-        must_enum("result", block.get("result"), STAND_RESULTS)
-        must_enum("stand_status", block.get("stand_status"), STAND_STATUSES)
-        must_str("commit", block.get("commit"))
-        must_enum("profile", block.get("profile"), STAND_PROFILES)
+    # 0247 (1.3.0): stand_result block kind removed. The lease-based
+    # singleton stand resource stores release evidence on the
+    # product task's tests block directly (tests.stand_evidence with
+    # lease_id / result / commit fields). No more per-stand task
+    # files, so no per-block schema field validation needed.
     elif kind == "session_iteration":
         must_str("summary", block.get("summary"))
     elif kind == "triage":
@@ -1012,31 +1003,10 @@ def _noop_existing(data: dict[str, Any], from_q: str, to_q: str) -> str | None:
     return None
 
 
-def _check_stand_result_block(data: dict[str, Any],
-                              from_q: str, to_q: str) -> str | None:
-    """0170: stand_wip → stand_done must carry a stand_result block.
-
-    Pre-0170 the schema row had ``requires: [stand_result_block,
-    evidence_for_if_related_product_task]`` but both validators were
-    ``_noop_existing`` placeholders. STAND-KEEPER could ``task mv
-    <id> stand_done`` without ever appending a stand_result block →
-    orphan task in stand_done with no result, evidence_for, or
-    commit. This validator closes the hole.
-    """
-    blocks = data.get("blocks") or []
-    has_result = any(
-        isinstance(b, dict) and b.get("kind") == "stand_result"
-        for b in blocks
-    )
-    if has_result:
-        return None
-    return (
-        "stand_result_block: stand_wip → stand_done requires at least "
-        "one stand_result block on the task. Append "
-        "`greatminds task append-block stand_result --id <X> --field "
-        "result=ok|partial|fail --field stand_status=READY|... --field "
-        "commit=<sha> --field profile=<profile> ...` before mv."
-    )
+# 0247 (1.3.0): _check_stand_result_block removed alongside the
+# stand_wip → stand_done transition (queue itself dropped). Lease-
+# based release evidence lives on the product task's tests block,
+# validated by gate_check (0246).
 
 
 def _check_triage_block(data: dict[str, Any],
@@ -1242,35 +1212,10 @@ def _check_all_dependencies_exist(data: dict[str, Any],
     return None
 
 
-def _check_evidence_for_if_related_product_task(
-    data: dict[str, Any], from_q: str, to_q: str,
-) -> str | None:
-    """0225: stand_wip → stand_done requires that, when the latest
-    stand_result block names a ``related_product_task``, the task's
-    header carries a non-empty ``evidence_for`` listing that task.
-
-    Without the check, STAND-KEEPER could declare evidence for a
-    task that the request itself didn't promise to cover — breaking
-    the gate-check evidence chain."""
-    blocks = data.get("blocks") or []
-    results = [b for b in blocks
-               if isinstance(b, dict) and b.get("kind") == "stand_result"]
-    if not results:
-        return None  # stand_result_block validator handles this case
-    latest = results[-1]
-    related = latest.get("related_product_task")
-    if not (isinstance(related, str) and related.strip()):
-        return None  # no related task declared → constraint vacuous
-    ef = data.get("evidence_for") or []
-    if not isinstance(ef, list) or not ef:
-        return (
-            f"evidence_for_if_related_product_task: stand_result "
-            f"names related_product_task={related!r} but the request "
-            f"header has empty evidence_for. The stand_done evidence "
-            f"chain requires the request to have promised coverage "
-            f"of {related!r} when it was filed."
-        )
-    return None
+# 0247 (1.3.0): _check_evidence_for_if_related_product_task removed
+# alongside the stand_wip → stand_done transition (queue dropped).
+# The lease model carries evidence_for implicitly via `lease.task`
+# (the lease IS the linkage).
 
 
 def _check_rollback_block_with_reason(data: dict[str, Any],
@@ -1409,70 +1354,11 @@ def _check_feature_blocked_withdrawn(data: dict[str, Any],
     )
 
 
-def _check_stand_done_no_active_dependents(data: dict[str, Any],
-                                            from_q: str, to_q: str) -> str | None:
-    """0102 (4): stand_done → archive by MAINTAINER requires that no
-    feature_blocked task currently depends on this stand_done file via
-    its blocked.dependencies list. Otherwise wake-check would silently
-    stall when MAINTAINER sweeps."""
-    task_id_full = data.get("id") or ""
-    if not task_id_full:
-        return None  # Defensive: id missing is its own error class.
-    try:
-        coord = find_coord_dir()
-    except Exception:
-        return None  # Outside a project — let other layers complain.
-    blocked_dir = coord / "feature_blocked"
-    if not blocked_dir.is_dir():
-        return None
-    target = f"stand_done/{task_id_full}.yaml"
-    dependents: list[str] = []
-    for f in sorted(blocked_dir.glob("*.yaml")):
-        try:
-            other = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
-        except (yaml.YAMLError, OSError):
-            continue
-        for b in (other.get("blocks") or []):
-            if not isinstance(b, dict) or b.get("kind") != "blocked":
-                continue
-            deps = b.get("dependencies") or []
-            if not isinstance(deps, list):
-                continue
-            if any(str(d) == target for d in deps):
-                dependents.append(f.stem)
-                break
-    if dependents:
-        return (
-            f"stand_done_no_active_dependents: feature_blocked tasks "
-            f"depend on this stand_done via wake-check: "
-            f"{sorted(dependents)}; resolve those first or wait for "
-            f"REVIEWER to wake them"
-        )
-    return None
-
-
-def _check_stand_request_not_yet_claimed(data: dict[str, Any],
-                                          from_q: str, to_q: str) -> str | None:
-    """0102 (5): stand_requests → archive by ARCHITECT-PLANNER requires
-    that STAND-KEEPER hasn't already claimed it (i.e., no stand_wip
-    file with the same id exists). Otherwise PLANNER wipes a
-    mid-claim request out from under STAND-KEEPER."""
-    task_id_full = data.get("id") or ""
-    if not task_id_full:
-        return None
-    try:
-        coord = find_coord_dir()
-    except Exception:
-        return None
-    wip = coord / "stand_wip" / f"{task_id_full}.yaml"
-    if wip.exists():
-        return (
-            f"stand_request_not_yet_claimed: STAND-KEEPER already "
-            f"claimed this request (stand_wip/{task_id_full}.yaml "
-            f"exists); ask STAND-KEEPER to release or wait for "
-            f"stand_done"
-        )
-    return None
+# 0247 (1.3.0): _check_stand_done_no_active_dependents and
+# _check_stand_request_not_yet_claimed both removed alongside the
+# stand_done → archive + stand_requests → archive transitions.
+# The lease model has no queue-to-queue transitions; release
+# evidence lives on the product task's tests block (0246).
 
 
 # ---------------------------------------------------------------------------
@@ -1527,21 +1413,18 @@ SCHEMA_REQUIRES_VALIDATORS: dict[str, "callable"] = {
     # 0225: real validator — feature_blocked → any_resume_to requires
     # every dependency file actually exists at its declared path.
     "all_dependencies_exist_per_wake_check": _check_all_dependencies_exist,
-    # 0170 real-enforcement: stand_wip → stand_done requires at least
-    # one stand_result block on the task.
-    "stand_result_block": _check_stand_result_block,
-    # 0225: real validator — when stand_result names a
-    # related_product_task, the request's header must carry that
-    # task in evidence_for (closes the evidence-chain hole).
-    "evidence_for_if_related_product_task": _check_evidence_for_if_related_product_task,
+    # 0247 (1.3.0): stand_result_block, evidence_for_if_related_product_task,
+    # stand_done_no_active_dependents, stand_request_not_yet_claimed
+    # all REMOVED. Their corresponding schema transitions (stand_wip →
+    # stand_done, stand_done → archive, stand_requests → archive) are
+    # gone with the queues. Lease evidence lives on the product task's
+    # tests block; gate_check (0246) validates the chain there.
     # 0103 real-enforcement: re-evaluate gate-check rather than trust
     # tests.gate_check_result.
     "gate_check_pass_if_stand_required": _check_gate_for_stand_required,
     # 0102 real-enforcement: archive-hole guards.
     "review_session_terminal_block": _check_review_session_terminal,
     "feature_blocked_withdrawn_reason": _check_feature_blocked_withdrawn,
-    "stand_done_no_active_dependents": _check_stand_done_no_active_dependents,
-    "stand_request_not_yet_claimed": _check_stand_request_not_yet_claimed,
     # 0195: verified → archive/feature_review must carry a rollback
     # block with non-empty reason. Restores the 0105 intent.
     "rollback_block_with_reason": _check_rollback_block_with_reason,
@@ -2021,16 +1904,14 @@ def create_task(
         data["kind"] = kind
         data["scope"] = scope
     elif stream == "stand":
-        data["kind"] = "stand_request"
-        if not request_type:
-            raise GreatMindsError("stand stream needs --request-type")
-        data["request_type"] = request_type
-        data["target"] = {
-            "profile": profile or "full-deploy",
-            "hosts": hosts or [],
-        }
-        if evidence_for:
-            data["evidence_for"] = evidence_for
+        # 0247 (1.3.0): stand stream task creation removed. Use
+        # ``greatminds stand lease`` for the singleton resource.
+        raise GreatMindsError(
+            "stream=stand removed in 1.3.0 — use `greatminds stand "
+            "lease --task <id> --worktree <path> --profile <enum>` "
+            "for the new lease API.",
+            exit_code=2,
+        )
     elif stream == "review_session":
         data["kind"] = "review_session"
         data["mode"] = mode or "B"

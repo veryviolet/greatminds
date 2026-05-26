@@ -143,58 +143,10 @@ def test_all_dependencies_exist_accepts_when_all_present(
     ) is None
 
 
-# ---------- _check_evidence_for_if_related_product_task ----------
-
-
-def test_evidence_for_accepts_when_no_related_product_task() -> None:
-    """No related_product_task declared → constraint vacuous → accept.
-    Most infra-only stand requests fall in this branch."""
-    data = {"blocks": [{
-        "kind": "stand_result", "result": "ok",
-    }]}
-    assert task_mod._check_evidence_for_if_related_product_task(
-        data, "stand_wip", "stand_done",
-    ) is None
-
-
-def test_evidence_for_rejects_when_related_but_no_evidence_for() -> None:
-    """stand_result names related_product_task, but the request's
-    evidence_for is empty → reject (evidence chain broken)."""
-    data = {
-        "evidence_for": [],
-        "blocks": [{
-            "kind": "stand_result",
-            "result": "ok",
-            "related_product_task": "0099-feature-task",
-        }],
-    }
-    msg = task_mod._check_evidence_for_if_related_product_task(
-        data, "stand_wip", "stand_done",
-    )
-    assert msg is not None
-    assert "0099-feature-task" in msg
-
-
-def test_evidence_for_accepts_when_related_and_evidence_for_present() -> None:
-    data = {
-        "evidence_for": ["0099-feature-task"],
-        "blocks": [{
-            "kind": "stand_result",
-            "related_product_task": "0099-feature-task",
-        }],
-    }
-    assert task_mod._check_evidence_for_if_related_product_task(
-        data, "stand_wip", "stand_done",
-    ) is None
-
-
-def test_evidence_for_accepts_when_no_stand_result_block() -> None:
-    """If the stand_result block is missing entirely, the
-    stand_result_block validator handles it. This validator is
-    vacuously OK."""
-    assert task_mod._check_evidence_for_if_related_product_task(
-        {"blocks": []}, "stand_wip", "stand_done",
-    ) is None
+# 0247 (1.3.0): _check_evidence_for_if_related_product_task removed
+# alongside stand_wip → stand_done transition. The lease model
+# carries evidence_for implicitly via lease.task (linkage is
+# structural, not a side-channel field).
 
 
 # ---------- registry pins ----------
@@ -221,11 +173,8 @@ def test_all_dependencies_exist_wired() -> None:
     assert fn is task_mod._check_all_dependencies_exist
 
 
-def test_evidence_for_if_related_wired() -> None:
-    fn = task_mod.SCHEMA_REQUIRES_VALIDATORS[
-        "evidence_for_if_related_product_task"
-    ]
-    assert fn is task_mod._check_evidence_for_if_related_product_task
+# 0247: evidence_for_if_related_product_task registry entry
+# removed alongside its validator.
 
 
 # ---------- documentary noop allowlist ----------

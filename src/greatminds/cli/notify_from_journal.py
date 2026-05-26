@@ -142,13 +142,10 @@ def determine_wakeups(schema: dict, coord: Path, entry: dict) -> list[tuple[str,
     reason = entry.get("reason") or ""
     out: list[tuple[str, str, str]] = []
 
-    if to_q == "stand_done":
-        # find product tasks needing this evidence; notify the role that owns
-        # the queue they currently sit in
-        for product_task, product_queue in find_stand_evidence_targets(coord, task):
-            for role in claimers_of(schema, product_queue):
-                out.append((role, f"stand evidence for {product_task} ready", product_task))
-        return out
+    # 0247 (1.3.0): stand_done branch removed alongside the queue.
+    # Lease-based stand resource fires inbox-info via
+    # `greatminds stand ready` directly to the lease holder; no
+    # journal-driven notification chain needed.
 
     # normal: whoever claims from to_q gets notified
     for role in claimers_of(schema, to_q):

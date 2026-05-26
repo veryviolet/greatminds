@@ -100,21 +100,10 @@ queues:
       live-stand exploration, files bugs as feature_inbox entries.
       ARCHITECT-PLANNER writes the initial session file (target,
       scenarios, stand_target) but does NOT claim from this queue.
-  stand_requests:
-    owner: STAND-KEEPER
-    writers: [ARCHITECT-PLANNER, ARCHITECT-REVIEWER, DEVELOPER, UI-DEVELOPER, TESTER, EXPLORER]
-    kind: active
-    description: Stand operation requests; only STAND-KEEPER moves.
-  stand_wip:
-    owner: STAND-KEEPER
-    writers: [STAND-KEEPER]
-    kind: active
-    description: Stand operation in progress.
-  stand_done:
-    owner: STAND-KEEPER
-    writers: [STAND-KEEPER]
-    kind: terminal
-    description: Completed stand operations; readiness evidence.
+  # 0247 (0242e / 1.3.0 BREAKING): stand_requests, stand_wip,
+  # stand_done queues REMOVED. The lease-based singleton stand
+  # resource (schema.stand.resource + .stand/state.yaml) replaces
+  # the three-queue model. See 0242 for the full design rationale.
   bot_inbox:
     owner: BOT-DEVELOPER
     writers: [BOT-USER]
@@ -225,10 +214,14 @@ roles:
     category: service
     launch_modes: [loop]
     heartbeat: heartbeat.stand-keeper
-    claims_from: [stand_requests]
+    # 0247: stand_requests queue removed; SK now watches
+    # coordination/.stand/state.yaml for lease grants (event-driven
+    # via coordd inotify on .stand/).
+    claims_from: []
     profiles: [full-deploy, vite-dev]
     description: |
-      Owns stand state and stand.status. Supports two profiles:
+      Owns the singleton stand resource (state.yaml-driven, post-0247).
+      Supports two profiles:
       - full-deploy: backend deploy on remote stand (scenarios A, B).
       - vite-dev: backend + Vite dev server with HMR (scenario C).
   USER:
@@ -348,15 +341,10 @@ transitions:
     to: archive
     by: ARCHITECT-REVIEWER
     requires: [feature_blocked_withdrawn_reason]
-  # MAINTAINER may archive completed stand evidence to keep the
-  # stand_done queue scannable.
-  # Task 0102 (4): refuse the sweep when any feature_blocked task lists
-  # this stand_done file in its blocked.dependencies — that would
-  # silently stall wake-check.
-  - from: stand_done
-    to: archive
-    by: MAINTAINER
-    requires: [stand_done_no_active_dependents]
+  # 0247 (1.3.0): stand_done → archive transition removed alongside
+  # the queue. Lease-based stand model has no terminal-queue
+  # equivalent — release evidence lands on the product task's
+  # tests block directly.
   # Entering feature_plan needs a triage block (the plan block is
   # written IN feature_plan, then it routes OUT to a per-scope queue).
   - from: feature_inbox
@@ -445,23 +433,11 @@ transitions:
     to: any_resume_to_queue
     by: ARCHITECT-REVIEWER
     requires: [all_dependencies_exist_per_wake_check]
-  - from: stand_requests
-    to: stand_wip
-    by: STAND-KEEPER
-    requires: []
-  # D: a stale/obsolete/withdrawn stand request can be cancelled by
-  # ARCHITECT-PLANNER instead of forcing STAND-KEEPER to process it.
-  # Task 0102 (5): refuse if STAND-KEEPER has already claimed
-  # (stand_wip/<id>.yaml exists); otherwise PLANNER wipes a
-  # mid-claim request out from under STAND-KEEPER.
-  - from: stand_requests
-    to: archive
-    by: ARCHITECT-PLANNER
-    requires: [stand_request_not_yet_claimed]
-  - from: stand_wip
-    to: stand_done
-    by: STAND-KEEPER
-    requires: [stand_result_block, evidence_for_if_related_product_task]
+  # 0247 (1.3.0): stand_requests → stand_wip → stand_done transitions
+  # removed alongside their queues. State transitions now happen on
+  # the singleton stand resource via the lease API
+  # (greatminds stand lease/ready/release/down/up) — see
+  # schema.stand.resource.transitions.
   # 0195: rollback paths from verified/. Two destinations:
   #   - archive       — "withdraw" (the verified work has been reverted
   #                     at code level; FSM record now matches reality)
@@ -543,28 +519,9 @@ task_kinds:
       - reason
       - dependencies      # list of "<queue>/<task-id>.md"
       - resume_to         # queue name from this schema
-  stand_request:
-    required_initial_fields:
-      - id
-      - stream            # stand
-      - reporter
-      - opened_at
-      - priority
-      - request_type
-      - target
-      - evidence_for      # new: list of product task ids this request will provide evidence for (may be empty for stand-only ops)
-    stand_result_block_required_fields:
-      - closed_by
-      - closed_at
-      - result
-      - stand_status
-      - hosts
-      - commit
-      - profile
-      - related_product_task
-      - commands
-      - evidence
-      - follow_up
+  # 0247 (1.3.0): stand_request task-kind removed. Lease-based
+  # singleton stand resource replaces the per-request task-file
+  # model; see schema.stand.resource for the new state machine.
   review_session:
     required_initial_fields:
       - id
@@ -734,6 +691,10 @@ stand:
         - stand_probe_*: requires holder of active_lease's lease_id
       enforcement_layer: cli
     state_file: .stand/state.yaml       # under coordination/
+    # 0244 (0242b / Phase 2): profile enum the lease CLI validates
+    # ``--profile`` against. SK's deploy playbook per value lives
+    # in PROJECT.md (out of scope for 0244 — separate design).
+    profiles_allowed: [full-deploy, vite-dev, smoke-only]
 
 tests_block_validation:
   stand_evidence:
@@ -817,9 +778,9 @@ streams:
     allowed_block_kinds:
       [triage, plan, implementation, tests, reader_review, review, blocked, rollback]
     intake_queues: [feature_inbox, user_feedback]
-  stand:
-    allowed_block_kinds: [stand_result, blocked]
-    intake_queues: [stand_requests]
+  # 0247 (1.3.0): stand stream removed. The lease-based singleton
+  # stand resource replaces the request/wip/done task-file model;
+  # see schema.stand.resource for the new state machine.
   review_session:
     allowed_block_kinds: [session_iteration, blocked]
     intake_queues: [review_sessions]
@@ -873,11 +834,10 @@ queue_accepts_blocks:
   feature_blocked:     [blocked]
   user_feedback:       [triage, blocked]
   review_sessions:     [session_iteration, blocked]
-  stand_requests:      [blocked]
-  stand_wip:           [stand_result, blocked]
+  # 0247 (1.3.0): stand_requests/wip/done queue_accepts_blocks
+  # entries removed alongside the queues themselves.
   verified:            [rollback]  # 0195: rollback only; terminal otherwise
   archive:             []
-  stand_done:          []
 
 # Implementation-block scope → which role's queue feeds it. Used by
 # 0134's intake-rejection + 0174's role-of-implementer dispatch.

@@ -386,33 +386,25 @@ def gate_check(task_id: str, project_dir: Path | None, canon_dir: Path | None,
             warn(f"  reason: plan.stand_required is {stand_required!r}, expected true/false")
         raise click.exceptions.Exit(2)
 
-    # 0246 (0242d / Phase 5): prefer lease evidence on the tests
-    # block over the legacy stand_done scan. Post-0245 the FSM
-    # transports stand-result evidence directly via
-    # tests.stand_evidence (the lease_id + result + commit are
-    # written by TESTER from the lease release output). Old
-    # stand_done/<id>.yaml path stays as backwards-compat fallback
-    # for tasks that haven't migrated; 0247 removes it.
+    # 0246 + 0247 (1.3.0): gate_check reads lease evidence from the
+    # product task's tests block. The pre-0246 stand_done scan
+    # fallback was removed in 0247 — the queues are gone, no files
+    # to scan. Tasks shipped before 0246 that lack
+    # tests.stand_evidence.lease_id fail with "missing" and require
+    # a refile path through the lease API.
     lease_evidence = extract_lease_evidence_from_tests(merged)
-    if lease_evidence is not None:
-        # Treat the lease evidence as a single-item candidate list
-        # (synthetic path label so existing fail_reasons formatting
-        # keeps working).
-        candidates = [(
-            type("SyntheticPath", (), {"name": "tests.stand_evidence"})(),
-            lease_evidence,
-        )]
-    else:
-        candidates = find_stand_evidence(project_dir, str(task_id_full))
-        if not candidates:
-            info("missing")
-            if verbose:
-                warn(
-                    f"  reason: no tests.stand_evidence with lease_id "
-                    f"AND no stand_done/*.{{yaml,md}} with evidence_for "
-                    f"matching {task_id_full}"
-                )
-            raise click.exceptions.Exit(2)
+    if lease_evidence is None:
+        info("missing")
+        if verbose:
+            warn(
+                f"  reason: no tests.stand_evidence with lease_id "
+                f"on task {task_id_full} (post-0247 lease model)"
+            )
+        raise click.exceptions.Exit(2)
+    candidates = [(
+        type("SyntheticPath", (), {"name": "tests.stand_evidence"})(),
+        lease_evidence,
+    )]
 
     task_commit = get_task_commit(merged)
     task_fingerprint = get_task_worktree_fingerprint(merged)

@@ -33,24 +33,32 @@ def _load_schema() -> dict:
 
 
 def test_schema_has_streams_section() -> None:
+    """0174 + 0247 (1.3.0): streams now contains product +
+    review_session only. stand stream removed alongside the
+    three-queue model in 0247."""
     doc = _load_schema()
     streams = doc.get("streams")
     assert streams is not None, "0174: schema.yaml missing 'streams:' section"
-    for required in ("product", "stand", "review_session"):
+    for required in ("product", "review_session"):
         assert required in streams, (
             f"0174: streams.{required} missing"
         )
         assert streams[required].get("allowed_block_kinds"), (
             f"0174: streams.{required}.allowed_block_kinds missing"
         )
+    # 0247: stand stream explicitly removed.
+    assert "stand" not in streams
 
 
 def test_schema_has_block_kinds_section() -> None:
+    """0174 + 0247: stand_result block kind dropped alongside the
+    stand stream (lease-based release writes evidence on the
+    product task's tests block instead)."""
     doc = _load_schema()
     bk = doc.get("block_kinds")
     assert bk is not None, "0174: schema.yaml missing 'block_kinds:' section"
     for required in ("triage", "plan", "implementation", "tests",
-                     "reader_review", "review", "stand_result",
+                     "reader_review", "review",
                      "session_iteration"):
         assert required in bk, f"0174: block_kinds.{required} missing"
         assert bk[required].get("authored_by"), (
@@ -73,7 +81,11 @@ def test_schema_has_queue_accepts_blocks() -> None:
     # marker for verified tasks reverted at the code level).
     assert q["verified"] == ["rollback"]
     assert q["archive"] == []
-    assert q["stand_done"] == []
+    # 0247 (1.3.0): stand_done queue removed entirely; should not
+    # appear in queue_accepts_blocks any more.
+    assert "stand_done" not in q
+    assert "stand_requests" not in q
+    assert "stand_wip" not in q
 
 
 def test_schema_has_assignee_role_by_scope() -> None:

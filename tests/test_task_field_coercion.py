@@ -225,32 +225,10 @@ def test_append_block_body_at_path_alias(tmp_path: Path):
     assert "Triage via @PATH" in triage["notes"]
 
 
-def test_hosts_comma_separated_single_flag(tmp_path: Path):
-    """``--hosts X,Y`` must produce a 2-host list (1.1.0 regression)."""
-    import yaml
-    proj = _setup_project(tmp_path)
-    cp = _gm(proj, "stand", "request",
-             "--request-type", "deploy", "--profile", "full-deploy",
-             "--title", "test hosts flatten",
-             "--hosts", "host-a,host-b")
-    assert cp.returncode == 0, cp.stderr
-    yaml_files = list((proj / "coordination" / "stand_requests").glob("*.yaml"))
-    data = yaml.safe_load(yaml_files[0].read_text(encoding="utf-8"))
-    assert data["target"]["hosts"] == ["host-a", "host-b"], data["target"]
-
-
-def test_hosts_repeated_flag(tmp_path: Path):
-    """``--hosts X --hosts Y`` (idiomatic click) must also produce a 2-host list."""
-    import yaml
-    proj = _setup_project(tmp_path)
-    cp = _gm(proj, "stand", "request",
-             "--request-type", "deploy", "--profile", "full-deploy",
-             "--title", "test hosts repeat",
-             "--hosts", "host-a", "--hosts", "host-b")
-    assert cp.returncode == 0, cp.stderr
-    yaml_files = list((proj / "coordination" / "stand_requests").glob("*.yaml"))
-    data = yaml.safe_load(yaml_files[0].read_text(encoding="utf-8"))
-    assert data["target"]["hosts"] == ["host-a", "host-b"], data["target"]
+# 0247 (1.3.0): test_hosts_* tests REMOVED — `greatminds stand
+# request` CLI is gone alongside the stand-stream queues. The new
+# lease API does not expose --hosts at all (PROJECT.md per-profile
+# deploy recipe owns hosts).
 
 
 # ---------------------------------------------------------------------------
@@ -292,40 +270,10 @@ def test_split_multivalue_unit_comma_path_unchanged():
     assert out == ["host-a", "host-b", "host-c"], out
 
 
-def test_stand_request_evidence_for_bracket_list_writes_real_list(tmp_path: Path):
-    """End-to-end: ``stand request --evidence-for [task-id]`` writes the
-    stand_requests YAML with ``evidence_for: ['task-id']`` (a proper
-    list of strings), NOT ``evidence_for: ['[task-id]']`` (the poison).
-    This is the actual bug repro USER filed against the stand writer."""
-    import yaml
-    proj = _setup_project(tmp_path)
-    tid = _new_task(proj, "0067-target")
-    cp = _gm(proj, "stand", "request",
-             "--request-type", "deploy", "--profile", "full-deploy",
-             "--title", "stand for 0067 target",
-             "--evidence-for", f"[{tid}]")
-    assert cp.returncode == 0, cp.stderr
-    yaml_files = list((proj / "coordination" / "stand_requests").glob("*.yaml"))
-    assert len(yaml_files) == 1, yaml_files
-    data = yaml.safe_load(yaml_files[0].read_text(encoding="utf-8"))
-    assert data["evidence_for"] == [tid], (
-        f"poisoned evidence_for shape: {data['evidence_for']!r}. "
-        f"Expected single-element list [tid], got the bracket-string."
-    )
-
-
-def test_stand_request_hosts_bracket_list(tmp_path: Path):
-    """Same fix applies to --hosts (also routed through _split_multivalue)."""
-    import yaml
-    proj = _setup_project(tmp_path)
-    cp = _gm(proj, "stand", "request",
-             "--request-type", "deploy", "--profile", "full-deploy",
-             "--title", "hosts bracket-list",
-             "--hosts", "[host-a, host-b]")
-    assert cp.returncode == 0, cp.stderr
-    yaml_files = list((proj / "coordination" / "stand_requests").glob("*.yaml"))
-    data = yaml.safe_load(yaml_files[0].read_text(encoding="utf-8"))
-    assert data["target"]["hosts"] == ["host-a", "host-b"], data["target"]
+# 0247 (1.3.0): test_stand_request_*_bracket_list tests REMOVED —
+# the stand_request CLI command is gone. The unit-level
+# _split_multivalue bracket-list tests above still pin the
+# regression fix (the helper is still used by other CLI options).
 
 
 def test_append_block_rejects_both_body_and_body_file(tmp_path: Path):

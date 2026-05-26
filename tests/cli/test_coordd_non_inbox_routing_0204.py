@@ -40,12 +40,15 @@ def test_owning_role_resolves_planner_for_feature_inbox() -> None:
     ) == "ARCHITECT-PLANNER"
 
 
-def test_owning_role_resolves_stand_keeper_for_stand_queues() -> None:
+def test_owning_role_unknown_for_removed_stand_queues() -> None:
+    """0247 (1.3.0): stand_requests/wip/done queues REMOVED.
+    _owning_role_for_queue returns None for unknown queues; this
+    test pins that the removed queues are no longer schema entries."""
     canon = find_canon_dir()
     assert coordd_mod._owning_role_for_queue(
-        canon, "stand_requests") == "STAND-KEEPER"
+        canon, "stand_requests") is None
     assert coordd_mod._owning_role_for_queue(
-        canon, "stand_wip") == "STAND-KEEPER"
+        canon, "stand_wip") is None
 
 
 def test_owning_role_resolves_reviewer_for_feature_review() -> None:
