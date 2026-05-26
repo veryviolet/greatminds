@@ -55,6 +55,7 @@ nav:
   - Concepts:
       - Queues: concepts/queues.md
       - Roles: concepts/roles.md
+      - Codex Profiles: concepts/codex-profiles.md
       - Scenarios: concepts/scenarios.md
       - Stand Gate: concepts/stand-gate.md
       - Inbox: concepts/inbox.md
