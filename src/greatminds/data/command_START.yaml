@@ -192,10 +192,16 @@ common: |
   `greatminds task mv`, `greatminds task append-block` (review /
   tests / implementation outcomes), or `greatminds inbox send`, end
   your turn-reply with one markdown line per `schema.visual_events`.
-  Use the emoji + bold + code-inline exactly as the template
-  prescribes (the operator scans panes by these markers). Include
-  nothing else AFTER this line — it's the last sentence of your
-  reply for that action.
+  Include nothing else AFTER this line — it's the last sentence of
+  your reply for that action.
+  `CLAIMED` means you took ownership, `FINISHED` means you handed
+  completed work to review/test, `ACCEPTED` means the task reached
+  `verified`, `REJECTED` means feedback/failure sent it back, and
+  `SENT` means an inbox message was sent. Use the emoji + bold +
+  code-inline exactly as the template prescribes (operators scan tmux
+  panes by these markers). These are per-agent utterances, not
+  daemon-pushed dashboard events; the daemon dashboard is future 1.3.0
+  work.
 
 # ---------------------------------------------------------------------------
 roles:
