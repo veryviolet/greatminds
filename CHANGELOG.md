@@ -4,6 +4,91 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.3.0 — 2026-05-26
+
+**BREAKING.** Stand-stream redesign: the legacy three-queue model
+(`stand_requests/` → `stand_wip/` → `stand_done/`) is replaced by a
+lease-based singleton stand resource backed by
+`coordination/.stand/state.yaml`. Operators upgrading from 1.2.x must
+drain any in-flight `stand_requests/*` and `stand_wip/*` before
+`pip install --upgrade greatminds==1.3.0`; existing `stand_done/*`
+files may stay as historical evidence.
+
+### Breaking
+
+- **Old stand queues removed.** `stand_requests/`, `stand_wip/`,
+  `stand_done/` queue directories are no longer scaffolded by
+  `greatminds setup`. All transitions touching them are gone from
+  `schema.yaml`, along with the `stand` task stream and four
+  stand-stream validators in `cli/task.py`.
+- **`greatminds stand request` / `stand result` CLI removed.**
+  Replaced by the lease API below. `greatminds task new --stream stand`
+  raises with a pointer at the new CLI.
+- **`gate_check` reads lease evidence exclusively.** The backwards-
+  compatibility fallback to `find_stand_evidence` (stand_done scan)
+  is gone. Pre-1.3.0 tasks without a `lease_id` on their tests block
+  return `missing`; refile via the lease API to verify.
+
+### Added
+
+- **Lease-based stand CLI:**
+  - `greatminds stand lease --task <id> --worktree <path> --profile
+    <enum>` — request a lease; returns a UUID `lease_id`. FIFO queue
+    when the stand is busy.
+  - `greatminds stand release --lease-id <id> --result
+    pass|fail|partial` — return the stand to free; result is a
+    closed enum (no prose channel).
+  - `greatminds stand ready --lease-id <id>` — SK signals deploy
+    complete; state preparing→ready; inbox-info to holder.
+  - `greatminds stand down --reason …` / `stand up --reason …` —
+    halt/recovery; queue paused under `down`.
+  - `greatminds stand status` — read-only state + queue + history-
+    tail.
+- **`coordination/.stand/state.yaml`** singleton state file with
+  fcntl-protected I/O. Four states (`free` / `preparing` / `ready`
+  / `down`) and transitions encoded in `schema.yaml stand.resource`.
+- **`coordd` inotify on `.stand/`** so SK reacts sub-second to state
+  changes instead of polling.
+- **Role canon (`STAND-KEEPER.md`, `TESTER.md`, `EXPLORER.md`)**
+  rewritten for the lease lifecycle. SK input is structured-only
+  (`--task`, `--worktree`, `--profile`); SK never sees `what to test`
+  by design (information asymmetry forces TESTER ownership of
+  probes).
+- **Public docs:** new `docs/concepts/stand-operations.md` page,
+  `docs/concepts/stand-gate.md` updated for lease evidence,
+  `mkdocs.yml` nav entry, `docs/architecture/filesystem-layout.md`
+  reflects `coordination/.stand/state.yaml`.
+
+### Companion changes (1.2.x → 1.3.0 batch)
+
+- **Commit-drift closure** (0228 / 0229 / 0233): TESTER own
+  functional_probes + tester_observations are now required on a
+  scope-driven schema gate; `gate_check` records a worktree
+  fingerprint to distinguish committed vs in-flight overlays;
+  `greatminds stand request` (now removed in 1.3.0) resolved
+  target_commit from `evidence_for[0]`'s impl block — superseded by
+  lease `--worktree` semantics.
+- **0236 + 0237** UserPromptSubmit hook + tmux send-keys split fix
+  for chat-mode panes (PLANNER / MAINTAINER) no longer miss messages
+  during USER topic-switches.
+- **0238** new `docs/concepts/codex-profiles.md` page covering the
+  0158 per-role `CODEX_HOME` model.
+- **0241** PLANNER role canon — propose-then-file default chat
+  posture, codified.
+- **Bugfixes** 0198 / 0202 / 0204 / 0235 + 13 doc tasks (0208 →
+  0220) cleared along the way.
+
+### Upgrade
+
+```bash
+pip install --upgrade greatminds==1.3.0
+greatminds update            # restarts daemon + agents
+```
+
+`greatminds update` auto-runs `daemon install` when the per-project
+template unit is missing (0202), so legacy pre-0008 fleets upgrade
+in a single step.
+
 ## 1.1.2 — 2026-05-21
 
 Bug-fix release. Three regressions found in 1.1.0 real-world use, plus a
