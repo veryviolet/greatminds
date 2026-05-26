@@ -383,114 +383,226 @@ def _load_curated_plugins(canon: Path) -> dict:
     return plugins if isinstance(plugins, dict) else {}
 
 
-def _install_claude_plugins_for_role(role: str, plugins: list[str],
-                                     verbose: bool = False) -> tuple[int, int, int]:
-    """0175: install each curated claude plugin for a role.
+def _resolve_claude_binary() -> str | None:
+    """0203: resolve the ``claude`` binary across npm-install locations.
 
-    Idempotent: skip a plugin if ``claude plugin list`` already reports
-    it. Per-plugin failure is non-fatal — log and continue. Returns
-    ``(installed, skipped, failed)`` counts for the setup summary.
+    Common case: claude is npm-installed under ``~/.local/bin`` or
+    ``~/.npm-global/bin``. ssh non-login shells don't source
+    ``~/.profile``, so ``~/.local/bin`` isn't on PATH → bare
+    ``subprocess.run(["claude", ...])`` fails with FileNotFoundError.
+    Resolve via shutil.which first, then fall back to common
+    install paths.
 
-    Naming follows the marketplace convention: ``<name>@claude-plugins-
-    official``. The ``@<marketplace>`` suffix is what disambiguates
-    when a name exists in multiple registered marketplaces.
+    Returns the absolute path (or "claude" if shutil.which found it)
+    or None when no executable claude exists anywhere we check.
     """
-    if not plugins:
-        return (0, 0, 0)
-    # One ``claude plugin list`` call per role to check existing state.
-    # Listing format: ``  ❯ <name>@<marketplace>`` (one per line, ❯
-    # is the install-status bullet claude emits). Strip the bullet and
-    # the ``@<marketplace>`` suffix so the set holds bare names that
-    # match the curated table entries.
+    p = shutil.which("claude")
+    if p:
+        return p
+    for cand in (
+        Path.home() / ".local/bin/claude",
+        Path.home() / ".npm-global/bin/claude",
+        Path("/usr/local/bin/claude"),
+    ):
+        if cand.is_file() and os.access(cand, os.X_OK):
+            return str(cand)
+    return None
+
+
+def _claude_plugin_list_names(claude_bin: str) -> set[str]:
+    """0203 iter-2: parse ``claude plugin list`` output into a name set.
+
+    Listing format: ``  ❯ <name>@<marketplace>`` (one per line, ❯ is
+    the install-status bullet claude emits). Strip the bullet and
+    the ``@<marketplace>`` suffix so the set holds bare names that
+    match the curated table entries. Returns empty set on any
+    subprocess failure (treated as 'nothing installed')."""
     try:
         listing = subprocess.run(
-            ["claude", "plugin", "list"],
+            [claude_bin, "plugin", "list"],
             capture_output=True, text=True, timeout=15,
         )
-        installed_names = set()
-        for raw in (listing.stdout or "").splitlines():
-            line = raw.strip()
-            if not line:
-                continue
-            if line.startswith("❯"):  # ❯ U+276F
-                line = line[1:].strip()
-            head = line.split(maxsplit=1)[0]
-            name = head.split("@", 1)[0]
-            if name and not name.endswith(":"):  # skip "Installed plugins:" hdr
-                installed_names.add(name)
     except (OSError, subprocess.TimeoutExpired):
-        installed_names = set()
+        return set()
+    names: set[str] = set()
+    for raw in (listing.stdout or "").splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("❯"):  # ❯ U+276F
+            line = line[1:].strip()
+        head = line.split(maxsplit=1)[0]
+        name = head.split("@", 1)[0]
+        if name and not name.endswith(":"):  # skip "Installed plugins:" header
+            names.add(name)
+    return names
 
-    installed = 0
-    skipped = 0
+
+def _install_claude_plugins_for_role(
+    role: str, plugins: list[str],
+    verbose: bool = False,
+    *,
+    claude_bin: str | None = None,
+    pre_campaign_installed: set[str] | None = None,
+    installed_this_run: set[str] | None = None,
+) -> tuple[int, int, int, int, list[str]]:
+    """0175 / 0203: install each curated claude plugin for a role.
+
+    Per-plugin classification (PLANNER §7 amendment to 0203):
+    - **fresh-install** — name absent from claude home + absent from
+      the in-flight run set; ``claude plugin install`` runs.
+    - **preserved-prior** — name was in claude home BEFORE this setup
+      campaign (snapshot taken once by the aggregate caller).
+    - **preserved-dedupe** — name installed earlier this run for a
+      different role (cross-role dedupe within the campaign).
+    - **failed** — install rc != 0 or subprocess exception.
+
+    Returns ``(installed_fresh, preserved_prior, preserved_dedupe,
+    failed, failed_names)``. Pre-0203-iter-2 the helper conflated
+    preserved-prior + preserved-dedupe into one counter, producing
+    the «6 installed, 8 preserved» ambiguity on Lattice.
+
+    The aggregate caller (``_install_role_plugins_per_host``) supplies
+    a shared ``pre_campaign_installed`` snapshot + mutable
+    ``installed_this_run`` set so cross-role dedupe is observable.
+    Solo callers (tests) can pass None for both; the function falls
+    back to per-role snapshot semantics.
+    """
+    if not plugins:
+        return (0, 0, 0, 0, [])
+
+    # 0203: resolve claude across npm-install locations so ssh non-
+    # login invocations (PATH=/usr/bin only) still find it.
+    if claude_bin is None:
+        claude_bin = _resolve_claude_binary()
+    if claude_bin is None:
+        warn(
+            f"claude binary not found in PATH or common locations "
+            f"(~/.local/bin, ~/.npm-global/bin, /usr/local/bin); "
+            f"skipping plugin install for {role}. Add claude to "
+            f"PATH or install it via `npm install -g @anthropic-ai/"
+            f"claude-code` to enable plugin install."
+        )
+        return (0, 0, 0, len(plugins), list(plugins))
+
+    # Fallback for solo callers / tests: snapshot per-role.
+    if pre_campaign_installed is None:
+        pre_campaign_installed = _claude_plugin_list_names(claude_bin)
+    if installed_this_run is None:
+        installed_this_run = set()
+
+    inst_fresh = 0
+    pres_prior = 0
+    pres_dedupe = 0
     failed = 0
+    failed_names: list[str] = []
+
     for name in plugins:
-        if name in installed_names:
-            skipped += 1
+        if name in pre_campaign_installed:
+            pres_prior += 1
+            info(
+                f"  plugin {name} preserved "
+                f"(already in claude home before campaign)"
+            )
+            continue
+        if name in installed_this_run:
+            pres_dedupe += 1
+            info(
+                f"  plugin {name} preserved "
+                f"(installed earlier this run for another role)"
+            )
             continue
         try:
             cp = subprocess.run(
-                ["claude", "plugin", "install",
+                [claude_bin, "plugin", "install",
                  f"{name}@claude-plugins-official"],
                 capture_output=True, text=True, timeout=60,
             )
             if cp.returncode == 0:
-                installed += 1
+                inst_fresh += 1
+                installed_this_run.add(name)
+                info(
+                    f"  plugin {name} installed via claude plugin install"
+                )
             else:
                 failed += 1
-                if verbose:
-                    print(
-                        f"  claude plugin install {name} failed: "
-                        f"{cp.stderr.strip()[:120]}",
-                    )
+                failed_names.append(name)
+                # 0203: surface stderr regardless of --verbose — silent
+                # failures hid the npm-PATH issue for an entire release
+                # cycle.
+                stderr_excerpt = (cp.stderr or "").strip().splitlines()
+                hint = stderr_excerpt[0][:160] if stderr_excerpt else "(no stderr)"
+                warn(f"  claude plugin install {name} failed: {hint}")
         except (OSError, subprocess.TimeoutExpired) as exc:
             failed += 1
-            if verbose:
-                print(f"  claude plugin install {name} errored: {exc}")
-    return (installed, skipped, failed)
+            failed_names.append(name)
+            warn(f"  claude plugin install {name} errored: {exc}")
+    return (inst_fresh, pres_prior, pres_dedupe, failed, failed_names)
 
 
-def _install_role_plugins_per_host(canon: Path,
-                                   verbose: bool = False) -> tuple[int, int, int]:
-    """0175: install the curated set of marketplace plugins per role.
+def _install_role_plugins_per_host(
+    canon: Path,
+    verbose: bool = False,
+) -> tuple[int, int, int, int, list[str]]:
+    """0175 / 0203: install the curated marketplace plugins per role.
 
-    For every claude-host role with a curated plugin list (per
-    schema.yaml's ``plugins.claude_marketplace`` table), run
-    ``claude plugin install <name>@claude-plugins-official`` once per
-    plugin. Codex side is deferred (empty lists per USER directive);
-    setup logs the deferral and continues.
-
-    Returns aggregate ``(installed, skipped, failed)`` across all
-    roles, for the setup summary line.
+    Returns aggregate ``(installed_fresh, preserved_prior,
+    preserved_dedupe, failed, failed_names)`` across all roles.
+    Splitting ``preserved`` into prior (already in claude home before
+    this campaign) and dedupe (installed earlier this run for another
+    role) closes the «6 installed, 8 preserved» ambiguity flagged on
+    Lattice (PLANNER §7 amendment to 0203).
     """
     # Opt-out for tests + CI hosts that don't want setup mutating the
     # host's claude plugin registry. Production setup leaves this
     # unset; the suite's conftest.py sets it so integration tests
     # don't shell out to the real ``claude`` binary.
     if os.environ.get("GREATMINDS_SKIP_PLUGIN_INSTALL"):
-        return (0, 0, 0)
+        return (0, 0, 0, 0, [])
     curated = _load_curated_plugins(canon)
     if not curated:
-        return (0, 0, 0)
-    total_installed = 0
-    total_skipped = 0
+        return (0, 0, 0, 0, [])
+
+    # 0203 iter-2: resolve claude once + snapshot pre-campaign state
+    # once so the per-role helper can distinguish "preserved (already
+    # there)" from "preserved (we installed it a moment ago for
+    # another role)".
+    claude_bin = _resolve_claude_binary()
+    if claude_bin is None:
+        # Per-role helper handles the no-binary case (all-failed with
+        # named plugins). Pass through; nothing else to snapshot.
+        pre_campaign_installed: set[str] = set()
+    else:
+        pre_campaign_installed = _claude_plugin_list_names(claude_bin)
+    installed_this_run: set[str] = set()
+
+    total_inst_fresh = 0
+    total_pres_prior = 0
+    total_pres_dedupe = 0
     total_failed = 0
+    all_failed_names: list[str] = []
 
     claude_table = curated.get("claude_marketplace") or {}
     for role, plugins in claude_table.items():
         if not plugins:
             continue
-        ci, cs, cf = _install_claude_plugins_for_role(
+        ci, pp, pd, cf, cfn = _install_claude_plugins_for_role(
             role, list(plugins), verbose=verbose,
+            claude_bin=claude_bin,
+            pre_campaign_installed=pre_campaign_installed,
+            installed_this_run=installed_this_run,
         )
         if verbose:
             print(
                 f"  claude plugins for {role}: "
-                f"{ci} installed, {cs} skipped, {cf} failed",
+                f"{ci} fresh, {pp} pre-existing, {pd} dedupe, "
+                f"{cf} failed",
             )
-        total_installed += ci
-        total_skipped += cs
+        total_inst_fresh += ci
+        total_pres_prior += pp
+        total_pres_dedupe += pd
         total_failed += cf
+        all_failed_names.extend(cfn)
 
     codex_table = curated.get("codex_marketplace") or {}
     deferred = [r for r, p in codex_table.items()
@@ -501,7 +613,8 @@ def _install_role_plugins_per_host(canon: Path,
             f"{', '.join(sorted(deferred))} (awaiting USER curation)",
         )
 
-    return (total_installed, total_skipped, total_failed)
+    return (total_inst_fresh, total_pres_prior, total_pres_dedupe,
+            total_failed, all_failed_names)
 
 
 def _copy_if_missing(src: Path, dst: Path, force: bool = False) -> str:
@@ -929,14 +1042,25 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     # USER directive — empty lists log deferral, no install calls.
     # Idempotent: per-plugin presence in ``claude plugin list`` skips
     # the install. Per-plugin failure is non-fatal (log + continue).
-    plugins_installed, plugins_skipped, plugins_failed = (
+    (plugins_inst_fresh, plugins_pres_prior, plugins_pres_dedupe,
+     plugins_failed, plugins_failed_names) = (
         _install_role_plugins_per_host(canon, verbose=False)
     )
-    if plugins_installed or plugins_skipped or plugins_failed:
+    plugins_pres_total = plugins_pres_prior + plugins_pres_dedupe
+    if (plugins_inst_fresh or plugins_pres_total or plugins_failed):
+        # 0203 iter-2 (PLANNER §7): break out preserved into prior
+        # (pre-campaign) vs dedupe (this-run), closing the «6/8»
+        # ambiguity on multi-role campaigns.
+        failed_suffix = (
+            f": {', '.join(sorted(set(plugins_failed_names)))}"
+            if plugins_failed_names else ""
+        )
         info(
-            f"  marketplace plugins: {plugins_installed} installed, "
-            f"{plugins_skipped} preserved, {plugins_failed} failed "
-            f"(see schema.yaml plugins:)"
+            f"  marketplace plugins: {plugins_inst_fresh} installed/"
+            f"{plugins_pres_prior} pre-existing/"
+            f"{plugins_pres_dedupe} dedupe-this-run/"
+            f"{plugins_failed} failed"
+            f"{failed_suffix} (see schema.yaml plugins:)"
         )
 
     # Git pre-commit hook (task 0091 item 2) — installs only if a
