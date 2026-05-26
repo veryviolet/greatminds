@@ -749,6 +749,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../codex-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Codex Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../scenarios/" class="md-nav__link">
         
   
@@ -757,6 +785,34 @@
     
   
     Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../stand-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stand Operations
   
 
     
@@ -1301,8 +1357,15 @@ role.</p>
 <li><code>feature_docs_review/</code>: docs ready for fresh-reader review.</li>
 <li><code>feature_review/</code>: final architectural review.</li>
 <li><code>feature_blocked/</code>: tasks parked on explicit dependencies.</li>
-<li><code>verified/</code>: approved work.</li>
+<li><code>verified/</code>: approved work. This is normally a final state, but
+  <code>ARCHITECT-REVIEWER</code> may roll it back when post-verify evidence shows the
+  work is wrong or obsolete.</li>
+<li><code>archive/</code>: abandoned, superseded, or withdrawn work.</li>
 </ul>
+<p>A verified task can leave <code>verified/</code> only through an explicit reviewer
+rollback. The reviewer appends a <code>rollback</code> block with a non-empty <code>reason</code>,
+then moves the task either to <code>archive/</code> when the work has been reverted or to
+<code>feature_review/</code> when it needs another review/fix cycle.</p>
 <p>Inline flags such as <code>ready_for_implementation: true</code> are evidence. They do not
 handoff ownership. Only the queue move does that.</p>
 <h2 id="mutation-rule">Mutation rule<a class="headerlink" href="#mutation-rule" title="Permanent link">&para;</a></h2>

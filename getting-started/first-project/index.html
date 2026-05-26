@@ -580,6 +580,28 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#claude-local-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claude local settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#claude-marketplace-plugins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claude marketplace plugins
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#start-the-daemon" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -771,6 +793,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../concepts/codex-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Codex Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../concepts/scenarios/" class="md-nav__link">
         
   
@@ -779,6 +829,34 @@
     
   
     Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/stand-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stand Operations
   
 
     
@@ -1278,6 +1356,28 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#claude-local-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claude local settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#claude-marketplace-plugins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claude marketplace plugins
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#start-the-daemon" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1339,6 +1439,60 @@ greatminds<span class="w"> </span>setup<span class="w"> </span>--session<span cl
 local agent configuration files, and copies the canon project templates. It does
 not overwrite an existing <code>coord.yaml</code>; edit that file when you want different
 tools, windows, or launch modes.</p>
+<h2 id="claude-local-settings">Claude local settings<a class="headerlink" href="#claude-local-settings" title="Permanent link">&para;</a></h2>
+<p>During setup, greatminds writes or extends
+<code>.claude/settings.local.json</code>. New files include the Stop hook,
+<code>autoMode.allow: ["$defaults"]</code>, and the canonical
+<code>permissions.allow</code> entries from <code>schema.yaml</code> under
+<code>claude_settings.permissions.allow</code>.</p>
+<p>Those allow rules let unattended Claude loop roles perform the git operations
+they are authorized to run, such as reviewer commit, tag, push, merge, branch,
+checkout, and worktree commands. Without explicit allow rules, Claude Code can
+pause on an approval prompt that a loop-mode role cannot answer.</p>
+<p>Project operators can add their own <code>permissions.allow</code> entries directly in
+<code>.claude/settings.local.json</code>. Re-running <code>greatminds setup</code> unions the schema
+defaults into the existing list, deduplicates them, and preserves operator-added
+rules. For a valid existing file, setup leaves other top-level settings such as
+custom hooks and <code>autoMode</code> untouched.</p>
+<h2 id="claude-marketplace-plugins">Claude marketplace plugins<a class="headerlink" href="#claude-marketplace-plugins" title="Permanent link">&para;</a></h2>
+<p>During setup, greatminds installs curated Claude marketplace plugins for each
+Claude-hosted role from <code>schema.yaml</code> under <code>plugins.claude_marketplace</code>.
+For example, the shipped schema can assign plugins such as <code>playwright</code>,
+<code>sentry</code>, <code>postman</code>, or <code>sourcegraph</code> to the roles that use them.</p>
+<p>The install step runs the equivalent of <code>claude plugin install &lt;name&gt;</code> for each
+plugin assigned to that role. It is idempotent: plugins already present in
+<code>claude plugin list</code> are preserved, failed installs are reported in the setup
+summary, and setup continues with the remaining plugins.</p>
+<p>Setup resolves the <code>claude</code> binary from <code>PATH</code> first, then checks common npm
+install locations: <code>~/.local/bin/claude</code>, <code>~/.npm-global/bin/claude</code>, and
+<code>/usr/local/bin/claude</code>. This covers non-login shells, SSH launches, and daemon
+contexts where the interactive shell profile that adds npm binaries to <code>PATH</code>
+has not been loaded.</p>
+<p>If setup reports <code>claude binary not found in PATH or common locations</code>, plugin
+installation is skipped for the affected roles and the plugin names are counted
+as failed. Add Claude Code to <code>PATH</code>, or install it with
+<code>npm install -g @anthropic-ai/claude-code</code>, then run <code>greatminds setup</code> again.</p>
+<p>The setup summary separates marketplace plugin results into <code>installed</code>,
+<code>pre-existing</code>, <code>dedupe-this-run</code>, and <code>failed</code>. <code>pre-existing</code> means the plugin
+was already present before setup started; <code>dedupe-this-run</code> means another role
+installed it earlier in the same setup run. Failed installs include the plugin
+name in the summary, and setup also prints the first stderr line from the
+underlying <code>claude plugin install</code> command.</p>
+<p>To change the curated set for a project, edit <code>schema.yaml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">plugins</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">claude_marketplace</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">DEVELOPER</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">postman</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">UI-DEVELOPER</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">playwright</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">chrome-devtools-mcp</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">postman</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">TESTER</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">playwright</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">sentry</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">postman</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">codspeed</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<p>Keep empty lists for roles that should not receive marketplace plugins. Codex
+marketplace lists are currently empty by design; Codex roles use generated
+per-role <code>CODEX_HOME</code> configs instead of Claude marketplace plugin installs.
+See <a href="../../concepts/codex-profiles/">Codex Profiles</a> for the generated layout
+and launch path.</p>
+<p>After setup, verify the installed Claude plugins with:</p>
+<div class="highlight"><pre><span></span><code>claude<span class="w"> </span>plugin<span class="w"> </span>list
+</code></pre></div>
 <h2 id="start-the-daemon">Start the daemon<a class="headerlink" href="#start-the-daemon" title="Permanent link">&para;</a></h2>
 <p>The daemon is the process that watches inboxes and pushes wake text into idle
 agents:</p>

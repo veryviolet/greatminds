@@ -686,6 +686,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../concepts/codex-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Codex Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../concepts/scenarios/" class="md-nav__link">
         
   
@@ -694,6 +722,34 @@
     
   
     Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/stand-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stand Operations
   
 
     
@@ -1224,6 +1280,7 @@
 itself, the package release path is:</p>
 <ol>
 <li>Ensure implementation, tests, docs, and review tasks are verified.</li>
+<li>Edit <code>pyproject.toml</code> <code>[project].version</code> to the release version.</li>
 <li>Run the full test suite.</li>
 <li>Build the package.</li>
 <li>Tag the release.</li>
@@ -1231,6 +1288,10 @@ itself, the package release path is:</p>
 <li>Upgrade the fleet environment that runs agents.</li>
 <li>Restart daemon and agent processes.</li>
 </ol>
+<p><code>greatminds.__version__</code> is derived from installed package metadata with
+<code>importlib.metadata.version("greatminds")</code>. Do not edit
+<code>src/greatminds/__init__.py</code> during a release bump; the package version source of
+truth is <code>pyproject.toml</code>.</p>
 <p>Useful commands:</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pytest
 python<span class="w"> </span>-m<span class="w"> </span>build

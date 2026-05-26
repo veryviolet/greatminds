@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://veryviolet.github.io/greatminds/concepts/stand-gate/">
       
       
-        <link rel="prev" href="../scenarios/">
+        <link rel="prev" href="../stand-operations/">
       
       
         <link rel="next" href="../inbox/">
@@ -691,6 +691,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../codex-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Codex Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../scenarios/" class="md-nav__link">
         
   
@@ -699,6 +727,34 @@
     
   
     Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../stand-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stand Operations
   
 
     
@@ -1225,14 +1281,16 @@ with:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">stand_required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <span class="nt">stand_reason</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;why</span><span class="nv"> </span><span class="s">live</span><span class="nv"> </span><span class="s">evidence</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">needed&quot;</span>
 </code></pre></div>
-<p><code>STAND-KEEPER</code> owns stand requests and records results in <code>stand_done/</code>.
-<code>TESTER</code> runs:</p>
+<p>Stand access now uses the lease workflow described in
+<a href="../stand-operations/">Stand Operations</a>. <code>TESTER</code> requests a lease, waits for
+<code>STAND-KEEPER</code> to mark it ready, probes the deployed stand, records
+lease-based <code>stand_evidence</code> in the product task's <code>tests</code> block, and runs:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>gate-check<span class="w"> </span>TASK_ID
 </code></pre></div>
-<p>The gate check verifies that stand evidence exists for the task, that the
-result is acceptable, and that the recorded commit matches the implementation
-commit. Final review should not approve a stand-required task without a passing
-gate result.</p>
+<p>The gate check verifies that tests-block stand evidence exists for the task,
+that the result is acceptable, and that the recorded commit matches the
+implementation commit. Final review should not approve a stand-required task
+without a passing gate result.</p>
 <p>Documentation-only tasks usually set <code>stand_required: false</code> and rely on local
 build or reader review instead.</p>
 

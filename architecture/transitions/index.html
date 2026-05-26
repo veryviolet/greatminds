@@ -686,6 +686,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../concepts/codex-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Codex Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../concepts/scenarios/" class="md-nav__link">
         
   
@@ -694,6 +722,34 @@
     
   
     Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/stand-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stand Operations
   
 
     
@@ -1222,6 +1278,12 @@
 <h1 id="transitions">Transitions<a class="headerlink" href="#transitions" title="Permanent link">&para;</a></h1>
 <p>Allowed transitions are encoded in <code>schema.yaml</code>. The CLI enforces the current
 role, current queue, target queue, and required readiness evidence.</p>
+<p><code>verified/</code> is not an absolute sink. If later review finds that verified work
+is wrong, obsolete, or already reverted, <code>ARCHITECT-REVIEWER</code> can append a
+<code>rollback</code> block with a non-empty <code>reason</code> and move the task from <code>verified/</code>
+to either <code>archive/</code> or <code>feature_review/</code>. Use <code>archive/</code> for withdrawn work
+whose code state already matches the rollback; use <code>feature_review/</code> when the
+task needs another amendment or review cycle.</p>
 <p>Read the source schema when changing the workflow:</p>
 <p><a href="https://github.com/veryviolet/greatminds/blob/main/schema.yaml">schema.yaml on GitHub</a></p>
 <div class="highlight"><pre><span></span><code>

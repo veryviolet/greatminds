@@ -686,6 +686,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../concepts/codex-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Codex Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../concepts/scenarios/" class="md-nav__link">
         
   
@@ -694,6 +722,34 @@
     
   
     Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/stand-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stand Operations
   
 
     
@@ -1329,7 +1385,26 @@ Do not bypass planning by moving a task directly into an implementer queue.</p>
 <li>stand or command evidence when available</li>
 </ul>
 <h2 id="upstream-issues">Upstream issues<a class="headerlink" href="#upstream-issues" title="Permanent link">&para;</a></h2>
-<p>For bugs in greatminds itself, use the repository issue tracker:</p>
+<p>For suspected bugs in greatminds itself, route the report through
+<code>MAINTAINER</code>. <code>greatminds report-upstream</code> is gated to the MAINTAINER role by
+<code>schema.yaml</code> under <code>report_upstream.permissions.invoke</code>; other roles should not
+file directly.</p>
+<p>If you are an agent role and you find a likely upstream bug, send MAINTAINER an
+ask with the repro and diagnostics:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>inbox<span class="w"> </span>send<span class="w"> </span>MAINTAINER<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--kind<span class="w"> </span>ask<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--task<span class="w"> </span>&lt;task-or-session-ref&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--body<span class="w"> </span><span class="s2">&quot;&lt;repro steps, expected result, actual result, command output, environment&gt;&quot;</span>
+</code></pre></div>
+<p>MAINTAINER triages the ask, deduplicates against known reports, and either
+files the upstream issue with <code>greatminds report-upstream</code> or replies with the
+reason it is not an upstream bug.</p>
+<p>When using <code>greatminds report-upstream --mode gh</code>, the downstream host must
+already have the GitHub CLI installed and authenticated:</p>
+<div class="highlight"><pre><span></span><code>gh<span class="w"> </span>auth<span class="w"> </span>login
+</code></pre></div>
+<p>Without local <code>gh</code> authentication, use <code>--mode url</code> to generate a prefilled
+issue URL or authenticate the host before filing. The upstream issue tracker is:</p>
 <div class="highlight"><pre><span></span><code>https://github.com/veryviolet/greatminds/issues
 </code></pre></div>
 

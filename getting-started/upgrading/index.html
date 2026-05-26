@@ -608,6 +608,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#update-notifications" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Update notifications
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#before-upgrading-a-fleet" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -760,6 +771,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../concepts/codex-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Codex Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../concepts/scenarios/" class="md-nav__link">
         
   
@@ -768,6 +807,34 @@
     
   
     Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/stand-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stand Operations
   
 
     
@@ -1267,6 +1334,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#update-notifications" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Update notifications
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#before-upgrading-a-fleet" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1310,14 +1388,30 @@
 
 <h1 id="upgrading">Upgrading<a class="headerlink" href="#upgrading" title="Permanent link">&para;</a></h1>
 <p>Upgrade the package in the environment that runs your fleet, then restart the
-daemon and agents so long-running processes import the new code.</p>
-<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>greatminds
-greatminds<span class="w"> </span>daemon<span class="w"> </span>restart
+daemon and agents so long-running processes import the new code. The normal
+fleet path is:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>update
 </code></pre></div>
 <p>If your project uses a pinned virtual environment, run the upgrade inside that
 environment. If the fleet is launched from tmux, restart the agent processes
 after the package upgrade so their registries, pty sockets, and role prompts
 match the installed version.</p>
+<p><code>greatminds update</code> also handles the daemon systemd migration. Fleets created
+before the per-project <code>greatminds-daemon@&lt;project&gt;.service</code> template may still
+have only the legacy singleton <code>coordd.service</code>, or may be missing the template
+unit after package upgrade. During update, greatminds removes the legacy unit
+when present and runs the equivalent of <code>greatminds daemon install</code> when the
+template unit is missing. Operators upgrading those older fleets do not need a
+separate manual daemon-install step.</p>
+<h2 id="update-notifications">Update notifications<a class="headerlink" href="#update-notifications" title="Permanent link">&para;</a></h2>
+<p>When <code>coordd</code> is running, it periodically checks PyPI for a newer greatminds
+release. The interval and target live in <code>schema.yaml</code> under <code>auto_update</code>;
+the default interval is <code>14400</code> seconds, and the default target is
+<code>MAINTAINER</code>.</p>
+<p>The current mode is <code>notify_only</code>. If PyPI has a newer version, <code>coordd</code> sends
+one inbox <code>info</code> message to MAINTAINER with the installed version, latest
+version, release link, and the command to run. It does not upgrade the fleet by
+itself. MAINTAINER chooses the timing and runs <code>greatminds update</code> manually.</p>
 <h2 id="before-upgrading-a-fleet">Before upgrading a fleet<a class="headerlink" href="#before-upgrading-a-fleet" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Check the changelog for CLI or coordination-contract changes.</li>
