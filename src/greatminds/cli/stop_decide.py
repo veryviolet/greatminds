@@ -75,6 +75,18 @@ def inbox_pending(coord: Path, role: str) -> list[str]:
     return out
 
 
+# 0236: chat-mode roles that the user-prompt-submit phase forces to
+# drain inbox BEFORE processing the next USER prompt. Loop-mode roles
+# (DEVELOPER, TESTER, etc.) don't need this — coordd's SIGINT handles
+# their wake. PLANNER + MAINTAINER are paced by the human and miss
+# pending inbox in the gap between turns, which is the hole 0236
+# closes.
+_CHAT_MODE_ROLES_FOR_USER_PROMPT_SUBMIT = {
+    "ARCHITECT-PLANNER",
+    "MAINTAINER",
+}
+
+
 @click.command(name="stop-decide",
                short_help="Stop-hook helper: emit block/allow JSON",
                help=__doc__)
@@ -85,8 +97,13 @@ def inbox_pending(coord: Path, role: str) -> list[str]:
               default=None, help="project root (default: cwd)")
 @click.option("--canon-dir", type=click.Path(exists=True, file_okay=False, path_type=Path),
               default=None, help="canon data dir (default: packaged greatminds.data)")
+@click.option("--phase",
+              type=click.Choice(["stop", "user-prompt-submit"]),
+              default="stop",
+              help="hook phase (0236: user-prompt-submit fires at start "
+                   "of each USER turn for chat-mode roles).")
 def stop_decide(role: str, host: str, project_dir: Path | None,
-                canon_dir: Path | None) -> None:
+                canon_dir: Path | None, phase: str) -> None:
     project_dir = project_dir or Path.cwd()
     canon_dir = canon_dir or find_canon_dir()
 
@@ -95,6 +112,15 @@ def stop_decide(role: str, host: str, project_dir: Path | None,
         sys.stdin.read()
     except Exception:
         pass
+
+    # 0236: user-prompt-submit phase only applies to chat-mode roles
+    # (PLANNER, MAINTAINER). Loop-mode roles get coordd's SIGINT wake;
+    # adding UserPromptSubmit blocking for them would jam every USER
+    # interaction with the chat-mode operator.
+    if phase == "user-prompt-submit":
+        if role.upper() not in _CHAT_MODE_ROLES_FOR_USER_PROMPT_SUBMIT:
+            click.echo("{}")
+            return
 
     coord = resolve_coord(project_dir)
     inbox_msgs = inbox_pending(coord, role)

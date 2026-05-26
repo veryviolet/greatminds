@@ -113,11 +113,23 @@ def _build_settings_local_json(project_dir: Path,
     claude sessions regardless of PATH. The ``permissions.allow`` list
     comes from schema's ``claude_settings:`` section so /loop roles
     can do git ops without operator approval (0191).
+
+    0236: chat-mode roles (PLANNER, MAINTAINER) need an
+    UserPromptSubmit hook in addition to Stop. The Stop hook fires
+    only at END of turn — pending inbox surfaces AFTER reply, so a
+    rapid USER topic-switch hides the inbox between turns. The
+    UserPromptSubmit hook fires at START of each USER prompt and
+    forces the agent to drain inbox first.
     """
     gm_bin = _greatminds_bin()
     stop_cmd = (
         f'{gm_bin} stop-decide "${{GREATMINDS_ROLE:-UNKNOWN}}" '
-        f'--host claude --project-dir {project_dir}'
+        f'--host claude --project-dir {project_dir} --phase stop'
+    )
+    ups_cmd = (
+        f'{gm_bin} stop-decide "${{GREATMINDS_ROLE:-UNKNOWN}}" '
+        f'--host claude --project-dir {project_dir} '
+        f'--phase user-prompt-submit'
     )
     allow: list[str] = []
     if canon is not None:
@@ -131,6 +143,19 @@ def _build_settings_local_json(project_dir: Path,
                     "matcher": "",
                     "hooks": [
                         {"type": "command", "command": stop_cmd},
+                    ],
+                },
+            ],
+            # 0236: close the end-of-turn inbox gap for chat-mode
+            # roles (PLANNER / MAINTAINER). Stop-decide --phase=user-
+            # prompt-submit checks inbox before each USER turn is
+            # processed; only chat-mode roles enforce, loop-mode
+            # roles see a no-op (coordd SIGINT already covers them).
+            "UserPromptSubmit": [
+                {
+                    "matcher": "",
+                    "hooks": [
+                        {"type": "command", "command": ups_cmd},
                     ],
                 },
             ],
