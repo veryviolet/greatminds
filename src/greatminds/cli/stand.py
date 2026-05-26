@@ -22,7 +22,11 @@ direct function imports (``create_task``, ``move_task``, ``append_block``)
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
+import uuid
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -264,6 +268,322 @@ def stand_result(task_id, result, status, commit, profile,
     )
     move_task(task_id=task_id, to_queue="stand_done", reason=reason)
     click.echo(f"recorded stand_result and moved {task_id} → stand_done")
+
+
+def _allowed_profiles() -> list[str]:
+    """0244: read ``stand.profiles_allowed`` from schema. Default to
+    the plan-documented enum if absent (defensive)."""
+    try:
+        import yaml as _yaml
+        from greatminds.core.paths import find_canon_dir
+        doc = _yaml.safe_load(
+            (find_canon_dir() / "schema.yaml").read_text(encoding="utf-8")
+        ) or {}
+    except Exception:
+        return ["full-deploy", "vite-dev", "smoke-only"]
+    stand_doc = (doc.get("stand") or {}).get("resource") or {}
+    profiles = stand_doc.get("profiles_allowed")
+    if not isinstance(profiles, list) or not profiles:
+        return ["full-deploy", "vite-dev", "smoke-only"]
+    return [str(p) for p in profiles]
+
+
+def _holder_role() -> str:
+    """Caller's role for lease bookkeeping."""
+    role = (os.environ.get("GREATMINDS_ROLE") or "").strip().upper()
+    if not role:
+        raise GreatMindsError(
+            "stand lease requires GREATMINDS_ROLE to be set; the lease "
+            "tracks who holds the stand for inbox-info dispatch."
+        )
+    return role
+
+
+def _file_inbox_info(coord: Path, to_role: str, body: str,
+                     task_ref: str = "") -> None:
+    """0244: file an inbox info-message to ``to_role`` from STAND-KEEPER
+    (the role responsible for ``ready`` transitions). Best-effort:
+    failure does NOT block the state transition — the state file is
+    the FSM source-of-truth; inbox messages are a notification layer.
+
+    Shells out to ``greatminds inbox send`` so the journal entry +
+    heartbeat side-effects fire through the normal CLI path."""
+    try:
+        cp = subprocess.run(
+            [sys.executable, "-m", "greatminds.cli.main",
+             "inbox", "send", to_role,
+             "--kind", "info",
+             "--body", body]
+            + (["--task", task_ref] if task_ref else []),
+            cwd=str(coord.parent),
+            env={**os.environ, "GREATMINDS_ROLE": "STAND-KEEPER"},
+            capture_output=True, text=True, timeout=10,
+        )
+        if cp.returncode != 0:
+            click.echo(
+                f"  (warn) inbox-info to {to_role} failed: "
+                f"{cp.stderr.strip()[:200]}",
+                err=True,
+            )
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
+@stand.command(name="lease")
+@click.option("--task", "task_id", required=True,
+              help="product-task id this lease serves")
+@click.option("--worktree", required=True,
+              help="path to the worktree SK will deploy from")
+@click.option("--profile", required=True,
+              help="deploy profile enum (schema.stand.resource."
+                   "profiles_allowed)")
+@click.option("--ttl-seconds", type=int, default=None,
+              help="override ttl (default: schema lease.ttl_seconds_default)")
+def stand_lease(task_id: str, worktree: str, profile: str,
+                 ttl_seconds: int | None) -> None:
+    """0244 (Phase 2 of 0242): request a lease on the singleton stand.
+
+    Behavior:
+    - On state=free: transitions free→preparing(lease_id); SK picks
+      up the new lease on its next tick.
+    - On state≠free: enqueues the request; the lease becomes active
+      when SK releases the current one.
+
+    Returns the freshly-minted lease_id (UUID4) as the LAST line of
+    stdout. Callers (test scripts, agents) capture this token; only
+    the holder may release.
+    """
+    from greatminds.cli import stand_state as ss
+
+    holder = _holder_role()
+    allowed = _allowed_profiles()
+    if profile not in allowed:
+        raise GreatMindsError(
+            f"--profile {profile!r} not in schema.stand.resource."
+            f"profiles_allowed: {allowed}",
+            exit_code=2,
+        )
+
+    # Read schema's default ttl.
+    if ttl_seconds is None:
+        try:
+            import yaml as _yaml
+            from greatminds.core.paths import find_canon_dir
+            doc = _yaml.safe_load(
+                (find_canon_dir() / "schema.yaml").read_text(
+                    encoding="utf-8")) or {}
+            lease_cfg = ((doc.get("stand") or {}).get("resource") or {}
+                         ).get("lease") or {}
+            ttl_seconds = int(lease_cfg.get("ttl_seconds_default") or 14400)
+        except Exception:
+            ttl_seconds = 14400
+
+    new_lease_id = uuid.uuid4().hex
+    coord = find_coord_dir()
+
+    def mutator(state):
+        lease_obj = {
+            "lease_id": new_lease_id,
+            "task": task_id,
+            "worktree": worktree,
+            "profile": profile,
+            "holder_role": holder,
+            "ttl_seconds": ttl_seconds,
+            "enqueued_at": ss.now_iso(),
+        }
+        if state.get("state") == "free":
+            lease_obj["granted_at"] = ss.now_iso()
+            lease_obj["ready_at"] = None
+            state["active_lease"] = lease_obj
+            ss.record_transition(
+                state, "free", "preparing", holder,
+                lease_id=new_lease_id,
+                reason=f"lease for {task_id} ({profile})",
+            )
+        elif state.get("state") in ("preparing", "ready", "down"):
+            queue = state.get("queue") or []
+            queue.append(lease_obj)
+            state["queue"] = queue
+
+    ss.update_stand_state(coord, mutator)
+    click.echo(f"lease_id: {new_lease_id}")
+
+
+@stand.command(name="release")
+@click.option("--lease-id", "lease_id", required=True,
+              help="lease_id token returned by `stand lease`")
+@click.option("--result", required=True,
+              type=click.Choice(["pass", "fail", "partial"]),
+              help="machine-readable resolution status (NOT a report)")
+def stand_release(lease_id: str, result: str) -> None:
+    """0244: release the active lease. Transitions ready→free; SK
+    pops the next FIFO queue entry for the next lease.
+
+    Only the holder may release. The CLI rejects with exit_code=3 if
+    ``--lease-id`` doesn't match the current active lease. Result is
+    a CLOSED ENUM (pass/fail/partial) — no prose channel; TESTER's
+    observations live exclusively in the product-task's tests block.
+
+    If the holder mismatches but the lease_id is in the queue, the
+    requester is cancelling a pending request (state file removes
+    the queue entry; no state transition).
+    """
+    from greatminds.cli import stand_state as ss
+    coord = find_coord_dir()
+
+    holder = _holder_role()
+
+    captured: dict[str, Any] = {}
+
+    def mutator(state):
+        active = state.get("active_lease") or {}
+        if active and active.get("lease_id") == lease_id:
+            if active.get("holder_role") != holder:
+                raise GreatMindsError(
+                    f"lease {lease_id} held by "
+                    f"{active.get('holder_role')!r}; only the holder "
+                    f"may release",
+                    exit_code=3,
+                )
+            captured["task"] = active.get("task")
+            captured["was_active"] = True
+            state["active_lease"] = None
+            ss.record_transition(
+                state, state.get("state") or "ready", "free",
+                holder, lease_id=lease_id,
+                reason=f"release ({result})",
+            )
+            return
+        # Look in queue — cancellation case.
+        queue = state.get("queue") or []
+        new_queue = []
+        cancelled = False
+        for entry in queue:
+            if isinstance(entry, dict) and entry.get("lease_id") == lease_id:
+                if entry.get("holder_role") != holder:
+                    raise GreatMindsError(
+                        f"queued lease {lease_id} held by "
+                        f"{entry.get('holder_role')!r}; only the holder "
+                        f"may cancel",
+                        exit_code=3,
+                    )
+                cancelled = True
+                continue
+            new_queue.append(entry)
+        if cancelled:
+            state["queue"] = new_queue
+            captured["was_cancelled"] = True
+        else:
+            raise GreatMindsError(
+                f"lease {lease_id} not found (not active, not queued)",
+                exit_code=2,
+            )
+
+    ss.update_stand_state(coord, mutator)
+    if captured.get("was_active"):
+        click.echo(f"released lease {lease_id} (result={result})")
+    elif captured.get("was_cancelled"):
+        click.echo(f"cancelled queued lease {lease_id}")
+
+
+@stand.command(name="down")
+@click.option("--reason", required=True,
+              help="operational reason logged in state file")
+def stand_down(reason: str) -> None:
+    """0244: SK-only. Mark the stand DOWN (failed deploy / infra
+    incident). Halts queue processing until `stand up`."""
+    from greatminds.cli import stand_state as ss
+    role = (os.environ.get("GREATMINDS_ROLE") or "").upper()
+    if role != "STAND-KEEPER":
+        raise GreatMindsError(
+            "only STAND-KEEPER may transition state to down",
+            exit_code=3,
+        )
+    coord = find_coord_dir()
+
+    def mutator(state):
+        prev = state.get("state") or "free"
+        state["down_reason"] = reason
+        ss.record_transition(state, prev, "down", role, reason=reason)
+
+    ss.update_stand_state(coord, mutator)
+    click.echo(f"state → down: {reason}")
+
+
+@stand.command(name="up")
+@click.option("--reason", required=True, help="resolution note")
+def stand_up(reason: str) -> None:
+    """0244: SK-only. Transition down→free; resumes queue processing
+    on SK's next tick."""
+    from greatminds.cli import stand_state as ss
+    role = (os.environ.get("GREATMINDS_ROLE") or "").upper()
+    if role != "STAND-KEEPER":
+        raise GreatMindsError(
+            "only STAND-KEEPER may transition state out of down",
+            exit_code=3,
+        )
+    coord = find_coord_dir()
+
+    def mutator(state):
+        if state.get("state") != "down":
+            raise GreatMindsError(
+                f"stand up requires state=down; current state="
+                f"{state.get('state')!r}",
+                exit_code=2,
+            )
+        state["down_reason"] = None
+        ss.record_transition(state, "down", "free", role, reason=reason)
+
+    ss.update_stand_state(coord, mutator)
+    click.echo(f"state → free: {reason}")
+
+
+@stand.command(name="ready")
+@click.option("--lease-id", "lease_id", required=True,
+              help="lease that just finished preparing")
+def stand_ready(lease_id: str) -> None:
+    """0244: SK-only. Transition preparing→ready for ``lease_id``
+    after deploy + smoke succeeds. Files an inbox-info to the lease
+    holder so they wake up and start probing the stand."""
+    from greatminds.cli import stand_state as ss
+    role = (os.environ.get("GREATMINDS_ROLE") or "").upper()
+    if role != "STAND-KEEPER":
+        raise GreatMindsError(
+            "only STAND-KEEPER may transition state to ready",
+            exit_code=3,
+        )
+    coord = find_coord_dir()
+    captured: dict[str, str] = {}
+
+    def mutator(state):
+        if state.get("state") != "preparing":
+            raise GreatMindsError(
+                f"stand ready requires state=preparing; current="
+                f"{state.get('state')!r}",
+                exit_code=2,
+            )
+        active = state.get("active_lease") or {}
+        if active.get("lease_id") != lease_id:
+            raise GreatMindsError(
+                f"active lease is {active.get('lease_id')!r}, not "
+                f"{lease_id!r}",
+                exit_code=3,
+            )
+        active["ready_at"] = ss.now_iso()
+        captured["holder"] = active.get("holder_role", "")
+        captured["task"] = active.get("task", "")
+        ss.record_transition(state, "preparing", "ready", role,
+                              lease_id=lease_id, reason="deploy ok")
+
+    ss.update_stand_state(coord, mutator)
+    if captured.get("holder"):
+        _file_inbox_info(
+            coord, captured["holder"],
+            f"stand lease {lease_id} ready; "
+            f"task={captured.get('task', '?')}",
+            task_ref=captured.get("task", ""),
+        )
+    click.echo(f"state → ready (lease {lease_id})")
 
 
 @stand.command(name="status")
