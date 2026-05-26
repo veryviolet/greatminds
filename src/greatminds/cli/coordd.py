@@ -161,6 +161,10 @@ class _InotifyWatcher:
         self._inotify = INotify()
         self._flags = flags.CREATE | flags.MOVED_TO | flags.CLOSE_WRITE
         self._verbose = verbose
+        # 0204: map watch-descriptor → queue-name so the main loop can
+        # tell which queue an event came from (the event itself only
+        # carries the watched dir's wd + the filename).
+        self._wd_to_queue: dict[int, str] = {}
         self._add_initial_watches(coord)
 
     def _add_initial_watches(self, coord: Path) -> None:
@@ -169,7 +173,8 @@ class _InotifyWatcher:
             if not d.is_dir():
                 continue
             try:
-                self._inotify.add_watch(str(d), self._flags)
+                wd = self._inotify.add_watch(str(d), self._flags)
+                self._wd_to_queue[wd] = sub
             except OSError:
                 # Watch budget exhausted, dir gone mid-init, etc.
                 # Soft-degrade: skip this dir; polling still covers it.
@@ -181,9 +186,22 @@ class _InotifyWatcher:
                     if not role_dir.is_dir():
                         continue
                     try:
-                        self._inotify.add_watch(str(role_dir), self._flags)
+                        wd = self._inotify.add_watch(
+                            str(role_dir), self._flags,
+                        )
+                        # Inbox subdirs are inbox-side per-role; tag
+                        # them as ``inbox`` so the dispatcher knows
+                        # to route via the inbox-scan path (not the
+                        # 0204 queue-owner routing).
+                        self._wd_to_queue[wd] = "inbox"
                     except OSError:
                         pass
+
+    def queue_for(self, wd: int) -> str | None:
+        """0204: which queue (or ``inbox``) does this watch-descriptor
+        belong to. Used by the main loop to dispatch queue events to
+        owning roles via schema.queues lookup."""
+        return self._wd_to_queue.get(wd)
 
     def read_or_timeout(self, timeout_s: float) -> list:
         """Block up to ``timeout_s`` seconds. Return the (possibly
@@ -612,6 +630,153 @@ def _window_for_role(coord_yaml: dict, role_upper: str) -> str | None:
 # few seconds. Coalesces to one nudge per ``event_wake.tmux_send_keys.
 # rate_limit_seconds`` window.
 _LAST_TMUX_NUDGE: dict[str, float] = {}
+
+
+def _owning_role_for_queue(canon_dir: Path, queue: str) -> str | None:
+    """0204: resolve the owner role for a queue per schema.
+
+    Reads ``schema.queues[<queue>].owner`` — the role that owns the
+    queue's content and claims from it. Returns the owner's role name
+    in upper-case (matching $GREATMINDS_ROLE conventions) or None
+    when the queue isn't in schema (test fixtures, future queues
+    without canon entries).
+    """
+    try:
+        schema = load_schema_roles.__globals__.get("yaml")
+        if schema is None:
+            import yaml as schema
+        doc = schema.safe_load(
+            (canon_dir / "schema.yaml").read_text(encoding="utf-8")
+        ) or {}
+    except Exception:
+        return None
+    q = (doc.get("queues") or {}).get(queue) or {}
+    owner = q.get("owner")
+    if not isinstance(owner, str) or not owner.strip():
+        return None
+    return owner.strip().upper()
+
+
+def _route_queue_event(coord: Path, canon_dir: Path,
+                       queue: str, filename: str, verbose: bool) -> bool:
+    """0204: wake the owning role of ``queue`` when a file lands there.
+
+    Pre-0204 coordd only reacted directly to ``inbox/<role>/*``
+    events; non-inbox queue landings (a task moved into feature_dev,
+    a stand request filed, a review session opened) reached the
+    owning role only indirectly via notify_from_journal writing a
+    wake-*.md into the inbox AFTER the journal got the entry. EXPLORER
+    (review_session 0140) measured 2s+ latency for that path.
+
+    Now: a file landing in any watched non-inbox queue directly
+    triggers the schema.event_wake mechanism for the owning role.
+    notify_from_journal still runs as before (Step 1 of the loop)
+    so the inbox path remains for cross-role messaging; this hook
+    is the direct route.
+
+    Returns True if a wake was dispatched, False otherwise.
+    """
+    # Ignore inbox events here — those have their own routing.
+    if queue == "inbox":
+        return False
+    # Filter file types: only .yaml / .md (task/inbox files). Atomic-
+    # mv staging files (.tmp.*, dot-prefixed) are noise.
+    if not (filename.endswith(".yaml") or filename.endswith(".md")):
+        return False
+    if filename.startswith(".") or filename.startswith("_TEMPLATE"):
+        return False
+
+    owner = _owning_role_for_queue(canon_dir, queue)
+    if owner is None:
+        return False
+
+    # 0152 self-wake suppression: if the actor that just landed this
+    # file IS the owner (e.g. PLANNER files a task into feature_inbox
+    # they themselves own), the owner doesn't need to be woken — they
+    # JUST did the work. The actor of the most recent journal entry
+    # naming this filename is a robust signal.
+    actor = _last_journal_actor_for(coord, filename)
+    if actor and actor.upper() == owner.upper():
+        if verbose:
+            print(
+                f"  0204: skip self-wake for {owner} (actor of "
+                f"{queue}/{filename})",
+                file=sys.stderr,
+            )
+        return False
+
+    # Apply per-tool wake mechanism from schema.event_wake.by_tool
+    # (the 0186 framework).
+    project_dir = coord.parent
+    coord_yaml_doc = _read_coord_yaml(project_dir)
+    located = _window_and_tool_for_role(coord_yaml_doc, owner)
+    tool = (located[1] if located else "").lower()
+    mechanism = _wake_mechanism_for_tool(tool)
+    if mechanism == "sigint_deepest_descendant":
+        sigint_sleeping_descendant(coord, owner, verbose)
+        if verbose:
+            print(
+                f"  0204: woke {owner} (SIGINT) for "
+                f"{queue}/{filename}",
+                file=sys.stderr,
+            )
+        return True
+    if mechanism == "tmux_send_keys":
+        tmux_send_keys_wake(coord, owner, verbose)
+        if verbose:
+            print(
+                f"  0204: woke {owner} (tmux send-keys) for "
+                f"{queue}/{filename}",
+                file=sys.stderr,
+            )
+        return True
+    if verbose:
+        print(
+            f"  0204: no wake mechanism for tool={tool!r} "
+            f"(role={owner}); deliver-only on {queue}/{filename}",
+            file=sys.stderr,
+        )
+    return False
+
+
+def _last_journal_actor_for(coord: Path, filename: str) -> str | None:
+    """0204 helper: return the most recent journal entry's actor for
+    the given task file (matched by id-prefix in the journal's
+    ``task`` field), or None if no recent entry mentions it.
+
+    The journal is append-only NDJSON; we scan the last ~50 entries
+    so a hot loop never reads the whole file. Filename → task id by
+    stripping the suffix; entries match if their ``task`` field is a
+    prefix of the stem (handles both short-id and full-slug forms)."""
+    import json as _json
+    journal = coord / "journal.ndjson"
+    if not journal.is_file():
+        return None
+    stem = filename.rsplit(".", 1)[0]
+    try:
+        # Read last ~16KB which is enough for ~50 entries.
+        size = journal.stat().st_size
+        with journal.open("rb") as f:
+            if size > 16384:
+                f.seek(size - 16384)
+                f.readline()  # drop partial first line
+            tail = f.read().decode("utf-8", errors="replace")
+        # Scan recent → old.
+        for line in reversed(tail.splitlines()):
+            try:
+                entry = _json.loads(line)
+            except _json.JSONDecodeError:
+                continue
+            task = entry.get("task") or ""
+            if not task:
+                continue
+            if stem == task or stem.startswith(f"{task}-") \
+               or task.startswith(stem) or task == stem[:4]:
+                actor = entry.get("actor") or ""
+                return actor.strip() if isinstance(actor, str) else None
+    except OSError:
+        return None
+    return None
 
 
 def _load_auto_update_config(canon_dir: Path) -> dict:
@@ -1213,7 +1378,31 @@ def coordd(project_dir: Path | None, project_name: str | None,
     known: set[str] = set(baseline)
     while not stop["flag"]:
         try:
-            poll_or_event_wait(interval)
+            events = poll_or_event_wait(interval) or []
+
+            # 0204: route non-inbox queue events directly to owning
+            # roles. Pre-0204 a file landing in feature_inbox / stand_
+            # requests / review_sessions was only seen by the owning
+            # role indirectly via notify_from_journal → inbox/wake.
+            # Now the inotify event triggers schema.event_wake directly
+            # so reaction latency drops from ~2s to sub-second. The
+            # inbox path stays for cross-role messaging — see Step 2.
+            if inotify_watcher is not None:
+                for ev in events:
+                    queue = inotify_watcher.queue_for(ev.wd)
+                    if queue is None or queue == "inbox":
+                        continue
+                    try:
+                        _route_queue_event(
+                            coord, canon_dir, queue,
+                            ev.name, verbose,
+                        )
+                    except Exception as exc:
+                        if verbose:
+                            print(
+                                f"coordd: 0204 route_queue_event "
+                                f"error: {exc}", file=sys.stderr,
+                            )
 
             # Step 1: run notify_from_journal — writes inbox messages for any
             # new journal lines. Idempotent (state file tracks last offset).
