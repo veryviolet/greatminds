@@ -104,6 +104,23 @@ queues:
   # stand_done queues REMOVED. The lease-based singleton stand
   # resource (schema.stand.resource + .stand/state.yaml) replaces
   # the three-queue model. See 0242 for the full design rationale.
+  #
+  # 0269: ``.stand`` is the inotify watch path for state.yaml lease
+  # lifecycle events (free → preparing → ready → released → free).
+  # It is NOT a claim-from queue — STAND-KEEPER's loop reads the
+  # state file directly via the lease API. Listing it here lets
+  # coordd's ``_owning_role_for_queue`` resolve STAND-KEEPER as the
+  # role to wake when state.yaml changes, so a lease acquired by
+  # TESTER lands on SK's pane in <1s instead of waiting for SK's
+  # next ScheduleWakeup tick (up to 600s).
+  .stand:
+    owner: STAND-KEEPER
+    writers: [STAND-KEEPER, TESTER, ARCHITECT-PLANNER, MAINTAINER]
+    kind: state
+    description: |
+      Singleton stand resource state.yaml + lease bookkeeping.
+      coordd watches this dir to wake STAND-KEEPER on lease lifecycle
+      events. Not a claim-from queue — no tasks live here.
   bot_inbox:
     owner: BOT-DEVELOPER
     writers: [BOT-USER]
