@@ -850,3 +850,26 @@ plugins:
   codex_marketplace:
     TECHNICAL-WRITER: []
     EXPLORER:         []
+
+# 0191: Claude Code auto-mode permissions for claude-host roles.
+#
+# /loop REVIEWER (and any other claude-host role that needs to run
+# destructive git ops) cannot do `git commit/tag/push/merge` without
+# an explicit allow rule — Claude Code's auto-mode classifier blocks
+# destructive Bash by default, and a /loop session has no operator to
+# answer an AskUserQuestion prompt. `greatminds setup` writes/extends
+# `<project>/.claude/settings.local.json` with these rules per the
+# structured-config-first directive. Operator may extend per-project
+# by editing settings.local.json directly; setup merges via union,
+# never overwriting existing operator entries.
+claude_settings:
+  permissions:
+    allow:
+      - "Bash(git add:*)"
+      - "Bash(git commit:*)"
+      - "Bash(git tag:*)"
+      - "Bash(git push:*)"
+      - "Bash(git merge:*)"
+      - "Bash(git worktree:*)"
+      - "Bash(git checkout:*)"
+      - "Bash(git branch:*)"

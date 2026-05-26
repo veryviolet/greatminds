@@ -84,20 +84,46 @@ def _greatminds_bin() -> str:
     return f"{sys.executable} -m greatminds.cli.main"
 
 
-def _build_settings_local_json(project_dir: Path) -> str:
+def _load_claude_settings_allow_from_canon(canon: Path) -> list[str]:
+    """0191: read ``claude_settings.permissions.allow`` from schema.yaml.
+
+    Returns the canonical list of Bash allow-rules that /loop claude-
+    host roles need (git ops, etc.). Empty list if schema is missing
+    the section — callers add nothing but the Stop hook in that case.
+    """
+    import yaml
+    schema_path = canon / "schema.yaml"
+    if not schema_path.is_file():
+        return []
+    try:
+        doc = yaml.safe_load(schema_path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        return []
+    cs = doc.get("claude_settings") or {}
+    allow = ((cs.get("permissions") or {}).get("allow") or [])
+    return [str(x) for x in allow if isinstance(x, str)]
+
+
+def _build_settings_local_json(project_dir: Path,
+                                canon: Path | None = None) -> str:
     """Return the JSON text for ``.claude/settings.local.json``.
 
     Every hook command begins with an absolute reference to greatminds
     (path or ``python -m`` fallback) so the file is portable across
-    claude sessions regardless of PATH.
+    claude sessions regardless of PATH. The ``permissions.allow`` list
+    comes from schema's ``claude_settings:`` section so /loop roles
+    can do git ops without operator approval (0191).
     """
     gm_bin = _greatminds_bin()
     stop_cmd = (
         f'{gm_bin} stop-decide "${{GREATMINDS_ROLE:-UNKNOWN}}" '
         f'--host claude --project-dir {project_dir}'
     )
+    allow: list[str] = []
+    if canon is not None:
+        allow = _load_claude_settings_allow_from_canon(canon)
     settings = {
-        "permissions": {"allow": []},
+        "permissions": {"allow": allow},
         "autoMode": {"allow": ["$defaults"]},
         "hooks": {
             "Stop": [
@@ -111,6 +137,69 @@ def _build_settings_local_json(project_dir: Path) -> str:
         },
     }
     return json.dumps(settings, indent=2) + "\n"
+
+
+def _ensure_claude_settings_local(project_dir: Path, canon: Path) -> str:
+    """0191: write or extend ``<project>/.claude/settings.local.json``.
+
+    Three cases:
+    1. File missing → write from template (Stop hook + schema's allow
+       list + ``autoMode.allow: ["$defaults"]``).
+    2. File present, valid JSON → union ``permissions.allow`` with
+       schema's allow (dedup, preserve operator's existing rules),
+       leave ``autoMode``, ``hooks``, and any other top-level keys
+       UNTOUCHED. Operator's customizations survive setup re-runs.
+    3. File present but unreadable (corrupt JSON, IO error) → leave
+       it alone, log "could not parse"; the operator owns the file.
+
+    Returns a one-word status string for the setup summary line:
+    ``"written"`` | ``"extended"`` | ``"unchanged"`` | ``"unreadable"``.
+    """
+    cclaude = project_dir / ".claude"
+    cclaude.mkdir(parents=True, exist_ok=True)
+    target = cclaude / "settings.local.json"
+
+    if not target.is_file():
+        target.write_text(
+            _build_settings_local_json(project_dir, canon=canon),
+            encoding="utf-8",
+        )
+        return "written"
+
+    try:
+        existing = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return "unreadable"
+    if not isinstance(existing, dict):
+        return "unreadable"
+
+    canonical_allow = _load_claude_settings_allow_from_canon(canon)
+    if not canonical_allow:
+        return "unchanged"
+
+    perms = existing.setdefault("permissions", {})
+    if not isinstance(perms, dict):
+        perms = {}
+        existing["permissions"] = perms
+    current_allow = perms.get("allow")
+    if not isinstance(current_allow, list):
+        current_allow = []
+    before = list(current_allow)
+    seen = set(str(x) for x in current_allow if isinstance(x, str))
+    added = False
+    for rule in canonical_allow:
+        if rule not in seen:
+            current_allow.append(rule)
+            seen.add(rule)
+            added = True
+    if not added:
+        return "unchanged"
+    perms["allow"] = current_allow
+    target.write_text(
+        json.dumps(existing, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return "extended"
 
 
 QUEUES = [
@@ -812,15 +901,11 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     else:
         info("  PROJECT.env.example: exists")
 
-    # .claude/settings.local.json — Stop hook for Claude Code integration
-    cclaude = project_dir / ".claude"
-    _ensure_dir(cclaude)
-    sl = cclaude / "settings.local.json"
-    if not sl.is_file():
-        sl.write_text(_build_settings_local_json(project_dir), encoding="utf-8")
-        info("  .claude/settings.local.json: written")
-    else:
-        info("  .claude/settings.local.json: exists")
+    # .claude/settings.local.json — Stop hook + schema's claude_settings
+    # permissions.allow rules (0191). Merge-on-existing preserves any
+    # operator-added rules + hook entries.
+    status = _ensure_claude_settings_local(project_dir, canon)
+    info(f"  .claude/settings.local.json: {status}")
 
     # Codex per-role homes (task 0158, supersedes 0047) — install
     # shipped profiles into ``<project>/coordination/.codex-home/<role>/
