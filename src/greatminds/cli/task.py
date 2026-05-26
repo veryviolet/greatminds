@@ -1245,6 +1245,13 @@ SCHEMA_REQUIRES_VALIDATORS: dict[str, "callable"] = {
     "scope_ui": _noop_existing,
     "scope_docs": _noop_existing,
     "plan.audit_only": _noop_existing,
+    # 0225 doc: implementation_block / tests_block names appear in
+    # ``feature_plan → feature_dev`` and ``feature_dev → feature_test``
+    # requires but the named block doesn't exist yet at mv time (it
+    # lands AFTER, in the destination queue). Real enforcement is owned
+    # by require_target_readiness(): it rejects both missing required
+    # blocks on exits that need them and false/missing ready_for_* flags
+    # on the prior block. Documentary here.
     "implementation_block": _noop_existing,
     "tests_block": _noop_existing,
     "tests_block_fail_or_partial": _noop_existing,
