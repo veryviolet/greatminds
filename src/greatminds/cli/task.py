@@ -943,9 +943,32 @@ def _evaluate_gate_check(task_data: dict[str, Any]) -> str:
     except Exception:
         pass
 
-    candidates = gc_mod.find_stand_evidence(project_dir, str(task_id_full))
-    if not candidates:
-        return "missing"
+    # 0268 / 0246: prefer lease evidence carried on the tests block
+    # (post-1.3.0 path) and fall back to the legacy stand_done/ scan
+    # only for tasks shipped before the lease API. ``find_stand_evidence``
+    # reads ``coordination/stand_done/`` which is empty for fresh fleets
+    # (0247 BREAKING removed the queue model), so without this branch
+    # every well-formed post-1.3.0 task would short-circuit to "missing"
+    # and block the feature_test → feature_review mv.
+    #
+    # ``extract_lease_evidence_from_tests`` consumes the merged
+    # ``parse_task_file`` shape (latest tests block lifted to
+    # ``merged['tests']``); validator data carries the raw blocks list,
+    # so we wrap the latest tests block in that shape.
+    tests_blocks = [b for b in (task_data.get("blocks") or [])
+                    if isinstance(b, dict) and b.get("kind") == "tests"]
+    latest_tests = tests_blocks[-1] if tests_blocks else None
+    lease_evidence = gc_mod.extract_lease_evidence_from_tests(
+        {"tests": latest_tests} if latest_tests else {}
+    )
+    if lease_evidence is not None:
+        synth_path = type("SyntheticPath", (),
+                          {"name": "tests.stand_evidence"})()
+        candidates: list[tuple[Any, dict]] = [(synth_path, lease_evidence)]
+    else:
+        candidates = gc_mod.find_stand_evidence(project_dir, str(task_id_full))
+        if not candidates:
+            return "missing"
 
     # Replicate gate_check.gate_check()'s pass/fail logic on the merged
     # task data we already have in-hand (no need to re-parse the task
