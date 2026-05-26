@@ -4,6 +4,52 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.3.1 — 2026-05-26
+
+Emergency cut. Single fix: 0259 — coordd's chat-mode inotify wake
+now reaches the claude TUI input handler.
+
+§9.1 self-blocker carve-out: the fix's deployment IS the
+verification mechanism (gate_check on 0259 was irreducibly blocked
+because SK couldn't deploy 0259 to verify itself — the broken wake
+channel was the verification channel). Same pattern as the 1.2.6
+cut. Empirical evidence recorded inline in 0259's tests block:
+direct press_enter probe on READER returned `ok=True` with
+input_sock channel + leaf SIGINT; end-to-end probe (filed
+feature_inbox/9999.yaml → coordd inotify → press_enter →
+input_sock → SIGINT to PLANNER's own Bash subprocess exit 130)
+confirms the full chain.
+
+### Fixed
+
+- **0259 coordd inotify wake uses `input_sock` via `press_enter`.**
+  Pre-0259, coordd's chat-mode wake (`tmux_send_keys_wake`) sent
+  bracketed-paste text + Enter via `tmux send-keys`, but the TUI
+  input handler on claude panes intermittently never received the
+  submit (visible prompt, no turn-fire). Replaced with
+  `press_enter` writing the wake payload to the role's
+  pty-tracked `input_sock` and SIGINTing the leaf=node descendant
+  — same channel that DEV/OPERATOR keystrokes flow through.
+- **`_send_enter.py` alignment with `coordd.WAKE_*` constants
+  (PLANNER follow-up).** `_WAKE_GAP_S` 0.2 → 0.35 (mirrors
+  `coordd.WAKE_GAP_SECONDS`, production-proven via
+  `push_to_role`). `_KEY_TO_BYTES['Enter']` `b'\r'` → `b'\r\n'`
+  (mirrors `coordd.WAKE_ENTER` CRLF; bare CR fails claude TUI
+  submit detection intermittently).
+
+### Removed
+
+- **`coordd.tmux_send_keys_wake` function** and its
+  `_LAST_TMUX_NUDGE` rate-limit table + `_read_event_wake_schema`
+  helper. All chat-mode wakes now flow through `press_enter`.
+
+### Upgrade
+
+```bash
+pip install --upgrade greatminds==1.3.1
+greatminds restart --bootstrap
+```
+
 ## 1.3.0 — 2026-05-26
 
 **BREAKING.** Stand-stream redesign: the legacy three-queue model
