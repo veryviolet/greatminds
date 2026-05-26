@@ -1,8 +1,9 @@
 # Profile: developer
 # Usage: codex exec --profile developer "<prompt>"
-# Copied to ~/.codex/developer.config.toml by `greatminds setup` and
-# picked up automatically by start_agent.py (--profile developer) when
-# the role is launched on codex.
+# Copied to coordination/.codex-home/developer/config.toml by
+# `greatminds setup`; start_agent.py launches codex with
+# CODEX_HOME=<project>/coordination/.codex-home/developer and
+# --profile developer.
 
 developer_instructions = """
 ## Mandatory tick heartbeat

@@ -1,7 +1,9 @@
 # Profile: tester
 # Usage: codex exec --profile tester "<prompt>"
-# Copied to ~/.codex/tester.config.toml by `greatminds setup` and
-# picked up automatically by start_agent.py when the role is on codex.
+# Copied to coordination/.codex-home/tester/config.toml by
+# `greatminds setup`; start_agent.py launches codex with
+# CODEX_HOME=<project>/coordination/.codex-home/tester and
+# --profile tester.
 
 developer_instructions = """
 ## Mandatory tick heartbeat

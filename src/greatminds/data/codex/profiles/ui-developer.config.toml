@@ -1,7 +1,9 @@
 # Profile: ui-developer
 # Usage: codex exec --profile ui-developer "<prompt>"
-# Copied to ~/.codex/ui-developer.config.toml by `greatminds setup` and
-# picked up automatically by start_agent.py when the role is on codex.
+# Copied to coordination/.codex-home/ui-developer/config.toml by
+# `greatminds setup`; start_agent.py launches codex with
+# CODEX_HOME=<project>/coordination/.codex-home/ui-developer and
+# --profile ui-developer.
 
 developer_instructions = """
 ## Mandatory tick heartbeat

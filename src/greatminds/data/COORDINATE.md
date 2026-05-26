@@ -364,12 +364,26 @@ Each task gets its own working tree under
 `<project_dir>/.worktrees/<task-id>/` on branch `task/<task-id>`.
 Implementers + TESTER `cd "$(greatminds worktree path <task-id>)"`
 before editing/testing — the CLI resolves the path from schema
-policy. The worktree is auto-created by `greatminds task mv ...
-feature_dev` (or `feature_ui_dev` / `feature_docs`) and merged into
-`main` by `greatminds task mv ... verified` (REVIEWER). STAND-KEEPER
-rsyncs the worktree (not the main project tree) when a stand_request
-carries `evidence_for: [<task-id>]`. Policy lives in `schema.yaml >
-worktrees:`. Before cutting the 1.2.x → 1.3 release, MAINTAINER runs
+policy.
+
+Lifecycle:
+
+- `greatminds task mv ... feature_dev|feature_ui_dev|feature_docs`
+  creates the per-task worktree.
+- The implementer works from `.worktrees/<task-id>/`, so unrelated
+  tasks cannot contaminate the main checkout or each other's working
+  trees.
+- `greatminds task mv ... verified` by REVIEWER merges the task branch
+  back with `--no-ff`, preserving an explicit task boundary in git
+  history.
+- `greatminds task mv ... archive` removes the task worktree.
+
+This replaces the 0115/0166 file-lock model. Lock-release handling from
+0166 is obsolete; operators should look in `.worktrees/` for in-flight
+code instead of looking for lock files. STAND-KEEPER rsyncs the worktree
+(not the main project tree) when a stand_request carries
+`evidence_for: [<task-id>]`. Policy lives in `schema.yaml > worktrees:`.
+Before cutting the 1.2.x → 1.3 release, MAINTAINER runs
 `greatminds worktree assert-drained` to confirm no in-flight tasks
 straddle the lock-era → worktree-era boundary.
 
@@ -473,16 +487,18 @@ role is launched on:
   Skill content is auto-invoked by Claude based on description-keyword
   match in the agent's working context.
 - **Codex** — codex CLI has no `--plugin-dir` equivalent. The
-  equivalent path is the codex **profile** mechanism: each role-on-codex
-  reads `~/.codex/<role-lower>.config.toml`'s `instructions = """..."""`
-  block at session start. `greatminds setup` (task 0047) copies the
-  shipped per-role profiles from `<canon>/codex/profiles/*.config.toml`
-  to `~/.codex/<role>.config.toml` on first run (idempotent: existing
-  user-customized files are preserved). `greatminds start-agent <ROLE>
-  codex` then adds `--profile <role-lower>` when the file is
-  present. The profile body summarizes the role contract — it's not a
-  full SKILL-format auto-invoke, but it brings the role-specific
-  procedural posture into every codex session.
+  equivalent path is the codex **profile** mechanism: `greatminds setup`
+  creates one per-role Codex home at
+  `coordination/.codex-home/<role>/config.toml`, copied from
+  `<canon>/codex/profiles/*.config.toml`. Each generated config contains
+  `developer_instructions = """..."""` plus `[profiles.<role>]` with the
+  model, approval, and sandbox settings. `greatminds start-agent <ROLE>
+  codex` launches with `CODEX_HOME=<project>/coordination/.codex-home/<role>`
+  and `--profile <role-lower>`, so codex reads that role-local
+  `$CODEX_HOME/config.toml`; the old user-home per-role profile files
+  are not part of the launch path. The profile body summarizes the role
+  contract — it's not a full SKILL-format auto-invoke, but it brings the
+  role-specific procedural posture into every codex session.
 - **Cursor** — currently no per-role plugin/profile mechanism is
   wired; cursor roles get the bootstrap prompt only (which already
   contains the full role brief rendered from `<role>.md`).
