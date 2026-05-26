@@ -139,6 +139,12 @@ INOTIFY_QUEUE_DIRS: tuple[str, ...] = (
     "stand_wip",
     "stand_done",
     "review_sessions",
+    # 0245 (0242c / Phase 3 of 0242): SK polls the singleton stand
+    # resource state via inotify on ``coordination/.stand/`` so
+    # state transitions (lease grants, releases, down events) wake
+    # the daemon sub-second instead of waiting for the next poll
+    # tick.
+    ".stand",
 )
 
 

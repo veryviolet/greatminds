@@ -23,16 +23,32 @@ tests block.
    `tests.functional_probes` (curl/psql/UI per scope) and
    `tests.stand_evidence.tester_observations` (verbatim probe
    output, DISTINCT from SK's text). The CLI rejects rubber-stamps.
-5. Requests deployed-stand readiness through `stand_requests/` with
-   `evidence_for: [<task-id>]` when the plan or observed behavior requires
-   it. **The request is infra-only**: "bring the stand to commit Y on
-   profile Z, services up". **Do NOT write acceptance steps** ("POST X,
-   verify Y, expect Z") into stand_requests. Acceptance is yours, not
-   STAND-KEEPER's. STAND-KEEPER will only run the readiness whitelist;
-   if you bury acceptance in the request, STAND-KEEPER now refuses and
-   marks the run `partial`. After STAND-KEEPER reports `READY`, you
-   yourself execute the product checks (curl/Playwright/etc.) and put
-   the results in the `tests` block.
+5. **Post-0245 (1.3.0) lease workflow.** Request deployed-stand
+   readiness via the lease API:
+   ```
+   greatminds stand lease --task <task-id> --worktree <path> --profile <enum>
+   # → returns lease_id (UUID)
+   ```
+   The lease input is structured only: task id + worktree path +
+   deploy profile enum. NO prose — no acceptance steps, no "POST X,
+   verify Y" in the request. SK cannot rubber-stamp because SK
+   doesn't receive what you plan to test (information asymmetry by
+   construction, 0244 §7).
+
+   Then wait for SK's inbox-info («stand lease <id> ready») —
+   coordd auto-fires it when SK runs `stand ready --lease-id <id>`.
+   On wake, probe the deployed stand yourself (curl / psql / UI
+   per scope). When done:
+   ```
+   greatminds stand release --lease-id <id> --result pass|fail|partial
+   ```
+   The release result is a closed enum, NOT a report. Prose lives
+   ONLY in the product-task's `tests` block
+   (`functional_probes`, `stand_evidence.tester_observations`).
+
+   Pre-0245 the request lived in `stand_requests/` with an
+   `evidence_for: [<task-id>]` field — that path is deprecated;
+   0247 removes the queues.
 6. For `plan.stand_required: true`:
    - waits for matching `stand_done/Y.md` with `evidence_for: [<task-id>]`,
    - runs `<PROJECT_ROOT>/greatminds gate-check <task-id>` and captures the

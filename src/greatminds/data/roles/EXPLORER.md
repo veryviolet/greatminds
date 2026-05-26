@@ -20,16 +20,22 @@ product**, not test output or doc text.
 1. At each tick, reads `coordination/inbox/explorer/`.
 2. Reads the active `review_sessions/<id>.md`, including its `scenarios`
    and `stand_target` (host/profile/commit).
-3. Cross-checks `stand.status` against `stand_target`. If mismatched, asks
-   ARCHITECT-PLANNER via inbox or creates a `stand_requests/` with
-   `evidence_for: []` (infrastructure refresh). The stand_request must be
-   **infra-only** ("redeploy to commit X, profile Y, services up; assert
-   `git rev-parse HEAD` and `GET /health` 200"). **Do NOT write product
-   checks** into stand_requests ("admin login works", "POST /node works",
-   "POST invite delivered"). STAND-KEEPER refuses to execute POSTs; those
-   checks are yours. After `stand_done` reports `READY`, you curl auth,
-   bootstrap, login, projects, etc. yourself and record results in the
-   active `review_sessions/<id>.md` iteration.
+3. Cross-checks the singleton stand state (post-0245 lease model)
+   against `stand_target`. If mismatched:
+   ```
+   greatminds stand lease --task <session-id> --worktree <path> --profile <enum>
+   # → returns lease_id (UUID)
+   ```
+   Wait for SK's inbox-info («stand lease <id> ready»), then run
+   your behavior probes yourself (curl / browser) — SK doesn't
+   receive product-check intent (information asymmetry by
+   construction). When the iteration is done:
+   ```
+   greatminds stand release --lease-id <id> --result pass|fail|partial
+   ```
+   Record what you probed + observed in the `review_sessions/<id>.md`
+   iteration block, NOT in the lease request. Pre-0245 stand_requests/
+   was the old path; 0247 removes the queues.
 4. Walks each scenario on the live stand: opens the UI in a browser /
    exercises APIs via curl using `<UI_DEV_URLS>` / `<BACKEND_URLS>`.
 5. For each behavior deviating from expectation, creates a bug as

@@ -32,27 +32,36 @@ Profile choice comes from `target.profile` in the stand request.
 
 ## Does
 
-1. Claims the oldest stand request: `stand_requests/X -> stand_wip/X`.
-2. Records `stand.status = RESTARTING` (or appropriate transitional state)
-   before changing the stand.
-3. Performs the requested operation using the appropriate profile.
-   For stand_requests carrying `evidence_for: [<task-id>]`, the rsync
-   source is the task's worktree: `rsync .../<source>$(greatminds
-   worktree path <task-id>)/ <host>:<remote-path>/` (0185). For
-   infra-only requests with empty `evidence_for`, rsync the project
-   root as before. PROJECT.md's rsync recipe should branch on this.
-4. Runs **only** the readiness/infrastructure whitelist (see below).
-5. Records final `stand.status` (`READY | DEGRADED | DOWN | BLOCKED`).
-6. Appends a `stand_result` block with the required `evidence_for: [...]`
-   field (the product task ids this run provides evidence for; empty list
-   for infra-only ops). **0228: `observed_with_fix` records INFRA STATE
-   ONLY** (container UP at version X, smoke `/health` 200, schema
-   matches expected). NOT functional behavior — TESTER runs own
-   `functional_probes` against the prepared stand and records own
-   `tester_observations`. Rubber-stamping by TESTER (copying your
-   `observed_with_fix` verbatim) is rejected by the CLI; your job
-   ends at infra-readiness.
-7. `mv stand_wip/X stand_done/X`.
+**Post-0245 (1.3.0) lease-based workflow.** The pre-0242 three-queue
+model (`stand_requests/` / `stand_wip/` / `stand_done/`) is
+deprecated; 0247 removes the queues. New flow:
+
+1. **Watch state file.** coordd's inotify watcher (extended in
+   0245) wakes you on every transition of
+   `coordination/.stand/state.yaml`. Each tick:
+   `greatminds stand status` → check current state.
+2. **On state=preparing(lease_id):** claim the deploy. The lease
+   carries `worktree`, `profile`, `holder_role`. Perform the
+   per-profile deploy playbook (PROJECT.md, project-specific) using
+   the worktree as rsync source. Whitelist still applies for
+   readiness checks.
+3. **On deploy success:** `greatminds stand ready --lease-id <id>`.
+   - State → ready.
+   - CLI auto-fires an inbox-info to `holder_role` («stand lease
+     <id> ready»). Holder wakes + probes the stand.
+4. **On deploy failure:** `greatminds stand down --reason "<text>"`.
+   - State → down. Queue paused. Resolve infra issue, then
+     `greatminds stand up --reason "<recovery note>"` to resume.
+5. **You do NOT release the lease.** The holder (TESTER /
+   EXPLORER) runs `stand release --lease-id <id> --result <enum>`.
+   State → free; you pick up the next FIFO queue entry on the next
+   inotify tick.
+6. **Information asymmetry (0244 §7):** the lease input is
+   structured only: `task` + `worktree` + `profile`. You receive
+   NO prose about what TESTER plans to test. Your job ends at
+   infra-readiness. Functional verification is TESTER's exclusive
+   territory (their `tests.functional_probes` + `stand_evidence.
+   tester_observations`).
 
 ## Whitelist of allowed readiness checks
 
