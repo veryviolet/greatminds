@@ -873,3 +873,31 @@ claude_settings:
       - "Bash(git worktree:*)"
       - "Bash(git checkout:*)"
       - "Bash(git branch:*)"
+
+# 0192: agent-pane visual feedback.
+#
+# The CLI emits a colored one-liner to stderr at the operator-visible
+# layer (task mv, inbox send) so the agent pane carries a visible
+# trail of the major lifecycle events. NOT a log file — ephemeral
+# pane decoration only. Disable via env: GREATMINDS_VISUAL_OFF=1.
+#
+# Each event entry has:
+#   color:    name resolved by cli/_colors.py:visual_color_to_ansi()
+#   template: f-string-ish, {role} {task_id} {from_queue} {to_queue}
+#             {from_role} {to_role} {kind} {task_ref} {reason}
+visual_events:
+  claimed:
+    color: cyan
+    template: "[{role}] CLAIMED {task_id} ({from_queue} → {to_queue})"
+  finished:
+    color: green
+    template: "[{role}] FINISHED {task_id} → {to_queue}"
+  accepted:
+    color: light_green
+    template: "[{role}] ACCEPTED {task_id} → verified"
+  rejected:
+    color: bright_red
+    template: "[{role}] REJECTED {task_id} ← {from_role} ({reason})"
+  message_sent:
+    color: violet
+    template: "[{from_role}] SENT {kind} → [{to_role}] {task_ref}"

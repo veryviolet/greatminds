@@ -50,3 +50,32 @@ def fail(msg: str, exit_code: int = 1) -> None:
     the click colour scheme."""
     err(msg)
     sys.exit(exit_code)
+
+
+# 0192: schema-named colors → click fg values. New names land here so
+# schema's ``visual_events:<event>.color`` can resolve symbolically
+# without each call site building its own ANSI codes.
+_VISUAL_COLOR_MAP: dict[str, str] = {
+    "cyan":         "cyan",
+    "green":        "green",
+    "light_green":  "bright_green",
+    "bright_red":   "bright_red",
+    "violet":       "magenta",  # closest standard ANSI to violet
+    "yellow":       "yellow",
+    "blue":         "blue",
+}
+
+
+def visual(msg: str, color: str) -> None:
+    """0192: print ``msg`` to stderr in the schema-named ``color``.
+
+    Honors ``GREATMINDS_VISUAL_OFF=1`` (silent no-op) so CI / piped
+    runs / scripted tests can suppress decoration without changing
+    schema. Unknown color names fall back to cyan (still emits, so
+    operator sees the line + can edit cli/_colors.py to add the
+    name)."""
+    import os
+    if os.environ.get("GREATMINDS_VISUAL_OFF"):
+        return
+    fg = _VISUAL_COLOR_MAP.get(color, "cyan")
+    click.secho(msg, fg=fg, err=True)

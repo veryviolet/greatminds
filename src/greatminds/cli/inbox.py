@@ -181,6 +181,16 @@ def inbox_send(to, kind, task, body) -> None:
     })
     touch_heartbeat(coord, from_role)
     click.echo(f"sent {target}")
+    # 0192: visual feedback for outgoing inbox messages.
+    try:
+        from greatminds.cli.task import _emit_visual_event
+        _emit_visual_event(
+            "message_sent",
+            from_role=from_role, to_role=to_role,
+            kind=kind, task_ref=(task or ""),
+        )
+    except Exception:
+        pass
 
 
 @inbox.command(name="list")
