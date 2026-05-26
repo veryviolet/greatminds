@@ -111,6 +111,12 @@ DEAD_REPORT_INTERVAL_SEC = float(os.environ.get("COORDD_DEAD_REPORT_INTERVAL_SEC
 STALLED_SWEEP_INTERVAL_DEFAULT = 300.0   # 5 min
 STALLED_THRESHOLD_DEFAULT      = 600.0   # 10 min
 
+# 0199: PyPI version check. Defaults match schema.auto_update.
+# Operator can override per-project via env (test/dev convenience).
+AUTO_UPDATE_CHECK_INTERVAL_DEFAULT = 14400.0   # 4h
+AUTO_UPDATE_PYPI_URL = "https://pypi.org/pypi/greatminds/json"
+AUTO_UPDATE_FETCH_TIMEOUT = 10.0   # network call; never block the loop
+
 
 # 0169: queue directories whose new-file events should wake coordd's
 # main loop. Inbox is the primary one; active claim queues are added
@@ -608,6 +614,117 @@ def _window_for_role(coord_yaml: dict, role_upper: str) -> str | None:
 _LAST_TMUX_NUDGE: dict[str, float] = {}
 
 
+def _load_auto_update_config(canon_dir: Path) -> dict:
+    """0199: read ``auto_update:`` from schema.yaml.
+
+    Returns a dict with ``check_interval_seconds``, ``notify_target``,
+    ``mode``, ``source``. Missing section → defaults that match the
+    canonical 4h / MAINTAINER / notify_only / pypi values."""
+    try:
+        import yaml as _yaml
+        doc = _yaml.safe_load(
+            (canon_dir / "schema.yaml").read_text(encoding="utf-8")
+        ) or {}
+    except (OSError, Exception):
+        doc = {}
+    au = doc.get("auto_update") or {}
+    return {
+        "check_interval_seconds": float(
+            au.get("check_interval_seconds")
+            or AUTO_UPDATE_CHECK_INTERVAL_DEFAULT
+        ),
+        "notify_target": str(au.get("notify_target") or "MAINTAINER"),
+        "mode": str(au.get("mode") or "notify_only"),
+        "source": str(au.get("source") or "pypi"),
+    }
+
+
+def _installed_greatminds_version() -> str | None:
+    """0199: read installed version via importlib.metadata.
+
+    Returns None if greatminds isn't installed (e.g. running from a
+    raw source checkout without ``pip install -e .``)."""
+    try:
+        import importlib.metadata
+        return importlib.metadata.version("greatminds")
+    except Exception:
+        return None
+
+
+def _fetch_pypi_latest_version(pypi_url: str = AUTO_UPDATE_PYPI_URL,
+                                timeout: float = AUTO_UPDATE_FETCH_TIMEOUT
+                                ) -> str | None:
+    """0199: fetch latest greatminds version from PyPI JSON API.
+
+    Network call — wrap in broad try/except so PyPI being offline,
+    DNS broken, JSON malformed, etc. don't crash coordd. Returns
+    None on any failure; caller treats as "no update detected"."""
+    import json as _json
+    import urllib.error
+    import urllib.request
+    try:
+        with urllib.request.urlopen(pypi_url, timeout=timeout) as resp:
+            payload = _json.loads(resp.read().decode("utf-8"))
+        return (payload.get("info") or {}).get("version")
+    except (urllib.error.URLError, OSError, _json.JSONDecodeError,
+            ValueError):
+        return None
+
+
+def _is_newer_version(latest: str, installed: str) -> bool:
+    """0199: prefer ``packaging.version.parse`` for PEP 440 ordering.
+
+    Falls back to lexicographic compare if packaging is somehow
+    absent (shouldn't be, it's a transitive dep)."""
+    try:
+        from packaging.version import parse as _parse
+        return _parse(latest) > _parse(installed)
+    except Exception:
+        return latest > installed
+
+
+def _notify_maintainer_of_new_version(coord: Path, notify_target: str,
+                                       latest: str, installed: str,
+                                       verbose: bool) -> bool:
+    """0199: file an inbox info message to ``notify_target`` about a
+    newer greatminds version on PyPI.
+
+    Returns True on success. Best-effort: a failed send doesn't crash
+    coordd (which would defeat the whole notify-only design)."""
+    try:
+        body = (
+            f"greatminds {latest} is available on PyPI (you have "
+            f"{installed}). Run `greatminds update` when ready to "
+            f"upgrade this fleet. Release notes: "
+            f"https://pypi.org/project/greatminds/{latest}/"
+        )
+        cp = subprocess.run(
+            [
+                sys.executable, "-m", "greatminds.cli.main",
+                "inbox", "send", notify_target,
+                "--kind", "info",
+                "--body", body,
+            ],
+            cwd=str(coord.parent),
+            env={**os.environ, "GREATMINDS_ROLE": "MAINTAINER"},
+            capture_output=True, text=True, timeout=10,
+        )
+        if cp.returncode == 0:
+            return True
+        if verbose:
+            print(
+                f"coordd: auto_update notify failed: "
+                f"{(cp.stderr or '').strip()[:200]}",
+                file=sys.stderr,
+            )
+        return False
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        if verbose:
+            print(f"coordd: auto_update notify exception: {exc}",
+                  file=sys.stderr)
+        return False
+
+
 def _read_coord_yaml(project_dir: Path) -> dict | None:
     """0186: read ``<project>/coord.yaml`` to look up a role's tmux
     window + tool. Cached behavior is deliberately omitted — coord.yaml
@@ -1057,6 +1174,25 @@ def coordd(project_dir: Path | None, project_name: str | None,
             file=sys.stderr,
         )
 
+    # 0199: PyPI version auto-check. Config from schema.auto_update;
+    # cadence is independent of the polling interval. Tracks the
+    # last-notified PyPI version in process memory so a still-un-
+    # acted-upon newer release doesn't spam every check. Resets on
+    # coordd restart (intentional: a fresh process picks up the new
+    # installed version if MAINTAINER ran update meanwhile).
+    auto_update_cfg = _load_auto_update_config(canon_dir)
+    last_auto_update_check: float = 0.0
+    last_notified_version: str | None = None
+    if verbose:
+        print(
+            f"coordd: auto_update enabled "
+            f"(interval {auto_update_cfg['check_interval_seconds']:.0f}s, "
+            f"target {auto_update_cfg['notify_target']}, "
+            f"mode {auto_update_cfg['mode']}, "
+            f"source {auto_update_cfg['source']})",
+            file=sys.stderr,
+        )
+
     # 0169: inotify-driven wake. The pre-0169 main loop blocked on
     # ``time.sleep(interval)`` between scans, so reaction latency was
     # bounded below by ``interval`` (default 1.0s; minimum 0.2s). With
@@ -1235,6 +1371,38 @@ def coordd(project_dir: Path | None, project_name: str | None,
                     if verbose:
                         print(
                             f"coordd: stalled-sweep error: {exc}",
+                            file=sys.stderr,
+                        )
+
+            # Step 6: PyPI version auto-check (task 0199). Throttled
+            # by schema.auto_update.check_interval_seconds. Sends one
+            # inbox info to notify_target when a newer version is
+            # detected; doesn't re-spam until either (a) coordd
+            # restarts (operator likely ran update) or (b) PyPI
+            # publishes an even newer version. Notify-only mode —
+            # MAINTAINER decides when to actually run
+            # `greatminds update`.
+            check_interval = auto_update_cfg["check_interval_seconds"]
+            if (auto_update_cfg["source"] == "pypi"
+                and auto_update_cfg["mode"] == "notify_only"
+                and now_ts - last_auto_update_check >= check_interval):
+                last_auto_update_check = now_ts
+                try:
+                    installed = _installed_greatminds_version()
+                    latest = _fetch_pypi_latest_version()
+                    if (installed and latest
+                        and latest != last_notified_version
+                        and _is_newer_version(latest, installed)):
+                        ok = _notify_maintainer_of_new_version(
+                            coord, auto_update_cfg["notify_target"],
+                            latest, installed, verbose,
+                        )
+                        if ok:
+                            last_notified_version = latest
+                except Exception as exc:  # noqa: BLE001 — never crash loop
+                    if verbose:
+                        print(
+                            f"coordd: auto_update check error: {exc}",
                             file=sys.stderr,
                         )
         except KeyboardInterrupt:

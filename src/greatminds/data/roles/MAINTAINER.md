@@ -93,6 +93,11 @@ MAINTAINER owns these one-shot operational commands:
    vets, deduplicates, then files the upstream GitHub issue. The
    CLI refuses for non-allowed roles per
    `schema.report_upstream.permissions.invoke`.
+5. **Auto-update notifications (0199):** coordd polls PyPI every
+   `schema.auto_update.check_interval_seconds` (default 4h) and
+   sends an inbox info-message to MAINTAINER when a newer
+   greatminds version is available. Run `greatminds update` to
+   upgrade the fleet. Notify-only — MAINTAINER decides timing.
 
 ## Never
 

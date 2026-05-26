@@ -31,6 +31,11 @@ dependencies = [
   # the optional import in cli/coordd.py degrades gracefully back to
   # the polling-only path.
   'inotify_simple>=2.0; platform_system == "Linux"',
+  # 0199 iter-2: coordd's PyPI auto-update check uses
+  # packaging.version.parse for PEP 440 ordering. Lexicographic
+  # fallback breaks on multi-digit segments (1.2.10 < 1.2.9 et al)
+  # so packaging must be a real direct dep, not a transitive guess.
+  "packaging>=21.0",
 ]
 
 [project.optional-dependencies]

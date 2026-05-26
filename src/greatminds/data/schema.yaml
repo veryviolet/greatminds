@@ -922,6 +922,19 @@ visual_events:
 # structured-config-first directive. Operator may extend per-project
 # by editing settings.local.json directly; setup merges via union,
 # never overwriting existing operator entries.
+# 0199: coordd periodic PyPI version check. Every
+# `check_interval_seconds`, coordd compares the installed greatminds
+# version against PyPI's latest; if newer, it sends ONE info-message
+# to `notify_target`. Notify-only — MAINTAINER decides when to
+# actually run `greatminds update`. coordd tracks the last-notified
+# version in process memory so a still-un-acted-upon newer release
+# doesn't spam every poll.
+auto_update:
+  check_interval_seconds: 14400   # 4h
+  notify_target: MAINTAINER
+  mode: notify_only               # future: auto_execute
+  source: pypi                    # future: git_tag
+
 # 0198: gate `greatminds report-upstream` to MAINTAINER only. Other
 # roles file bug-suspects via `greatminds inbox send MAINTAINER
 # --kind ask`. CLI refuses for non-allowed agent roles; operator-
