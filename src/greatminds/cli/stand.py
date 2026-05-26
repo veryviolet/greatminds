@@ -266,5 +266,60 @@ def stand_result(task_id, result, status, commit, profile,
     click.echo(f"recorded stand_result and moved {task_id} → stand_done")
 
 
+@stand.command(name="status")
+def stand_status() -> None:
+    """0243 (0242 Phase 1): print the singleton stand resource state.
+
+    Reads ``coordination/.stand/state.yaml`` (creates a synthetic
+    empty-state view when the file doesn't exist yet) and prints a
+    compact human-readable summary: state, active lease (if any),
+    queue contents, and the last few transitions.
+
+    Read-only. Mutation paths land in 0244 (lease/release) and 0245
+    (SK migration).
+    """
+    from greatminds.cli import stand_state as ss
+    coord = find_coord_dir()
+    state = ss.read_stand_state(coord)
+
+    click.echo(f"state: {state.get('state')}")
+    active = state.get("active_lease")
+    if active:
+        click.echo("active_lease:")
+        for k in ("lease_id", "task", "worktree", "holder_role",
+                  "granted_at", "ready_at", "ttl_seconds"):
+            v = active.get(k)
+            if v is not None:
+                click.echo(f"  {k}: {v}")
+    else:
+        click.echo("active_lease: (none)")
+
+    queue = state.get("queue") or []
+    if queue:
+        click.echo(f"queue: {len(queue)} pending")
+        for i, item in enumerate(queue):
+            click.echo(
+                f"  {i+1}. lease={item.get('lease_id', '?')[:8]} "
+                f"task={item.get('task', '?')} "
+                f"role={item.get('holder_role', '?')}"
+            )
+    else:
+        click.echo("queue: (empty)")
+
+    down_reason = state.get("down_reason")
+    if down_reason:
+        click.echo(f"down_reason: {down_reason}")
+
+    history = state.get("history") or []
+    if history:
+        click.echo("history (last 5):")
+        for entry in history[-5:]:
+            click.echo(
+                f"  {entry.get('t', '?')} {entry.get('from', '?')}"
+                f" → {entry.get('to', '?')} "
+                f"by={entry.get('by', '?')}"
+            )
+
+
 if __name__ == "__main__":
     stand()

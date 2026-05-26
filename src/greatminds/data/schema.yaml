@@ -693,6 +693,47 @@ stand:
   deploy_strategy:
     target_commit_resolution: evidence_for_impl_base_commit
     post_stand_main_revert: true
+  # 0243 (0242a / Phase 1 of 0242): stand resource state machine.
+  # Singleton resource per project; FIFO lease queue; token-gated
+  # access. Replaces the stand_requests/stand_wip/stand_done three-
+  # queue model in 1.3.0. Phase 1 ships read-only — schema + state
+  # file + status CLI. Mutating CLI lands in 0244.
+  resource:
+    states: [free, preparing, ready, down]
+    transitions:
+      - from: free
+        to: preparing
+        by: STAND-KEEPER
+        requires: [active_lease_set]
+      - from: preparing
+        to: ready
+        by: STAND-KEEPER
+        requires: [deploy_smoke_ok]
+      - from: preparing
+        to: down
+        by: STAND-KEEPER
+        requires: [deploy_failure_logged]
+      - from: ready
+        to: free
+        by: lease_holder_or_stand_keeper_auto
+      - from: ready
+        to: down
+        by: STAND-KEEPER
+        requires: [infra_incident_logged]
+      - from: down
+        to: free
+        by: STAND-KEEPER
+        requires: [recovery_logged]
+    lease:
+      ttl_seconds_default: 14400        # 4h
+      ttl_warn_window_seconds: 300      # 5min warn before auto-release
+      auto_release_on_no_response: true
+    queue: fifo
+    access_control:
+      operations:
+        - stand_probe_*: requires holder of active_lease's lease_id
+      enforcement_layer: cli
+    state_file: .stand/state.yaml       # under coordination/
 
 tests_block_validation:
   stand_evidence:
