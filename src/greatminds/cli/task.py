@@ -81,6 +81,13 @@ ALLOWED_INTAKE_QUEUES: dict[str, set[str]] = {
 LIST_FIELDS = {
     "dependencies", "files", "test_files", "hosts", "scenarios",
     "evidence_for", "docs_checked", "bugs_filed", "commands",
+    # 0235: tests block (post-0228) requires functional_probes as a
+    # non-empty list. Without this entry coerce_value would store a
+    # `--field functional_probes=cmd1,cmd2` value as the literal
+    # string "cmd1,cmd2"; the 0228 validator then rejects with «not
+    # a list», blocking TESTER's mv. tester_observations stays
+    # scalar — it's a single text blob per probe-run.
+    "functional_probes",
 }
 
 
