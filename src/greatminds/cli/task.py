@@ -1039,6 +1039,109 @@ def _check_stand_result_block(data: dict[str, Any],
     )
 
 
+def _check_triage_block(data: dict[str, Any],
+                         from_q: str, to_q: str) -> str | None:
+    """0222: user_feedback → {feature_inbox, archive} must carry a
+    ``triage`` block authored by ARCHITECT-PLANNER with non-empty
+    notes/body.
+
+    Pre-0222 the schema row carried ``requires: [triage_block]`` but
+    the registry mapped it to ``_noop_existing`` — the gate was
+    documentary, not enforced. EXPLORER's stand_done/0205 ran a
+    blocks=[] task through these transitions and watched the mv
+    succeed. This validator closes the hole.
+
+    Latest-wins: a task may accumulate triage blocks across re-
+    triage iterations; the LATEST one decides whether the mv is
+    allowed.
+    """
+    blocks = data.get("blocks") or []
+    triages = [b for b in blocks
+               if isinstance(b, dict) and b.get("kind") == "triage"]
+    if not triages:
+        return (
+            "triage_block: user_feedback → {feature_inbox, archive} "
+            "requires a triage block. Append "
+            "`greatminds task append-block triage --id <X> --field "
+            "by=ARCHITECT-PLANNER --field notes='<triage outcome>'` "
+            "before mv."
+        )
+    latest = triages[-1]
+    notes = (latest.get("notes") or latest.get("body") or "")
+    if not (isinstance(notes, str) and notes.strip()):
+        return (
+            "triage_block: latest triage block has empty notes/body. "
+            "Append a fresh triage block with a non-empty notes "
+            "field stating the routing decision."
+        )
+    return None
+
+
+def _check_reader_block_pass(data: dict[str, Any],
+                              from_q: str, to_q: str) -> str | None:
+    """0222: feature_docs_review → feature_review must carry a
+    ``reader_review`` block whose latest entry has
+    ``outcome in {pass, approved}``.
+
+    Pre-0222 mapped to ``_noop_existing`` — READER could mv with
+    outcome=fail and the FSM would accept. EXPLORER's stand_done/0205
+    showed this transition accepting reader_review.outcome='fail'.
+    Latest-wins semantics."""
+    blocks = data.get("blocks") or []
+    readers = [b for b in blocks
+               if isinstance(b, dict) and b.get("kind") == "reader_review"]
+    if not readers:
+        return (
+            "reader_block_pass: feature_docs_review → feature_review "
+            "requires a reader_review block with outcome in {pass, "
+            "approved}. Append `greatminds task append-block "
+            "reader_review --id <X> --field outcome=pass ...` "
+            "before mv."
+        )
+    outcome = readers[-1].get("outcome")
+    if outcome in ("pass", "approved"):
+        return None
+    return (
+        f"reader_block_pass: latest reader_review block has "
+        f"outcome={outcome!r}, expected 'pass' or 'approved'. Either "
+        f"append a fresh reader_review with outcome=pass (post-fix), "
+        f"or route the task back to feature_docs via the "
+        f"reader_block_fail_or_partial transition."
+    )
+
+
+def _check_reader_block_fail_or_partial(data: dict[str, Any],
+                                          from_q: str,
+                                          to_q: str) -> str | None:
+    """0222: feature_docs_review → feature_docs (hand-back) must
+    carry a ``reader_review`` block whose latest entry has
+    ``outcome in {fail, partial, changes_requested}``.
+
+    The complement of ``reader_block_pass``. Pre-0222 noop'd, so
+    contradictory states (no reader block at all, or outcome=pass)
+    could route to the hand-back path."""
+    blocks = data.get("blocks") or []
+    readers = [b for b in blocks
+               if isinstance(b, dict) and b.get("kind") == "reader_review"]
+    if not readers:
+        return (
+            "reader_block_fail_or_partial: feature_docs_review → "
+            "feature_docs requires a reader_review block with outcome "
+            "in {fail, partial, changes_requested}. Append "
+            "`greatminds task append-block reader_review --id <X> "
+            "--field outcome=fail ...` before mv."
+        )
+    outcome = readers[-1].get("outcome")
+    if outcome in ("fail", "partial", "changes_requested"):
+        return None
+    return (
+        f"reader_block_fail_or_partial: latest reader_review block "
+        f"has outcome={outcome!r}, expected 'fail', 'partial', or "
+        f"'changes_requested'. The hand-back transition fires only "
+        f"when READER found something to fix."
+    )
+
+
 def _check_rollback_block_with_reason(data: dict[str, Any],
                                        from_q: str, to_q: str) -> str | None:
     """0195: verified → {archive, feature_review} must carry a rollback
@@ -1246,7 +1349,10 @@ SCHEMA_REQUIRES_VALIDATORS: dict[str, "callable"] = {
     # Empty pre-condition is always satisfied.
     # (Schema entries with `requires: []` are still validated for role/
     # transition existence via can_role_move.)
-    "triage_block": _noop_existing,
+    # 0222: was _noop_existing; real validator enforces user_feedback
+    # → {feature_inbox, archive} carries a triage block with non-empty
+    # notes (EXPLORER stand_done/0205 found the hole).
+    "triage_block": _check_triage_block,
     "plan_block": _noop_existing,
     "scope_backend": _noop_existing,
     "scope_ui": _noop_existing,
@@ -1262,8 +1368,9 @@ SCHEMA_REQUIRES_VALIDATORS: dict[str, "callable"] = {
     "implementation_block": _noop_existing,
     "tests_block": _noop_existing,
     "tests_block_fail_or_partial": _noop_existing,
-    "reader_block_pass": _noop_existing,
-    "reader_block_fail_or_partial": _noop_existing,
+    # 0222: real validators for the docs-review verdict gates.
+    "reader_block_pass": _check_reader_block_pass,
+    "reader_block_fail_or_partial": _check_reader_block_fail_or_partial,
     # 0171 real-enforcement: require_target_readiness no longer trusts
     # the bare presence of a review block; the latest one must carry
     # outcome=approved.
