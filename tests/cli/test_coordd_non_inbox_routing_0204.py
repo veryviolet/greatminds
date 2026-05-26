@@ -113,19 +113,25 @@ def test_route_queue_event_invokes_sigint_for_codex_owner(
     assert sigint_calls == ["DEVELOPER"]
 
 
-def test_route_queue_event_invokes_tmux_for_claude_owner(
+def test_route_queue_event_invokes_press_enter_for_claude_owner(
     tmp_path: Path, monkeypatch,
 ) -> None:
-    """Claude chat-mode role (ARCHITECT-PLANNER) → tmux send-keys
-    (the 0186 path), not SIGINT (claude isn't a bash-wrapper
-    descendant). Pin the dispatch."""
+    """0259: claude chat-mode role (ARCHITECT-PLANNER) → press_enter
+    via input_sock Channel 1 (replaces the 0186 tmux-send-keys
+    shortcut). Pin the dispatch."""
     project = _project(tmp_path, owner_tool="codex")
     coord = project / "coordination"
 
-    tmux_calls: list = []
+    calls: list[dict] = []
+    def fake_press_enter(coord_dir, session, window, role_lower,
+                         agent_type, *, mode, verify, **_kw):
+        calls.append({
+            "role_lower": role_lower, "agent_type": agent_type,
+            "mode": mode, "verify": verify,
+        })
+        return (True, "fake-ok")
     monkeypatch.setattr(
-        coordd_mod, "tmux_send_keys_wake",
-        lambda c, role, verbose: tmux_calls.append(role),
+        "greatminds.cli._send_enter.press_enter", fake_press_enter,
     )
 
     woke = coordd_mod._route_queue_event(
@@ -133,7 +139,11 @@ def test_route_queue_event_invokes_tmux_for_claude_owner(
         "0199-fake-task.yaml", verbose=False,
     )
     assert woke is True
-    assert tmux_calls == ["ARCHITECT-PLANNER"]
+    assert len(calls) == 1
+    assert calls[0]["role_lower"] == "architect-planner"
+    assert calls[0]["agent_type"] == "claude"
+    assert calls[0]["mode"] == "wake"
+    assert calls[0]["verify"] is False
 
 
 def test_route_queue_event_skips_inbox_queue(tmp_path: Path,

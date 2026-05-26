@@ -630,14 +630,6 @@ def _window_for_role(coord_yaml: dict, role_upper: str) -> str | None:
     return None
 
 
-# 0186: per-role per-process timestamp of the last tmux send-keys
-# nudge. Rate-limits chat-mode wakes so a burst of inbox writes
-# doesn't flood the claude pane with N "check inbox" lines within a
-# few seconds. Coalesces to one nudge per ``event_wake.tmux_send_keys.
-# rate_limit_seconds`` window.
-_LAST_TMUX_NUDGE: dict[str, float] = {}
-
-
 def _owning_role_for_queue(canon_dir: Path, queue: str) -> str | None:
     """0204: resolve the owner role for a queue per schema.
 
@@ -728,14 +720,21 @@ def _route_queue_event(coord: Path, canon_dir: Path,
             )
         return True
     if mechanism == "tmux_send_keys":
-        tmux_send_keys_wake(coord, owner, verbose)
+        from greatminds.cli._send_enter import press_enter
+        session = (coord_yaml_doc.get("session") or "").strip() \
+            if coord_yaml_doc else ""
+        window = (located[0] if located else "").strip()
+        ok, diag = press_enter(
+            coord, session, window, owner.lower(), "claude",
+            mode="wake", verify=False,
+        )
         if verbose:
             print(
-                f"  0204: woke {owner} (tmux send-keys) for "
-                f"{queue}/{filename}",
+                f"  0204: woke {owner} (press_enter via input_sock) "
+                f"for {queue}/{filename}: {diag}",
                 file=sys.stderr,
             )
-        return True
+        return ok
     if verbose:
         print(
             f"  0204: no wake mechanism for tool={tool!r} "
@@ -930,121 +929,6 @@ def _window_and_tool_for_role(coord_yaml: dict | None,
             return ((w.get("name") or "").strip(),
                     (w.get("tool") or "").strip().lower())
     return None
-
-
-def tmux_send_keys_wake(coord: Path, role: str,
-                       verbose: bool = False) -> bool:
-    """0186: chat-mode wake via ``tmux send-keys`` for claude panes.
-
-    Pre-0186 chat-mode roles (claude PLANNER + MAINTAINER) had NO
-    event-wake mechanism — they sat in NO_KEYSTROKE_INJECT_ROLES so
-    push_to_role was skipped, and coordd's sigint primitive can't
-    reach a claude process the same way it can SIGINT a codex
-    wrapper's sleep (claude is the user-facing tool, not a sleep-
-    descendant of a bash wrapper). Result: inbox messages to PLANNER /
-    MAINTAINER never auto-triggered a tick.
-
-    Mechanism: read coord.yaml for this role's tmux window; send the
-    literal keystroke ``check inbox and continue your tick`` + Enter
-    into that pane via ``tmux send-keys``. Claude's UI buffers the
-    text the same way as if the operator typed it, runs the tick on
-    Enter.
-
-    Rate-limited per role per coordd process so a burst of N inbox
-    writes within ``rate_limit_seconds`` only nudges claude once.
-    """
-    project_dir = coord.parent
-    coord_yaml = _read_coord_yaml(project_dir)
-    located = _window_and_tool_for_role(coord_yaml, role)
-    if located is None:
-        if verbose:
-            print(f"  tmux-wake: role={role} not declared in coord.yaml; skip",
-                  file=sys.stderr)
-        return False
-    window, _tool = located
-    if not window:
-        if verbose:
-            print(f"  tmux-wake: role={role} has empty window name; skip",
-                  file=sys.stderr)
-        return False
-    session = (coord_yaml.get("session") or "").strip()
-    if not session:
-        if verbose:
-            print(f"  tmux-wake: no session in coord.yaml; skip", file=sys.stderr)
-        return False
-
-    # Rate-limit per role per process.
-    rate_limit = 5.0  # default if schema absent (defensive)
-    try:
-        schema = _read_event_wake_schema(coord)
-        rate_limit = float(schema.get("rate_limit_seconds") or rate_limit)
-    except (OSError, KeyError, TypeError, ValueError):
-        pass
-
-    now = time.time()
-    last = _LAST_TMUX_NUDGE.get(role, 0.0)
-    if now - last < rate_limit:
-        if verbose:
-            print(
-                f"  tmux-wake: role={role} rate-limited "
-                f"(last nudge {now - last:.1f}s ago < {rate_limit:.0f}s); skip",
-                file=sys.stderr,
-            )
-        return False
-
-    # 0237: split text + Enter into TWO send-keys calls with the
-    # ``WAKE_GAP_SECONDS`` gap between them — same pattern codex's
-    # push_to_role uses (lines 51–58 of this module). When text +
-    # Enter arrive in one bytes-blast some TUIs (claude included)
-    # classify it as a paste and DON'T fire the prompt-submit event
-    # on the trailing CR. Splitting registers the Enter as a
-    # discrete keypress, which is what triggers the agent's turn.
-    target = f"{session}:{window}"
-    cp = subprocess.run(
-        ["tmux", "send-keys", "-t", target, WAKE_TEXT],
-        capture_output=True, text=True,
-    )
-    if cp.returncode != 0:
-        if verbose:
-            print(
-                f"  tmux-wake: role={role} tmux send-keys text failed: "
-                f"{cp.stderr.strip()[:200]}",
-                file=sys.stderr,
-            )
-        return False
-    time.sleep(WAKE_GAP_SECONDS)
-    cp = subprocess.run(
-        ["tmux", "send-keys", "-t", target, "Enter"],
-        capture_output=True, text=True,
-    )
-    if cp.returncode != 0:
-        if verbose:
-            print(
-                f"  tmux-wake: role={role} tmux send-keys Enter failed: "
-                f"{cp.stderr.strip()[:200]}",
-                file=sys.stderr,
-            )
-        return False
-    _LAST_TMUX_NUDGE[role] = now
-    if verbose:
-        print(
-            f"  event-wake: role={role} tmux send-keys to "
-            f"{session}:{window}",
-            file=sys.stderr,
-        )
-    return True
-
-
-def _read_event_wake_schema(coord: Path) -> dict:
-    """0186: read ``event_wake:`` section from schema.yaml. Returns the
-    ``tmux_send_keys`` sub-mapping or an empty dict on absence — the
-    caller has hard-coded defaults so missing/malformed schema is
-    non-fatal."""
-    from greatminds.core.paths import find_canon_dir
-    schema_path = find_canon_dir() / "schema.yaml"
-    doc = yaml.safe_load(schema_path.read_text(encoding="utf-8")) or {}
-    section = (doc.get("event_wake") or {}).get("tmux_send_keys") or {}
-    return section if isinstance(section, dict) else {}
 
 
 def _wake_mechanism_for_tool(tool: str) -> str:
@@ -1478,11 +1362,14 @@ def coordd(project_dir: Path | None, project_name: str | None,
                     sigint_sleeping_descendant(coord, role, verbose)
                     push_to_role(coord, role, path, verbose)
                 elif mechanism == "tmux_send_keys":
-                    # Chat-mode pane: nudge via tmux send-keys only.
-                    # No SIGINT (claude isn't a bash-wrapper descendant)
-                    # and no push_to_role keystroke (claude has no
-                    # input_sock; the tmux pane IS the input channel).
-                    tmux_send_keys_wake(coord, role, verbose)
+                    from greatminds.cli._send_enter import press_enter
+                    session = (coord_yaml_doc.get("session") or "").strip() \
+                        if coord_yaml_doc else ""
+                    window = (located[0] if located else "").strip()
+                    press_enter(
+                        coord, session, window, role.lower(), "claude",
+                        mode="wake", verify=False,
+                    )
                 else:
                     # No event-wake mechanism registered for this tool
                     # (e.g. an exotic / future tool, or NO_KEYSTROKE_

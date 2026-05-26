@@ -1,15 +1,16 @@
-"""Tests for task 0186: chat-mode claude wake via tmux send-keys.
+"""Tests for task 0186: chat-mode claude wake.
 
 Pre-0186 chat-mode roles (claude PLANNER + MAINTAINER) sat in
 ``NO_KEYSTROKE_INJECT_ROLES`` so coordd's event-wake dispatcher
 silently skipped them — inbox messages to PLANNER / MAINTAINER never
 auto-triggered a tick.
 
-0186 adds ``tmux_send_keys_wake(coord, role)`` that reads coord.yaml
-for the role's tmux window + session and runs ``tmux send-keys -t
-<session>:<window> "check inbox and continue your tick" Enter`` —
-identical to operator-typed input. Rate-limited per role per coordd
-process so a burst doesn't flood the pane.
+0186 added the ``tmux_send_keys`` mechanism dispatch in
+schema.event_wake.by_tool; 0259 rewires the call to
+``press_enter`` (input_sock Channel 1 with tmux send-keys as
+fallback) — the proven path used by restart.py and the
+stalled-sweep. The schema label ``tmux_send_keys`` is retained as
+the dispatch key for chat-mode panes.
 """
 from __future__ import annotations
 
@@ -102,121 +103,126 @@ def test_wake_mechanism_unknown_tool_returns_empty() -> None:
     assert coordd_mod._wake_mechanism_for_tool("") == ""
 
 
-# ---------- tmux_send_keys_wake mechanics ----------
+# ---------- chat-mode wake dispatches press_enter (0259) ----------
 
 
-def test_tmux_send_keys_wake_runs_tmux_command(tmp_path: Path,
-                                                 monkeypatch) -> None:
-    """Happy path: 0237 splits text + Enter into TWO send-keys
-    calls separated by ``WAKE_GAP_SECONDS`` (claude classifies a
-    text+Enter blast as a paste and doesn't fire prompt-submit).
-    Both calls target the same session:window."""
+def _route(coord, queue, filename, verbose=False):
+    """Drive the inotify-wake dispatcher (``_route_queue_event``)
+    with a canon_dir that resolves the queue's owner to the role we
+    want woken. We pass a canon dir with a minimal schema.yaml that
+    declares the queue's owner."""
+    canon = coord.parent / "canon"
+    canon.mkdir(exist_ok=True)
+    (canon / "schema.yaml").write_text(yaml.safe_dump({
+        "queues": {
+            "feature_dev": {"owner": "ARCHITECT-PLANNER"},
+        },
+        "event_wake": {
+            "by_tool": {
+                "claude": "tmux_send_keys",
+                "codex": "sigint_deepest_descendant",
+            },
+        },
+    }), encoding="utf-8")
+    return coordd_mod._route_queue_event(
+        coord, canon, queue, filename, verbose,
+    )
+
+
+def test_route_queue_event_dispatches_press_enter_for_claude(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """0259: chat-mode wake (mechanism=tmux_send_keys in schema)
+    now invokes ``press_enter`` with the claude agent type, the
+    target role's session+window, and ``mode='wake', verify=False``.
+    This is the production-proven channel — input_sock Channel 1
+    with tmux send-keys fallback."""
     coord = _make_project(tmp_path)
-    coordd_mod._LAST_TMUX_NUDGE.clear()
 
-    calls: list[list[str]] = []
+    calls: list[dict] = []
+    def fake_press_enter(coord_dir, session, window, role_lower,
+                         agent_type, *, mode, verify, **_kw):
+        calls.append({
+            "session": session, "window": window,
+            "role_lower": role_lower, "agent_type": agent_type,
+            "mode": mode, "verify": verify,
+        })
+        return (True, "fake-ok")
+    monkeypatch.setattr(
+        "greatminds.cli._send_enter.press_enter", fake_press_enter,
+    )
 
-    import subprocess
-    def fake_run(cmd, *_a, **_kw):
-        calls.append(list(cmd))
-        return subprocess.CompletedProcess(list(cmd), 0, "", "")
-    monkeypatch.setattr(coordd_mod.subprocess, "run", fake_run)
-    monkeypatch.setattr(coordd_mod.time, "sleep", lambda _s: None)
-
-    ok = coordd_mod.tmux_send_keys_wake(coord, "ARCHITECT-PLANNER")
-
+    ok = _route(coord, "feature_dev", "0001.yaml")
     assert ok is True
-    send_keys = [c for c in calls if c[:2] == ["tmux", "send-keys"]]
-    assert len(send_keys) == 2, (
-        "0237: text and Enter must be split into two send-keys calls "
-        f"(got {len(send_keys)})"
-    )
-    # Both calls target the same window.
-    for cmd in send_keys:
-        assert "-t" in cmd
-        target = cmd[cmd.index("-t") + 1]
-        assert target == "test-session:planner"
-    # First call: text. Second call: Enter.
-    assert "check inbox and continue your tick" in send_keys[0]
-    assert send_keys[1][-1] == "Enter"
+    assert len(calls) == 1
+    c = calls[0]
+    assert c["agent_type"] == "claude"
+    assert c["session"] == "test-session"
+    assert c["window"] == "planner"
+    assert c["role_lower"] == "architect-planner"
+    assert c["mode"] == "wake"
+    assert c["verify"] is False
 
 
-def test_tmux_send_keys_wake_rate_limits(tmp_path: Path, monkeypatch) -> None:
-    """0186 + 0237: a burst of N nudges within rate_limit_seconds
-    must collapse to ONE wake — but the wake itself is two send-
-    keys calls (text then Enter). Pin against accidental fan-out
-    where each rate-limited call still issued only the text."""
-    coord = _make_project(tmp_path)
-    coordd_mod._LAST_TMUX_NUDGE.clear()
-
-    calls: list[list[str]] = []
-    import subprocess
-    def fake_run(cmd, *_a, **_kw):
-        calls.append(list(cmd))
-        return subprocess.CompletedProcess(list(cmd), 0, "", "")
-    monkeypatch.setattr(coordd_mod.subprocess, "run", fake_run)
-    monkeypatch.setattr(coordd_mod.time, "sleep", lambda _s: None)
-
-    # Three rapid-fire nudges to the same role.
-    coordd_mod.tmux_send_keys_wake(coord, "ARCHITECT-PLANNER")
-    coordd_mod.tmux_send_keys_wake(coord, "ARCHITECT-PLANNER")
-    coordd_mod.tmux_send_keys_wake(coord, "ARCHITECT-PLANNER")
-
-    send_keys_calls = [c for c in calls if c[:2] == ["tmux", "send-keys"]]
-    # One wake = two calls (text + Enter); rate-limit means subsequent
-    # nudges add ZERO calls.
-    assert len(send_keys_calls) == 2, (
-        f"0186 + 0237: expected 2 send-keys calls (text+Enter) for "
-        f"ONE wake after rate-limit; got {len(send_keys_calls)}"
-    )
-
-
-def test_tmux_send_keys_wake_skips_when_role_not_in_coord_yaml(
+def test_route_queue_event_press_enter_failure_propagates(
     tmp_path: Path, monkeypatch,
 ) -> None:
-    """Defensive: role exists in CLI scope but operator didn't
-    declare a window in coord.yaml → log + skip; don't crash."""
-    coord = _make_project(tmp_path, windows=[
-        {"name": "dev", "role": "DEVELOPER", "tool": "codex"},
-    ])
-    coordd_mod._LAST_TMUX_NUDGE.clear()
+    """press_enter returns ``(False, diag)`` — dispatcher returns
+    False so coordd's downstream signal that 'no wake landed' fires
+    (delivery still happened; just no agent kick)."""
+    coord = _make_project(tmp_path)
 
-    calls: list = []
-    import subprocess
     monkeypatch.setattr(
-        coordd_mod.subprocess, "run",
-        lambda cmd, *a, **kw: calls.append(list(cmd)) or
-        subprocess.CompletedProcess(list(cmd), 0, "", ""),
+        "greatminds.cli._send_enter.press_enter",
+        lambda *a, **kw: (False, "input_sock missing"),
     )
 
-    ok = coordd_mod.tmux_send_keys_wake(coord, "ARCHITECT-PLANNER")
+    ok = _route(coord, "feature_dev", "0001.yaml")
     assert ok is False
-    assert not calls
 
 
-def test_tmux_send_keys_wake_propagates_tmux_failure(
+def test_press_enter_prefers_input_sock_when_present(
     tmp_path: Path, monkeypatch,
 ) -> None:
-    """tmux returns non-zero (session doesn't exist, etc.) → helper
-    returns False; the bursty fail doesn't update _LAST_TMUX_NUDGE
-    so a recovery retry isn't rate-limited."""
-    coord = _make_project(tmp_path)
-    coordd_mod._LAST_TMUX_NUDGE.clear()
+    """0259 verification: with input_sock registered, press_enter
+    routes via input_sock Channel 1 (no tmux send-keys writes).
+    Pins the wiring promise of the 0259 fix — tmux send-keys is now
+    a fallback, not the primary path."""
+    from greatminds.cli import _send_enter as se
 
-    import subprocess
+    # Fake registry with input_sock present + alive pid.
+    sock_path = tmp_path / "agent.sock"
+    sock_path.write_text("")  # exists, but writes intercepted below
+    monkeypatch.setattr(se, "_read_registry",
+                        lambda *a, **kw: {"input_sock": str(sock_path),
+                                          "pid": None})
+    monkeypatch.setattr(se, "_pid_alive", lambda _p: True)
+
+    sock_writes: list[bytes] = []
+    def fake_send_via_sock(path, payload):
+        sock_writes.append(payload)
+        return True
+    monkeypatch.setattr(se, "_send_via_input_sock", fake_send_via_sock)
+
+    tmux_writes: list[tuple] = []
     monkeypatch.setattr(
-        coordd_mod.subprocess, "run",
-        lambda cmd, *a, **kw: subprocess.CompletedProcess(
-            list(cmd), 1, "", "no server",
-        ),
+        se, "_send_via_tmux",
+        lambda s, w, k: tmux_writes.append((s, w, k)) or True,
     )
+    monkeypatch.setattr(se.time, "sleep", lambda _s: None)
 
-    ok = coordd_mod.tmux_send_keys_wake(coord, "ARCHITECT-PLANNER")
-    assert ok is False
-    assert "ARCHITECT-PLANNER" not in coordd_mod._LAST_TMUX_NUDGE, (
-        "0186: failed nudges must not update the rate-limit timestamp "
-        "(otherwise recovery retries are blocked)"
+    ok, diag = se.press_enter(
+        tmp_path, "test-session", "planner", "architect-planner",
+        "claude", mode="wake", verify=False,
     )
+    assert ok is True
+    # input_sock was used; tmux send-keys was NOT.
+    assert sock_writes, "input_sock channel must be exercised"
+    assert not tmux_writes, (
+        f"0259: tmux send-keys must NOT fire when input_sock works "
+        f"(got writes: {tmux_writes})"
+    )
+    assert "input_sock" in diag
 
 
 # ---------- schema.yaml event_wake section ----------
