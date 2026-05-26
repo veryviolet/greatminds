@@ -13,6 +13,18 @@ environment. If the fleet is launched from tmux, restart the agent processes
 after the package upgrade so their registries, pty sockets, and role prompts
 match the installed version.
 
+## Update notifications
+
+When `coordd` is running, it periodically checks PyPI for a newer greatminds
+release. The interval and target live in `schema.yaml` under `auto_update`;
+the default interval is `14400` seconds, and the default target is
+`MAINTAINER`.
+
+The current mode is `notify_only`. If PyPI has a newer version, `coordd` sends
+one inbox `info` message to MAINTAINER with the installed version, latest
+version, release link, and the command to run. It does not upgrade the fleet by
+itself. MAINTAINER chooses the timing and runs `greatminds update` manually.
+
 ## Before upgrading a fleet
 
 - Check the changelog for CLI or coordination-contract changes.
