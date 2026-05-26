@@ -246,6 +246,56 @@ def get_task_commit(merged: dict) -> str | None:
     return None
 
 
+def get_task_worktree_fingerprint(merged: dict) -> str | None:
+    """0229: latest worktree_fingerprint known for the task.
+
+    The fingerprint captures the uncommitted overlay at impl-mv-to-
+    feature_test time (when DEV refiles the impl block). Compared
+    against stand_result.worktree_fingerprint to decouple "what was
+    tested" from "what is committed at base_commit".
+
+    Returns None when the impl block has no fingerprint — backwards-
+    compat for tasks shipped before 0229.
+    """
+    impl = merged.get("implementation")
+    if isinstance(impl, dict):
+        fp = impl.get("worktree_fingerprint")
+        if isinstance(fp, str) and fp.strip():
+            return fp.strip()
+    return None
+
+
+def compute_worktree_fingerprint(project_dir: Path) -> str | None:
+    """0229: sha256 of ``git diff HEAD`` for ``project_dir``.
+
+    Captures the uncommitted overlay (modified + staged but not
+    committed). Returns None when the project isn't a git repo, when
+    git isn't on PATH, or when the diff is empty (no overlay — caller
+    omits the field).
+
+    Empty-diff case returns "clean" string (not None) so the caller
+    can distinguish "no overlay computed yet" (None) from "computed
+    and there was nothing pending" ("clean"). gate_check uses both
+    branches.
+    """
+    import hashlib
+    import subprocess
+    try:
+        cp = subprocess.run(
+            ["git", "diff", "HEAD"],
+            cwd=str(project_dir),
+            capture_output=True, text=True, timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if cp.returncode != 0:
+        return None
+    diff = cp.stdout or ""
+    if not diff.strip():
+        return "clean"
+    return hashlib.sha256(diff.encode("utf-8")).hexdigest()[:32]
+
+
 @click.command(name="gate-check",
                short_help="check stand-evidence gate for a product task",
                help=__doc__)
@@ -302,18 +352,34 @@ def gate_check(task_id: str, project_dir: Path | None, canon_dir: Path | None,
         raise click.exceptions.Exit(2)
 
     task_commit = get_task_commit(merged)
+    task_fingerprint = get_task_worktree_fingerprint(merged)
     pass_any = False
     fail_reasons: list[str] = []
     for path, sr in candidates:
         result = sr.get("result")
         sr_commit = sr.get("commit")
+        sr_fingerprint = sr.get("worktree_fingerprint")
         if result not in ("pass", "ok"):
             fail_reasons.append(f"{path.name}: result={result!r}")
             continue
+        # Commit-match check (existing behavior; commit drift always
+        # wins as the primary signal).
         if task_commit and sr_commit and not str(sr_commit).startswith(str(task_commit)) \
                 and not str(task_commit).startswith(str(sr_commit)):
             fail_reasons.append(f"{path.name}: commit mismatch (stand={sr_commit!r}, task={task_commit!r})")
             continue
+        # 0229 fingerprint check: when BOTH sides carry a
+        # worktree_fingerprint, they must match. If either side
+        # lacks the field (pre-0229 task / pre-0229 stand), fall
+        # back to commit-only (backwards-compat).
+        if task_fingerprint and isinstance(sr_fingerprint, str) and sr_fingerprint:
+            if task_fingerprint != sr_fingerprint:
+                fail_reasons.append(
+                    f"{path.name}: worktree_fingerprint mismatch "
+                    f"(stand={sr_fingerprint!r}, "
+                    f"task={task_fingerprint!r}) — iter-N overlay drift"
+                )
+                continue
         pass_any = True
         if verbose:
             info(f"  matched: {path.name}")

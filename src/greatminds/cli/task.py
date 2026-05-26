@@ -1993,6 +1993,23 @@ def append_block(
         if body:
             block[body_field_for(kind)] = read_body(body)
 
+        # 0229: auto-stamp worktree_fingerprint for blocks where
+        # "what was tested" identity matters. Captures the
+        # uncommitted overlay so gate_check can decouple tested-state
+        # from committed-state. Skip if the caller supplied one
+        # explicitly (allows test/operator override).
+        if (kind in ("implementation", "stand_result")
+                and "worktree_fingerprint" not in block):
+            try:
+                from greatminds.cli.gate_check import (
+                    compute_worktree_fingerprint,
+                )
+                fp = compute_worktree_fingerprint(coord.parent)
+                if fp is not None:
+                    block["worktree_fingerprint"] = fp
+            except Exception:
+                pass  # best-effort; never block the append
+
         validate_block(data.get("stream") or "product", block)
         require_block_cross_state(block, data)
 
