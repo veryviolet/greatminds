@@ -676,6 +676,24 @@ git_permissions:
 # stand_evidence mapping with the three subfields below. Enforced by
 # validate_block in cli/task.py. Task 0091 item 3.
 # ---------------------------------------------------------------------------
+# 0233: systemic commit-drift fix. STAND-KEEPER deploys the EXACT
+# commit the requesting task's impl.base_commit names, not whatever
+# main HEAD happens to be at SK-run time. Resolution strategy:
+# greatminds stand request looks up evidence_for[0]'s impl block,
+# extracts base_commit, and stores it as ``target_commit`` on the
+# stand_request file. PROJECT.md's deploy recipe reads
+# ``target_commit`` and runs ``git checkout <sha>`` on each host
+# before the rsync/compose flow. After stand_result records, SK
+# optionally reverts the host to main (post_stand_main_revert).
+#
+# Pairs with 0229 worktree_fingerprint: 0233 covers committed-state
+# identity, 0229 covers uncommitted-overlay identity. Either passing
+# proves «stand tested what impl describes».
+stand:
+  deploy_strategy:
+    target_commit_resolution: evidence_for_impl_base_commit
+    post_stand_main_revert: true
+
 tests_block_validation:
   stand_evidence:
     required_subfields:

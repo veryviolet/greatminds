@@ -142,16 +142,32 @@ def stand_request(request_type, profile, title, hosts, evidence_for,
         priority=priority,
         reason=reason,
     )
-    # 0185: append the resolved worktree paths to the request file so
-    # STAND-KEEPER's rsync wrapper can pick them up without a second
-    # CLI call per task id. Empty when no evidence_for or no
-    # worktrees exist (greenfield projects, infra-only stand ops).
-    if worktree_sources:
+    # 0233: resolve target_commit from evidence_for[0]'s impl block.
+    # STAND-KEEPER's deploy must `git checkout <target_commit>` so the
+    # stand tests the EXACT commit the impl describes — not whatever
+    # main HEAD became between filing and SK-run. Stored on the
+    # stand_request file; PROJECT.md's deploy recipe reads it.
+    target_commit: str | None = None
+    if evidence_for:
+        try:
+            target_commit = _resolve_target_commit_from_evidence(
+                coord, evidence_for[0],
+            )
+        except Exception:
+            target_commit = None
+
+    # 0185 + 0233: enrich the request file with worktree_sources and
+    # target_commit so SK's deploy recipe has everything it needs in
+    # one place. Best-effort; CLI continues even if patch fails.
+    if worktree_sources or target_commit:
         import yaml as _yaml
         try:
             doc = _yaml.safe_load(
                 target_path.read_text(encoding="utf-8")) or {}
-            doc["worktree_sources"] = worktree_sources
+            if worktree_sources:
+                doc["worktree_sources"] = worktree_sources
+            if target_commit:
+                doc["target_commit"] = target_commit
             target_path.write_text(
                 _yaml.safe_dump(doc, sort_keys=False),
                 encoding="utf-8",
@@ -159,6 +175,44 @@ def stand_request(request_type, profile, title, hosts, evidence_for,
         except (OSError, _yaml.YAMLError):
             pass  # best-effort; SK can fall back to `worktree path` CLI
     click.echo(f"created {target_path}")
+
+
+def _resolve_target_commit_from_evidence(coord: Path,
+                                          evidence_task_id: str) -> str | None:
+    """0233: look up ``evidence_task_id``'s implementation.base_commit.
+
+    Walks the coordination tree via the unified find_task helper,
+    loads the task file, finds the latest implementation block, and
+    returns its ``base_commit`` (or None if any link is missing).
+    Falls back to plan.base_commit when no impl block exists yet
+    (e.g., the request is for a docs/research task that skips impl).
+    """
+    try:
+        from greatminds.cli.task import find_task, load_task
+    except ImportError:
+        return None
+    located = find_task(coord, evidence_task_id)
+    if located is None:
+        return None
+    path, _queue = located
+    try:
+        data = load_task(path)
+    except Exception:
+        return None
+    blocks = data.get("blocks") or []
+    # Latest implementation block wins.
+    for block in reversed(blocks):
+        if isinstance(block, dict) and block.get("kind") == "implementation":
+            bc = block.get("base_commit")
+            if isinstance(bc, str) and bc.strip():
+                return bc.strip()
+    # Fallback to latest plan block's base_commit.
+    for block in reversed(blocks):
+        if isinstance(block, dict) and block.get("kind") == "plan":
+            bc = block.get("base_commit")
+            if isinstance(bc, str) and bc.strip():
+                return bc.strip()
+    return None
 
 
 @stand.command(name="result")
