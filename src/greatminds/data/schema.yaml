@@ -1013,6 +1013,24 @@ report_upstream:
   triage_inbox_target: MAINTAINER
   upstream_repo_required: true
 
+# 0274: canonical list of system variables greatminds reads out of
+# the box. ``setup`` generates ``coordination/PROJECT.env`` from this
+# section, pre-populating each var with its description / acquire
+# instructions. Users add their own KEY=value to PROJECT.env after
+# setup; only the entries listed here come from canon.
+project_env:
+  system_vars:
+    GREATMINDS_UPSTREAM_TOKEN:
+      required: false
+      description: |
+        GitHub PAT for `greatminds report-upstream --mode api-token`.
+        Skip if using --mode gh (gh auth login) instead.
+      usage_locations: [src/greatminds/cli/report_upstream.py]
+      acquire_instructions: |
+        github.com → Settings → Developer settings → Personal access
+        tokens. Scope: issues:write on the upstream repo
+        (default veryviolet/greatminds).
+
 claude_settings:
   permissions:
     allow:

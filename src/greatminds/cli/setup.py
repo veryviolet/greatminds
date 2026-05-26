@@ -84,6 +84,179 @@ def _greatminds_bin() -> str:
     return f"{sys.executable} -m greatminds.cli.main"
 
 
+def _load_project_env_system_vars_from_canon(canon: Path) -> dict[str, dict]:
+    """0274: read ``project_env.system_vars`` from schema.yaml.
+
+    Returns an ordered mapping of var name → metadata
+    (``description``, ``acquire_instructions``, ``required``,
+    ``usage_locations``). Empty dict if the schema lacks the section
+    — setup then writes a header-only PROJECT.env so the file exists
+    for users to populate manually.
+    """
+    import yaml
+    schema_path = canon / "schema.yaml"
+    if not schema_path.is_file():
+        return {}
+    try:
+        doc = yaml.safe_load(schema_path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        return {}
+    pe = doc.get("project_env") or {}
+    sv = pe.get("system_vars") or {}
+    out: dict[str, dict] = {}
+    for name, meta in sv.items():
+        if isinstance(name, str) and isinstance(meta, dict):
+            out[name] = meta
+    return out
+
+
+def _wrap_lines(text: str, prefix: str, width: int = 72) -> str:
+    """Wrap ``text`` into ``# ``-prefixed lines for .env file comments.
+
+    Multi-line values from schema (YAML block scalars) carry literal
+    newlines; we re-flow each paragraph so the .env file reads
+    cleanly in a terminal. Empty paragraphs become an empty comment
+    line.
+    """
+    import textwrap
+    out_lines: list[str] = []
+    for paragraph in text.splitlines():
+        para = paragraph.rstrip()
+        if not para:
+            out_lines.append(prefix.rstrip())
+            continue
+        wrapped = textwrap.fill(
+            para,
+            width=width,
+            initial_indent=prefix,
+            subsequent_indent=prefix,
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+        out_lines.append(wrapped)
+    return "\n".join(out_lines)
+
+
+def _render_project_env_entry(name: str, meta: dict) -> str:
+    """Render a single ``KEY=value`` block for PROJECT.env: a
+    leading description comment, optional acquire-instructions
+    comment, then ``KEY=`` (no default value — user fills in)."""
+    lines: list[str] = []
+    desc = (meta.get("description") or "").strip()
+    if desc:
+        lines.append(_wrap_lines(f"{name} — {desc}", "# "))
+    acq = (meta.get("acquire_instructions") or "").strip()
+    if acq:
+        if lines:
+            lines.append("#")
+        lines.append(_wrap_lines(acq, "#   "))
+    if meta.get("required") is True:
+        lines.append("# REQUIRED")
+    lines.append(f"{name}=")
+    return "\n".join(lines)
+
+
+def _render_project_env_body(system_vars: dict[str, dict]) -> str:
+    if not system_vars:
+        return "# (no system vars declared in schema.project_env.system_vars)"
+    blocks = [_render_project_env_entry(n, m) for n, m in system_vars.items()]
+    return "\n\n".join(blocks)
+
+
+def _render_system_vars_docs(system_vars: dict[str, dict]) -> str:
+    """Render the System variables section body for PROJECT.md.
+
+    One ``### NAME`` heading per var + its description from schema +
+    a one-liner pointer to PROJECT.env for setup instructions.
+    """
+    if not system_vars:
+        return "_(no system vars declared in schema.project_env.system_vars)_"
+    out: list[str] = []
+    for name, meta in system_vars.items():
+        out.append(f"### {name}")
+        desc = (meta.get("description") or "").strip()
+        if desc:
+            out.append("")
+            out.append(desc)
+        out.append("")
+        out.append(
+            "See `coordination/PROJECT.env` for the entry + setup "
+            "instructions."
+        )
+        out.append("")
+    return "\n".join(out).rstrip()
+
+
+def _ensure_project_env(coord: Path, canon: Path, force: bool) -> str:
+    """0274: write/refresh ``coordination/PROJECT.env`` from schema.
+
+    Behavior:
+    - File missing → write from template + schema. Returns "written".
+    - File present + force=True → backup to ``.bak`` then overwrite.
+      Returns "overwritten".
+    - File present + force=False → leave alone (preserves user's
+      filled-in values). Returns "exists".
+    """
+    target = coord / "PROJECT.env"
+    if target.is_file() and not force:
+        return "exists"
+
+    tmpl_path = canon / "templates" / "PROJECT.env.template"
+    if not tmpl_path.is_file():
+        return "template-missing"
+    template = tmpl_path.read_text(encoding="utf-8")
+    system_vars = _load_project_env_system_vars_from_canon(canon)
+    body = _render_project_env_body(system_vars)
+    rendered = template.replace("{{SYSTEM_VARS_ENTRIES}}", body)
+
+    status = "written"
+    if target.is_file():
+        backup = target.with_suffix(".env.bak")
+        backup.write_text(target.read_text(encoding="utf-8"),
+                          encoding="utf-8")
+        status = "overwritten"
+    target.write_text(rendered, encoding="utf-8")
+    return status
+
+
+def _ensure_project_md(coord: Path, canon: Path, force: bool,
+                        lang: str) -> str:
+    """0274: write/refresh ``coordination/PROJECT.md`` from template
+    + schema-driven System variables section.
+
+    Behavior mirrors ``_ensure_project_env``: missing → written;
+    force=True → overwritten (legacy file preserved as ``.md.bak``);
+    force=False → exists.
+
+    ``lang`` is appended as a one-line ``Language: <lang>`` near the
+    top of the project-context section so users can edit it later
+    without losing the schema-driven sections on re-runs.
+    """
+    target = coord / "PROJECT.md"
+    if target.is_file() and not force:
+        return "exists"
+
+    tmpl_path = canon / "templates" / "PROJECT.md.template"
+    if not tmpl_path.is_file():
+        return "template-missing"
+    template = tmpl_path.read_text(encoding="utf-8")
+    system_vars = _load_project_env_system_vars_from_canon(canon)
+    docs = _render_system_vars_docs(system_vars)
+    rendered = template.replace("{{SYSTEM_VARS_DOCS}}", docs)
+    # Inject language hint at the bottom (operator can move/edit
+    # later; keeps the template surface clean of a `<TOKEN>`).
+    rendered = rendered.rstrip() + f"\n\nLanguage: {lang}\n"
+
+    status = "written"
+    if target.is_file():
+        backup = target.with_suffix(".md.bak")
+        backup.write_text(target.read_text(encoding="utf-8"),
+                          encoding="utf-8")
+        status = "overwritten"
+    target.write_text(rendered, encoding="utf-8")
+    return status
+
+
 def _load_claude_settings_allow_from_canon(canon: Path) -> list[str]:
     """0191: read ``claude_settings.permissions.allow`` from schema.yaml.
 
@@ -954,23 +1127,10 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     coord = project_dir / "coordination"
     header("\ncoordination/ (runtime state):")
     info(f"  dir: {_ensure_dir(coord)}")
-    info(f"  PROJECT.md: {_copy_if_missing(canon / 'templates' / 'PROJECT.md.template', coord / 'PROJECT.md', force)}")
-    # Substitute the <GREATMINDS_LANG> token in PROJECT.md to the requested
-    # value (default `en`). The template ships with `| `<GREATMINDS_LANG>` | `en` |`
-    # so we rewrite that row's value column. Always apply this — language
-    # is a project-level decision, not a "first install only" thing.
-    project_md = coord / "PROJECT.md"
-    if project_md.is_file():
-        text = project_md.read_text(encoding="utf-8")
-        import re
-        new_text, n = re.subn(
-            r"(`<GREATMINDS_LANG>`\s*\|\s*)`[^`]*`",
-            rf"\1`{lang}`",
-            text,
-        )
-        if n:
-            project_md.write_text(new_text, encoding="utf-8")
-            info(f"  GREATMINDS_LANG: {lang}")
+    # 0274: PROJECT.md is generated from the template with the
+    # schema-driven System variables section interpolated.
+    md_status = _ensure_project_md(coord, canon, force, lang)
+    info(f"  PROJECT.md: {md_status} (lang={lang})")
 
     gi = coord / ".gitignore"
     if not gi.is_file() or force:
@@ -1070,25 +1230,12 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     else:
         info("  mcp.local.json: exists")
 
-    pe_ex = coord / "PROJECT.env.example"
-    if not pe_ex.is_file():
-        pe_ex.write_text(
-            "# coordination/PROJECT.env.example — TEMPLATE for PROJECT.env.\n"
-            "# Copy to PROJECT.env (gitignored) and fill secrets per env.\n"
-            "# greatminds-start-agent sources PROJECT.env before launching\n"
-            "# Claude/codex/cursor so MCP servers resolve ${VAR}.\n"
-            "\n"
-            "#PROJECT_ROOT=/opt/your_project\n"
-            "GREATMINDS_POSTGRES_DSN=\n"
-            "STAND_HOST_A=\n"
-            "STAND_HOST_B=\n"
-            "STAND_URL_A=\n"
-            "STAND_URL_B=\n",
-            encoding="utf-8",
-        )
-        info("  PROJECT.env.example: written")
-    else:
-        info("  PROJECT.env.example: exists")
+    # 0274: PROJECT.env is generated directly (no longer a
+    # ``.example`` step). Contents come from
+    # ``schema.project_env.system_vars`` — pre-populated KEY= lines
+    # with description / acquire-instructions comments per var.
+    env_status = _ensure_project_env(coord, canon, force)
+    info(f"  PROJECT.env: {env_status}")
 
     # .claude/settings.local.json — Stop hook + schema's claude_settings
     # permissions.allow rules (0191). Merge-on-existing preserves any
