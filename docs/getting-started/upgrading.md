@@ -1,17 +1,25 @@
 # Upgrading
 
 Upgrade the package in the environment that runs your fleet, then restart the
-daemon and agents so long-running processes import the new code.
+daemon and agents so long-running processes import the new code. The normal
+fleet path is:
 
 ```bash
-pip install --upgrade greatminds
-greatminds daemon restart
+greatminds update
 ```
 
 If your project uses a pinned virtual environment, run the upgrade inside that
 environment. If the fleet is launched from tmux, restart the agent processes
 after the package upgrade so their registries, pty sockets, and role prompts
 match the installed version.
+
+`greatminds update` also handles the daemon systemd migration. Fleets created
+before the per-project `greatminds-daemon@<project>.service` template may still
+have only the legacy singleton `coordd.service`, or may be missing the template
+unit after package upgrade. During update, greatminds removes the legacy unit
+when present and runs the equivalent of `greatminds daemon install` when the
+template unit is missing. Operators upgrading those older fleets do not need a
+separate manual daemon-install step.
 
 ## Update notifications
 
