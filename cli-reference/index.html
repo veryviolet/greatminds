@@ -1126,6 +1126,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#greatminds-migrate-stand-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        migrate-stand-history
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#greatminds-migrate-task" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1844,6 +1855,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#greatminds-migrate-stand-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        migrate-stand-history
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#greatminds-migrate-task" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2255,6 +2277,16 @@ warned about but do not fail.</p>
 <p><strong>Options:</strong></p>
 <div class="highlight"><pre><span></span><code>  --canon-dir DIRECTORY  canon data dir (default: packaged greatminds.data)
   -h, --help             Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-migrate-stand-history">greatminds migrate-stand-history<a class="headerlink" href="#greatminds-migrate-stand-history" title="Permanent link">&para;</a></h3>
+<p>Move legacy coordination/stand_done/* into coordination/archive/stand-history/ (0247 cleanup).</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds migrate-stand-history [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --coord TEXT  path to coordination/ (default: resolved via env / cwd)
+  --dry-run     report what would move; touch nothing
+  -h, --help    Show this message and exit.
 </code></pre></div>
 <h3 id="greatminds-migrate-task">greatminds migrate-task<a class="headerlink" href="#greatminds-migrate-task" title="Permanent link">&para;</a></h3>
 <p>bin/migrate-task — convert legacy .md task files to the strict .yaml format.</p>

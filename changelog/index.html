@@ -1273,6 +1273,72 @@
 <p>All notable changes to <strong>greatminds</strong> are documented here. Format follows
 <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a> loosely; versions
 follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
+<h2 id="132-2026-05-27">1.3.2 — 2026-05-27<a class="headerlink" href="#132-2026-05-27" title="Permanent link">&para;</a></h2>
+<p>Followup cut after the 1.3.0 BREAKING stand-stream redesign + 1.3.1
+emergency wake fix. Five verified tasks merged on local main; all
+empirically validated via real avatar SSH stand probes (no shape-only
+evidence).</p>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<ul>
+<li>
+<p><strong>0258 — complete BREAKING removal of stand-stream runtime.</strong>
+  CLI now rejects <code>--stream stand</code> and <code>--kind stand_request</code> with
+  rc=2 + <code>stream=stand removed in 1.3.0</code> message; <code>greatminds setup</code>
+  no longer scaffolds <code>stand_{requests,wip,done}/</code> directories;
+  <code>coordd._build_inotify_dirs</code> drops the legacy queue watches; new
+  <code>greatminds migrate-stand-history</code> CLI moves pre-1.3.0
+  <code>stand_done/*</code> artifacts under <code>coordination/archive/stand-history/</code>
+  (idempotent, supports <code>--dry-run</code>).</p>
+</li>
+<li>
+<p><strong>0268 — <code>_evaluate_gate_check</code> reads lease evidence first.</strong>
+  Pre-fix, a lease-evidence-carrying task could see <code>gate-check</code>
+  return <code>pass</code> from the lease while <code>_check_gate_for_stand_required</code>
+  returned <code>missing</code> from the same task data (the latter only knew
+  about removed <code>stand_done/&lt;id&gt;.yaml</code> files). Now
+  <code>extract_lease_evidence_from_tests</code> is probed first; the legacy
+  <code>find_stand_evidence</code> path remains as a fall-through for any
+  in-flight pre-migration tasks.</p>
+</li>
+<li>
+<p><strong>0267 — <code>greatminds setup</code> bakes <code>autoMode.allow</code> + ops perms from
+  schema canon.</strong> <code>data/schema.yaml</code> now declares the full
+  <code>claude_settings.autoMode.allow</code> (<code>Bash(git push origin main:*)</code> +
+  <code>--follow-tags</code> variants) and <code>claude_settings.permissions.allow</code>
+  (ssh / scp / rsync / git revert) under one source of truth.
+  <code>_build_settings_local_json</code> populates <code>autoMode.allow</code> from schema
+  instead of a hardcoded list; <code>_ensure_claude_settings_local</code>
+  additively merges new canonical entries on existing fleets — the
+  operator's own additions and Stop/UserPromptSubmit hooks are
+  preserved; repeat runs report <code>unchanged</code>.</p>
+</li>
+<li>
+<p><strong>0269 — coordd inotify <code>.stand</code> events route to STAND-KEEPER.</strong>
+  <code>.stand</code> was an <code>INOTIFY_QUEUE_DIRS</code> entry but not listed in
+  <code>schema.queues</code>, so <code>_owning_role_for_queue('.stand')</code> returned
+  <code>None</code> and <code>_route_queue_event</code> silently dropped state.yaml writes.
+  Schema now declares <code>.stand</code> with <code>owner: STAND-KEEPER</code>,
+  <code>writers: [STAND-KEEPER, TESTER, ARCHITECT-PLANNER, MAINTAINER]</code>,
+  <code>kind: state</code>. Lease delivery latency drops from waiting on SK's
+  own ScheduleWakeup tick to coordd-pushed via <code>press_enter</code> on the
+  input_sock. The <code>kind: state</code> marker keeps <code>watchdog</code> (active-only)
+  and <code>wake_check</code> (terminal-only) iterations untouched.</p>
+</li>
+<li>
+<p><strong>0271 — <code>greatminds stand lease</code> enforces per-task worktree at
+  acquire.</strong> Pre-fix the only worktree enforcement was SK's runtime
+  whitelist; the CLI accepted any <code>--worktree</code>, flipped state.yaml to
+  <code>preparing</code>, and only SK rejected later with a self-modify reason,
+  leaving an orphaned lease. Now schema declares
+  <code>stand.resource.lease.worktree_constraint</code> (pattern
+  <code>{project_dir}/.worktrees/{seq}[-slug]</code>, <code>enforced_by: cli</code>) and
+  <code>stand.py:_validate_lease_worktree</code> rejects at acquire with rc=2 +
+  named-rule errors: empty/None, main-tree (with paste-ready
+  <code>git worktree add</code> recipe), wrong parent, wrong basename. Relative
+  paths resolve via <code>Path(...).resolve(strict=False)</code>. state.yaml is
+  not mutated on reject.</p>
+</li>
+</ul>
 <h2 id="131-2026-05-26">1.3.1 — 2026-05-26<a class="headerlink" href="#131-2026-05-26" title="Permanent link">&para;</a></h2>
 <p>Emergency cut. Single fix: 0259 — coordd's chat-mode inotify wake
 now reaches the claude TUI input handler.</p>
@@ -1286,7 +1352,7 @@ input_sock channel + leaf SIGINT; end-to-end probe (filed
 feature_inbox/9999.yaml → coordd inotify → press_enter →
 input_sock → SIGINT to PLANNER's own Bash subprocess exit 130)
 confirms the full chain.</p>
-<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0259 coordd inotify wake uses <code>input_sock</code> via <code>press_enter</code>.</strong>
   Pre-0259, coordd's chat-mode wake (<code>tmux_send_keys_wake</code>) sent
@@ -1396,7 +1462,7 @@ in a single step.</p>
 <p>Bug-fix release. Three regressions found in 1.1.0 real-world use, plus a
 critical wake-up channel regression introduced silently by the 1.0.0
 umbrella-console-script migration. No new features.</p>
-<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>task append-block --body-file</code> option missing.</strong> Dropped during the
   argparse→click conversion. The plan orchestrator and several agent
@@ -1543,7 +1609,7 @@ plan → dev) confirmed against a fresh project: 7+ journal
 transitions, schema validation rejects malformed blocks, role
 permissions enforced.</p>
 <h2 id="011-2026-05-20">0.1.1 — 2026-05-20<a class="headerlink" href="#011-2026-05-20" title="Permanent link">&para;</a></h2>
-<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>greatminds-coord-launch</code> and <code>greatminds-coord-tmux</code> now find a
   sibling <code>greatminds-start-agent</code> in the same venv via
