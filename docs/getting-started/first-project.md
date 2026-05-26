@@ -12,6 +12,25 @@ local agent configuration files, and copies the canon project templates. It does
 not overwrite an existing `coord.yaml`; edit that file when you want different
 tools, windows, or launch modes.
 
+## Claude local settings
+
+During setup, greatminds writes or extends
+`.claude/settings.local.json`. New files include the Stop hook,
+`autoMode.allow: ["$defaults"]`, and the canonical
+`permissions.allow` entries from `schema.yaml` under
+`claude_settings.permissions.allow`.
+
+Those allow rules let unattended Claude loop roles perform the git operations
+they are authorized to run, such as reviewer commit, tag, push, merge, branch,
+checkout, and worktree commands. Without explicit allow rules, Claude Code can
+pause on an approval prompt that a loop-mode role cannot answer.
+
+Project operators can add their own `permissions.allow` entries directly in
+`.claude/settings.local.json`. Re-running `greatminds setup` unions the schema
+defaults into the existing list, deduplicates them, and preserves operator-added
+rules. For a valid existing file, setup leaves other top-level settings such as
+custom hooks and `autoMode` untouched.
+
 ## Claude marketplace plugins
 
 During setup, greatminds installs curated Claude marketplace plugins for each
