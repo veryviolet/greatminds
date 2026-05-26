@@ -1043,3 +1043,12 @@ claude_settings:
       - "Bash(git push origin main:*)"
       - "Bash(git push origin main --follow-tags:*)"
       - "Bash(git push --follow-tags:*)"
+      # 0273: ssh/scp/rsync also need to live in auto_mode.allow,
+      # not just permissions.allow. 0267 added them to permissions
+      # but the classifier's auto-mode ceiling is a SEPARATE gate —
+      # TESTER's avatar probe from an --permission-mode auto pane
+      # was still being challenged for USER session auth on every
+      # invocation. Parallel entries unblock the auto-mode panes.
+      - "Bash(ssh:*)"
+      - "Bash(scp:*)"
+      - "Bash(rsync:*)"
