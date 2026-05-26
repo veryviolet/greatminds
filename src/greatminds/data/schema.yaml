@@ -462,6 +462,21 @@ transitions:
     to: stand_done
     by: STAND-KEEPER
     requires: [stand_result_block, evidence_for_if_related_product_task]
+  # 0195: rollback paths from verified/. Two destinations:
+  #   - archive       — "withdraw" (the verified work has been reverted
+  #                     at code level; FSM record now matches reality)
+  #   - feature_review — "revisit" (REVIEWER decides verified work
+  #                     needs further amendment; bounce back for fix)
+  # Both gated on a rollback block with non-empty reason — operators
+  # must record WHY before the FSM exits verified.
+  - from: verified
+    to: archive
+    by: ARCHITECT-REVIEWER
+    requires: [rollback_block_with_reason]
+  - from: verified
+    to: feature_review
+    by: ARCHITECT-REVIEWER
+    requires: [rollback_block_with_reason]
 
 # ---------------------------------------------------------------------------
 # Task front-matter requirements
@@ -726,7 +741,7 @@ event_wake:
 streams:
   product:
     allowed_block_kinds:
-      [triage, plan, implementation, tests, reader_review, review, blocked]
+      [triage, plan, implementation, tests, reader_review, review, blocked, rollback]
     intake_queues: [feature_inbox, user_feedback]
   stand:
     allowed_block_kinds: [stand_result, blocked]
@@ -764,6 +779,10 @@ block_kinds:
     authored_by: [EXPLORER]
   blocked:
     # author = current owner of the queue, resolved at runtime
+  # 0195: rollback block — REVIEWER's witdraw/revisit marker for a
+  # task already in verified/. Must carry non-empty ``reason:``.
+  rollback:
+    authored_by: [ARCHITECT-REVIEWER]
 
 # Which block kinds may be appended to a task currently sitting in
 # each queue. Terminal queues accept nothing (empty list). Mirrors
@@ -782,7 +801,7 @@ queue_accepts_blocks:
   review_sessions:     [session_iteration, blocked]
   stand_requests:      [blocked]
   stand_wip:           [stand_result, blocked]
-  verified:            []
+  verified:            [rollback]  # 0195: rollback only; terminal otherwise
   archive:             []
   stand_done:          []
 
@@ -850,6 +869,47 @@ plugins:
   codex_marketplace:
     TECHNICAL-WRITER: []
     EXPLORER:         []
+
+# 0193: agent-uttered visual markers.
+#
+# After each successful greatminds task mv / append-block / inbox
+# send, the agent ends its turn-reply with one markdown line per
+# the schema-defined template. Unicode colored emoji + markdown
+# bold + inline code = TUI (claude / codex / tmux) renders this
+# natively — no ANSI escapes (which most TUIs strip). Operator
+# scrolling through any agent pane scans by the emoji color and
+# spots major lifecycle events without parsing tool-output blocks.
+#
+# Detection rules (which event for which CLI verb):
+#   - task mv → implementer queue from non-claim queue       → claimed
+#   - task mv → feature_test / feature_docs_review from
+#     an implementer queue                                   → finished
+#   - task mv → verified                                     → accepted
+#   - task append-block tests --field test_result=fail|partial
+#     OR review --field outcome=changes_requested
+#     OR mv back to implementer queue from review queue      → rejected
+#   - inbox send                                             → message_sent
+#
+# Templates use Python str.format placeholders. Available context:
+# {emoji}, {task_id}, {from_queue}, {to_queue}, {from_role},
+# {to_role}, {kind}, {task_ref}, {reason}. Agents pick the right
+# placeholders for each event.
+visual_events:
+  claimed:
+    emoji: "🔵"
+    template: "{emoji} **CLAIMED** `{task_id}` ({from_queue} → {to_queue})"
+  finished:
+    emoji: "🟢"
+    template: "{emoji} **FINISHED** `{task_id}` → `{to_queue}`"
+  accepted:
+    emoji: "🟩"
+    template: "{emoji} **ACCEPTED** `{task_id}` → `verified`"
+  rejected:
+    emoji: "🔴"
+    template: "{emoji} **REJECTED** `{task_id}` ← {from_role} ({reason})"
+  message_sent:
+    emoji: "🟣"
+    template: "{emoji} **SENT** {kind} → {to_role} {task_ref}"
 
 # 0191: Claude Code auto-mode permissions for claude-host roles.
 #

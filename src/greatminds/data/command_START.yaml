@@ -188,6 +188,15 @@ common: |
   roles, code, prompts, log lines for `greatminds-*` tooling — stay
   English regardless of `<GREATMINDS_LANG>`.
 
+  **Visual event markers (0193).** After EACH successful
+  `greatminds task mv`, `greatminds task append-block` (review /
+  tests / implementation outcomes), or `greatminds inbox send`, end
+  your turn-reply with one markdown line per `schema.visual_events`.
+  Use the emoji + bold + code-inline exactly as the template
+  prescribes (the operator scans panes by these markers). Include
+  nothing else AFTER this line — it's the last sentence of your
+  reply for that action.
+
 # ---------------------------------------------------------------------------
 roles:
 
