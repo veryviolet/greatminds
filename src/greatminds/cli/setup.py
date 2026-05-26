@@ -104,6 +104,30 @@ def _load_claude_settings_allow_from_canon(canon: Path) -> list[str]:
     return [str(x) for x in allow if isinstance(x, str)]
 
 
+def _load_claude_settings_auto_mode_from_canon(canon: Path) -> list[str]:
+    """0267: read ``claude_settings.auto_mode.allow`` from schema.yaml.
+
+    The classifier's auto-mode ceiling silently blocks several
+    commands that ``permissions.allow`` would otherwise permit (the
+    motivating case: ``git push origin main``). Schema's
+    ``auto_mode.allow`` list maps directly into the file's
+    ``autoMode.allow`` key. Defaults to ``["$defaults"]`` if the
+    section is missing so the file remains valid for older fleets.
+    """
+    import yaml
+    schema_path = canon / "schema.yaml"
+    if not schema_path.is_file():
+        return ["$defaults"]
+    try:
+        doc = yaml.safe_load(schema_path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        return ["$defaults"]
+    cs = doc.get("claude_settings") or {}
+    allow = ((cs.get("auto_mode") or {}).get("allow") or [])
+    out = [str(x) for x in allow if isinstance(x, str)]
+    return out or ["$defaults"]
+
+
 def _build_settings_local_json(project_dir: Path,
                                 canon: Path | None = None) -> str:
     """Return the JSON text for ``.claude/settings.local.json``.
@@ -132,11 +156,16 @@ def _build_settings_local_json(project_dir: Path,
         f'--phase user-prompt-submit'
     )
     allow: list[str] = []
+    auto_mode_allow: list[str] = ["$defaults"]
     if canon is not None:
         allow = _load_claude_settings_allow_from_canon(canon)
+        auto_mode_allow = _load_claude_settings_auto_mode_from_canon(canon)
     settings = {
         "permissions": {"allow": allow},
-        "autoMode": {"allow": ["$defaults"]},
+        # 0267: schema-driven auto_mode raises the classifier ceiling
+        # for the specific commands (push origin main, follow-tags)
+        # that operators previously had to type with the `!` prefix.
+        "autoMode": {"allow": auto_mode_allow},
         "hooks": {
             "Stop": [
                 {
@@ -199,27 +228,47 @@ def _ensure_claude_settings_local(project_dir: Path, canon: Path) -> str:
         return "unreadable"
 
     canonical_allow = _load_claude_settings_allow_from_canon(canon)
-    if not canonical_allow:
-        return "unchanged"
-
-    perms = existing.setdefault("permissions", {})
-    if not isinstance(perms, dict):
-        perms = {}
-        existing["permissions"] = perms
-    current_allow = perms.get("allow")
-    if not isinstance(current_allow, list):
-        current_allow = []
-    before = list(current_allow)
-    seen = set(str(x) for x in current_allow if isinstance(x, str))
+    canonical_auto = _load_claude_settings_auto_mode_from_canon(canon)
     added = False
-    for rule in canonical_allow:
-        if rule not in seen:
-            current_allow.append(rule)
-            seen.add(rule)
-            added = True
+
+    if canonical_allow:
+        perms = existing.setdefault("permissions", {})
+        if not isinstance(perms, dict):
+            perms = {}
+            existing["permissions"] = perms
+        current_allow = perms.get("allow")
+        if not isinstance(current_allow, list):
+            current_allow = []
+        seen = set(str(x) for x in current_allow if isinstance(x, str))
+        for rule in canonical_allow:
+            if rule not in seen:
+                current_allow.append(rule)
+                seen.add(rule)
+                added = True
+        perms["allow"] = current_allow
+
+    # 0267: same additive-merge for auto_mode. Operator's custom
+    # entries (e.g. their own '$defaults' tweak or extra Bash globs)
+    # are preserved; only the schema's rules not yet present are
+    # appended.
+    if canonical_auto:
+        auto = existing.setdefault("autoMode", {})
+        if not isinstance(auto, dict):
+            auto = {}
+            existing["autoMode"] = auto
+        current_auto = auto.get("allow")
+        if not isinstance(current_auto, list):
+            current_auto = []
+        seen_auto = set(str(x) for x in current_auto if isinstance(x, str))
+        for rule in canonical_auto:
+            if rule not in seen_auto:
+                current_auto.append(rule)
+                seen_auto.add(rule)
+                added = True
+        auto["allow"] = current_auto
+
     if not added:
         return "unchanged"
-    perms["allow"] = current_allow
     target.write_text(
         json.dumps(existing, indent=2) + "\n",
         encoding="utf-8",

@@ -990,3 +990,22 @@ claude_settings:
       - "Bash(git worktree:*)"
       - "Bash(git checkout:*)"
       - "Bash(git branch:*)"
+      # 0267: REVIEWER's rollback path (verified → revert) needs git
+      # revert; TESTER's stand probe needs ssh/scp; STAND-KEEPER's
+      # deploy uses rsync. Pre-0267 these were typed manually with `!`
+      # prefix on every invocation.
+      - "Bash(git revert:*)"
+      - "Bash(ssh:*)"
+      - "Bash(scp:*)"
+      - "Bash(rsync:*)"
+  # 0267: classifier auto-mode ceiling. Without explicit auto_mode
+  # entries the classifier blocks `git push origin main` even when
+  # permissions.allow contains `Bash(git push:*)`. These rules raise
+  # the ceiling so REVIEWER's automated cut-and-push pipeline works
+  # without manual `!` prefix on each push.
+  auto_mode:
+    allow:
+      - "$defaults"
+      - "Bash(git push origin main:*)"
+      - "Bash(git push origin main --follow-tags:*)"
+      - "Bash(git push --follow-tags:*)"
