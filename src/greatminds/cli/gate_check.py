@@ -246,6 +246,48 @@ def get_task_commit(merged: dict) -> str | None:
     return None
 
 
+def extract_lease_evidence_from_tests(merged: dict) -> dict | None:
+    """0246 (0242d / Phase 5): read lease-release evidence from the
+    product task's latest tests block.
+
+    Post-0245 the FSM transports stand-result evidence directly on
+    the tests block via ``stand_evidence`` carrying the lease's
+    structured fields: ``lease_id``, ``result``, ``commit``,
+    ``ready_at``, ``released_at`` (and the existing free-form
+    fields like ``observed_with_fix``, ``tester_observations``).
+
+    This helper returns a dict in the same SHAPE that the legacy
+    ``find_stand_evidence`` scan produced — so the gate_check pass/
+    fail loop reuses the same comparison logic across both code
+    paths. Returns None when:
+    - no tests block, or
+    - the tests block lacks ``stand_evidence``, or
+    - ``stand_evidence`` lacks ``lease_id`` (pre-0246 evidence
+      shape; caller falls back to the legacy stand_done scan).
+    """
+    tests = merged.get("tests")
+    if not isinstance(tests, dict):
+        return None
+    ev = tests.get("stand_evidence")
+    if not isinstance(ev, dict):
+        return None
+    if not ev.get("lease_id"):
+        return None
+    # Map test_result → stand_result-shaped result key for the
+    # unified comparison loop.
+    test_result = tests.get("test_result") or ev.get("result")
+    return {
+        "lease_id": ev.get("lease_id"),
+        "result": test_result,
+        "commit": ev.get("commit") or tests.get("gate_check_commit"),
+        "worktree_fingerprint": ev.get("worktree_fingerprint"),
+        "observed_with_fix": ev.get("observed_with_fix"),
+        "tester_observations": ev.get("tester_observations"),
+        "ready_at": ev.get("ready_at"),
+        "released_at": ev.get("released_at"),
+    }
+
+
 def get_task_worktree_fingerprint(merged: dict) -> str | None:
     """0229: latest worktree_fingerprint known for the task.
 
@@ -344,12 +386,33 @@ def gate_check(task_id: str, project_dir: Path | None, canon_dir: Path | None,
             warn(f"  reason: plan.stand_required is {stand_required!r}, expected true/false")
         raise click.exceptions.Exit(2)
 
-    candidates = find_stand_evidence(project_dir, str(task_id_full))
-    if not candidates:
-        info("missing")
-        if verbose:
-            warn(f"  reason: no stand_done/*.{{yaml,md}} with evidence_for matching {task_id_full}")
-        raise click.exceptions.Exit(2)
+    # 0246 (0242d / Phase 5): prefer lease evidence on the tests
+    # block over the legacy stand_done scan. Post-0245 the FSM
+    # transports stand-result evidence directly via
+    # tests.stand_evidence (the lease_id + result + commit are
+    # written by TESTER from the lease release output). Old
+    # stand_done/<id>.yaml path stays as backwards-compat fallback
+    # for tasks that haven't migrated; 0247 removes it.
+    lease_evidence = extract_lease_evidence_from_tests(merged)
+    if lease_evidence is not None:
+        # Treat the lease evidence as a single-item candidate list
+        # (synthetic path label so existing fail_reasons formatting
+        # keeps working).
+        candidates = [(
+            type("SyntheticPath", (), {"name": "tests.stand_evidence"})(),
+            lease_evidence,
+        )]
+    else:
+        candidates = find_stand_evidence(project_dir, str(task_id_full))
+        if not candidates:
+            info("missing")
+            if verbose:
+                warn(
+                    f"  reason: no tests.stand_evidence with lease_id "
+                    f"AND no stand_done/*.{{yaml,md}} with evidence_for "
+                    f"matching {task_id_full}"
+                )
+            raise click.exceptions.Exit(2)
 
     task_commit = get_task_commit(merged)
     task_fingerprint = get_task_worktree_fingerprint(merged)
