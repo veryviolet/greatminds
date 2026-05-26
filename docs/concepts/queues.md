@@ -15,7 +15,15 @@ Common product queues:
 - `feature_docs_review/`: docs ready for fresh-reader review.
 - `feature_review/`: final architectural review.
 - `feature_blocked/`: tasks parked on explicit dependencies.
-- `verified/`: approved work.
+- `verified/`: approved work. This is normally a final state, but
+  `ARCHITECT-REVIEWER` may roll it back when post-verify evidence shows the
+  work is wrong or obsolete.
+- `archive/`: abandoned, superseded, or withdrawn work.
+
+A verified task can leave `verified/` only through an explicit reviewer
+rollback. The reviewer appends a `rollback` block with a non-empty `reason`,
+then moves the task either to `archive/` when the work has been reverted or to
+`feature_review/` when it needs another review/fix cycle.
 
 Inline flags such as `ready_for_implementation: true` are evidence. They do not
 handoff ownership. Only the queue move does that.
