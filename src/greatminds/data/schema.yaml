@@ -187,6 +187,10 @@ roles:
       - route_tasks_per_scope
       - chat_partner_for_user
       - file_review_sessions
+      # 0297: fresh-install gap closure — PLANNER must know about
+      # the stand-profile mechanism out of the box.
+      - coordinate_stand_profile_tasks_via_schema_and_canon
+      - file_schema_extension_task_on_lease_enum_block
     forbidden_actions:
       - implement_code
       - run_ansible
@@ -205,6 +209,21 @@ roles:
         - write_plan_block
         - set_stand_required
         - route_to_feature_dev_or_feature_ui_dev_or_feature_docs
+      # 0297: stand_down classifiers — PLANNER reads SK's
+      # auto-notification (0291) and routes the fix per the
+      # down_reason signature.
+      on_stand_down_yaml_playbook_error:
+        - read_down_reason_from_inbox_info
+        - file_bugfix_task_for_coordination_stand_profiles_yaml
+        - assign_to_developer
+      on_stand_down_md_interpretation_error:
+        - read_down_reason_from_inbox_info
+        - file_bugfix_task_for_coordination_stand_profiles_md
+        - assign_to_developer
+      on_stand_lease_enum_block:
+        - file_schema_extension_task_for_profiles_allowed_enum
+        - assign_to_developer
+        - block_dependent_lease_until_schema_lands
   ARCHITECT-REVIEWER:
     category: product
     launch_modes: [loop]

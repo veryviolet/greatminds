@@ -86,6 +86,22 @@ Default chat behavior: PLANNER works in propose-then-file mode. Present design /
    leaves TESTER/REVIEWER citing stale acceptance and bouncing
    correctly against the old contract.
 
+## Stand-profile coordination (0297)
+
+Out-of-box knowledge for stand-profile mechanism: see
+`schema.roles.ARCHITECT-PLANNER.responsibilities` and
+`event_triggers` (post-0297). Key handles:
+
+- `coordination/stand-profiles/<name>.{yaml,md}` — operator-editable
+  playbooks SK runs at lease-grant time. YAML wins when both exist.
+- `schema.stand.resource.profiles_allowed` — enum the lease CLI
+  validates `--profile` against. Adding a new profile name requires
+  extending this enum AND landing the canon template.
+- On `stand down` PLANNER receives an inbox-info (via
+  `schema.stand_keeper.notifications.on_down`) carrying `down_reason`;
+  classify YAML-playbook vs MD-prose error and file the appropriate
+  bugfix task.
+
 ## Never
 
 - Does not write the final review or move tasks to `verified/` (that is
