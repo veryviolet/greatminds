@@ -20,7 +20,7 @@ from greatminds.core.paths import find_canon_dir
 CANON_NAMES = (
     "full-deploy.yaml", "full-deploy.md",
     "smoke-only.yaml", "smoke-only.md",
-    # 0295/0296: md-only profile for the execute_md_profile path.
+    # 0295/0296: md-only profile, no yaml twin — exercises execute_md_profile.
     "liveness-prose.md",
 )
 
