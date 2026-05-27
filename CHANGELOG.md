@@ -4,6 +4,23 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.3.7 — 2026-05-27
+
+Closes the 0276 stand-profile umbrella DoD with the MD-cycle live-green
+on real avatar.
+
+### Added
+
+- **0295 liveness-prose MD-only canon template (Phase I of 0276).**
+  New `data/templates/stand-profiles/liveness-prose.md` with no YAML
+  twin so `load_profile` resolves to `format='md'` and SK dispatches
+  through `execute_md_profile` (not `execute_yaml_profile`). Frontmatter
+  declares `deploy_prerequisites_only: false`; body references
+  `${host}`, `${user}`, `${deploy_path}`, `${task_id}`, `${lease_id}`
+  to exercise the substitution path on a real lease. Tests pin the
+  NO-YAML-TWIN invariant as a regression net so a future yaml file with
+  the same stem can't silently short-circuit the MD path.
+
 ## 1.3.6 — 2026-05-27
 
 Closes the 0276 stand-profile umbrella with the live-integration phase
