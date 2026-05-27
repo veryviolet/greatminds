@@ -418,6 +418,12 @@ def stand_down(reason: str) -> None:
     def mutator(state):
         prev = state.get("state") or "free"
         state["down_reason"] = reason
+        # 0289: the lease that triggered this incident is no longer
+        # the live target — clear the active_lease pointer so
+        # ``stand status`` doesn't show an orphan record alongside
+        # state=down. The lease's task / commit details are still
+        # in the transition history for audit.
+        state["active_lease"] = None
         ss.record_transition(state, prev, "down", role, reason=reason)
 
     ss.update_stand_state(coord, mutator)
@@ -446,6 +452,11 @@ def stand_up(reason: str) -> None:
                 exit_code=2,
             )
         state["down_reason"] = None
+        # 0289: down→free is a clean slate for the next lease.
+        # Make sure no orphan active_lease lingers (stand_down should
+        # already have cleared it; this is the second-line defense
+        # for older state files written before 0289).
+        state["active_lease"] = None
         ss.record_transition(state, "down", "free", role, reason=reason)
 
     ss.update_stand_state(coord, mutator)
