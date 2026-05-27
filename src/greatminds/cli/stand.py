@@ -228,8 +228,15 @@ def _file_inbox_info(coord: Path, to_role: str, body: str,
                    "profiles_allowed)")
 @click.option("--ttl-seconds", type=int, default=None,
               help="override ttl (default: schema lease.ttl_seconds_default)")
+@click.option("--deploy-prerequisites-only", "deploy_prerequisites_only",
+              is_flag=True, default=False,
+              help="0283: SK runs only the prerequisite-tagged tasks "
+                   "(YAML) or sees a PREREQUISITES-ONLY notice (MD); "
+                   "TESTER does the actual deploy. Overrides the "
+                   "profile-level setting.")
 def stand_lease(task_id: str, worktree: str, profile: str,
-                 ttl_seconds: int | None) -> None:
+                 ttl_seconds: int | None,
+                 deploy_prerequisites_only: bool) -> None:
     """0244 (Phase 2 of 0242): request a lease on the singleton stand.
 
     Behavior:
@@ -288,6 +295,10 @@ def stand_lease(task_id: str, worktree: str, profile: str,
             "ttl_seconds": ttl_seconds,
             "enqueued_at": ss.now_iso(),
         }
+        # 0283: only persist the flag when set, so leases that
+        # accept the profile default keep the state file minimal.
+        if deploy_prerequisites_only:
+            lease_obj["deploy_prerequisites_only"] = True
         if state.get("state") == "free":
             lease_obj["granted_at"] = ss.now_iso()
             lease_obj["ready_at"] = None
