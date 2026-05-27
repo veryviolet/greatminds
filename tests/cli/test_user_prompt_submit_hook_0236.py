@@ -26,12 +26,15 @@ from greatminds.cli import stop_decide as sd_mod
 # ---------- stop_decide --phase ----------
 
 
-def test_user_prompt_submit_phase_blocks_planner_with_pending(
+def test_user_prompt_submit_phase_surfaces_inbox_for_planner(
     tmp_path: Path, monkeypatch,
 ) -> None:
-    """0236 contract: --phase user-prompt-submit + chat-mode role +
-    pending inbox → emits Claude block JSON forcing inbox drain
-    before the USER prompt is processed."""
+    """0298: --phase user-prompt-submit + chat-mode role + pending
+    inbox → emits only ``systemMessage`` (NEVER ``decision: block``).
+    The block payload at user-prompt-submit jammed every USER
+    prompt and deadlocked the chat-mode conversation; the hook
+    now surfaces the inbox notice informationally so the USER's
+    prompt still reaches the role."""
     coord = tmp_path / "coordination"
     inbox = coord / "inbox" / "architect-planner"
     inbox.mkdir(parents=True)
@@ -48,14 +51,19 @@ def test_user_prompt_submit_phase_blocks_planner_with_pending(
     )
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    assert payload.get("decision") == "block"
-    assert "continue your tick" in payload.get("reason", "")
+    assert "decision" not in payload, (
+        f"0298: user-prompt-submit must NEVER carry decision; "
+        f"got {payload!r}"
+    )
+    assert "systemMessage" in payload
+    assert "continue your tick" in payload["systemMessage"]
 
 
-def test_user_prompt_submit_phase_blocks_maintainer_with_pending(
+def test_user_prompt_submit_phase_surfaces_inbox_for_maintainer(
     tmp_path: Path,
 ) -> None:
-    """MAINTAINER is the other chat-mode role per the allowlist."""
+    """MAINTAINER is the other chat-mode role per the allowlist —
+    same 0298 contract."""
     coord = tmp_path / "coordination"
     inbox = coord / "inbox" / "maintainer"
     inbox.mkdir(parents=True)
@@ -71,7 +79,9 @@ def test_user_prompt_submit_phase_blocks_maintainer_with_pending(
         input="{}",
     )
     assert result.exit_code == 0
-    assert json.loads(result.output).get("decision") == "block"
+    payload = json.loads(result.output)
+    assert "decision" not in payload
+    assert "systemMessage" in payload
 
 
 def test_user_prompt_submit_phase_noop_for_loop_mode_role(
