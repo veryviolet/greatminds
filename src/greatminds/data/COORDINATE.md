@@ -213,6 +213,31 @@ gate_check_commit: <sha>
 that is for the wrong task, against the wrong commit, or has
 `result != pass` fails the gate.
 
+### 8.1 Stand profiles (`coordination/stand-profiles/`)
+
+When STAND-KEEPER grants a lease, it loads a profile file matching
+`lease.profile` (the enum declared in `schema.stand.resource.profiles_allowed`)
+from the canonical directory `coordination/stand-profiles/` and executes
+it as part of the deploy.
+
+Convention:
+
+- File name: `<profile-name>.yaml` or `<profile-name>.md`,
+  where `<profile-name>` is the `lease.profile` enum value
+  (e.g. `full-deploy.yaml`, `vite-dev.md`, `smoke-only.yaml`).
+- YAML files use a subset of ansible-playbook syntax (machine-runnable
+  by SK) — required fields `name`, `hosts`, `tasks`; optional `vars`,
+  `handlers`, `gather_facts`.
+- MD files are free-form prose; SK injects the file contents into its
+  next-tick prompt and works the recipe as instructions.
+- If both formats exist for the same profile name, YAML wins.
+- The lease's `deploy_prerequisites_only` metadata flag tells SK to
+  execute only the prerequisites subset of the profile (used by warmup
+  leases that prepare the stand before the real probe).
+
+Schema source-of-truth: `schema.stand_profile` (added in 0277 / 0276 Phase A).
+Runtime loader + validator land in 0276 Phase B+.
+
 ---
 
 ## 9. Tested / verified — definition
