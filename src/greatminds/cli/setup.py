@@ -1319,11 +1319,56 @@ def setup(project_dir: Path | None, force: bool, lang: str,
                 f"(greatminds daemon install will fix). reason: {exc}"
             )
 
+    # 0280 (0276 Phase D): sanity check ansible-playbook is on PATH.
+    # ansible-core is now a hard dependency (pyproject.toml) so a
+    # successful pip install should provide it; this check surfaces
+    # broken installs early. Warn-only — YAML stand profiles need
+    # it; MD profiles still work without.
+    _check_ansible_playbook_available()
+
     ok("\ndone.")
     info("\nNext:")
     info(f"  1. edit {project_dir}/coord.yaml — confirm project_dir + window list")
     info(f"  2. fill {project_dir}/coordination/PROJECT.md tokens")
     info(f"  3. run: cd {project_dir} && greatminds launch --target tmux")
+
+
+def _check_ansible_playbook_available() -> None:
+    """0280: warn (not error) if ``ansible-playbook`` is absent.
+
+    YAML stand-profiles (Phase C / cli/stand_executor.py) require it;
+    MD-format profiles continue to work without ansible. We emit a
+    visible warning instead of aborting setup so an operator without
+    ansible can still bootstrap a fleet for MD-only workflows.
+    """
+    found = shutil.which("ansible-playbook")
+    if not found:
+        warn(
+            "  ansible-playbook NOT on PATH — YAML stand-profile "
+            "execution (Phase C) will fail. ansible-core is declared "
+            "as a hard dep; if you just ran `pip install greatminds`, "
+            "verify the venv: `pip show ansible-core` should list it. "
+            "MD-format profiles still work without ansible."
+        )
+        return
+
+    # Mostly cosmetic: capture --version output for the setup log so
+    # operators see the exact version + interpreter at install time.
+    try:
+        cp = subprocess.run(
+            [found, "--version"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if cp.returncode == 0:
+            first = (cp.stdout or "").splitlines()[:1]
+            info(f"  ansible-playbook: {first[0] if first else found}")
+            return
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    warn(
+        f"  ansible-playbook present at {found} but --version "
+        "failed; YAML profile execution may be flaky."
+    )
 
 
 if __name__ == "__main__":
