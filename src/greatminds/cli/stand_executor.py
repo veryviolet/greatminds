@@ -215,7 +215,13 @@ def execute_yaml_profile(
             import json as _json
             ev_path.write_text(_json.dumps(extra_vars), encoding="utf-8")
             cmd.extend(["--extra-vars", f"@{ev_path}"])
-        if spec.deploy_prerequisites_only:
+        # 0283 (0276 Phase G): lease-level override wins over spec
+        # value (CLI flag is the most-recent intent).
+        if "deploy_prerequisites_only" in (lease_meta or {}):
+            prereq_only = bool(lease_meta["deploy_prerequisites_only"])
+        else:
+            prereq_only = bool(spec.deploy_prerequisites_only)
+        if prereq_only:
             cmd.extend(["--tags", PREREQ_TAG])
         if extra_argv:
             cmd.extend(extra_argv)
@@ -245,6 +251,15 @@ def execute_yaml_profile(
 # ---------------------------------------------------------------------------
 
 
+PREREQ_ONLY_NOTICE = (
+    "**Mode: PREREQUISITES ONLY** — execute only the prerequisite "
+    "steps (e.g. host clean, docker installed, venv ready); skip the "
+    "main deploy logic. After the prerequisites succeed, call "
+    "`greatminds stand ready --lease-id <lease_id>` and let TESTER "
+    "run the actual deploy + functional probes.\n\n"
+)
+
+
 def execute_md_profile(
     spec: ProfileSpec,
     lease_meta: dict[str, Any],
@@ -257,11 +272,14 @@ def execute_md_profile(
     into its next-tick prompt; the LLM emits the actual Bash
     commands.
 
-    The ``deploy_prerequisites_only`` flag is NOT decoded here —
-    MD profiles are prose and the flag's effect is documented in
-    the prose itself (e.g. "if deploy_prerequisites_only is set,
-    stop after step 3"). The flag is still on the spec for the
-    LLM to read.
+    0283 (0276 Phase G): when the spec's
+    ``deploy_prerequisites_only`` flag is set OR the lease meta
+    overrides it (``lease_meta['deploy_prerequisites_only']``), a
+    machine-readable notice is prepended to the rendered output so
+    the LLM sees the mode switch as the FIRST line of context. The
+    notice tells SK to stop after the prerequisite steps and hand
+    off to TESTER for the actual deploy. Lease-level override
+    wins over spec-level value (CLI flag is the most-recent intent).
     """
     if spec.format != "md":
         raise GreatMindsError(
@@ -271,6 +289,14 @@ def execute_md_profile(
         )
     body = spec.md_content or ""
     rendered = _substitute(body, lease_meta)
+    # Lease-level override takes precedence; fall back to the spec's
+    # frontmatter / yaml.vars value.
+    if "deploy_prerequisites_only" in (lease_meta or {}):
+        prereq_only = bool(lease_meta["deploy_prerequisites_only"])
+    else:
+        prereq_only = bool(spec.deploy_prerequisites_only)
+    if prereq_only:
+        rendered = PREREQ_ONLY_NOTICE + rendered
     return (0, rendered)
 
 
