@@ -159,6 +159,28 @@ def _validate_lease_worktree(task_id: str, worktree: str,
         )
 
 
+def _stand_keeper_notification_target(event: str) -> str | None:
+    """0291: read ``schema.stand_keeper.notifications.<event>`` so
+    SK's auto-inbox-info on lifecycle events stays schema-driven
+    rather than hardcoded. Returns None when the schema lacks the
+    notification entry — caller silently skips the send (graceful
+    degradation; the FSM is unaffected)."""
+    try:
+        import yaml as _yaml
+        from greatminds.core.paths import find_canon_dir
+        doc = _yaml.safe_load(
+            (find_canon_dir() / "schema.yaml").read_text(
+                encoding="utf-8")) or {}
+    except Exception:
+        return None
+    notif = ((doc.get("stand_keeper") or {})
+             .get("notifications") or {})
+    target = notif.get(event)
+    if isinstance(target, str) and target.strip():
+        return target.strip()
+    return None
+
+
 def _allowed_profiles() -> list[str]:
     """0244: read ``stand.profiles_allowed`` from schema. Default to
     the plan-documented enum if absent (defensive)."""
@@ -415,6 +437,8 @@ def stand_down(reason: str) -> None:
         )
     coord = find_coord_dir()
 
+    captured: dict[str, Any] = {}
+
     def mutator(state):
         prev = state.get("state") or "free"
         state["down_reason"] = reason
@@ -423,10 +447,26 @@ def stand_down(reason: str) -> None:
         # ``stand status`` doesn't show an orphan record alongside
         # state=down. The lease's task / commit details are still
         # in the transition history for audit.
+        active = state.get("active_lease") or {}
+        captured["task"] = active.get("task", "")
+        captured["lease_id"] = active.get("lease_id", "")
         state["active_lease"] = None
         ss.record_transition(state, prev, "down", role, reason=reason)
 
     ss.update_stand_state(coord, mutator)
+    # 0291: auto-notify PLANNER on down so they don't need to poll
+    # state.yaml. Best-effort — failure to send doesn't block the
+    # transition (state.yaml is the FSM source-of-truth; the inbox
+    # message is a convenience).
+    notify_target = _stand_keeper_notification_target("on_down")
+    if notify_target:
+        body = f"stand down: {reason}"
+        if captured.get("lease_id"):
+            body += f" (lease_id={captured['lease_id']})"
+        _file_inbox_info(
+            coord, notify_target, body,
+            task_ref=captured.get("task", ""),
+        )
     click.echo(f"state → down: {reason}")
 
 

@@ -1309,3 +1309,13 @@ stand_profile:
   # "prerequisites" subset of the profile (used by warmup leases
   # that prepare the stand for the real probe).
   deploy_prerequisites_only_flag: deploy_prerequisites_only
+
+# 0291: STAND-KEEPER lifecycle notifications. SK files inbox-info
+# automatically on these events so PLANNER (or another role) doesn't
+# need to poll state.yaml. Keep the map small — only events PLANNER
+# must react to. ARCHITECT-PLANNER is the canonical target for
+# ``on_down`` because PLANNER is the one who decides between "SK
+# fixes it" and "USER escalation".
+stand_keeper:
+  notifications:
+    on_down: ARCHITECT-PLANNER
