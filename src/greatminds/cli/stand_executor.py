@@ -301,6 +301,75 @@ def execute_md_profile(
 
 
 # ---------------------------------------------------------------------------
+# Safety check: distinguish remote / isolated deploys from self-modify
+# ---------------------------------------------------------------------------
+
+
+LOCAL_HOSTS = {"", "localhost", "127.0.0.1", "::1"}
+
+
+def is_deploy_safe(
+    worktree: str | Path,
+    host: str | None,
+    project_dir: str | Path,
+) -> tuple[bool, str]:
+    """0285: classify a (worktree, host) pair as safe-to-deploy or
+    self-modify.
+
+    Returns ``(safe, reason)``. ``reason`` is a short explanation
+    suitable for ``stand down`` / setup logs / test assertions.
+
+    Rules:
+      - Worktree resolves under ``<project_dir>/.worktrees/<seq>/`` →
+        ALWAYS safe (0271 isolation guarantee covers self-modify
+        regardless of host).
+      - Worktree IS the project_dir itself (main fleet tree):
+          * host empty / localhost / loopback → self-modify trap.
+            Refuse: deploying onto the running host's own checkout
+            would overwrite the very processes the lease serves.
+          * any other host → safe (remote deploy from main tree is
+            OK; nothing local is modified).
+      - Any other worktree (random path outside ``.worktrees`` or
+        the project) → refuse with "unknown worktree location"; the
+        operator can override via an explicit safe worktree.
+    """
+    try:
+        wt = Path(worktree).resolve(strict=False)
+    except (OSError, RuntimeError):
+        return False, f"unresolvable worktree path: {worktree!r}"
+    project_resolved = Path(project_dir).resolve(strict=False)
+    host_norm = (host or "").strip().lower()
+
+    # .worktrees/<seq>/ — always safe (0271 enforces the layout at
+    # lease-acquire time, so reaching here means an isolated branch).
+    worktrees_root = project_resolved / ".worktrees"
+    try:
+        if worktrees_root in wt.parents or wt.parent == worktrees_root:
+            return True, "isolated worktree under .worktrees/"
+    except OSError:
+        pass
+
+    # Main fleet tree itself — depends on the target host.
+    if wt == project_resolved:
+        if host_norm in LOCAL_HOSTS:
+            return False, (
+                "self-modify trap: deploy from main fleet tree to "
+                "localhost would overwrite the running host's "
+                "checkout; set STAND_HOST to a remote target or "
+                "use a .worktrees/<seq>/ worktree."
+            )
+        return True, (
+            f"remote deploy from main tree to {host!r} — no local "
+            "self-modify risk"
+        )
+
+    return False, (
+        f"unknown worktree location {wt} — not under "
+        f"{worktrees_root} and not equal to {project_resolved}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Dispatch helper consumed by stand.py
 # ---------------------------------------------------------------------------
 

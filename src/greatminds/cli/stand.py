@@ -303,6 +303,12 @@ def stand_lease(task_id: str, worktree: str, profile: str,
             lease_obj["granted_at"] = ss.now_iso()
             lease_obj["ready_at"] = None
             state["active_lease"] = lease_obj
+            # 0285: clear stale ``down_reason`` left by a prior
+            # lease that crashed before reaching ``up`` — every
+            # free→preparing is a clean slate; SK's whitelist
+            # diagnostic loop must not see yesterday's reason and
+            # short-circuit today's deploy.
+            state["down_reason"] = None
             ss.record_transition(
                 state, "free", "preparing", holder,
                 lease_id=new_lease_id,
