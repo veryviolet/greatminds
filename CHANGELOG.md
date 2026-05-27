@@ -4,6 +4,77 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.3.3 — 2026-05-27
+
+Stand-profile mechanism (0276 umbrella, Phases A-G) plus a deploy-safety
+fix that unblocks Phase H avatar verification.
+
+### Added
+
+- **0277 stand_profile schema section + canon convention (Phase A).**
+  `schema.stand_profile` declares directory
+  (`coordination/stand-profiles`), formats (yaml/md), lookup pattern,
+  dialects (ansible-playbook subset / free prose), yaml required +
+  optional fields, and `deploy_prerequisites_only_flag`. COORDINATE.md
+  §8.1 documents file-name convention, YAML-wins-on-conflict, and
+  references `schema.stand_profile` as source of truth.
+
+- **0278 stand_profile loader/parser (Phase B).** New
+  `cli/stand_profile.py` exposes `ProfileSpec` + `load_profile` +
+  `profile_paths`. Lookup precedence: yaml → md → error naming both
+  paths. `deploy_prerequisites_only` extracted uniformly from
+  `yaml.vars` or md frontmatter. Malformed MD frontmatter silently
+  falls back to full body.
+
+- **0279 SK execution path — YAML→ansible-playbook + MD→prose (Phase
+  C).** `cli/stand_executor.py` adds `execute_yaml_profile`,
+  `execute_md_profile`, and `dispatch_profile`. YAML synthesizes
+  inventory + extra-vars (via `@<json-file>` so shell metacharacters
+  survive) and shells out to `ansible-playbook`. MD substitutes
+  `${var}` via `string.Template.safe_substitute` (unknown vars stay
+  literal). STAND-KEEPER.md §Does Step 2 extended.
+
+- **0280 ansible-core hard dep (Phase D).** `pyproject.toml` pins
+  `ansible-core>=2.16,<2.18`; `setup` runs a sanity check at the end
+  of its run that warns (but does not abort) if ansible-playbook is
+  missing — MD-only operators stay unblocked.
+
+- **0281 full-deploy + smoke-only presets (Phase E).** Four canon
+  preset files under `data/templates/stand-profiles/` (yaml + md for
+  each). `setup._seed_stand_profiles` copies them into
+  `<coord>/stand-profiles/` idempotently. Loader side-fix:
+  `_load_yaml_profile` now accepts both list-of-plays (real ansible
+  playbook) and mapping (single-play short-hand) at the top level.
+
+- **0282 canon updates — STAND-KEEPER + TESTER + COORDINATE.md (Phase
+  F).** STAND-KEEPER workflow anchors on `load_profile + dispatch`,
+  success/failure via `stand ready/down`, `deploy_prerequisites_only`
+  semantics. TESTER scope tightens to probe-only with a
+  deploy-pipeline carve-out. COORDINATE.md §8.1 publishes profile
+  ownership, consumers, format choice.
+
+- **0283 `deploy_prerequisites_only` flag end-to-end (Phase G).**
+  `greatminds stand lease --deploy-prerequisites-only` persists the
+  flag into `active_lease.deploy_prerequisites_only` only when True
+  (minimal-state pin). YAML executor appends `--tags prerequisite`
+  on the resolved value; MD executor prepends `PREREQ_ONLY_NOTICE`
+  banner so SK's LLM sees the mode switch before the recipe.
+  Lease-level override wins over spec value.
+
+### Fixed
+
+- **0285 SK deploy-bypass closed — `is_deploy_safe` classifier.** SK
+  was refusing every deploy that touched the main fleet tree, even
+  when the lease pointed at a per-task `.worktrees/<seq>/` worktree
+  OR named a remote `STAND_HOST`; state short-circuited to ready
+  without `ansible-playbook` executing. New
+  `is_deploy_safe(worktree, host, project_dir)` classifier resolves
+  three branches: isolated worktree always safe, main-tree +
+  local-host unsafe (self-modify), main-tree + remote-host safe.
+  `LOCAL_HOSTS` set + host normalization so PROJECT.env strings
+  classify cleanly. Lease mutator also clears stale `down_reason` on
+  free→preparing so prior incidents don't poison subsequent leases.
+
 ## 1.3.2 — 2026-05-27
 
 Followup cut after the 1.3.0 BREAKING stand-stream redesign + 1.3.1
