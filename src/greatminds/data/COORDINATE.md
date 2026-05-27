@@ -220,6 +220,16 @@ When STAND-KEEPER grants a lease, it loads a profile file matching
 from the canonical directory `coordination/stand-profiles/` and executes
 it as part of the deploy.
 
+Ownership and usage:
+
+- Stand profiles live at `coordination/stand-profiles/<name>.{yaml,md}`.
+- USER and DEVELOPER write or update profiles when adding new deploy
+  scenarios.
+- STAND-KEEPER uses a profile only when the active lease carries
+  `profile=<name>`, loading it with `load_profile(coord, lease.profile)`.
+- YAML and MD profile files are both supported; the author chooses the
+  format that best fits the scenario.
+
 Convention:
 
 - File name: `<profile-name>.yaml` or `<profile-name>.md`,
@@ -229,11 +239,12 @@ Convention:
   by SK) — required fields `name`, `hosts`, `tasks`; optional `vars`,
   `handlers`, `gather_facts`.
 - MD files are free-form prose; SK injects the file contents into its
-  next-tick prompt and works the recipe as instructions.
+  next-tick prompt and writes the Bash needed to work the recipe.
 - If both formats exist for the same profile name, YAML wins.
 - The lease's `deploy_prerequisites_only` metadata flag tells SK to
-  execute only the prerequisites subset of the profile (used by warmup
-  leases that prepare the stand before the real probe).
+  execute only tasks tagged `prerequisite` for YAML, or only the
+  prerequisite section for MD. This is used when TESTER must verify the
+  deployment pipeline itself after SK prepares only the host prerequisites.
 
 Schema source-of-truth: `schema.stand_profile` (added in 0277 / 0276 Phase A).
 Runtime loader + validator land in 0276 Phase B+.

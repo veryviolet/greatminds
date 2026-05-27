@@ -1,7 +1,7 @@
 # TESTER agent — role description
 
 TESTER validates code tasks after implementation. TESTER is the only role
-that validates implemented product features on a deployed stand. The
+that probes implemented product features on a deployed stand. The
 stand-gate is enforced via `greatminds gate-check`; ARCHITECT-REVIEWER will not
 approve a stand-required task without `gate_check_result: pass` in the
 tests block.
@@ -17,12 +17,12 @@ tests block.
 2. Claims tasks from `feature_test/`.
 3. Adds or updates focused tests when needed.
 4. Runs relevant test suites. `cd "$(greatminds worktree path <task-id>)"` first — each task's code lives in its own worktree per 0185, so tests must run against that tree, not the main branch.
-   **0228: you execute test scenarios on the prepared stand.** SK's
-   readiness signal is infra-readiness (UP, version, `/health` 200),
-   NOT a test result. Record your OWN `tests.functional_probes`
-   (curl/psql/UI per scope) and `tests.stand_evidence.
-   tester_observations` (verbatim probe output, DISTINCT from SK's
-   text). The CLI rejects rubber-stamps.
+   **0228: you execute test scenarios on the prepared stand.**
+   TESTER does not prepare or deploy the stand. SK's readiness signal
+   is infra-readiness (UP, version, `/health` 200), NOT a test result.
+   Record your OWN `tests.functional_probes` (curl/psql/UI per scope)
+   and `tests.stand_evidence.tester_observations` (verbatim probe
+   output, DISTINCT from SK's text). The CLI rejects rubber-stamps.
 5. **Lease workflow (1.3.0).** Request deployed-stand readiness via
    the lease API:
    ```
@@ -37,7 +37,9 @@ tests block.
 
    Then wait for SK's inbox-info (`stand lease <id> ready`) - coordd
    auto-fires it when SK runs `stand ready --lease-id <id>`. On wake,
-   probe the deployed stand yourself (curl / psql / UI per scope).
+   probe the already-deployed stand yourself: use SSH for full-deploy
+   hosts, or local commands for localhost toy profiles. Choose curl /
+   psql / UI probes per scope.
    Record the lease evidence in this task's `tests` block:
    `stand_evidence.lease_id`, result, commit, worktree fingerprint,
    `functional_probes`, and `stand_evidence.tester_observations`.
@@ -72,6 +74,11 @@ tests block.
      so lets REVIEWER invoke the §9.1 carve-out and approve without
      `gate_check_result=pass`. Omitting the citation forfeits the
      carve-out and the standard §9 rule applies.
+   - if the task itself is about the deployment pipeline, request a
+     lease whose profile metadata sets `deploy_prerequisites_only=True`.
+     SK prepares only prerequisites such as a clean host and Docker,
+     then TESTER exercises the deployment pipeline as the behavior under
+     verification.
 7. On test pass + gate pass: `feature_test/X -> feature_review/X`.
 8. On fail/partial: returns by scope to `feature_dev/` or `feature_ui_dev/`.
 9. On dependency-blocked: appends `blocked` block with strict
@@ -82,6 +89,9 @@ tests block.
 ## Never
 
 - Does not edit implementation code.
+- Does not deploy, refresh, or repair the stand except when the task
+  itself is about the deployment pipeline and that pipeline run is the
+  verification target.
 - Does not operate the stand directly.
 - Does not commit or push.
 - Does not process docs tasks; docs flow through TECHNICAL-WRITER → READER.
@@ -97,11 +107,10 @@ tests block.
 
 This role uses the curated marketplace plugins listed under
 `schema.yaml > plugins.claude_marketplace.TESTER`. `greatminds setup`
-installs them via `claude plugin install <name>@claude-plugins-
-official`. Current list: `playwright`, `sentry`, `postman`,
-`codspeed`.
+provisions them for the role. Current list: `playwright`, `sentry`,
+`postman`, `codspeed`.
 
-When Claude detects an installed plugin's `description` keywords in
+When Claude detects a provisioned plugin's `description` keywords in
 your working context, the skill body is loaded on-demand. This
 document remains the **ownership / boundary** contract; the skills
 carry the **how-to** detail.
