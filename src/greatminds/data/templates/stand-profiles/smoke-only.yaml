@@ -1,0 +1,24 @@
+# smoke-only.yaml — fast reachability + CLI-responds probe. No
+# rsync, no install. Used for warmup leases and post-deploy
+# liveness checks.
+---
+- name: greatminds smoke
+  hosts: stand
+  gather_facts: false
+  become: false
+  vars:
+    deploy_path: "{{ deploy_path | default('/srv/greatminds') }}"
+
+  tasks:
+    - name: ssh reachable + remote shell working
+      ansible.builtin.command: /bin/true
+      changed_when: false
+      tags: [prerequisite]
+
+    - name: greatminds CLI responds
+      ansible.builtin.command:
+        cmd: ".venv-coord/bin/greatminds --version"
+        chdir: "{{ deploy_path }}"
+      register: version_out
+      changed_when: false
+      failed_when: version_out.rc != 0

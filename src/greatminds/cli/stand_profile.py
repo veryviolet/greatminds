@@ -144,15 +144,31 @@ def _load_yaml_profile(name: str, path: Path) -> ProfileSpec:
             f"stand-profile {name!r} ({path.name}): invalid YAML: {exc}",
             exit_code=2,
         )
-    if not isinstance(data, dict):
+    # 0281: ansible-playbook syntax has the document as a LIST of
+    # plays. Phase B's original loader only accepted a top-level
+    # mapping (single-play short-hand). Accept both: list-of-plays
+    # uses the first play for required-field validation; ``yaml_data``
+    # keeps the full original shape so ``ansible-playbook`` can
+    # consume it directly.
+    if isinstance(data, list):
+        if not data or not isinstance(data[0], dict):
+            raise GreatMindsError(
+                f"stand-profile {name!r} ({path.name}): list-of-plays "
+                f"form must contain at least one mapping entry",
+                exit_code=2,
+            )
+        first_play = data[0]
+    elif isinstance(data, dict):
+        first_play = data
+    else:
         raise GreatMindsError(
             f"stand-profile {name!r} ({path.name}): top-level must be "
-            f"a mapping (got {type(data).__name__})",
+            f"a mapping or list-of-mappings (got {type(data).__name__})",
             exit_code=2,
         )
 
     required = _yaml_required_fields_from_schema()
-    missing = [f for f in required if f not in data]
+    missing = [f for f in required if f not in first_play]
     if missing:
         raise GreatMindsError(
             f"stand-profile {name!r} ({path.name}): missing required "
@@ -160,7 +176,7 @@ def _load_yaml_profile(name: str, path: Path) -> ProfileSpec:
             exit_code=2,
         )
 
-    vars_block = data.get("vars") or {}
+    vars_block = first_play.get("vars") or {}
     if not isinstance(vars_block, dict):
         vars_block = {}
     prereq = bool(vars_block.get(PREREQ_ONLY_KEY, False))
