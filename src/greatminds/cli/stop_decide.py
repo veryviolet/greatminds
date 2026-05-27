@@ -134,11 +134,22 @@ def stop_decide(role: str, host: str, project_dir: Path | None,
 
     msg = f"continue your tick: inbox/{role.lower()}/ has {len(inbox_msgs)} pending inbox message(s)"
     if host == "claude":
-        click.echo(json.dumps({
-            "decision": "block",
-            "reason": msg,
-            "systemMessage": msg,
-        }))
+        # 0298: branch output by phase. Stop hook blocks the agent
+        # from idling between turns when work is pending (the
+        # 0236 contract). UserPromptSubmit hook fires at the start
+        # of every USER turn — emitting ``decision: block`` here
+        # rejects the USER's prompt, jamming the chat-mode role
+        # into a deadlock the USER can't recover from in-band.
+        # The hook may still surface the pending-inbox notice
+        # via systemMessage, but the prompt MUST reach the role.
+        if phase == "user-prompt-submit":
+            click.echo(json.dumps({"systemMessage": msg}))
+        else:
+            click.echo(json.dumps({
+                "decision": "block",
+                "reason": msg,
+                "systemMessage": msg,
+            }))
     else:
         click.echo(json.dumps({"followup_message": msg}))
 
