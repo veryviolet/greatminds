@@ -4,6 +4,26 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.3.8 — 2026-05-27
+
+Adds PLANNER's machine-readable contract for the stand-profile
+mechanism so fresh-install PLANNER agents pick up the workflow at
+tick start without an operator ping. Closes the role-contract gap
+left after the 0276 stand-profile umbrella shipped.
+
+### Added
+
+- **0297 PLANNER role contract gains stand-profile coordination.**
+  `schema.roles.ARCHITECT-PLANNER` now declares
+  `coordinate_stand_profile_tasks_via_schema_and_canon` +
+  `file_schema_extension_task_on_lease_enum_block` responsibilities
+  and three new `event_triggers`:
+  `on_stand_down_yaml_playbook_error` (file YAML bugfix from SK's
+  inbox-info), `on_stand_down_md_interpretation_error` (same flow for
+  MD prose), `on_stand_lease_enum_block` (file schema-extension task
+  before the dependent lease proceeds). `ARCHITECT-PLANNER.md` carries
+  a short cross-reference paragraph — no duplicate prose.
+
 ## 1.3.7 — 2026-05-27
 
 Closes the 0276 stand-profile umbrella DoD with the MD-cycle live-green
