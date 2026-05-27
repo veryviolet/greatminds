@@ -937,7 +937,10 @@ stand:
     # 0244 (0242b / Phase 2): profile enum the lease CLI validates
     # ``--profile`` against. SK's deploy playbook per value lives
     # in PROJECT.md (out of scope for 0244 — separate design).
-    profiles_allowed: [full-deploy, vite-dev, smoke-only]
+    # 0296: ``liveness-prose`` added — md-only profile (no yaml
+    # twin) for exercising ``execute_md_profile`` end-to-end on
+    # real avatar. Canon template ships in templates/stand-profiles/.
+    profiles_allowed: [full-deploy, vite-dev, smoke-only, liveness-prose]
 
 tests_block_validation:
   stand_evidence:
