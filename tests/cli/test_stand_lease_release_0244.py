@@ -187,6 +187,11 @@ def test_ready_transitions_state(tmp_path, monkeypatch) -> None:
         "active_lease": {"lease_id": "abc", "task": "0099",
                          "holder_role": "TESTER"},
     }))
+    # 0286: stand_ready now requires the deploy marker; seed one.
+    from greatminds.cli.stand_executor import deploy_marker_path
+    marker = deploy_marker_path(coord, "abc")
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text("rc=0\n", encoding="utf-8")
     # Stub the subprocess call to inbox send (would shell out in real).
     monkeypatch.setattr(stand_mod, "_file_inbox_info",
                         lambda *a, **kw: None)
@@ -209,6 +214,11 @@ def test_ready_fires_inbox_info_to_holder(tmp_path, monkeypatch) -> None:
         "active_lease": {"lease_id": "xyz-id", "task": "0099-foo",
                          "holder_role": "EXPLORER"},
     }))
+    # 0286: deploy marker required.
+    from greatminds.cli.stand_executor import deploy_marker_path
+    marker = deploy_marker_path(coord, "xyz-id")
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text("rc=0\n", encoding="utf-8")
     sent: list = []
     monkeypatch.setattr(
         stand_mod, "_file_inbox_info",
@@ -433,6 +443,12 @@ def test_lease_release_recorded_in_history(tmp_path, monkeypatch) -> None:
         "--profile", "full-deploy",
     ])
     lid = out.output.strip().split("lease_id:")[1].strip()
+
+    # 0286: deploy marker required for stand ready.
+    from greatminds.cli.stand_executor import deploy_marker_path
+    marker = deploy_marker_path(coord, lid)
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text("rc=0\n", encoding="utf-8")
 
     monkeypatch.setenv("GREATMINDS_ROLE", "STAND-KEEPER")
     monkeypatch.setattr(stand_mod, "_file_inbox_info",

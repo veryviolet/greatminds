@@ -458,8 +458,16 @@ def stand_up(reason: str) -> None:
 def stand_ready(lease_id: str) -> None:
     """0244: SK-only. Transition preparing→ready for ``lease_id``
     after deploy + smoke succeeds. Files an inbox-info to the lease
-    holder so they wake up and start probing the stand."""
+    holder so they wake up and start probing the stand.
+
+    0286: refuses the transition unless a deploy marker exists at
+    ``<coord>/.stand/deploy-<lease_id>.log`` — proves SK actually
+    invoked ``execute_yaml_profile`` / ``execute_md_profile`` and
+    didn't short-circuit to ``ready`` without running the playbook.
+    """
     from greatminds.cli import stand_state as ss
+    from greatminds.cli.stand_executor import deploy_marker_path
+
     role = (os.environ.get("GREATMINDS_ROLE") or "").upper()
     if role != "STAND-KEEPER":
         raise GreatMindsError(
@@ -467,6 +475,21 @@ def stand_ready(lease_id: str) -> None:
             exit_code=3,
         )
     coord = find_coord_dir()
+
+    # 0286 gate: marker must exist for this lease_id BEFORE we touch
+    # state.yaml. Skipping ansible and calling `stand ready` was the
+    # bug — this check removes the foot-gun at the CLI surface.
+    marker = deploy_marker_path(coord, lease_id)
+    if not marker.is_file():
+        raise GreatMindsError(
+            f"stand ready refused: no deploy marker at {marker}. "
+            "SK must invoke execute_yaml_profile (or execute_md_profile) "
+            "via stand_executor.dispatch_profile BEFORE stand ready. "
+            "The marker proves the deploy actually ran instead of "
+            "short-circuiting to ready.",
+            exit_code=2,
+        )
+
     captured: dict[str, str] = {}
 
     def mutator(state):

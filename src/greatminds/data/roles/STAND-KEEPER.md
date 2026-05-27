@@ -44,6 +44,26 @@ gone. The singleton stand is driven by `coordination/.stand/state.yaml`.
    Load the profile with `load_profile(coord, lease.profile)`, then
    deploy from the lease worktree using the profile-specific runbook.
 
+   **0286 mandatory step.** You MUST invoke
+   `greatminds.cli.stand_executor.dispatch_profile(spec, lease_meta)`
+   (or its underlying `execute_yaml_profile` / `execute_md_profile`)
+   BEFORE calling `greatminds stand ready --lease-id <X>`. The
+   executor:
+   - calls `is_deploy_safe(worktree, host, project_dir)` first and
+     refuses any deploy that would self-modify the running fleet
+     tree (returns rc=126 with a clear reason).
+   - drops a marker file at
+     `<coord>/.stand/deploy-<lease_id>.log` capturing the exit
+     code + log output.
+   - is the only way `stand ready` will accept the transition —
+     the CLI rejects with exit_code=2 + "no deploy marker" if the
+     file is absent. Skipping the executor and trying to short-cut
+     `stand ready` is no longer possible.
+
+   Include `coord: <coord_dir>` in `lease_meta` (alongside the
+   lease fields you read from `active_lease`) so the executor knows
+   where to write the marker.
+
    **0279 (0276 Phase C) — profile dispatch.** The profile name on
    the lease maps to a file under `coordination/stand-profiles/`:
    - `spec.format == "yaml"` — run `ansible-playbook` for the YAML
