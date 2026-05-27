@@ -20,6 +20,8 @@ from greatminds.core.paths import find_canon_dir
 CANON_NAMES = (
     "full-deploy.yaml", "full-deploy.md",
     "smoke-only.yaml", "smoke-only.md",
+    # 0295/0296: md-only profile for the execute_md_profile path.
+    "liveness-prose.md",
 )
 
 
@@ -113,7 +115,7 @@ def test_seed_stand_profiles_copies_all_four(tmp_path: Path) -> None:
     coord = _coord(tmp_path)
     copied, skipped = setup_mod._seed_stand_profiles(
         coord, find_canon_dir())
-    assert (copied, skipped) == (4, 0)
+    assert (copied, skipped) == (5, 0)
     landing = coord / "stand-profiles"
     assert landing.is_dir()
     for name in CANON_NAMES:
@@ -135,7 +137,7 @@ def test_seed_stand_profiles_is_idempotent(tmp_path: Path) -> None:
 
     copied, skipped = setup_mod._seed_stand_profiles(
         coord, find_canon_dir())
-    assert (copied, skipped) == (0, 4)
+    assert (copied, skipped) == (0, 5)
     assert target.read_text(encoding="utf-8") == operator_edit, (
         "0281: setup must NOT overwrite operator-edited preset files"
     )
