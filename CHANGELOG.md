@@ -4,6 +4,32 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.3.10 — 2026-05-27
+
+Fixes two operator-facing bugs in `greatminds update` so the command
+works correctly on projects managed by uv / poetry / pipenv and stops
+resurrecting torn-down fleet sessions.
+
+### Fixed
+
+- **0299 update branches by `detect_env_setup` + skips fleet restart
+  when tmux session absent.** `update` used to call pip even when the
+  project lived under uv/poetry/pipenv, installing into the wrong env
+  layer and then losing on the uv-lock mismatch on the next install.
+  The pip-step is now replaced by a `detect_env_setup` dispatch:
+  - `env_type=uv` → `uv lock --upgrade-package greatminds && uv sync`
+  - `env_type=poetry` → `poetry update greatminds`
+  - `env_type=pipenv` → `pipenv update greatminds`
+  - `env_type=conda` or fallback `None` → `<py> -m pip install …`
+
+  The fleet-restart step also called tmux send-keys unconditionally,
+  resurrecting state on hosts where the operator had torn the tmux
+  down. `_step_restart_agents` now gates on
+  `_tmux_session_present(name)` (reads session name from
+  `coord.yaml`, checks tmux PATH + `has-session` rc, swallows
+  TimeoutExpired); when the session is absent it logs a skip-info
+  and returns without touching tmux.
+
 ## 1.3.9 — 2026-05-27
 
 Critical fix for the chat-mode UserPromptSubmit deadlock that
