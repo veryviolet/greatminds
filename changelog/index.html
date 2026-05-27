@@ -1273,6 +1273,25 @@
 <p>All notable changes to <strong>greatminds</strong> are documented here. Format follows
 <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a> loosely; versions
 follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
+<h2 id="134-2026-05-27">1.3.4 — 2026-05-27<a class="headerlink" href="#134-2026-05-27" title="Permanent link">&para;</a></h2>
+<p>Followup patch tightening the SK runtime gate so the stand-profile
+dispatch contract is actually enforced.</p>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>0286 three-layer deploy lock.</strong> SK could still mark state=ready
+  without invoking ansible-playbook because the <code>is_deploy_safe</code>
+  classifier landed in 1.3.3 had no callsites in the runtime path.
+  Three independent layers now enforce the contract end-to-end:
+  (1) <code>execute_yaml_profile</code> gates on <code>is_deploy_safe</code> at top of
+  function — unsafe → rc=126, no subprocess, reason captured in
+  marker. (2) Both executors drop a per-lease marker at
+  <code>&lt;coord&gt;/.stand/deploy-&lt;lease_id&gt;.log</code>; timeouts (124),
+  FileNotFoundError (127), and refusals (126) all record markers so
+  failure modes surface via rc, not "no evidence". (3) <code>greatminds
+  stand ready --lease-id</code> refuses with exit_code=2 + actionable
+  message when the marker is absent. STAND-KEEPER.md §2 codifies the
+  <code>dispatch_profile</code> MUST-precede contract.</li>
+</ul>
 <h2 id="133-2026-05-27">1.3.3 — 2026-05-27<a class="headerlink" href="#133-2026-05-27" title="Permanent link">&para;</a></h2>
 <p>Stand-profile mechanism (0276 umbrella, Phases A-G) plus a deploy-safety
 fix that unblocks Phase H avatar verification.</p>
@@ -1336,7 +1355,7 @@ fix that unblocks Phase H avatar verification.</p>
   Lease-level override wins over spec value.</p>
 </li>
 </ul>
-<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0285 SK deploy-bypass closed — <code>is_deploy_safe</code> classifier.</strong> SK
   was refusing every deploy that touched the main fleet tree, even
@@ -1355,7 +1374,7 @@ fix that unblocks Phase H avatar verification.</p>
 emergency wake fix. Five verified tasks merged on local main; all
 empirically validated via real avatar SSH stand probes (no shape-only
 evidence).</p>
-<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0258 — complete BREAKING removal of stand-stream runtime.</strong>
@@ -1429,7 +1448,7 @@ input_sock channel + leaf SIGINT; end-to-end probe (filed
 feature_inbox/9999.yaml → coordd inotify → press_enter →
 input_sock → SIGINT to PLANNER's own Bash subprocess exit 130)
 confirms the full chain.</p>
-<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0259 coordd inotify wake uses <code>input_sock</code> via <code>press_enter</code>.</strong>
   Pre-0259, coordd's chat-mode wake (<code>tmux_send_keys_wake</code>) sent
@@ -1539,7 +1558,7 @@ in a single step.</p>
 <p>Bug-fix release. Three regressions found in 1.1.0 real-world use, plus a
 critical wake-up channel regression introduced silently by the 1.0.0
 umbrella-console-script migration. No new features.</p>
-<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_4">Fixed<a class="headerlink" href="#fixed_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>task append-block --body-file</code> option missing.</strong> Dropped during the
   argparse→click conversion. The plan orchestrator and several agent
@@ -1686,7 +1705,7 @@ plan → dev) confirmed against a fresh project: 7+ journal
 transitions, schema validation rejects malformed blocks, role
 permissions enforced.</p>
 <h2 id="011-2026-05-20">0.1.1 — 2026-05-20<a class="headerlink" href="#011-2026-05-20" title="Permanent link">&para;</a></h2>
-<h3 id="fixed_4">Fixed<a class="headerlink" href="#fixed_4" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_5">Fixed<a class="headerlink" href="#fixed_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>greatminds-coord-launch</code> and <code>greatminds-coord-tmux</code> now find a
   sibling <code>greatminds-start-agent</code> in the same venv via
