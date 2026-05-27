@@ -1273,11 +1273,34 @@
 <p>All notable changes to <strong>greatminds</strong> are documented here. Format follows
 <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a> loosely; versions
 follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
+<h2 id="1310-2026-05-27">1.3.10 — 2026-05-27<a class="headerlink" href="#1310-2026-05-27" title="Permanent link">&para;</a></h2>
+<p>Fixes two operator-facing bugs in <code>greatminds update</code> so the command
+works correctly on projects managed by uv / poetry / pipenv and stops
+resurrecting torn-down fleet sessions.</p>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>0299 update branches by <code>detect_env_setup</code> + skips fleet restart
+  when tmux session absent.</strong> <code>update</code> used to call pip even when the
+  project lived under uv/poetry/pipenv, installing into the wrong env
+  layer and then losing on the uv-lock mismatch on the next install.
+  The pip-step is now replaced by a <code>detect_env_setup</code> dispatch:</li>
+<li><code>env_type=uv</code> → <code>uv lock --upgrade-package greatminds &amp;&amp; uv sync</code></li>
+<li><code>env_type=poetry</code> → <code>poetry update greatminds</code></li>
+<li><code>env_type=pipenv</code> → <code>pipenv update greatminds</code></li>
+<li><code>env_type=conda</code> or fallback <code>None</code> → <code>&lt;py&gt; -m pip install …</code></li>
+</ul>
+<p>The fleet-restart step also called tmux send-keys unconditionally,
+  resurrecting state on hosts where the operator had torn the tmux
+  down. <code>_step_restart_agents</code> now gates on
+  <code>_tmux_session_present(name)</code> (reads session name from
+  <code>coord.yaml</code>, checks tmux PATH + <code>has-session</code> rc, swallows
+  TimeoutExpired); when the session is absent it logs a skip-info
+  and returns without touching tmux.</p>
 <h2 id="139-2026-05-27">1.3.9 — 2026-05-27<a class="headerlink" href="#139-2026-05-27" title="Permanent link">&para;</a></h2>
 <p>Critical fix for the chat-mode UserPromptSubmit deadlock that
 shipped across the 1.3.x line. Operators on existing projects should
 upgrade promptly.</p>
-<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0298 stop-decide <code>user-prompt-submit</code> phase no longer emits
   <code>decision: block</code>.</strong> <code>greatminds stop-decide</code> returned the same
@@ -1359,7 +1382,7 @@ be leased.</p>
   rejection.</p>
 </li>
 </ul>
-<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0292 <code>full-deploy.yaml</code> install step uses <code>uv pip</code>.</strong> <code>uv venv</code>
@@ -1394,7 +1417,7 @@ contradictions across the stand transitions.</p>
   role list</code> CLI surface the rendered contract. Existing
   <code>roles/*.md</code> prose remains; doc-shrinkage follow-up deferred.</li>
 </ul>
-<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0289 stand release/down/up nullify <code>active_lease</code>.</strong> Pre-fix
   <code>stand down</code> left the triggering lease set, and <code>stand up</code> did
@@ -1408,7 +1431,7 @@ contradictions across the stand transitions.</p>
 <h2 id="134-2026-05-27">1.3.4 — 2026-05-27<a class="headerlink" href="#134-2026-05-27" title="Permanent link">&para;</a></h2>
 <p>Followup patch tightening the SK runtime gate so the stand-profile
 dispatch contract is actually enforced.</p>
-<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_4">Fixed<a class="headerlink" href="#fixed_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0286 three-layer deploy lock.</strong> SK could still mark state=ready
   without invoking ansible-playbook because the <code>is_deploy_safe</code>
@@ -1487,7 +1510,7 @@ fix that unblocks Phase H avatar verification.</p>
   Lease-level override wins over spec value.</p>
 </li>
 </ul>
-<h3 id="fixed_4">Fixed<a class="headerlink" href="#fixed_4" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_5">Fixed<a class="headerlink" href="#fixed_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0285 SK deploy-bypass closed — <code>is_deploy_safe</code> classifier.</strong> SK
   was refusing every deploy that touched the main fleet tree, even
@@ -1506,7 +1529,7 @@ fix that unblocks Phase H avatar verification.</p>
 emergency wake fix. Five verified tasks merged on local main; all
 empirically validated via real avatar SSH stand probes (no shape-only
 evidence).</p>
-<h3 id="fixed_5">Fixed<a class="headerlink" href="#fixed_5" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_6">Fixed<a class="headerlink" href="#fixed_6" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0258 — complete BREAKING removal of stand-stream runtime.</strong>
@@ -1580,7 +1603,7 @@ input_sock channel + leaf SIGINT; end-to-end probe (filed
 feature_inbox/9999.yaml → coordd inotify → press_enter →
 input_sock → SIGINT to PLANNER's own Bash subprocess exit 130)
 confirms the full chain.</p>
-<h3 id="fixed_6">Fixed<a class="headerlink" href="#fixed_6" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_7">Fixed<a class="headerlink" href="#fixed_7" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0259 coordd inotify wake uses <code>input_sock</code> via <code>press_enter</code>.</strong>
   Pre-0259, coordd's chat-mode wake (<code>tmux_send_keys_wake</code>) sent
@@ -1690,7 +1713,7 @@ in a single step.</p>
 <p>Bug-fix release. Three regressions found in 1.1.0 real-world use, plus a
 critical wake-up channel regression introduced silently by the 1.0.0
 umbrella-console-script migration. No new features.</p>
-<h3 id="fixed_7">Fixed<a class="headerlink" href="#fixed_7" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_8">Fixed<a class="headerlink" href="#fixed_8" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>task append-block --body-file</code> option missing.</strong> Dropped during the
   argparse→click conversion. The plan orchestrator and several agent
@@ -1837,7 +1860,7 @@ plan → dev) confirmed against a fresh project: 7+ journal
 transitions, schema validation rejects malformed blocks, role
 permissions enforced.</p>
 <h2 id="011-2026-05-20">0.1.1 — 2026-05-20<a class="headerlink" href="#011-2026-05-20" title="Permanent link">&para;</a></h2>
-<h3 id="fixed_8">Fixed<a class="headerlink" href="#fixed_8" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_9">Fixed<a class="headerlink" href="#fixed_9" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>greatminds-coord-launch</code> and <code>greatminds-coord-tmux</code> now find a
   sibling <code>greatminds-start-agent</code> in the same venv via
