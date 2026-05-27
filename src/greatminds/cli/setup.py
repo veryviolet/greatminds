@@ -257,6 +257,41 @@ def _ensure_project_md(coord: Path, canon: Path, force: bool,
     return status
 
 
+def _seed_stand_profiles(coord: Path, canon: Path) -> tuple[int, int]:
+    """0281 (0276 Phase E): copy canon stand-profile presets into
+    ``coord/stand-profiles/``.
+
+    Source: ``<canon>/templates/stand-profiles/*.{yaml,md}``. Target:
+    ``coord/stand-profiles/<name>``. Idempotent — files that already
+    exist (operator-edited) are NOT overwritten. Returns
+    ``(copied, skipped)`` counts for the setup log line.
+
+    Sub-directory creation: if the source dir is missing (a partial
+    install / dev build that hasn't been packaged yet), returns
+    ``(0, 0)`` silently so setup still succeeds.
+    """
+    src_dir = canon / "templates" / "stand-profiles"
+    if not src_dir.is_dir():
+        return (0, 0)
+    target_dir = coord / "stand-profiles"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    copied = skipped = 0
+    for src in sorted(src_dir.iterdir()):
+        if not src.is_file():
+            continue
+        if src.suffix not in (".yaml", ".md"):
+            continue
+        if src.name.startswith("."):
+            continue
+        dst = target_dir / src.name
+        if dst.is_file():
+            skipped += 1
+            continue
+        dst.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        copied += 1
+    return (copied, skipped)
+
+
 def _load_claude_settings_allow_from_canon(canon: Path) -> list[str]:
     """0191: read ``claude_settings.permissions.allow`` from schema.yaml.
 
@@ -1236,6 +1271,13 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     # with description / acquire-instructions comments per var.
     env_status = _ensure_project_env(coord, canon, force)
     info(f"  PROJECT.env: {env_status}")
+
+    # 0281 (0276 Phase E): seed the per-project stand-profiles dir
+    # with the canonical presets (full-deploy / smoke-only, both
+    # yaml + md). Idempotent — existing operator-edited copies are
+    # NOT overwritten.
+    sp_copied, sp_skipped = _seed_stand_profiles(coord, canon)
+    info(f"  stand-profiles: {sp_copied} copied, {sp_skipped} exist")
 
     # .claude/settings.local.json — Stop hook + schema's claude_settings
     # permissions.allow rules (0191). Merge-on-existing preserves any
