@@ -4,6 +4,27 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.3.4 — 2026-05-27
+
+Followup patch tightening the SK runtime gate so the stand-profile
+dispatch contract is actually enforced.
+
+### Fixed
+
+- **0286 three-layer deploy lock.** SK could still mark state=ready
+  without invoking ansible-playbook because the `is_deploy_safe`
+  classifier landed in 1.3.3 had no callsites in the runtime path.
+  Three independent layers now enforce the contract end-to-end:
+  (1) `execute_yaml_profile` gates on `is_deploy_safe` at top of
+  function — unsafe → rc=126, no subprocess, reason captured in
+  marker. (2) Both executors drop a per-lease marker at
+  `<coord>/.stand/deploy-<lease_id>.log`; timeouts (124),
+  FileNotFoundError (127), and refusals (126) all record markers so
+  failure modes surface via rc, not "no evidence". (3) `greatminds
+  stand ready --lease-id` refuses with exit_code=2 + actionable
+  message when the marker is absent. STAND-KEEPER.md §2 codifies the
+  `dispatch_profile` MUST-precede contract.
+
 ## 1.3.3 — 2026-05-27
 
 Stand-profile mechanism (0276 umbrella, Phases A-G) plus a deploy-safety
