@@ -41,6 +41,26 @@ singleton stand is driven by `coordination/.stand/state.yaml`.
 2. **On `state=preparing`:** read the active lease. It carries
    `lease_id`, `task`, `worktree`, `profile`, `holder_role`, and TTL.
    Deploy from the lease worktree using the profile-specific runbook.
+
+   **0279 (0276 Phase C) — profile dispatch.** The profile name on
+   the lease maps to a file under `coordination/stand-profiles/`:
+   - `<profile>.yaml` — ansible-playbook subset. Use
+     `from greatminds.cli.stand_profile import load_profile` +
+     `from greatminds.cli.stand_executor import dispatch_profile`
+     (or invoke `ansible-playbook` directly via the same inventory
+     synthesized from the lease). Exit 0 → `stand ready`; nonzero
+     → `stand down --reason "profile <X> failed: <log tail>"`.
+   - `<profile>.md` — free prose. The loader returns the
+     ${var}-substituted body; treat it as your next-tick deploy
+     recipe and execute the steps inline. Mark the lease ready
+     after the prose's success criteria are met.
+   - Both formats honor the lease's `deploy_prerequisites_only`
+     flag — when set, run only the prerequisite-tagged tasks
+     (YAML) or the prerequisite section per prose (MD).
+   - Substitution variables available in both dialects:
+     `${lease_id}`, `${task_id}`, `${worktree}`, `${host}`,
+     `${user}`, `${deploy_path}`, plus any `${KEY}` defined in
+     `coordination/PROJECT.env`.
 3. **On deploy success:** run
    `greatminds stand ready --lease-id <lease_id>`. This moves the
    state to `ready` and emits an inbox-info to the holder:
