@@ -4,6 +4,28 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.3.9 — 2026-05-27
+
+Critical fix for the chat-mode UserPromptSubmit deadlock that
+shipped across the 1.3.x line. Operators on existing projects should
+upgrade promptly.
+
+### Fixed
+
+- **0298 stop-decide `user-prompt-submit` phase no longer emits
+  `decision: block`.** `greatminds stop-decide` returned the same
+  `{decision: block, reason, systemMessage}` payload for both
+  `phase=stop` (correct — Stop hook drains inbox between turns) and
+  `phase=user-prompt-submit` (catastrophic — the UserPromptSubmit hook
+  with `decision: block` rejects EVERY USER prompt, leaving chat-mode
+  roles like PLANNER and MAINTAINER unreachable until an operator
+  hand-edits the inbox directory). `stop_decide.py` now branches on
+  phase: `user-prompt-submit` emits only `{"systemMessage": msg}` so
+  the informational notice surfaces but USER's prompt passes through;
+  `phase=stop` unchanged. Test assertions in
+  `test_user_prompt_submit_hook_0236.py` that pinned the bug were
+  rewritten to the post-0298 contract.
+
 ## 1.3.8 — 2026-05-27
 
 Adds PLANNER's machine-readable contract for the stand-profile
