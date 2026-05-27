@@ -124,8 +124,33 @@ def test_check_major_bump_with_flag_proceeds(fake_pypi):
 
 
 def test_full_update_calls_pip_then_self_replaces(fake_pypi, fake_subprocess,
-                                                    fake_execv):
+                                                    fake_execv,
+                                                    monkeypatch):
     fake_pypi["latest"] = "1.99.0"
+
+    # 0299: stub the env detector to ``venv`` so the legacy pip
+    # path is exercised here. The new env branching (uv/poetry/pixi
+    # /conda) is covered exhaustively by
+    # ``test_update_env_branching_0299.py``; this test pins the
+    # pip happy path that survives 0299 as the no-lockfile
+    # fallback.
+    from greatminds.core.env import EnvSetup
+    monkeypatch.setattr(
+        "greatminds.cli.update.detect_env_setup",
+        lambda *_a, **_k: EnvSetup(
+            env_type="venv", activation="", source="(test stub)",
+        ),
+        raising=False,
+    )
+    # The import path inside ``_step_pip_upgrade`` is the actual
+    # call site; patch there too.
+    from greatminds.core import env as _env
+    monkeypatch.setattr(
+        _env, "detect",
+        lambda *_a, **_k: EnvSetup(
+            env_type="venv", activation="", source="(test stub)",
+        ),
+    )
 
     with pytest.raises(fake_execv.sentinel):
         # The fake execv raises; we let the exception escape so the test
@@ -136,7 +161,7 @@ def test_full_update_calls_pip_then_self_replaces(fake_pypi, fake_subprocess,
             project_name=None,
         )
 
-    # pip install command was issued.
+    # pip install command was issued (env=venv → legacy pip path).
     pip_calls = [c for c in fake_subprocess if "pip" in c and "install" in c]
     assert len(pip_calls) == 1
     assert "--upgrade" in pip_calls[0]
@@ -179,6 +204,18 @@ def test_post_pip_invokes_daemon_restart_and_agent_restart(monkeypatch,
     monkeypatch.setattr(
         "greatminds.cli.daemon.detect_legacy_coordd", lambda: False,
     )
+    # 0299: agent restart now gates on tmux session presence.
+    # Stub both helpers so the legacy assertion (restart subprocess
+    # fires) continues to hold.
+    from greatminds.cli import update as _update_mod
+    monkeypatch.setattr(
+        _update_mod, "_resolve_session_from_coord_yaml",
+        lambda: "greatminds",
+    )
+    monkeypatch.setattr(
+        _update_mod, "_tmux_session_present", lambda _s: True,
+    )
+
     result = _invoke(["--post-pip"])
     assert result.exit_code == 0, result.output
 
