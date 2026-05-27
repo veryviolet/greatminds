@@ -109,8 +109,40 @@ def _greatminds_bin() -> str:
 # ---------------------------------------------------------------------------
 
 
+def _upgrade_command_for_env(env_type: str | None,
+                              project_dir: Path) -> list[str]:
+    """0299: pick the correct upgrade command per env manager.
+
+    Pre-0299 ``update`` always called ``<py> -m pip install --upgrade
+    greatminds`` regardless of env manager. Under uv that broke the
+    lock invariant: pip wrote 1.3.9 into the venv, ``uv.lock`` still
+    pinned 1.3.0, the next ``uv run`` snapped back. Silent infinite
+    loop.
+
+    For each detected env_type return the binary + args that update
+    THE LOCKFILE (the source of truth) so the next activation picks
+    up the new version. ``venv`` / ``external-venv`` / None fall
+    back to the pre-0299 pip path — those have no lock to maintain.
+    """
+    if env_type == "uv":
+        # Two-step: refresh the lock entry, then sync the venv.
+        return ["uv", "lock", "--upgrade-package", "greatminds"]
+    if env_type == "poetry":
+        return ["poetry", "update", "--directory", str(project_dir),
+                "greatminds"]
+    if env_type == "pixi":
+        return ["pixi", "update", "--manifest-path",
+                str(project_dir / "pixi.toml"), "greatminds"]
+    if env_type == "conda":
+        return ["conda", "update", "-y", "greatminds"]
+    # venv / external-venv / override / None → pip
+    return [sys.executable, "-m", "pip", "install", "--upgrade",
+            "greatminds"]
+
+
 def _step_pip_upgrade(major: bool) -> str:
-    """Run pip upgrade; return the just-installed version string."""
+    """Run the env-appropriate upgrade command; return the just-
+    installed version string."""
     current = __version__
     info(f"==> current: greatminds {current}")
     latest = _fetch_latest_pypi_version()
@@ -128,15 +160,36 @@ def _step_pip_upgrade(major: bool) -> str:
         )
         raise click.exceptions.Exit(2)
 
+    # 0299: branch on env manager so we update the lock file, not
+    # just the venv binary.
+    from greatminds.core.env import detect as detect_env_setup
+    setup = detect_env_setup(Path.cwd())
+    info(f"==> env: {setup.env_type or 'system'} ({setup.source})")
+
+    cmd = _upgrade_command_for_env(setup.env_type, Path.cwd())
     info(f"==> upgrading package... {current} → {latest}")
-    pip_cmd = [sys.executable, "-m", "pip", "install", "--upgrade", "greatminds"]
-    cp = subprocess.run(pip_cmd, capture_output=True, text=True)
+    cp = subprocess.run(cmd, capture_output=True, text=True)
     if cp.returncode != 0:
-        err("pip install failed:")
+        err(f"upgrade command failed: {' '.join(cmd)}")
         if cp.stderr:
             click.echo(cp.stderr, nl=False, err=True)
         raise click.exceptions.Exit(cp.returncode)
-    ok(f"    ✓ pip install --upgrade greatminds ({current} → {latest})")
+    ok(f"    ✓ {' '.join(cmd[:3])}… ({current} → {latest})")
+
+    # 0299: uv needs a second pass to actually pull the new wheel
+    # into the venv after the lock refresh. Other env managers do
+    # this implicitly in their `update` command.
+    if setup.env_type == "uv":
+        sync_cmd = ["uv", "sync"]
+        info(f"==> {' '.join(sync_cmd)}")
+        cp2 = subprocess.run(sync_cmd, capture_output=True, text=True)
+        if cp2.returncode != 0:
+            err("uv sync failed after lock refresh:")
+            if cp2.stderr:
+                click.echo(cp2.stderr, nl=False, err=True)
+            raise click.exceptions.Exit(cp2.returncode)
+        ok("    ✓ uv sync")
+
     return latest
 
 
@@ -233,8 +286,67 @@ def _step_restart_daemon(project_name: str | None) -> None:
     ok("    ✓ daemon active")
 
 
+def _tmux_session_present(session: str | None) -> bool:
+    """0299: check whether the project's tmux session exists.
+
+    Returns False when:
+      - ``session`` is None (no coord.yaml or no session field).
+      - ``tmux`` is not on PATH.
+      - ``tmux has-session -t <session>`` returns non-zero (session
+        not running).
+
+    Caller skips the agent-restart phase entirely when this is
+    False — USER may have intentionally killed the session before
+    running ``greatminds update``; resurrecting it would be hostile.
+    """
+    if not session:
+        return False
+    tmux = shutil.which("tmux")
+    if not tmux:
+        return False
+    try:
+        cp = subprocess.run(
+            [tmux, "has-session", "-t", session],
+            capture_output=True, text=True, timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return cp.returncode == 0
+
+
+def _resolve_session_from_coord_yaml() -> str | None:
+    """Best-effort: read ``coord.yaml`` for the session name. None
+    if absent / malformed."""
+    import yaml as _yaml
+    cy = Path.cwd() / "coord.yaml"
+    if not cy.is_file():
+        return None
+    try:
+        doc = _yaml.safe_load(cy.read_text(encoding="utf-8")) or {}
+    except (OSError, _yaml.YAMLError):
+        return None
+    sess = doc.get("session")
+    return str(sess).strip() if isinstance(sess, str) and sess.strip() else None
+
+
 def _step_restart_agents() -> None:
-    """Invoke `greatminds restart` to refresh tmux agents."""
+    """Invoke `greatminds restart` to refresh tmux agents — but
+    only if the tmux session was already running before ``update``.
+
+    0299: ``update`` MUST NOT start a tmux session that wasn't up
+    when the operator invoked it. USER may have killed the session
+    deliberately (debugging, paused fleet, etc.); spinning the
+    agents back up would be hostile + create surprise PIDs.
+    """
+    session = _resolve_session_from_coord_yaml()
+    if not _tmux_session_present(session):
+        info(
+            f"==> tmux session {session!r} absent; skipping agent "
+            "restart (re-run `greatminds launch --target tmux` "
+            "when you want the fleet back up)"
+        )
+        return
+
     new_bin = _greatminds_bin().split()
     cmd = new_bin + ["restart"]
     info("==> restarting tmux agents...")
