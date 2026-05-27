@@ -154,6 +154,21 @@ queues:
 # queues it may claim from. Roles with `launch_modes` containing `chat` may be
 # started without a /loop body for interactive use.
 # ---------------------------------------------------------------------------
+# 0288: per-role machine-readable contracts.
+#
+# Each role declares:
+#   - responsibilities: list[str]      — high-level duties.
+#   - forbidden_actions: list[str]     — things the role MUST NOT do.
+#   - event_triggers: map[event → list[step_name]]
+#                                     — ordered steps the role takes
+#                                       on each event.
+#
+# The keys are intentionally short identifiers (snake_case verbs);
+# they don't carry executable semantics — they're a checklist the
+# LLM-driven agents follow + a regression-net against role drift.
+# Step IDs that match CLI commands (``stand lease``,
+# ``greatminds task mv``, etc.) hint at the runtime path; arbitrary
+# verbs (``probe_via_ssh``) describe the logical step the LLM owns.
 roles:
   ARCHITECT-PLANNER:
     category: product
@@ -166,6 +181,30 @@ roles:
       feature_ui_dev / feature_docs. Interactive chat partner for the
       user. Writes to review_sessions but does not claim from it —
       EXPLORER owns review-session iteration.
+    responsibilities:
+      - triage_user_feedback
+      - write_plan_blocks
+      - route_tasks_per_scope
+      - chat_partner_for_user
+      - file_review_sessions
+    forbidden_actions:
+      - implement_code
+      - run_ansible
+      - mark_stand_ready
+      - claim_review_sessions
+      - archive_in_lifecycle_work_directly
+    event_triggers:
+      on_user_feedback_claim:
+        - read_user_feedback_block
+        - append_triage_block
+        - mv_user_feedback_to_feature_inbox_or_archive
+      on_feature_inbox_claim:
+        - append_triage_block
+        - mv_to_feature_plan_or_archive
+      on_feature_plan_claim:
+        - write_plan_block
+        - set_stand_required
+        - route_to_feature_dev_or_feature_ui_dev_or_feature_docs
   ARCHITECT-REVIEWER:
     category: product
     launch_modes: [loop]
@@ -175,6 +214,29 @@ roles:
       Final review with stand-evidence verification (via greatminds gate-check
       result in tests block), commit, push if policy allows. Owns
       feature_blocked wake-up: runs greatminds wake-check at start of each tick.
+    responsibilities:
+      - verify_evidence_chain
+      - commit_and_merge
+      - resume_blocked_tasks_via_wake_check
+      - rollback_verified_tasks
+    forbidden_actions:
+      - implement_code
+      - claim_outside_review_queues
+      - approve_without_gate_check_pass_when_stand_required
+    event_triggers:
+      on_feature_review_claim:
+        - verify_blocks_chain
+        - run_gate_check
+        - append_review_block_approved_or_changes_requested
+        - mv_to_verified_on_approved
+        - mv_back_to_implementer_queue_on_changes_requested
+      on_feature_blocked_claim:
+        - run_wake_check
+        - mv_to_resume_to_queue_when_dependencies_satisfied
+        - archive_when_withdrawn_reason_present
+      on_verified_rollback:
+        - append_rollback_block_with_reason
+        - mv_to_archive_or_feature_review
   DEVELOPER:
     category: product
     launch_modes: [loop]
@@ -183,6 +245,22 @@ roles:
     description: |
       Backend/product-code implementation. Picks up from feature_dev/
       (placed there by ARCHITECT-PLANNER routing scope:backend tasks).
+    responsibilities:
+      - implement_backend_features
+      - write_unit_tests
+      - file_implementation_block_with_files_list
+    forbidden_actions:
+      - claim_ui_or_docs_or_stand_tasks
+      - deploy_stand
+      - run_product_validation_on_stand
+      - read_or_move_from_feature_plan
+      - commit_to_main_directly
+    event_triggers:
+      on_feature_dev_claim:
+        - implement_code_in_worktree
+        - run_pytest_suite
+        - append_implementation_block
+        - mv_to_feature_test
   UI-DEVELOPER:
     category: product
     launch_modes: [loop, chat]
@@ -197,6 +275,20 @@ roles:
       - chat: scenario C (UI rapid iteration with Vite HMR). Does NOT
         claim from feature_ui_dev; touches heartbeat.ui-developer.fast
         instead of the pipeline heartbeat to avoid contention.
+    responsibilities:
+      - implement_ui_features
+      - run_ui_tests
+      - file_implementation_block
+    forbidden_actions:
+      - claim_backend_or_docs_tasks
+      - deploy_stand
+      - commit_to_main_directly
+    event_triggers:
+      on_feature_ui_dev_claim:
+        - implement_ui_in_worktree
+        - run_ui_test_suite
+        - append_implementation_block
+        - mv_to_feature_test
   TECHNICAL-WRITER:
     category: product
     launch_modes: [loop]
@@ -205,6 +297,18 @@ roles:
     description: |
       Documentation implementation. Picks up from feature_docs/
       (placed there by ARCHITECT-PLANNER routing scope:docs tasks).
+    responsibilities:
+      - write_documentation
+      - file_implementation_block
+    forbidden_actions:
+      - claim_backend_or_ui_tasks
+      - commit_to_main_directly
+    event_triggers:
+      on_feature_docs_claim:
+        - write_docs_in_worktree
+        - run_docs_build_if_configured
+        - append_implementation_block
+        - mv_to_feature_docs_review
   TESTER:
     category: product
     launch_modes: [loop]
@@ -213,12 +317,42 @@ roles:
     description: |
       Tests code on a deployed stand. Before mv to feature_review must
       run greatminds gate-check and record the result in the tests block.
+    responsibilities:
+      - probe_feature_on_deployed_stand
+      - fill_real_stand_evidence
+      - run_gate_check_before_mv
+    forbidden_actions:
+      - deploy_stand
+      - run_ansible_locally
+      - fill_fake_stand_evidence
+      - claim_outside_feature_test
+    event_triggers:
+      on_feature_test_claim:
+        - acquire_lease_via_stand_lease
+        - wait_for_state_ready
+        - probe_via_ssh_using_project_env_host
+        - fill_tests_block_with_real_observed_output
+        - run_gate_check
+        - release_lease_with_result
+        - mv_to_feature_review
   READER:
     category: product
     launch_modes: [loop]
     heartbeat: heartbeat.reader
     claims_from: [feature_docs_review]
     description: Reads docs as a fresh user; validates clarity and accuracy.
+    responsibilities:
+      - validate_doc_clarity_as_fresh_user
+      - append_reader_review_block
+    forbidden_actions:
+      - claim_implementer_queues
+      - write_code
+    event_triggers:
+      on_feature_docs_review_claim:
+        - read_docs_fresh_no_prior_context
+        - append_reader_review_block
+        - mv_to_feature_review_on_pass
+        - mv_back_to_feature_docs_on_fail_or_partial
   EXPLORER:
     category: product
     launch_modes: [loop]
@@ -227,6 +361,21 @@ roles:
     description: |
       Uses the live system on the stand as a real user (scenario B).
       Files bugs as plan_kind: bugfix tasks in feature_inbox.
+    responsibilities:
+      - run_review_sessions_on_live_stand
+      - file_bugs_to_feature_inbox
+    forbidden_actions:
+      - implement_code
+      - deploy_stand
+      - claim_outside_review_sessions
+    event_triggers:
+      on_review_sessions_claim:
+        - acquire_lease_via_stand_lease
+        - run_scenarios_against_deployed_stand
+        - file_bugs_as_feature_inbox_tasks
+        - append_session_iteration_block
+        - release_lease
+        - mv_to_archive_when_complete
   STAND-KEEPER:
     category: service
     launch_modes: [loop]
@@ -241,6 +390,23 @@ roles:
       Supports two profiles:
       - full-deploy: backend deploy on remote stand (scenarios A, B).
       - vite-dev: backend + Vite dev server with HMR (scenario C).
+    responsibilities:
+      - serve_singleton_stand_via_lease
+      - deploy_via_profile_executor
+    forbidden_actions:
+      - probe_feature
+      - fill_tests_block
+      - mv_to_feature_review
+      - claim_product_queues
+      - mark_ready_without_executor_run
+    event_triggers:
+      on_lease_preparing:
+        - load_profile_via_load_profile
+        - dispatch_profile_via_execute_yaml_or_md
+        - on_success_run_stand_ready
+        - on_failure_run_stand_down
+      on_state_ready_release:
+        - pop_next_lease_from_queue
   USER:
     category: entry
     launch_modes: [chat]
@@ -249,6 +415,14 @@ roles:
     description: |
       Writes user_feedback or initiates ARCHITECT-PLANNER chat. Never
       creates implementation tasks directly.
+    responsibilities:
+      - file_user_feedback
+      - chat_with_planner
+    forbidden_actions:
+      - claim_any_queue
+      - implement_code
+      - write_blocks_directly_to_active_queues
+    event_triggers: {}
   MAINTAINER:
     category: system
     launch_modes: [chat]
@@ -263,18 +437,53 @@ roles:
       when their issue is structural/schema rather than product.
       Does NOT claim from any product queue; does NOT triage user_feedback
       or write plans (that is ARCHITECT-PLANNER's job).
+    responsibilities:
+      - agent_restart
+      - dead_pid_recovery
+      - schema_yaml_maintenance
+      - cutover_orchestration
+      - infra_chat_for_user
+    forbidden_actions:
+      - claim_product_queues
+      - triage_user_feedback
+      - write_plan_blocks
+    event_triggers:
+      on_inbox_dead_pid_ask:
+        - diagnose_pid_state
+        - restart_agent_via_greatminds_restart
+      on_inbox_stand_blocked_ask:
+        - escalate_or_diagnose_infra
+      on_release_cut_ask:
+        - run_release_pipeline
   BOT-USER:
     category: bot
     launch_modes: [loop]
     heartbeat: heartbeat.bot-user
     claims_from: [bot_done, bot_verified]
     description: Bot stream entry; not touched in this refactor.
+    responsibilities:
+      - verify_bot_output
+    forbidden_actions:
+      - claim_product_queues
+    event_triggers:
+      on_bot_done_claim:
+        - verify_bot_change
+        - mv_to_bot_verified_or_back_to_bot_wip
   BOT-DEVELOPER:
     category: bot
     launch_modes: [loop]
     heartbeat: heartbeat.bot-developer
     claims_from: [bot_inbox]
     description: Bot stream implementer; not touched in this refactor.
+    responsibilities:
+      - implement_bot_change
+    forbidden_actions:
+      - claim_product_queues
+    event_triggers:
+      on_bot_inbox_claim:
+        - implement_bot_change_in_worktree
+        - mv_to_bot_wip
+        - mv_to_bot_done_on_complete
 
 # ---------------------------------------------------------------------------
 # Transitions
