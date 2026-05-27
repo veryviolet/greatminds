@@ -65,9 +65,16 @@
         chdir: "{{ deploy_path }}"
       changed_when: true
 
-    - name: install greatminds into venv
+    - name: install greatminds into venv (use uv pip — uv venv lacks pip by default)
+      # 0292: ``uv venv`` does NOT install pip into the venv; the
+      # previous ``.venv-coord/bin/pip install …`` step failed with
+      # rc=2 (executable not found) on every fresh deploy. ``uv pip
+      # install --python <interp>`` performs the install using uv's
+      # built-in pip-compatible surface — no pip binary required.
       ansible.builtin.command:
-        cmd: ".venv-coord/bin/pip install --force-reinstall dist/greatminds-*.whl"
+        cmd: >
+          uv pip install --python .venv-coord/bin/python
+          --force-reinstall dist/greatminds-*.whl
         chdir: "{{ deploy_path }}"
       changed_when: true
 
