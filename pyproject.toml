@@ -36,6 +36,12 @@ dependencies = [
   # fallback breaks on multi-digit segments (1.2.10 < 1.2.9 et al)
   # so packaging must be a real direct dep, not a transitive guess.
   "packaging>=21.0",
+  # 0280 (0276 Phase D): ansible-core powers the YAML stand-profile
+  # execution path (cli/stand_executor.py:execute_yaml_profile).
+  # ~25-30MB on disk plus jinja2/packaging/resolvelib transitives —
+  # acceptable trade-off for the structured-deploy path. MD profiles
+  # still work without ansible if a deployer prefers prose-only.
+  "ansible-core>=2.16,<2.18",
 ]
 
 [project.optional-dependencies]
