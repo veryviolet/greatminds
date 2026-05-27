@@ -59,6 +59,17 @@
         chdir: "{{ deploy_path }}"
         creates: "{{ deploy_path }}/.venv-coord"
 
+    - name: remove stale wheels from dist/ (uv pip refuses ambiguous glob)
+      # 0293: ``uv pip install dist/greatminds-*.whl`` refuses to
+      # install when the glob matches multiple files (e.g. a
+      # previous deploy's wheel still on disk + the freshly-built
+      # one). Cleaning ``dist/`` before ``uv build --wheel`` keeps
+      # the glob single-result so the install step is deterministic.
+      ansible.builtin.shell: rm -f dist/greatminds-*.whl
+      args:
+        chdir: "{{ deploy_path }}"
+      changed_when: true
+
     - name: build greatminds wheel locally
       ansible.builtin.command:
         cmd: uv build --wheel
