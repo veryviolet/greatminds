@@ -1070,3 +1070,33 @@ claude_settings:
       - "Bash(ssh:*)"
       - "Bash(scp:*)"
       - "Bash(rsync:*)"
+
+# 0277 (0276 Phase A): stand profile files. STAND-KEEPER reads a
+# profile file matching ``lease.profile`` (the enum from
+# stand.resource.profiles_allowed) from a canonical directory at
+# lease-grant time and executes it as part of the deploy. Two
+# dialects supported on disk:
+#
+#   * ``yaml`` — a subset of ansible-playbook syntax. Machine-runnable
+#     by SK; preferred when both formats are present for the same
+#     profile name.
+#   * ``md``  — free-form prose. SK injects the file contents into the
+#     next-tick prompt for itself; useful for one-off profiles that
+#     don't yet justify a structured playbook.
+#
+# Phase A only declares the schema + canon convention. Phases B-G
+# add the runtime loader, lease-metadata opt-out flag, validators,
+# bringup recipe, etc.
+stand_profile:
+  directory: coordination/stand-profiles
+  formats: [yaml, md]
+  # When both <profile>.yaml and <profile>.md exist, yaml wins.
+  lookup: "<directory>/<lease.profile>.<format>"
+  yaml_dialect: ansible_playbook
+  md_dialect: free_prose
+  yaml_required_fields: [name, hosts, tasks]
+  yaml_optional_fields: [vars, handlers, gather_facts]
+  # Opt-out flag carried on lease metadata so SK runs only the
+  # "prerequisites" subset of the profile (used by warmup leases
+  # that prepare the stand for the real probe).
+  deploy_prerequisites_only_flag: deploy_prerequisites_only
