@@ -4,6 +4,52 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.3.6 — 2026-05-27
+
+Closes the 0276 stand-profile umbrella with the live-integration phase
+plus a chain of canon-playbook robustness fixes empirically proven on
+real avatar deploys, and pushes the schema enum so md-only profiles can
+be leased.
+
+### Added
+
+- **0284 end-to-end stand-profile cycle tests + collection-free rsync
+  (Phase H of 0276).** New `test_stand_profile_end_to_end_0284.py`
+  exercises the YAML cycle (loader → dispatch argv → prereq tag) and
+  the MD cycle (loader → `${var}` substitution → `PREREQ_ONLY_NOTICE`
+  injection) plus a real `ansible-playbook --syntax-check` against the
+  seeded canon playbook. The canon `full-deploy.yaml` `synchronize`
+  task is replaced with `delegate_to: localhost` +
+  `ansible.builtin.command: rsync …`, dropping the
+  `ansible.posix` collection requirement.
+
+- **0291 SK `stand down` auto-notifies PLANNER inbox.** New
+  `schema.stand_keeper.notifications` map (`on_down: ARCHITECT-PLANNER`).
+  `stand_down` mutator captures the active lease's `task` + `lease_id`,
+  files `"stand down: <reason> (lease_id=<id>)"` to PLANNER's inbox
+  with `task_ref` populated. PLANNER no longer polls `state.yaml` to
+  discover incidents.
+
+- **0296 schema `stand.resource.profiles_allowed` += `liveness-prose`.**
+  Enum extended and the canon `liveness-prose.md` template shipped in
+  the same commit so md-only profiles can be leased without an enum
+  rejection.
+
+### Fixed
+
+- **0292 `full-deploy.yaml` install step uses `uv pip`.** `uv venv`
+  does not install pip, so `.venv-coord/bin/pip` failed rc=2 on every
+  fresh deploy. Replacement uses `uv pip install --python
+  .venv-coord/bin/python --force-reinstall …` — no pip-in-venv
+  required.
+
+- **0293 `full-deploy.yaml` pre-build wheel cleanup avoids glob
+  collision.** Second-or-later deploys left a prior wheel in `dist/`,
+  causing `uv pip install dist/greatminds-*.whl` to refuse with
+  "ambiguous glob". New pre-build `ansible.builtin.shell: rm -f
+  dist/greatminds-*.whl` task ordered before `uv build` so the install
+  glob always resolves to exactly the freshly-built wheel.
+
 ## 1.3.5 — 2026-05-27
 
 Adds schema-driven role contracts so any agent can read its own
