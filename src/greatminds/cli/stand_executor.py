@@ -194,6 +194,26 @@ def execute_yaml_profile(
             exit_code=2,
         )
 
+    # 0286: gate the deploy on the is_deploy_safe classifier so SK
+    # cannot land an ansible-playbook run against the main fleet
+    # tree + localhost. When unsafe, skip the subprocess and record
+    # the refusal to the marker log (no ansible run = no marker
+    # = stand ready will refuse downstream).
+    coord = _coord_from_lease_meta(lease_meta)
+    if coord is not None:
+        project_dir = coord.parent
+        worktree = (lease_meta or {}).get("worktree")
+        host = (lease_meta or {}).get("host")
+        if worktree:
+            safe, reason = is_deploy_safe(worktree, host, project_dir)
+            if not safe:
+                _write_deploy_marker(
+                    coord, lease_meta,
+                    rc=126,
+                    log=f"refused by is_deploy_safe: {reason}\n",
+                )
+                return (126, f"refused by is_deploy_safe: {reason}")
+
     binary = ansible_playbook or _ansible_playbook_path()
 
     inventory_text = _build_inventory(lease_meta)
@@ -235,14 +255,26 @@ def execute_yaml_profile(
                 env={**os.environ, "ANSIBLE_FORCE_COLOR": "0"},
             )
         except subprocess.TimeoutExpired as exc:
-            return (124, f"ansible-playbook timed out after "
-                          f"{timeout_seconds}s: {exc}")
+            msg = (f"ansible-playbook timed out after "
+                   f"{timeout_seconds}s: {exc}")
+            if coord is not None:
+                _write_deploy_marker(coord, lease_meta, rc=124, log=msg)
+            return (124, msg)
         except FileNotFoundError as exc:
-            return (127, f"ansible-playbook not executable: {exc}")
+            msg = f"ansible-playbook not executable: {exc}"
+            if coord is not None:
+                _write_deploy_marker(coord, lease_meta, rc=127, log=msg)
+            return (127, msg)
 
         log = ""
         if capture_output:
             log = (cp.stdout or "") + (cp.stderr or "")
+        # 0286: record marker so stand ready can prove the deploy
+        # actually ran. The marker captures whatever rc + log the
+        # subprocess produced (success OR failure).
+        if coord is not None:
+            _write_deploy_marker(coord, lease_meta,
+                                  rc=cp.returncode, log=log)
         return (cp.returncode, log)
 
 
@@ -297,6 +329,15 @@ def execute_md_profile(
         prereq_only = bool(spec.deploy_prerequisites_only)
     if prereq_only:
         rendered = PREREQ_ONLY_NOTICE + rendered
+
+    # 0286: record marker so stand ready can prove SK actually
+    # invoked the executor (even for MD profiles where the LLM does
+    # the work). The marker is informational — its presence proves
+    # the dispatch path ran; SK still does the actual deploy by
+    # acting on the rendered prose.
+    coord = _coord_from_lease_meta(lease_meta)
+    if coord is not None:
+        _write_deploy_marker(coord, lease_meta, rc=0, log=rendered)
     return (0, rendered)
 
 
@@ -306,6 +347,63 @@ def execute_md_profile(
 
 
 LOCAL_HOSTS = {"", "localhost", "127.0.0.1", "::1"}
+
+
+# ---------------------------------------------------------------------------
+# 0286: deploy marker so `stand ready` can prove execute_yaml_profile ran
+# ---------------------------------------------------------------------------
+
+
+STAND_STATE_DIR = ".stand"
+
+
+def deploy_marker_path(coord: Path | str, lease_id: str) -> Path:
+    """Canonical path for the per-lease deploy marker.
+
+    ``<coord>/.stand/deploy-<lease_id>.log``. Tests + the
+    ``stand ready`` gate use this helper so the path stays in one
+    place.
+    """
+    return Path(coord) / STAND_STATE_DIR / f"deploy-{lease_id}.log"
+
+
+def _coord_from_lease_meta(lease_meta: dict[str, Any] | None
+                            ) -> Path | None:
+    """Resolve the coord dir for marker writes. Callers can either
+    pass ``coord`` directly in lease_meta or rely on the standard
+    resolution path; we prefer explicit ``coord`` to keep tests
+    hermetic."""
+    if not lease_meta:
+        return None
+    coord = lease_meta.get("coord")
+    if isinstance(coord, (str, Path)):
+        return Path(coord)
+    return None
+
+
+def _write_deploy_marker(coord: Path, lease_meta: dict[str, Any] | None,
+                          *, rc: int, log: str) -> None:
+    """Write the marker file. Best-effort — failures don't crash
+    the executor (the deploy already happened; the marker is a
+    bookkeeping aid)."""
+    if not lease_meta:
+        return
+    lease_id = lease_meta.get("lease_id")
+    if not lease_id:
+        return
+    target = deploy_marker_path(coord, str(lease_id))
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            f"rc={rc}\n"
+            f"task_id={lease_meta.get('task_id', '')}\n"
+            f"host={lease_meta.get('host', '')}\n"
+            f"worktree={lease_meta.get('worktree', '')}\n"
+            f"---log---\n{log}",
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
 
 
 def is_deploy_safe(
