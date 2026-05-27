@@ -4,6 +4,36 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.3.5 — 2026-05-27
+
+Adds schema-driven role contracts so any agent can read its own
+workflow from `schema.yaml` at tick start, and plugs the orphan
+`active_lease` leak that produced `state=down + active_lease={...}`
+contradictions across the stand transitions.
+
+### Added
+
+- **0288 schema-driven role contracts for all 13 roles + CLI.**
+  `schema.roles.<ROLE>` now carries `responsibilities`,
+  `forbidden_actions`, and (for product roles) `event_triggers`
+  (`on_<event>` → ordered step list). Steps are short verbs —
+  CLI commands like `stand_lease` / `stand_ready` /
+  `mv_to_feature_review`, or logical placeholders the LLM
+  resolves. New `greatminds role contract <ROLE>` + `greatminds
+  role list` CLI surface the rendered contract. Existing
+  `roles/*.md` prose remains; doc-shrinkage follow-up deferred.
+
+### Fixed
+
+- **0289 stand release/down/up nullify `active_lease`.** Pre-fix
+  `stand down` left the triggering lease set, and `stand up` did
+  not defensively clean older state files — producing
+  `state=down + active_lease={...}` contradictions visible in
+  `stand status`. Mutators now set `active_lease=None` on both
+  transitions alongside their existing `down_reason` mutations;
+  `stand release` already cleared correctly and is now
+  regression-locked.
+
 ## 1.3.4 — 2026-05-27
 
 Followup patch tightening the SK runtime gate so the stand-profile
