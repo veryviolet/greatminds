@@ -51,6 +51,27 @@ tests block.
    only in the product task's `tests` block. The old
    `stand_requests/` -> `stand_wip/` -> `stand_done/` path is removed
    from the active workflow.
+
+   **When the stand sits in `down`** (e.g. a prior deploy hit a
+   playbook bug and you've bounced the task to DEVELOPER for a fix):
+   wait for DEV's inbox info that iter-N has landed. Then, if you
+   want to drive the recovery yourself, send STAND-KEEPER a wake
+   with the canonical `FIX-LANDED` body shape:
+
+   ```bash
+   greatminds inbox send STAND-KEEPER --kind wake \
+     --task <task-id> \
+     --body "FIX-LANDED for <task-id> stand-profile <profile>. \
+       Worktree .worktrees/<task-id>/coordination/stand-profiles/<profile>.yaml \
+       carries iter-<N> changes: <one-line summary>. Please \
+       greatminds stand up --reason 'iter-<N> fix landed for <task-id>'."
+   ```
+
+   `greatminds stand up` is SK-only — TESTER cannot call it
+   directly. The wake's `FIX-LANDED` body is what SK reads to know
+   the state is safe to clear. Bare wake pings or wakes that talk
+   about an active lease are not enough; SK will (correctly) ignore
+   them while the stand is `down`.
 6. For `plan.stand_required: true`:
    - waits for its lease to become ready via SK's inbox-info,
    - probes the stand directly and records lease-based stand evidence,
