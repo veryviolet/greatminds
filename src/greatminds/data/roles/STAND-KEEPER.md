@@ -89,8 +89,30 @@ gone. The singleton stand is driven by `coordination/.stand/state.yaml`.
    `preparing` lease on a later tick.
 5. **On deploy or infra failure:** run
    `greatminds stand down --reason "profile failed: <step>"`, naming
-   the failed profile step. Queue processing pauses.
-   After recovery, run `greatminds stand up --reason "<note>"`.
+   the failed profile step. Queue processing pauses until you run
+   `greatminds stand up`. While the stand is `down`, **do not act
+   on bare wake pings or wakes that describe a lease** — there is
+   no active lease to deploy, and re-running an unfixed playbook
+   would just re-fail.
+
+   **Clearing the `down` state.** Run `greatminds stand up --reason
+   "<note>"` only after receiving an inbox message whose body
+   carries an explicit *fix-landed* signal from the implementer
+   (DEVELOPER) or the holder (TESTER / EXPLORER). The canonical
+   body shape is:
+
+   > `FIX-LANDED for <task-id> stand-profile <profile>. Worktree
+   > .worktrees/<task-id>/coordination/stand-profiles/<profile>.yaml
+   > carries iter-<N> changes: <one-line summary>. Please
+   > greatminds stand up --reason "iter-<N> fix landed for <task-id>".`
+
+   Verify the worktree carries the named change (a quick `grep`
+   or `diff` is enough — you do not need to re-deploy yet), then
+   transition with `stand up`. If the body lacks the `FIX-LANDED`
+   prefix or doesn't name a worktree path you can verify, ignore
+   the message — the stand stays `down` until a properly-shaped
+   signal arrives. This intentional friction is what prevents a
+   stray wake from re-running unfixed code.
 6. **Never release the holder's active lease.** TESTER or EXPLORER
    runs `greatminds stand release --lease-id <lease_id> --result
    pass|fail|partial` after its own probes.

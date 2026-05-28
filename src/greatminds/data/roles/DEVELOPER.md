@@ -21,6 +21,25 @@ DEVELOPER implements backend/product-code tasks planned by ARCHITECT-PLANNER.
 5. For `plan.stand_required: true`, files a stand request with
    `greatminds stand request ... --evidence-for <task-id>`.
 6. Records any stand request id/result/caveat in the implementation block.
+
+   **If a prior iter put the stand in `down`** because of a
+   playbook bug your iter-N fix resolves: after the fix is in
+   your worktree, send STAND-KEEPER a wake with the canonical
+   `FIX-LANDED` body shape (SK reads the body verbatim and will
+   then run `stand up` on its next tick — `greatminds stand up`
+   is SK-only):
+
+   ```bash
+   greatminds inbox send STAND-KEEPER --kind wake \
+     --task <task-id> \
+     --body "FIX-LANDED for <task-id> stand-profile <profile>. \
+       Worktree .worktrees/<task-id>/coordination/stand-profiles/<profile>.yaml \
+       carries iter-<N> changes: <one-line summary>. Please \
+       greatminds stand up --reason 'iter-<N> fix landed for <task-id>'."
+   ```
+
+   Don't ask MAINTAINER to clear the stand — `stand up` is gated
+   to STAND-KEEPER and MAINTAINER has no override.
 7. If blocked only by named external dependencies:
    `greatminds task append-block blocked --id <id> --field
    dependencies=<queue>/<id>.yaml,... --field resume_to=feature_dev`
