@@ -2210,6 +2210,67 @@ def _worktree_hook_post_move(coord: Path, task_id: str,
             pass
 
 
+def _enforce_worktree_isolation_for_block(
+    kind: str,
+    data: dict[str, Any],
+    coord: Path,
+    task_id: str,
+) -> None:
+    """0303 (upstream issue #3): refuse code-mutating blocks when
+    the caller's cwd is not the per-task worktree.
+
+    Applies only to ``implementation`` / ``tests`` blocks on tasks
+    whose kind is listed in ``schema.worktrees.required_for_task_kinds``
+    (feature/bugfix/ops by default). Pre-0303 the schema flag was
+    declarative-only; implementers could silently edit main while
+    filing the block.
+
+    The override env var ``GREATMINDS_SKIP_WORKTREE_CHECK=1`` is
+    honored so test scripts + power users running from CI containers
+    aren't blocked; auditing those flows is out of scope here.
+    """
+    if kind not in ("implementation", "tests"):
+        return
+    if os.environ.get("GREATMINDS_SKIP_WORKTREE_CHECK", "").strip() == "1":
+        return
+    task_kind = (data.get("kind") or "").strip()
+    try:
+        cfg = (schema().get("worktrees") or {})
+    except Exception:
+        return
+    required_kinds = set(cfg.get("required_for_task_kinds") or [])
+    if task_kind not in required_kinds:
+        return
+    project_dir = coord.parent.resolve(strict=False)
+    base_path = (cfg.get("base_path") or ".worktrees").strip()
+    worktrees_root = (project_dir / base_path).resolve(strict=False)
+    try:
+        cwd = Path.cwd().resolve(strict=False)
+    except OSError:
+        return
+    # Allowed: cwd is under <project>/.worktrees/<X>/ where X starts
+    # with the task's seq prefix (matches stand-lease validator 0271).
+    seq = task_id.split("-", 1)[0]
+    rel = None
+    try:
+        rel = cwd.relative_to(worktrees_root)
+    except ValueError:
+        rel = None
+    if rel is not None and rel.parts:
+        wt_name = rel.parts[0]
+        if wt_name == seq or wt_name.startswith(f"{seq}-"):
+            return
+    raise GreatMindsError(
+        f"append-block {kind!r} refused: cwd {cwd} is not under the "
+        f"per-task worktree {worktrees_root}/{seq} (task.kind="
+        f"{task_kind!r} requires worktree isolation per "
+        f"schema.worktrees.required_for_task_kinds). Run "
+        f"`cd \"$(greatminds worktree path {task_id})\"` first. "
+        f"Override with GREATMINDS_SKIP_WORKTREE_CHECK=1 in CI.",
+        exit_code=2,
+    )
+
+
 def append_block(
     *,
     task_id: str,
@@ -2281,6 +2342,16 @@ def append_block(
                 pass  # best-effort; never block the append
 
         validate_block(data.get("stream") or "product", block)
+        # 0303: refuse implementation / tests blocks when the caller's
+        # cwd is not the per-task worktree. Pre-0303 implementers
+        # could silently edit main while filing the block (upstream
+        # issue #3: TESTER rsync'd from .worktrees/<id>/ where the
+        # fix was absent because DEV had edited main). Schema flag
+        # ``worktrees.required_for_task_kinds`` lists the product
+        # kinds that require isolation.
+        _enforce_worktree_isolation_for_block(
+            kind, data, coord, task_id,
+        )
         require_block_cross_state(block, data)
 
         # 0185: file-lock acquisition removed. Per-task git worktree
