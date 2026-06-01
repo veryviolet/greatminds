@@ -246,6 +246,11 @@ def execute_yaml_profile(
         if extra_argv:
             cmd.extend(extra_argv)
 
+        # 0305 (upstream issue #2): refresh SK heartbeat while
+        # ansible runs so watchdog doesn't flag the lease cycle as a
+        # dead pid during a multi-minute remote deploy. Best-effort;
+        # never crashes the executor.
+        hb_handle = _start_heartbeat_refresher(coord, "stand-keeper")
         try:
             cp = subprocess.run(
                 cmd,
@@ -265,6 +270,10 @@ def execute_yaml_profile(
             if coord is not None:
                 _write_deploy_marker(coord, lease_meta, rc=127, log=msg)
             return (127, msg)
+        finally:
+            # 0305: stop the heartbeat refresher on every exit path
+            # (success, timeout, FileNotFoundError, unexpected raise).
+            _stop_heartbeat_refresher(hb_handle)
 
         log = ""
         if capture_output:
@@ -347,6 +356,84 @@ def execute_md_profile(
 
 
 LOCAL_HOSTS = {"", "localhost", "127.0.0.1", "::1"}
+
+
+# ---------------------------------------------------------------------------
+# 0305 (upstream issue #2): heartbeat refresh while ansible runs.
+#
+# Watchdog's stall-detection threshold is ~600s by default; an
+# ansible-playbook over SSH can easily exceed that on a fresh
+# remote-build deploy. Pre-0305 SK's heartbeat went stale during
+# legit work → watchdog flagged it as a dead pid → spurious
+# dead-pid asks landed in MAINTAINER inbox.
+#
+# Fix: spin a background thread that touches the SK heartbeat
+# every ``HEARTBEAT_REFRESH_INTERVAL_SEC`` seconds while the
+# subprocess runs. Stops as soon as the subprocess returns.
+# ---------------------------------------------------------------------------
+
+
+HEARTBEAT_REFRESH_INTERVAL_SEC = 30.0
+
+
+def _start_heartbeat_refresher(
+    coord: Path | None,
+    role: str,
+    interval: float = HEARTBEAT_REFRESH_INTERVAL_SEC,
+) -> tuple[Any, Any] | None:
+    """Spawn a daemon thread that touches the role's heartbeat at
+    ``interval`` seconds. Returns ``(thread, stop_event)`` so the
+    caller can stop the thread once the work is done. Returns None
+    when ``coord`` is unresolvable or threading is unavailable —
+    callers tolerate that (it's a watchdog convenience, not the
+    FSM source of truth).
+    """
+    if coord is None:
+        return None
+    try:
+        import threading
+    except ImportError:
+        return None
+    hb_path = coord / f"heartbeat.{role.lower()}"
+    stop = threading.Event()
+
+    def _loop() -> None:
+        # Touch immediately so a quick subprocess still refreshes
+        # the heartbeat once.
+        try:
+            hb_path.parent.mkdir(parents=True, exist_ok=True)
+            hb_path.touch()
+        except OSError:
+            return
+        while not stop.wait(interval):
+            try:
+                hb_path.touch()
+            except OSError:
+                return
+
+    t = threading.Thread(target=_loop, name=f"sk-heartbeat-{role}",
+                          daemon=True)
+    t.start()
+    return (t, stop)
+
+
+def _stop_heartbeat_refresher(handle: tuple[Any, Any] | None) -> None:
+    """Signal the heartbeat refresher to exit. Idempotent and
+    swallows errors — the watchdog convenience must never crash
+    the lease cycle."""
+    if handle is None:
+        return
+    try:
+        thread, stop_event = handle
+        stop_event.set()
+        # Best-effort join with a short timeout — the thread is a
+        # daemon, the process can exit if it doesn't finish.
+        try:
+            thread.join(timeout=2.0)
+        except RuntimeError:
+            pass
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
