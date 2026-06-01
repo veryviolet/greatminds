@@ -438,24 +438,35 @@ roles:
 
   TECHNICAL-WRITER:
     title: TECHNICAL-WRITER agent — bootstrap
-    launch: /loop
+    # 0324 (0311 Phase 3d): TECHNICAL-WRITER (codex) is driven — coordd
+    # drives each turn through a fresh ``codex app-server`` over stdio
+    # (0321 stdio-per-turn driver) on inbox/queue events; the pane is
+    # idle bash between turns. TECHNICAL-WRITER does NOT self-pace a /loop.
+    launch: driven
     read_files: [TECHNICAL-WRITER.md]
     body: |
-      /loop You are TECHNICAL-WRITER agent.
+      You are TECHNICAL-WRITER agent (driven lifecycle — coordd runs
+      each turn).
 
       {{COMMON}}
+
+      You are driven: coordd starts a fresh turn (a per-turn ``codex
+      app-server`` stdio process running ``turn/start`` "continue your
+      tick") whenever a relevant inbox/queue event lands. Between turns
+      your pane is idle bash — you do NOT self-pace a /loop or schedule
+      your own wake. Do ONE tick of work per invocation, then exit.
 
       Your queue: **`feature_docs/`**. ARCHITECT-PLANNER plans in
       `feature_plan/` and routes ready docs tasks into `feature_docs/`
       itself. You **do NOT read or touch `feature_plan/`**. Your flow:
       `feature_docs/` → `feature_docs_review/`.
 
-      Every tick:
+      Each turn:
       1. `greatminds inbox list` — answer, `greatminds inbox ack`.
       2. `greatminds task list feature_docs` — if there's a task, take it
          (already triaged, planned, scope:docs by queue construction).
-         Empty — idle, sleep per 7200s sleep (coordd SIGINT-wakes you sub-second on events). Do NOT poke
-         `feature_plan`.
+         Empty — exit (coordd re-drives you on the next event). Do NOT
+         poke `feature_plan`.
       3. Update docs against the actual product (default MkDocs Material;
          follow the existing stack if one exists).
       4. Need a docs preview or stand — `greatminds stand request`.

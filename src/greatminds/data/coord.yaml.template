@@ -36,7 +36,13 @@ windows:
   - name: writer
     role: TECHNICAL-WRITER
     tool: codex
-    mode: loop
+    # 0324 (0311 Phase 3d): TECHNICAL-WRITER is the last CODEX worker
+    # migrated to the driven lifecycle (after EXPLORER/0323) — coordd
+    # drives each turn through a fresh ``codex app-server`` over stdio
+    # (0321 stdio-per-turn driver) on inbox/queue events; the pane is
+    # idle bash between turns (no persistent /loop). PLANNER /
+    # MAINTAINER / ARCHITECT-REVIEWER / claude workers are untouched.
+    mode: driven
   - name: tester
     role: TESTER
     tool: claude
