@@ -191,11 +191,14 @@ def test_release_preserves_history(
 # ---------- queue handling preserved ----------
 
 
-def test_release_does_not_clear_queued_leases(
+def test_release_does_not_drop_queued_leases(
     tmp_path: Path, monkeypatch,
 ) -> None:
-    """Releasing the active lease must not touch the FIFO queue —
-    the next lease becomes active on a subsequent SK tick."""
+    """Releasing the active lease must never silently DROP a queued
+    lease (0289 anti-clobber intent). 0343: the head queued lease is
+    now auto-promoted to active immediately (free→preparing) instead of
+    waiting for a manual re-lease — so the queued lease is preserved by
+    becoming the new active_lease, not by lingering in the queue."""
     project = _project(tmp_path, monkeypatch, state="ready",
                         active_lease=_make_active_lease())
     coord = project / "coordination"
@@ -213,7 +216,9 @@ def test_release_does_not_clear_queued_leases(
     ])
 
     state = ss.read_stand_state(coord)
-    assert state["active_lease"] is None
-    queue = state.get("queue") or []
-    assert len(queue) == 1
-    assert queue[0]["lease_id"] == "next-lease"
+    # 0343: the queued lease was promoted, not lost — it is now active,
+    # the stand moved toward preparing, and the queue drained its head.
+    assert state["active_lease"] is not None
+    assert state["active_lease"]["lease_id"] == "next-lease"
+    assert state["state"] == "preparing"
+    assert (state.get("queue") or []) == []

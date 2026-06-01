@@ -206,3 +206,44 @@ def record_transition(state: dict[str, Any], from_s: str, to_s: str,
     state["state"] = to_s
     state["last_state_change_at"] = entry["t"]
     state["last_state_change_by"] = by_role
+
+
+def promote_head_on_free(state: dict[str, Any], by_role: str,
+                         reason: str | None = None) -> str | None:
+    """0343: auto-promote the next FIFO-queued lease when the stand is
+    free.
+
+    ``stand release`` / ``stand up`` transition the singleton to
+    ``free`` but historically left a non-empty queue untouched — the
+    documented "pops the next FIFO queue entry" never happened, so
+    queued validations stalled until someone manually re-leased. Call
+    this from inside a mutator AFTER recording the ``→free`` transition:
+    if the state is ``free`` and the queue is non-empty, the head entry
+    is granted (``granted_at`` now, ``ready_at`` cleared), set as the
+    ``active_lease``, removed from the queue, and the stand moves
+    ``free→preparing`` so SK deploys it on its next tick without a
+    manual re-lease.
+
+    No-op (returns ``None``) when the state isn't ``free`` or the queue
+    is empty. Returns the promoted ``lease_id`` otherwise.
+    """
+    if state.get("state") != "free":
+        return None
+    queue = state.get("queue") or []
+    if not queue:
+        return None
+    head = dict(queue[0])
+    head["granted_at"] = now_iso()
+    head["ready_at"] = None
+    state["active_lease"] = head
+    state["queue"] = list(queue[1:])
+    # A fresh grant is a clean slate — never carry a prior incident's
+    # down_reason into the promoted lease's preparing cycle.
+    state["down_reason"] = None
+    record_transition(
+        state, "free", "preparing", by_role,
+        lease_id=head.get("lease_id"),
+        reason=reason or (
+            f"auto-promoted queued lease for {head.get('task')}"),
+    )
+    return head.get("lease_id")
