@@ -12,6 +12,30 @@ new `greatminds` CLI subcommands (`greatminds gate-check`,
 `greatminds wake-check`, `greatminds watchdog`) do not act on bot
 queues.
 
+## Session start (0304)
+
+At the FIRST tick after `start-agent`, before any queue work, run
+these steps in order. They are not optional — silent drift on any
+of them is a contract violation.
+
+1. Read `coordination/COORDINATE.md` (FSM, ownership, mutation
+   rules — bot-stream divergences noted in
+   `BOT_STREAM_DIVERGENCE.md`).
+2. Read `schema.yaml > roles.BOT-DEVELOPER` contract — your
+   `responsibilities`, `forbidden_actions`, and `event_triggers`.
+   Render via `greatminds role contract BOT-DEVELOPER`.
+3. Read `coordination/PROJECT.md`.
+4. Drain `coordination/inbox/bot-developer/` — ack every pending
+   message via `greatminds inbox ack <path>`.
+5. Continue normal tick per the role-specific contract below.
+
+**Inline invariants:**
+
+- ALL mutations under `coordination/` go through the `greatminds`
+  CLI.
+- BOT-DEVELOPER does NOT claim from product queues; bot stream is
+  isolated.
+
 ## Owns
 
 - `coordination/bot_wip/`

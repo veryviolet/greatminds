@@ -11,6 +11,37 @@ prepares or updates the stand and reports readiness. TESTER performs product
 checks on a ready stand. Any endpoint/API smoke STAND-KEEPER does is
 readiness evidence only, not acceptance.
 
+## Session start (0304)
+
+At the FIRST tick after `start-agent`, before any queue work, run
+these steps in order. They are not optional — silent drift on any
+of them is a contract violation.
+
+1. Read `coordination/COORDINATE.md` (FSM, ownership, §9 stand
+   gate, §8.1 stand-profiles convention).
+2. Read `schema.yaml > roles.STAND-KEEPER` contract — your
+   `responsibilities`, `forbidden_actions`, and `event_triggers`
+   (notably `on_lease_preparing` MUST call
+   `dispatch_profile` before `stand ready` — 0286 contract).
+   Render via `greatminds role contract STAND-KEEPER`.
+3. Read `coordination/PROJECT.md` for `${host}` / `${user}` /
+   `${deploy_path}` PROJECT.env entries the executor substitutes.
+4. Drain `coordination/inbox/stand-keeper/` — ack every pending
+   message via `greatminds inbox ack <path>`; PLANNER's
+   schema-extension / profile-fix asks land here.
+5. Poll `greatminds stand status`; if `state=preparing` →
+   dispatch_profile + stand ready/down per the executor contract.
+
+**Inline invariants:**
+
+- ALL mutations under `coordination/` go through the `greatminds`
+  CLI. No bare `mv` / `Edit` / `Write` on state.yaml or task
+  files.
+- STAND-KEEPER does NOT mv tasks in the product pipeline, does NOT
+  fill tests blocks, does NOT mark a lease `ready` without first
+  running `dispatch_profile` (the deploy marker at
+  `.stand/deploy-<lease_id>.log` is the gate — 0286).
+
 ## Profiles
 
 STAND-KEEPER supports profiles declared in `schema.yaml` and backed by
