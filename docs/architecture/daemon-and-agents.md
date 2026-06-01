@@ -6,23 +6,33 @@ in `coord.yaml` with:
 - window name
 - role
 - tool (`claude`, `codex`, `cursor`, or `bash`)
-- mode (`chat` or `loop`)
+- mode (`chat`, `loop`, or `driven`)
 
-Loop-mode roles repeatedly check their inbox and the queues they own. Chat-mode
-roles wait for direct user interaction.
+The role's lifecycle is declared in `schema.yaml`:
+
+- `interactive`: human-paced chat. `ARCHITECT-PLANNER` is the normal
+  user-facing planner.
+- `self-loop`: an autonomous watchdog loop. `MAINTAINER` uses this to recover
+  dead agents, restart coordd, and escalate FSM stalls without waiting for USER.
+- `driven`: no persistent agent loop. The pane is idle between turns; `coordd`
+  runs one turn when an inbox, queue, or stand-state event lands.
+
+Driven dispatch requires both `schema.yaml` lifecycle and the installed
+`coord.yaml` window mode to be `driven`. That gate lets existing fleets migrate
+role by role.
 
 ## coordd
 
-`coordd` watches `coordination/` for inbox and queue-file activity and nudges
-idle agents. It does not own the task FSM and does not decide task transitions.
-Its job is latency: when a producer moves work into another role's queue, the
-consumer can react without waiting for a fallback polling interval.
+`coordd` watches `coordination/` for inbox, queue-file, and stand-state
+activity. It does not own the task FSM and does not decide task transitions.
+Its job is turn delivery: when a producer moves work into another role's queue,
+the consumer can react immediately.
 
 On Linux, `coordd` arms an inotify watcher. New inbox files under
 `coordination/inbox/<role>/` and new task files landing in watched queues trigger
-the owning role's event-wake path. The wake mechanism is selected from
-`schema.yaml` under `event_wake.by_tool`, keyed by the role window's
-`coord.yaml` `tool:` value:
+the owning role's event path. For non-driven roles, the wake mechanism is
+selected from `schema.yaml` under `event_wake.by_tool`, keyed by the role
+window's `coord.yaml` `tool:` value:
 
 - `codex` and `cursor`: `coordd` finds the role's deepest sleeping descendant
   and sends `SIGINT`. That interrupts the long sleep wrapper so the next tick
@@ -31,9 +41,16 @@ the owning role's event-wake path. The wake mechanism is selected from
   the role's tmux pane. The default text is defined in
   `event_wake.tmux_send_keys.keys`.
 
-This event path replaces short idle polling for normal queue and inbox changes.
-Reaction time should be the daemon watcher interval plus one signal or tmux
-keystroke, not the agent's long sleep value.
+For driven roles, `coordd` starts one turn instead of waking an existing loop:
+
+- `claude` driven roles run one `claude -p` / resume turn with the rendered
+  role bootstrap file.
+- `codex` driven roles run one fresh `codex app-server` stdio process for the
+  turn; the app-server thread id is persisted for continuity.
+
+This reactive path replaces short idle polling for normal queue and inbox
+changes. Reaction time should be the daemon watcher interval plus one driven
+spawn or wake signal, not a role's fallback sleep value.
 
 `coordd` does not push visual status markers into chat panes. Those markers are
 per-agent utterances: after a successful task move, task block append, or inbox
@@ -46,15 +63,20 @@ If a role does not react to new work, check these in order:
 1. Confirm the daemon is running for the project with `greatminds daemon status`.
 2. Confirm the role exists in `coord.yaml`, has the expected `tool:`, and has a
    live agent registry entry.
-3. Confirm `schema.yaml` still maps that tool in `event_wake.by_tool`.
-4. For `codex` or `cursor`, inspect whether the agent is actually inside a sleep
+3. Confirm the role's `schema.yaml` lifecycle and `coord.yaml` mode agree with
+   the expected model. Driven roles require both values to be `driven`.
+4. For a driven role, inspect coordd logs for the driven spawn result and check
+   the per-role run lock under `coordination/.locks/`.
+5. Confirm `schema.yaml` still maps that tool in `event_wake.by_tool` for
+   non-driven roles.
+6. For non-driven `codex` or `cursor`, inspect whether the agent is actually inside a sleep
    descendant. `coordd` does not signal the agent process itself when no sleeping
    child exists.
-5. For `claude`, confirm the tmux session and window name match `coord.yaml`.
+7. For non-driven `claude`, confirm the tmux session and window name match `coord.yaml`.
    Chat-mode wakes are rate-limited by
    `event_wake.tmux_send_keys.rate_limit_seconds`, so a burst of messages may
    coalesce into one prompt.
-6. Run `greatminds watchdog` to check dead pids, stale heartbeats, and orphaned
+8. Run `greatminds watchdog` to check dead pids, stale heartbeats, and orphaned
    intents.
 
 ## Visual event markers

@@ -11,6 +11,14 @@ prepares or updates the stand and reports readiness. TESTER performs product
 checks on a ready stand. Any endpoint/API smoke STAND-KEEPER does is
 readiness evidence only, not acceptance.
 
+## Runtime lifecycle
+
+STAND-KEEPER is `lifecycle: driven`. There is no persistent `/loop` agent
+polling stand state. The tmux pane is idle between turns; coordd starts one
+`claude -p` / resume turn when stand state or stand-keeper inbox changes.
+Carry an in-progress deploy/readiness operation as far as possible in that
+turn, then exit and wait for coordd to drive the next turn.
+
 ## Session start (0304)
 
 At the FIRST tick after `start-agent`, before any queue work, run

@@ -2,6 +2,13 @@
 
 DEVELOPER implements backend/product-code tasks planned by ARCHITECT-PLANNER.
 
+## Runtime lifecycle
+
+DEVELOPER is `lifecycle: driven`. There is no persistent `/loop` agent
+checking `feature_dev/`. The tmux pane is idle between turns; coordd starts
+one `claude -p` / resume turn when a developer inbox or queue event lands.
+Do one tick of work, then exit and wait for coordd to drive the next turn.
+
 ## Session start (0304)
 
 At the FIRST tick after `start-agent`, before any queue work, run

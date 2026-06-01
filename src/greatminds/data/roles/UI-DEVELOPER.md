@@ -16,6 +16,15 @@ Use only one of the two modes at a time. Run pipeline-mode by default;
 switch to FAST when STAND-KEEPER is in profile `vite-dev` and the user
 wants rapid iteration.
 
+## Runtime lifecycle
+
+Pipeline UI-DEVELOPER is `lifecycle: driven`. There is no persistent
+`/loop` agent checking `feature_ui_dev/`. The tmux pane is idle between
+turns; coordd starts one `claude -p` / resume turn when a UI inbox or queue
+event lands. Do one pipeline tick of work, then exit and wait for coordd to
+drive the next turn. FAST mode remains direct user chat and does not claim
+pipeline queues.
+
 ## Session start (0304)
 
 At the FIRST tick after `start-agent`, before any queue work, run
