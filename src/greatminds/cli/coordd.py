@@ -789,6 +789,7 @@ def _spawn_driven_turn(
     *,
     spawn: "callable | None" = None,
     reg: dict | None = None,
+    force_fresh: bool = False,
 ) -> tuple[bool, str]:
     """0315: run one turn for a driven claude role via
     ``claude --resume -p``. Honors a per-role run-lock: if a turn is
@@ -821,7 +822,9 @@ def _spawn_driven_turn(
         return (False, "run-lock held; pending set")
 
     # 0317: decide resume-vs-fresh from the accumulated turn count.
-    reset = _should_reset_session(reg)
+    # 0318: force_fresh (no session_id yet — first turn / killed
+    # pane) also starts a fresh session.
+    reset = force_fresh or _should_reset_session(reg)
     argv = _build_driven_claude_argv(
         session_id, bootstrap_file, fresh=reset)
     try:
@@ -938,39 +941,49 @@ def _route_queue_event(coord: Path, canon_dir: Path,
 
     # 0315 (0311 Phase 2a): driven claude roles are no longer just
     # woken — coordd RUNS the turn via ``claude --resume -p``. The
-    # pane is idle bash between turns. Only claude + lifecycle=driven
-    # take this path; everything else falls through to the legacy
-    # wake mechanism below (interactive / self-loop / codex stay on
-    # press_enter / SIGINT until Phase 3 covers codex).
+    # pane is idle bash between turns.
+    #
+    # 0318 (Phase 2d) migration gate: the driven driver fires only
+    # when BOTH the schema lifecycle == 'driven' AND the coord.yaml
+    # window mode == 'driven'. This is the per-fleet, one-at-a-time
+    # migration switch — Phase 2d flips READER's window to driven;
+    # STAND-KEEPER (lifecycle=driven in schema but still woken on
+    # .stand state events, mode != driven) keeps the press_enter
+    # wake path until its own migration phase. Everything else
+    # (interactive / self-loop / codex / unmigrated) falls through
+    # to the legacy wake mechanism below.
     lifecycle = _lifecycle_for_role(canon_dir, owner)
-    if lifecycle == "driven" and tool == "claude":
+    window_mode = _window_mode_for_role(coord_yaml_doc, owner)
+    if lifecycle == "driven" and tool == "claude" \
+            and window_mode == "driven":
         reg = read_registry(coord / REGISTRY_DIR, owner.lower())
         session_id = (reg or {}).get("session_id") or ""
-        if not session_id:
-            if verbose:
-                print(
-                    f"  0315: driven role {owner} has no session_id "
-                    f"in registry; falling back to wake",
-                    file=sys.stderr,
-                )
-        else:
-            session_name = (coord_yaml_doc.get("session") or "").strip() \
-                if coord_yaml_doc else ""
-            pane = (located[0] if located else "").strip()
-            bootstrap_file = _driven_bootstrap_path(coord, owner.lower())
-            ok, diag = _spawn_driven_turn(
-                coord, owner.lower(), session_id, pane, session_name,
-                bootstrap_file if bootstrap_file and
-                Path(bootstrap_file).is_file() else None,
-                verbose,
-                reg=reg,  # 0317: turn-count drives session-reset
+        session_name = (coord_yaml_doc.get("session") or "").strip() \
+            if coord_yaml_doc else ""
+        pane = (located[0] if located else "").strip()
+        bootstrap_file = _driven_bootstrap_path(coord, owner.lower())
+        bf = (bootstrap_file if bootstrap_file and
+              Path(bootstrap_file).is_file() else None)
+        # 0318: driven roles run no persistent agent — the pane is
+        # idle bash between turns. On the FIRST event after launch
+        # (or after a killed pane) there's no session_id yet, so we
+        # force a FRESH session (``claude -p`` without --resume);
+        # claude mints the session-id, which the agent records to the
+        # registry for subsequent --resume turns. Pre-0318 a missing
+        # session_id fell back to a wake — useless for a driven role
+        # whose pane has no running agent to wake.
+        ok, diag = _spawn_driven_turn(
+            coord, owner.lower(), session_id, pane, session_name,
+            bf, verbose,
+            reg=reg,  # 0317: turn-count drives session-reset
+            force_fresh=(not session_id),
+        )
+        if verbose:
+            print(
+                f"  0315/0318: driven dispatch for {owner}: {diag}",
+                file=sys.stderr,
             )
-            if verbose:
-                print(
-                    f"  0315: driven dispatch for {owner}: {diag}",
-                    file=sys.stderr,
-                )
-            return ok
+        return ok
 
     mechanism = _wake_mechanism_for_tool(tool)
     if mechanism == "sigint_deepest_descendant":
@@ -1192,6 +1205,24 @@ def _window_and_tool_for_role(coord_yaml: dict | None,
             return ((w.get("name") or "").strip(),
                     (w.get("tool") or "").strip().lower())
     return None
+
+
+def _window_mode_for_role(coord_yaml: dict | None, role: str) -> str:
+    """0318: return the coord.yaml ``mode:`` for a role's window (or
+    "" when absent). The driven-driver migration gate is per-fleet:
+    a role is driven only when its coord.yaml window mode == 'driven'
+    AND its schema lifecycle == 'driven'. This lets roles migrate to
+    the driven model ONE AT A TIME (Phase 2d migrates READER only;
+    STAND-KEEPER etc. keep their wake path until their own phase)."""
+    if not coord_yaml:
+        return ""
+    role_upper = role.upper()
+    for w in coord_yaml.get("windows") or []:
+        if not isinstance(w, dict):
+            continue
+        if (w.get("role") or "").upper() == role_upper:
+            return (w.get("mode") or "").strip().lower()
+    return ""
 
 
 def _wake_mechanism_for_tool(tool: str) -> str:

@@ -218,7 +218,13 @@ def _emit_tmux(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
             raise click.exceptions.Exit(1)
 
         # bash/no-role windows just open a project shell with env activated.
-        if tool == "bash" or not role:
+        # 0318 (0311 Phase 2d): driven roles (mode=driven) run NO
+        # persistent agent — coordd spawns each turn via
+        # ``claude --resume -p`` and the pane stays idle bash between
+        # turns. So launch leaves the pane idle (no start-agent send);
+        # the first inbox/queue event after launch triggers coordd's
+        # driven dispatch (force-fresh session on the first turn).
+        if tool == "bash" or not role or mode == "driven":
             launch_cmd = ""
         else:
             launch_cmd = _launch_command(launcher, role, tool, mode)
