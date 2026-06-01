@@ -21,7 +21,9 @@ CANONICAL_WINDOWS = [
     ("reader",     "READER",             "claude", "loop"),
     ("explorer",   "EXPLORER",           "codex",  "loop"),
     ("stand",      "STAND-KEEPER",       "claude", "loop"),
-    ("maintainer", "MAINTAINER",         "claude", "chat"),
+    # 0314 (0311 Phase 1b): MAINTAINER is now a self-loop watchdog
+    # → mode=loop in the coord.yaml template (was chat).
+    ("maintainer", "MAINTAINER",         "claude", "loop"),
     ("ops",        "",                   "bash",   None),
 ]
 
