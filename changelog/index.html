@@ -1273,11 +1273,98 @@
 <p>All notable changes to <strong>greatminds</strong> are documented here. Format follows
 <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a> loosely; versions
 follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
+<h2 id="1311-2026-06-01">1.3.11 — 2026-06-01<a class="headerlink" href="#1311-2026-06-01" title="Permanent link">&para;</a></h2>
+<p>Eight verified fixes covering the REVIEWER merge direction, the
+schema/gate-check stand_evidence contract, dispatch/lease coherence,
+worktree-isolation enforcement at the CLI, uniform session-start
+canon-read across role canons, SK heartbeat refresh during long
+ansible runs, daemon install systemd enablement + repair subcommand,
+and the launch/restart wrapper-loop removal.</p>
+<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<ul>
+<li>
+<p><strong>0303 task append-block enforces cwd under per-task worktree.</strong>
+  <code>schema.worktrees.required_for_task_kinds</code> was declarative only;
+  implementers could silently edit main while filing impl/tests blocks
+  (TESTER's lease then rsync'd a stale worktree, multiple stand_downs).
+  New <code>_enforce_worktree_isolation_for_block</code> runs at append-block
+  entry — refuses with exit_code=2 + the <code>cd "$(greatminds worktree
+  path &lt;id&gt;)"</code> recipe + <code>GREATMINDS_SKIP_WORKTREE_CHECK=1</code> escape
+  hatch. Skip cases preserve current flows (non-code blocks,
+  docs/research tasks, env-var override).</p>
+</li>
+<li>
+<p><strong>0304 uniform session-start canon-read block across 8 role canons.</strong>
+  Only MAINTAINER had explicit canon-read guidance at session start;
+  fresh-install agents for the other 8 roles could (and did) skip
+  re-reading COORDINATE.md / schema. Each of DEVELOPER, UI-DEVELOPER,
+  TESTER, READER, TECHNICAL-WRITER, STAND-KEEPER, EXPLORER,
+  BOT-DEVELOPER now carries a uniform <code>## Session start (0304)</code>
+  section + inline-invariants block. MAINTAINER.md intentionally
+  untouched; the existing Does step 1 pattern is regression-locked.</p>
+</li>
+<li>
+<p><strong>0307 daemon install enables unit + <code>greatminds daemon repair</code>.</strong>
+  <code>greatminds daemon install</code> now runs <code>systemctl --user enable</code>
+  for the resolved template instance so the symlink lands under
+  <code>default.target.wants/</code> and the unit auto-starts after logout /
+  shutdown. New <code>greatminds daemon repair --project &lt;name&gt;</code> is the
+  one-shot fix for existing pre-fix fleets — stricter than install
+  (nonzero exit propagates because enable is the whole point).</p>
+</li>
+</ul>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<ul>
+<li>
+<p><strong>0300 worktree_merge pulls origin/main before merging task
+  branch.</strong> Pins the REVIEWER verified-merge direction. The current
+  code already did checkout main → merge task/<id> correctly; this
+  adds the regression-net tests pinning the order plus the missing
+  <code>git pull --ff-only origin main</code> step between checkout and merge so
+  main advances when origin is strictly ahead.</p>
+</li>
+<li>
+<p><strong>0301 stand_evidence required_subfields list matches gate_check
+  expectations.</strong> <code>schema.tests_block_validation.stand_evidence.
+  required_subfields</code> listed 3 prose fields but gate_check also
+  required <code>lease_id</code>, <code>result</code>, <code>commit</code> — every well-formed lease
+  release hit "missing" at the feature_test → feature_review gate.
+  Schema now enumerates all six; <code>cli/task.py</code> validator reads from
+  schema with a defensive 3-field fallback for partial installs.</p>
+</li>
+<li>
+<p><strong>0302 dispatch_profile cross-checks <code>spec.name</code> against
+  <code>lease_meta['profile']</code>.</strong> Pre-fix SK could silently run a
+  spec-loaded-by-other-means against an unrelated lease.
+  <code>dispatch_profile</code> now refuses with exit_code=2 +
+  GreatMindsError naming both values before any subprocess so a
+  misrouted dispatch can never invoke the wrong playbook.</p>
+</li>
+<li>
+<p><strong>0305 SK heartbeat refresh during long ansible runs (Fix B).</strong>
+  Watchdog dead-pid asks were accumulating while SK was waiting on
+  multi-minute ansible deploys. New <code>_start_heartbeat_refresher</code>
+  daemon thread touches <code>heartbeat.&lt;role&gt;</code> every 30s during the
+  subprocess; <code>execute_yaml_profile</code> wraps <code>subprocess.run</code> in
+  try/finally so the refresher stops on every exit path. Fix A
+  (coordd wake on <code>state.yaml</code> writes) was already in production.</p>
+</li>
+<li>
+<p><strong>0308 launch sends <code>greatminds start-agent</code> directly + restart
+  mirrors the same sequence.</strong> Wrapper-loop install path replaced
+  with <code>tmux send-keys C-u</code> + the launch command + Enter on each
+  pane; restart uses the same shared builder so launch and resurrect
+  share one code path. <code>_wrapper_loop</code> + <code>CIRCUIT_BREAKER_*</code>
+  retained as dormant symbols for legacy fixtures; the wrapper's
+  built-in counter is removed (failing agents retry naturally on
+  the next restart; a watchdog-side counter lands as a follow-up).</p>
+</li>
+</ul>
 <h2 id="1310-2026-05-27">1.3.10 — 2026-05-27<a class="headerlink" href="#1310-2026-05-27" title="Permanent link">&para;</a></h2>
 <p>Fixes two operator-facing bugs in <code>greatminds update</code> so the command
 works correctly on projects managed by uv / poetry / pipenv and stops
 resurrecting torn-down fleet sessions.</p>
-<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0299 update branches by <code>detect_env_setup</code> + skips fleet restart
   when tmux session absent.</strong> <code>update</code> used to call pip even when the
@@ -1300,7 +1387,7 @@ resurrecting torn-down fleet sessions.</p>
 <p>Critical fix for the chat-mode UserPromptSubmit deadlock that
 shipped across the 1.3.x line. Operators on existing projects should
 upgrade promptly.</p>
-<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0298 stop-decide <code>user-prompt-submit</code> phase no longer emits
   <code>decision: block</code>.</strong> <code>greatminds stop-decide</code> returned the same
@@ -1321,7 +1408,7 @@ upgrade promptly.</p>
 mechanism so fresh-install PLANNER agents pick up the workflow at
 tick start without an operator ping. Closes the role-contract gap
 left after the 0276 stand-profile umbrella shipped.</p>
-<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0297 PLANNER role contract gains stand-profile coordination.</strong>
   <code>schema.roles.ARCHITECT-PLANNER</code> now declares
@@ -1337,7 +1424,7 @@ left after the 0276 stand-profile umbrella shipped.</p>
 <h2 id="137-2026-05-27">1.3.7 — 2026-05-27<a class="headerlink" href="#137-2026-05-27" title="Permanent link">&para;</a></h2>
 <p>Closes the 0276 stand-profile umbrella DoD with the MD-cycle live-green
 on real avatar.</p>
-<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
+<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0295 liveness-prose MD-only canon template (Phase I of 0276).</strong>
   New <code>data/templates/stand-profiles/liveness-prose.md</code> with no YAML
@@ -1354,7 +1441,7 @@ on real avatar.</p>
 plus a chain of canon-playbook robustness fixes empirically proven on
 real avatar deploys, and pushes the schema enum so md-only profiles can
 be leased.</p>
-<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
+<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0284 end-to-end stand-profile cycle tests + collection-free rsync
@@ -1382,7 +1469,7 @@ be leased.</p>
   rejection.</p>
 </li>
 </ul>
-<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0292 <code>full-deploy.yaml</code> install step uses <code>uv pip</code>.</strong> <code>uv venv</code>
@@ -1405,7 +1492,7 @@ be leased.</p>
 workflow from <code>schema.yaml</code> at tick start, and plugs the orphan
 <code>active_lease</code> leak that produced <code>state=down + active_lease={...}</code>
 contradictions across the stand transitions.</p>
-<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">&para;</a></h3>
+<h3 id="added_4">Added<a class="headerlink" href="#added_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0288 schema-driven role contracts for all 13 roles + CLI.</strong>
   <code>schema.roles.&lt;ROLE&gt;</code> now carries <code>responsibilities</code>,
@@ -1417,7 +1504,7 @@ contradictions across the stand transitions.</p>
   role list</code> CLI surface the rendered contract. Existing
   <code>roles/*.md</code> prose remains; doc-shrinkage follow-up deferred.</li>
 </ul>
-<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_4">Fixed<a class="headerlink" href="#fixed_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0289 stand release/down/up nullify <code>active_lease</code>.</strong> Pre-fix
   <code>stand down</code> left the triggering lease set, and <code>stand up</code> did
@@ -1431,7 +1518,7 @@ contradictions across the stand transitions.</p>
 <h2 id="134-2026-05-27">1.3.4 — 2026-05-27<a class="headerlink" href="#134-2026-05-27" title="Permanent link">&para;</a></h2>
 <p>Followup patch tightening the SK runtime gate so the stand-profile
 dispatch contract is actually enforced.</p>
-<h3 id="fixed_4">Fixed<a class="headerlink" href="#fixed_4" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_5">Fixed<a class="headerlink" href="#fixed_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0286 three-layer deploy lock.</strong> SK could still mark state=ready
   without invoking ansible-playbook because the <code>is_deploy_safe</code>
@@ -1450,7 +1537,7 @@ dispatch contract is actually enforced.</p>
 <h2 id="133-2026-05-27">1.3.3 — 2026-05-27<a class="headerlink" href="#133-2026-05-27" title="Permanent link">&para;</a></h2>
 <p>Stand-profile mechanism (0276 umbrella, Phases A-G) plus a deploy-safety
 fix that unblocks Phase H avatar verification.</p>
-<h3 id="added_4">Added<a class="headerlink" href="#added_4" title="Permanent link">&para;</a></h3>
+<h3 id="added_5">Added<a class="headerlink" href="#added_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0277 stand_profile schema section + canon convention (Phase A).</strong>
@@ -1510,7 +1597,7 @@ fix that unblocks Phase H avatar verification.</p>
   Lease-level override wins over spec value.</p>
 </li>
 </ul>
-<h3 id="fixed_5">Fixed<a class="headerlink" href="#fixed_5" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_6">Fixed<a class="headerlink" href="#fixed_6" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0285 SK deploy-bypass closed — <code>is_deploy_safe</code> classifier.</strong> SK
   was refusing every deploy that touched the main fleet tree, even
@@ -1529,7 +1616,7 @@ fix that unblocks Phase H avatar verification.</p>
 emergency wake fix. Five verified tasks merged on local main; all
 empirically validated via real avatar SSH stand probes (no shape-only
 evidence).</p>
-<h3 id="fixed_6">Fixed<a class="headerlink" href="#fixed_6" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_7">Fixed<a class="headerlink" href="#fixed_7" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0258 — complete BREAKING removal of stand-stream runtime.</strong>
@@ -1603,7 +1690,7 @@ input_sock channel + leaf SIGINT; end-to-end probe (filed
 feature_inbox/9999.yaml → coordd inotify → press_enter →
 input_sock → SIGINT to PLANNER's own Bash subprocess exit 130)
 confirms the full chain.</p>
-<h3 id="fixed_7">Fixed<a class="headerlink" href="#fixed_7" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_8">Fixed<a class="headerlink" href="#fixed_8" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0259 coordd inotify wake uses <code>input_sock</code> via <code>press_enter</code>.</strong>
   Pre-0259, coordd's chat-mode wake (<code>tmux_send_keys_wake</code>) sent
@@ -1653,7 +1740,7 @@ files may stay as historical evidence.</p>
   is gone. Pre-1.3.0 tasks without a <code>lease_id</code> on their tests block
   return <code>missing</code>; refile via the lease API to verify.</li>
 </ul>
-<h3 id="added_5">Added<a class="headerlink" href="#added_5" title="Permanent link">&para;</a></h3>
+<h3 id="added_6">Added<a class="headerlink" href="#added_6" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Lease-based stand CLI:</strong></li>
 <li><code>greatminds stand lease --task &lt;id&gt; --worktree &lt;path&gt; --profile
@@ -1713,7 +1800,7 @@ in a single step.</p>
 <p>Bug-fix release. Three regressions found in 1.1.0 real-world use, plus a
 critical wake-up channel regression introduced silently by the 1.0.0
 umbrella-console-script migration. No new features.</p>
-<h3 id="fixed_8">Fixed<a class="headerlink" href="#fixed_8" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_9">Fixed<a class="headerlink" href="#fixed_9" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>task append-block --body-file</code> option missing.</strong> Dropped during the
   argparse→click conversion. The plan orchestrator and several agent
@@ -1771,7 +1858,7 @@ umbrella-console-script migration. No new features.</p>
   library API; the click handlers are thin wrappers calling them,
   matching vfl's <code>create_node()</code> / <code>create_project()</code> pattern.</li>
 </ul>
-<h3 id="added_6">Added<a class="headerlink" href="#added_6" title="Permanent link">&para;</a></h3>
+<h3 id="added_7">Added<a class="headerlink" href="#added_7" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>tests/test_task_field_coercion.py</code> — pytest regression suite
   covering all three 1.1.0 bugs (20 tests, all passing). Tests:
@@ -1804,7 +1891,7 @@ internal artefacts (task files, journal, code) English.</p>
   Russian to English. Pre-1.1.0 versions on PyPI (0.1.0, 0.1.1, 1.0.0)
   shipped Russian-only canon by mistake — yank them in favour of 1.1.0+.</li>
 </ul>
-<h3 id="added_7">Added<a class="headerlink" href="#added_7" title="Permanent link">&para;</a></h3>
+<h3 id="added_8">Added<a class="headerlink" href="#added_8" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>greatminds setup --lang &lt;code&gt;</code> flag — records the agent
   user-facing language in <code>PROJECT.md</code> as <code>&lt;GREATMINDS_LANG&gt;</code>. Any
@@ -1835,7 +1922,7 @@ are consolidated into a single <code>greatminds</code> umbrella with subcommands
 <li><code>coord-init</code>, <code>coord-launch</code>, <code>coord-tmux</code> modules removed; their
   functionality is in <code>greatminds setup</code> and <code>greatminds launch</code>.</li>
 </ul>
-<h3 id="added_8">Added<a class="headerlink" href="#added_8" title="Permanent link">&para;</a></h3>
+<h3 id="added_9">Added<a class="headerlink" href="#added_9" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>greatminds.core.env</code> — adaptive Python-env detector covering 8
   scenarios: pixi, uv, poetry, conda, plain venv, external-venv
@@ -1860,7 +1947,7 @@ plan → dev) confirmed against a fresh project: 7+ journal
 transitions, schema validation rejects malformed blocks, role
 permissions enforced.</p>
 <h2 id="011-2026-05-20">0.1.1 — 2026-05-20<a class="headerlink" href="#011-2026-05-20" title="Permanent link">&para;</a></h2>
-<h3 id="fixed_9">Fixed<a class="headerlink" href="#fixed_9" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_10">Fixed<a class="headerlink" href="#fixed_10" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>greatminds-coord-launch</code> and <code>greatminds-coord-tmux</code> now find a
   sibling <code>greatminds-start-agent</code> in the same venv via
@@ -1876,7 +1963,7 @@ permissions enforced.</p>
 </ul>
 <h2 id="010-2026-05-20">0.1.0 — 2026-05-20<a class="headerlink" href="#010-2026-05-20" title="Permanent link">&para;</a></h2>
 <p>First public release.</p>
-<h3 id="added_9">Added<a class="headerlink" href="#added_9" title="Permanent link">&para;</a></h3>
+<h3 id="added_10">Added<a class="headerlink" href="#added_10" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Python package <code>greatminds</code> with 19 console entry-points covering the
   full R8 pipeline:</li>

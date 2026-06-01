@@ -972,6 +972,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#greatminds-daemon-repair" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        repair
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#greatminds-daemon-restart" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1701,6 +1712,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#greatminds-daemon-repair" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        repair
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#greatminds-daemon-restart" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2094,6 +2116,20 @@ singleton <code>coordd.service</code> if present.</p>
 <p><strong>Options:</strong></p>
 <div class="highlight"><pre><span></span><code>  --yes       confirm removal of legacy coordd.service
   -h, --help  Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-daemon-repair">greatminds daemon repair<a class="headerlink" href="#greatminds-daemon-repair" title="Permanent link">&para;</a></h4>
+<p>0307: idempotent <code>systemctl --user enable</code> for the project's
+daemon instance. Pre-0307 <code>daemon install</code> skipped the enable
+step → the unit was torn down with default.target on KDE
+logout. Existing fleets need this one-time repair to recover
+survive-logout behavior.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds daemon repair [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --name TEXT              project name (default: coord.yaml `session`)
+  --project-dir DIRECTORY  project root (default: cwd)
+  -h, --help               Show this message and exit.
 </code></pre></div>
 <h4 id="greatminds-daemon-restart">greatminds daemon restart<a class="headerlink" href="#greatminds-daemon-restart" title="Permanent link">&para;</a></h4>
 <p>restart the daemon for a project</p>
