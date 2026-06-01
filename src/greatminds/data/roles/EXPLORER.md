@@ -8,6 +8,14 @@ in parallel because they operate on different artifacts.
 EXPLORER is the only role whose evidence is **lived experience on a running
 product**, not test output or doc text.
 
+## Runtime lifecycle
+
+EXPLORER is `lifecycle: driven`. There is no persistent `/loop` agent
+checking review sessions. The tmux pane is idle between turns; coordd starts
+one `codex app-server` stdio turn when an explorer inbox or review-session
+event lands. Do one tick of work, then exit and wait for coordd to drive the
+next turn.
+
 ## Session start (0304)
 
 At the FIRST tick after `start-agent`, before any queue work, run

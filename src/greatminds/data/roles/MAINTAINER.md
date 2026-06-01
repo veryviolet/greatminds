@@ -82,7 +82,7 @@ MAINTAINER owns these one-shot operational commands:
 
 ## Does
 
-1. At each session start, read inbox/maintainer/ and act on every ask:
+1. At each self-loop tick, read inbox/maintainer/ and act on every ask:
    - **dead-pid from coordd** — diagnose (was it crash? rate-limit?
      intentional?). Restart via `greatminds start-agent <ROLE> <tool>` or
      remove `.agent_registry/<role>.json` if intentional.
@@ -136,45 +136,25 @@ MAINTAINER owns these one-shot operational commands:
 When in doubt, MAINTAINER may forward to ARCHITECT-PLANNER via
 `greatminds inbox send ARCHITECT-PLANNER --kind ask` (or vice versa).
 
-## Bootstrap (chat)
+## Bootstrap (self-loop)
 
-There is no /loop body. MAINTAINER is chat-mode. Two distinct cases:
-
-**Fresh operator session** (no prior context to keep):
-
-```bash
-GREATMINDS_ROLE=MAINTAINER claude
-```
-
-reads `MAINTAINER.md`, `COORDINATE.md`, `schema.yaml`, and
-`coordination/PROJECT.md` at start and proceeds interactively.
-
-**Continue an existing operator session** (the usual case — keep the
-operator's full history across a restart or a host migration):
+MAINTAINER runs as a non-user-facing self-loop watchdog. Fresh fleets start it
+through the rendered role bootstrap and the `coord.yaml` maintainer window
+(`tool: claude`, `mode: loop`):
 
 ```bash
-claude --resume <session-id>
+greatminds start-agent MAINTAINER claude --mode loop
 ```
 
-Find `<session-id>` as the newest jsonl in
-`~/.claude/projects/<project-slug>/`.
+The bootstrap text tells MAINTAINER to run one health-check tick per loop
+iteration: drain inbox, perform safe recovery actions, ack handled messages,
+touch heartbeat through CLI calls, then wait for the next timer or coordd early
+wake.
 
-**coord-tmux + registry.** `greatminds start-agent MAINTAINER …` (the line
-`greatminds launch --target tmux` pre-fills) is NOT inherently the fresh path: like
-every role, it resumes when `coordination/.agent_registry/maintainer.session-id`
-exists (`claude --resume <uuid>`), and only starts fresh when that file
-is absent. So Enter on the pre-filled line continues the operator
-session **iff** that file holds the intended UUID. The footgun: a
-stray fresh MAINTAINER (e.g. an accidental bring-up) overwrites
-`maintainer.session-id` with its own empty session — then Enter would
-resume the empty one. Before bring-up, ensure the file is correct:
-
-```bash
-echo <intended-uuid> > coordination/.agent_registry/maintainer.session-id
-```
-
-All other windows use the pre-filled `greatminds start-agent` line as-is —
-they self-resume the same way from their own `<role>.session-id`.
+`greatminds start-agent` still uses the registry and session-id files for tool
+continuity, but MAINTAINER is not an operator chat session. USER-facing infra
+requests go to ARCHITECT-PLANNER, which forwards actionable asks to
+`coordination/inbox/maintainer/`.
 
 ## Marketplace plugins
 

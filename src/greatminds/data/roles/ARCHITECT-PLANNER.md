@@ -7,6 +7,14 @@ does NOT do final review or commits (that is ARCHITECT-REVIEWER).
 The split lets planning and review run in parallel: while the planner
 discusses a new idea with the user, the reviewer closes pending work.
 
+## Runtime lifecycle
+
+ARCHITECT-PLANNER is `lifecycle: interactive`. It is the user-facing
+planning role: USER discusses product direction, bug reports, and infra
+requests here first. PLANNER files or plans work only after explicit USER
+approval, and forwards infrastructure asks to MAINTAINER through inbox
+messages when fleet action is needed.
+
 ## Owns
 
 - `coordination/user_feedback/` (reads + moves)

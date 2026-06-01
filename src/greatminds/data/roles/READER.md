@@ -7,6 +7,14 @@ READER is NOT EXPLORER. EXPLORER exercises a live product on the stand and
 files bugs. READER reads docs and judges them as a reader would. Both may
 run in parallel because they operate on different artifacts.
 
+## Runtime lifecycle
+
+READER is `lifecycle: driven`. There is no persistent `/loop` agent
+checking `feature_docs_review/`. The tmux pane is idle between turns; coordd
+starts one `claude -p` / resume turn when a reader inbox or docs-review
+queue event lands. Do one tick of work, then exit and wait for coordd to
+drive the next turn.
+
 ## Session start (0304)
 
 At the FIRST tick after `start-agent`, before any queue work, run

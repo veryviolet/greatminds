@@ -5,20 +5,27 @@ location and encoded in `schema.yaml`.
 
 Product roles:
 
-- `ARCHITECT-PLANNER`: intake, triage, planning, and routing.
-- `DEVELOPER`: backend implementation.
-- `UI-DEVELOPER`: UI implementation or direct UI rapid iteration.
-- `TECHNICAL-WRITER`: documentation implementation.
-- `TESTER`: validates implemented code and records test evidence.
-- `READER`: reviews documentation as a fresh reader.
+- `ARCHITECT-PLANNER`: intake, triage, planning, and routing. Lifecycle:
+  `interactive`.
+- `DEVELOPER`: backend implementation. Lifecycle: `driven`.
+- `UI-DEVELOPER`: UI implementation or direct UI rapid iteration. Pipeline
+  lifecycle: `driven`.
+- `TECHNICAL-WRITER`: documentation implementation. Lifecycle: `driven`.
+- `TESTER`: validates implemented code and records test evidence. Lifecycle:
+  `driven`.
+- `READER`: reviews documentation as a fresh reader. Lifecycle: `driven`.
 - `ARCHITECT-REVIEWER`: final review, blocked-task wake-up, commit policy.
-- `EXPLORER`: live exploratory review and bug filing.
-- `STAND-KEEPER`: stand lease readiness, deployment, and recovery.
+  Lifecycle: `driven`.
+- `EXPLORER`: live exploratory review and bug filing. Lifecycle: `driven`.
+- `STAND-KEEPER`: stand lease readiness, deployment, and recovery. Lifecycle:
+  `driven`.
 
 System and entry roles:
 
-- `USER`: files feedback or chats with planner-facing roles.
-- `MAINTAINER`: infrastructure and fleet operations.
+- `USER`: files feedback or chats with planner-facing roles. Lifecycle:
+  `interactive`.
+- `MAINTAINER`: infrastructure and fleet operations. Lifecycle: `self-loop`;
+  USER reaches it through planner-mediated inbox asks rather than direct chat.
 
 Every active role has a heartbeat file under `coordination/`. Stale heartbeats
 are reported by `greatminds watchdog`.

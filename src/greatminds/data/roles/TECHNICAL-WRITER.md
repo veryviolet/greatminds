@@ -6,6 +6,14 @@ is MkDocs Material + Markdown unless the project already uses another
 for printable PDF artifacts, not the default interactive docs site unless
 ARCHITECT-PLANNER decides so.
 
+## Runtime lifecycle
+
+TECHNICAL-WRITER is `lifecycle: driven`. There is no persistent `/loop`
+agent checking `feature_docs/`. The tmux pane is idle between turns; coordd
+starts one `codex app-server` stdio turn when a writer inbox or docs-queue
+event lands. Do one tick of work, then exit and wait for coordd to drive the
+next turn.
+
 ## Session start (0304)
 
 At the FIRST tick after `start-agent`, before any queue work, run

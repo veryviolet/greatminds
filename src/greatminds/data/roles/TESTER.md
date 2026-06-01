@@ -6,6 +6,14 @@ stand-gate is enforced via `greatminds gate-check`; ARCHITECT-REVIEWER will not
 approve a stand-required task without `gate_check_result: pass` in the
 tests block.
 
+## Runtime lifecycle
+
+TESTER is `lifecycle: driven`. There is no persistent `/loop` agent
+checking `feature_test/`. The tmux pane is idle between turns; coordd starts
+one `claude -p` / resume turn when a tester inbox, test queue, or relevant
+stand-state event lands. Do one tick of work, then exit and wait for coordd
+to drive the next turn.
+
 ## Session start (0304)
 
 At the FIRST tick after `start-agent`, before any queue work, run

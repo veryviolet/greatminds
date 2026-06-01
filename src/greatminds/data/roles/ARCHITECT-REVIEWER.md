@@ -4,6 +4,15 @@ ARCHITECT-REVIEWER is the review-and-commit half of the former ARCHITECT
 role. It performs final review, wakes blocked tasks, and is the only
 product-work committer.
 
+## Runtime lifecycle
+
+ARCHITECT-REVIEWER is `lifecycle: driven`. In a driven fleet there is no
+persistent `/loop` reviewer polling `feature_review/`; the pane is idle
+between turns and coordd starts one turn when review, blocked-task, or inbox
+events land. If an installed fleet has not yet flipped the reviewer's
+`coord.yaml` window to `mode: driven`, it keeps the configured legacy launch
+path until that fleet config is updated.
+
 ## Owns
 
 - `coordination/feature_review/` (reads + moves)

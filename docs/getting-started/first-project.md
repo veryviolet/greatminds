@@ -20,10 +20,10 @@ During setup, greatminds writes or extends
 `permissions.allow` entries from `schema.yaml` under
 `claude_settings.permissions.allow`.
 
-Those allow rules let unattended Claude loop roles perform the git operations
-they are authorized to run, such as reviewer commit, tag, push, merge, branch,
+Those allow rules let unattended Claude roles perform the git operations they
+are authorized to run, such as reviewer commit, tag, push, merge, branch,
 checkout, and worktree commands. Without explicit allow rules, Claude Code can
-pause on an approval prompt that a loop-mode role cannot answer.
+pause on an approval prompt that a driven or self-loop role cannot answer.
 
 Project operators can add their own `permissions.allow` entries directly in
 `.claude/settings.local.json`. Re-running `greatminds setup` unions the schema
@@ -105,8 +105,10 @@ greatminds launch --target tmux
 tmux a -t myproject
 ```
 
-Each window in `coord.yaml` starts the configured role, tool, and mode. Chat
-roles wait for user input; loop roles poll their inbox and owned queues.
+Each window in `coord.yaml` starts the configured role, tool, and mode. Planner
+is the user-facing interactive role. MAINTAINER runs as a self-loop watchdog.
+Worker roles are driven by `coordd`: their panes stay idle between turns, and
+coordd starts one turn when their inbox, queue, or stand-state events change.
 
 ## File your first task
 

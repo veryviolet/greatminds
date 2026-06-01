@@ -30,8 +30,9 @@ Every installed agent reads `COORDINATE.md`, `schema.yaml`, its own role
   Iterations create new blocks with the same name.
 - **Ownership is location.** Inline flags such as `ready_for_review: true`
   are evidence, not handoff. Only the physical move transfers ownership.
-- **No central authority.** Each role reads schema/inbox/queue and acts.
-  There is no scheduler that decides what runs when.
+- **Coordd drives turns, not decisions.** `coordd` observes filesystem
+  events and starts the next role turn when work lands. It does not own
+  task state, choose transitions, or override role ownership.
 - **Read-only observability.** New tools (`greatminds watchdog`, `greatminds wake-check`,
   `greatminds gate-check`) only read; they never move files. They produce reports
   for the appropriate role to act on.
@@ -41,6 +42,57 @@ Every installed agent reads `COORDINATE.md`, `schema.yaml`, its own role
 ## 2. Roles
 
 See `schema.yaml` `roles:` for the full roster and per-role description.
+
+### 2.1 Reactive fleet lifecycle
+
+Every role declares `schema.yaml > roles.<ROLE>.lifecycle`. That field
+describes how the role receives work; it is orthogonal to task scenario
+mode (`A`, `B`, `C`) and to the product queue it owns.
+
+Lifecycle values:
+
+- `interactive` — human-paced chat. The role is user-facing and acts
+  when the operator speaks to it. `ARCHITECT-PLANNER` is the normal
+  interactive product role: it discusses scope with USER, then files or
+  plans work after explicit approval.
+- `self-loop` — autonomous watchdog loop. The role wakes itself on a
+  timer and may also be woken early by coordd. `MAINTAINER` uses this
+  model so fleet recovery does not depend on a user being present.
+- `driven` — no persistent agent loop. The tmux pane is idle between
+  turns. `coordd` observes an inbox, queue, or stand-state event and
+  runs one role turn, then the role exits. Driven roles do one tick per
+  invocation; they do not self-pace with `/loop`, long sleeps, or
+  `ScheduleWakeup`.
+
+The launch path is selected by lifecycle plus tool:
+
+| Lifecycle | Tool | Turn mechanism | Between turns |
+|---|---|---|---|
+| `interactive` | `claude` | operator chat / USER prompt | live chat session |
+| `self-loop` | `claude` | `/loop` plus `ScheduleWakeup` timer, with coordd early wake | loop waits for next tick |
+| `self-loop` | `codex` or `cursor` | explicit loop plus Bash sleep fallback, with coordd interrupt | loop waits for next tick |
+| `driven` | `claude` | coordd spawns one `claude -p` / resume turn with the rendered role bootstrap | idle bash pane |
+| `driven` | `codex` | coordd drives one fresh `codex app-server` stdio turn and persists the app-server thread id | idle bash pane |
+| `driven` | `bash` | direct command run by the owning automation | process exits |
+
+Driven dispatch is intentionally gated by both `schema.yaml` lifecycle
+and the installed `coord.yaml` window mode. This lets an installed fleet
+migrate one role at a time; when both say `driven`, coordd uses the
+driven turn path. Otherwise the role keeps its configured legacy launch
+behavior until the operator updates the fleet config.
+
+`MAINTAINER` is non-user-facing in this model. USER asks about fleet
+health, restarts, schema changes, or upgrades go to `ARCHITECT-PLANNER`
+first; PLANNER forwards an inbox ask to MAINTAINER when infrastructure
+action is needed. The recovery chain is:
+
+```text
+systemd user unit -> coordd -> MAINTAINER self-loop -> worker restart / coordd restart / PLANNER escalation
+```
+
+`coordd` and systemd keep the observation and process layers alive;
+MAINTAINER decides only safe fleet-recovery actions and escalates
+product/FSM decisions back to PLANNER.
 
 ---
 
