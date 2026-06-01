@@ -4,6 +4,121 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.3.12 — 2026-06-01
+
+Closes the 0311 reactive-fleet umbrella (Phases 1–4): every role
+declares a lifecycle in schema; MAINTAINER is a non-user-facing
+self-loop watchdog with auto_mode-allowed recovery commands; all
+claude + codex workers are coordd-driven (one turn per event over
+`claude -p`/`--resume` or a fresh `codex app-server` stdio); canon
+prose + public mkdocs site mirror the model.
+
+### Added
+
+- **0312 schema role contracts gain per-role lifecycle field (Phase 1a).**
+  `schema.roles.<ROLE>.lifecycle` ∈ {`interactive`, `self-loop`,
+  `driven`}. PLANNER + USER interactive; MAINTAINER self-loop;
+  8 workers + BOT-\* driven. `greatminds role contract <ROLE>` renders
+  the line.
+
+- **0313 MAINTAINER recovery commands in `auto_mode.allow` (Phase 1c).**
+  Schema `claude_settings.auto_mode.allow` gains `greatminds restart/
+  daemon/start-agent`, `kill`, and `systemctl --user` patterns so
+  MAINTAINER's self-loop recovery survives the classifier ceiling
+  without a USER present.
+
+- **0314 MAINTAINER self-loop watchdog tick (Phase 1b).** Flips
+  MAINTAINER from chat to a self-loop health-check tick that
+  auto-restarts dead workers and coordd and escalates queue/FSM
+  stalls + upstream-bug candidates to PLANNER. Non-user-facing —
+  USER reaches infra topics through PLANNER. `data/command_START.yaml`
+  + `coord.yaml.template` + `MAINTAINER.md` reframed; recovery
+  commands are already allow-listed.
+
+- **0315 coordd driver core spawns `claude --resume` for driven roles
+  (Phase 2a).** For lifecycle=driven + tool=claude coordd RUNS each
+  turn via `claude --resume <sid> -p "continue your tick"` instead of
+  waking a persistent agent. Pane is idle bash between turns; per-role
+  run-lock prevents overlapping turns and sets a pending marker for
+  mid-turn events; `_route_queue_event` falls through to legacy wake
+  on missing session id / non-driven / non-claude.
+
+- **0316 role contract via `--append-system-prompt-file` (Phase 2b).**
+  Each driven turn is a fresh `claude -p` call, so the role contract
+  lives in the system prompt: `setup._seed_role_bootstraps` writes
+  `coordination/.bootstrap/<role>.md` from the existing `render_role`
+  for every role; the 0315 driver passes the file as
+  `--append-system-prompt-file`.
+
+- **0317 driven driver session-reset policy at turn threshold (Phase
+  2c).** `SESSION_RESET_TURN_THRESHOLD` (default 50, env override
+  `COORDD_SESSION_RESET_TURNS`). At/above the threshold the next turn
+  starts fresh (no `--resume`) with the bootstrap still riding, and
+  the per-role `driven_turn_count` resets to 1. Caps `claude --resume`
+  history growth.
+
+- **0318 migrate READER to driven lifecycle (Phase 2d — first low-risk
+  pilot).** `coord.yaml.template` reader window mode loop → driven,
+  bootstrap launch /loop → driven. `_route_queue_event` driven path
+  now also checks coord.yaml window mode (lifecycle=driven AND
+  tool=claude AND window_mode=driven); missing session_id forces a
+  fresh first turn instead of falling back to wake.
+
+- **0319 migrate DEVELOPER + UI-DEVELOPER + TESTER + STAND-KEEPER to
+  driven (Phase 2e).** Batches the remaining four claude workers
+  onto the driven driver. PLANNER (interactive) + MAINTAINER
+  (self-loop) + codex roles unchanged.
+
+- **0320 codex app-server as managed `systemd --user` unit (Phase
+  3a).** `greatminds-appserver@<fleet>.service` template carries an
+  absolute-node ExecStart + `Environment=PATH` that leads with the
+  node bin dir, so codex's `#!/usr/bin/env node` shebang resolves
+  under systemd's minimal PATH. `greatminds daemon install` enables
+  the unit when the fleet has driven+codex roles. (The driver in
+  0321 ultimately uses stdio per turn rather than the WS socket;
+  the unit is retained as harmless infrastructure for now.)
+
+- **0321 coordd codex driver via stdio app-server per-turn (Phase
+  3b).** For lifecycle=driven + tool=codex coordd spawns a fresh
+  `codex app-server` over stdio per event and speaks the
+  line-delimited JSON-RPC (`initialize` →
+  `thread/start | thread/resume` → `turn/start` → wait
+  `turn/completed` → exit). Per-role run-lock + pending marker;
+  async daemon thread releases the lock on completion and re-fires
+  one pending event. Pane is idle bash between turns.
+
+- **0323 migrate EXPLORER (first codex worker) to driven (Phase 3c).**
+  `coord.yaml.template` explorer window mode loop → driven; bootstrap
+  launch /loop → driven with codex stdio-per-turn wording. The
+  generic codex driver (0321) routes the new dispatch with no coordd
+  code change.
+
+- **0324 migrate TECHNICAL-WRITER (last codex worker) to driven
+  (Phase 3d).** Same config-only flip as 0323. With this both codex
+  workers run driven; ARCHITECT-REVIEWER stays non-driven for now.
+
+### Changed
+
+- **0325 canon docs for the reactive-fleet lifecycle model (Phase 4).**
+  `COORDINATE.md` §2.1 (new) carries the lifecycle vocabulary + the
+  lifecycle × tool dispatch matrix + the systemd → coordd → MAINTAINER
+  → worker/coordd/PLANNER escalation chain. Per-role canon files gain
+  a Runtime lifecycle section; ARCHITECT-REVIEWER explicitly carries
+  the legacy-launch fallback wording. Public mkdocs pages extend the
+  window mode enum to `chat|loop|driven`, bifurcate the coordd wake
+  vs driven-spawn paths, annotate every role with its lifecycle, and
+  update the permissions paragraph from "loop-mode role" to "driven or
+  self-loop role".
+
+### Operator migration
+
+- Pre-1.3.12 fleets need a one-time `greatminds setup` regen against
+  their existing project (or hand-edit `coord.yaml` window modes for
+  the affected roles) before the driven dispatch takes effect — setup
+  never overwrites an existing `coord.yaml`. Run `greatminds daemon
+  repair --project <name>` if the systemd `--user` unit was installed
+  pre-1.3.11.
+
 ## 1.3.11 — 2026-06-01
 
 Eight verified fixes covering the REVIEWER merge direction, the
