@@ -65,6 +65,12 @@ def render_contract(role: str, entry: dict[str, Any]) -> str:
     cat = entry.get("category")
     if cat:
         out.append(f"Category: {cat}")
+    # 0312: surface the lifecycle classification (interactive /
+    # self-loop / driven) so the agent + operators see how the role
+    # is woken.
+    lifecycle = entry.get("lifecycle")
+    if lifecycle:
+        out.append(f"Lifecycle: {lifecycle}")
     claims = entry.get("claims_from") or []
     if claims:
         out.append(f"Claims from: {list(claims)}")

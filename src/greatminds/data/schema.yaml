@@ -172,6 +172,12 @@ queues:
 roles:
   ARCHITECT-PLANNER:
     category: product
+    # 0312 (0311 Phase 1a): lifecycle classifies how the agent is
+    # driven — interactive (human-paced chat), self-loop (wakes
+    # itself on a timer), or driven (woken by coordd on queue +
+    # inbox events). Orthogonal to coord.yaml's `tool`. Phase 2/3
+    # selects launch mechanics as f(lifecycle, tool).
+    lifecycle: interactive
     launch_modes: [chat, loop]
     heartbeat: heartbeat.architect-planner
     claims_from: [user_feedback, feature_inbox, feature_plan]
@@ -226,6 +232,7 @@ roles:
         - block_dependent_lease_until_schema_lands
   ARCHITECT-REVIEWER:
     category: product
+    lifecycle: driven
     launch_modes: [loop]
     heartbeat: heartbeat.architect-reviewer
     claims_from: [feature_review, feature_blocked]
@@ -258,6 +265,7 @@ roles:
         - mv_to_archive_or_feature_review
   DEVELOPER:
     category: product
+    lifecycle: driven
     launch_modes: [loop]
     heartbeat: heartbeat.developer
     claims_from: [feature_dev]
@@ -282,6 +290,7 @@ roles:
         - mv_to_feature_test
   UI-DEVELOPER:
     category: product
+    lifecycle: driven
     launch_modes: [loop, chat]
     heartbeat: heartbeat.ui-developer
     heartbeat_fast: heartbeat.ui-developer.fast
@@ -310,6 +319,7 @@ roles:
         - mv_to_feature_test
   TECHNICAL-WRITER:
     category: product
+    lifecycle: driven
     launch_modes: [loop]
     heartbeat: heartbeat.technical-writer
     claims_from: [feature_docs]
@@ -330,6 +340,7 @@ roles:
         - mv_to_feature_docs_review
   TESTER:
     category: product
+    lifecycle: driven
     launch_modes: [loop]
     heartbeat: heartbeat.tester
     claims_from: [feature_test]
@@ -356,6 +367,7 @@ roles:
         - mv_to_feature_review
   READER:
     category: product
+    lifecycle: driven
     launch_modes: [loop]
     heartbeat: heartbeat.reader
     claims_from: [feature_docs_review]
@@ -374,6 +386,7 @@ roles:
         - mv_back_to_feature_docs_on_fail_or_partial
   EXPLORER:
     category: product
+    lifecycle: driven
     launch_modes: [loop]
     heartbeat: heartbeat.explorer
     claims_from: [review_sessions]
@@ -397,6 +410,7 @@ roles:
         - mv_to_archive_when_complete
   STAND-KEEPER:
     category: service
+    lifecycle: driven
     launch_modes: [loop]
     heartbeat: heartbeat.stand-keeper
     # 0247: stand_requests queue removed; SK now watches
@@ -428,6 +442,8 @@ roles:
         - pop_next_lease_from_queue
   USER:
     category: entry
+    # USER is the human entry point — interactive by definition.
+    lifecycle: interactive
     launch_modes: [chat]
     heartbeat: heartbeat.user
     claims_from: []
@@ -444,6 +460,9 @@ roles:
     event_triggers: {}
   MAINTAINER:
     category: system
+    # 0312: MAINTAINER is self-loop — it wakes itself to drain its
+    # inbox + run recovery (no queue-claim, USER-absent operation).
+    lifecycle: self-loop
     launch_modes: [chat]
     heartbeat: heartbeat.maintainer
     claims_from: []
@@ -476,6 +495,7 @@ roles:
         - run_release_pipeline
   BOT-USER:
     category: bot
+    lifecycle: driven
     launch_modes: [loop]
     heartbeat: heartbeat.bot-user
     claims_from: [bot_done, bot_verified]
@@ -490,6 +510,7 @@ roles:
         - mv_to_bot_verified_or_back_to_bot_wip
   BOT-DEVELOPER:
     category: bot
+    lifecycle: driven
     launch_modes: [loop]
     heartbeat: heartbeat.bot-developer
     claims_from: [bot_inbox]
