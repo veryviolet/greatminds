@@ -193,13 +193,6 @@ roles:
       - route_tasks_per_scope
       - chat_partner_for_user
       - file_review_sessions
-      # 0331 (0311 Phase 5): scenario-ownership rule. EXPLORER
-      # review-sessions must contain BLACK-BOX (CLI/REST) scenarios
-      # only — EXPLORER has no host access. Host-destructive lifecycle
-      # scenarios (kill coordd/app-server, logout-survival, raw
-      # coordination FS reads) route to the host-capable owner
-      # (STAND-KEEPER), not EXPLORER.
-      - author_explorer_review_sessions_black_box_only
       # 0297: fresh-install gap closure — PLANNER must know about
       # the stand-profile mechanism out of the box.
       - coordinate_stand_profile_tasks_via_schema_and_canon
@@ -210,7 +203,6 @@ roles:
       - mark_stand_ready
       - claim_review_sessions
       - archive_in_lifecycle_work_directly
-      - emit_host_destructive_steps_to_explorer_review_sessions
     event_triggers:
       on_user_feedback_claim:
         - read_user_feedback_block
@@ -406,36 +398,27 @@ roles:
     heartbeat: heartbeat.explorer
     claims_from: [review_sessions]
     description: |
-      Uses the live system on the stand as a real user (scenario B),
-      through BLACK-BOX product surfaces only (deployed CLI + REST /
-      browser on the published URLs). Files bugs as plan_kind: bugfix
-      tasks in feature_inbox.
-    # 0331 (0311 Phase 5): EXPLORER's review-session surface is
-    # black-box product-authorized access ONLY — no host access. Host-
-    # destructive lifecycle validation (kill coordd/app-server/agents,
-    # logout/login survival, raw coordination filesystem reads) is NOT
-    # EXPLORER's; it routes to a host-capable role (STAND-KEEPER). This
-    # is machine-readable so review-session authoring (ARCHITECT-PLANNER)
-    # does not emit host steps to EXPLORER.
-    review_session_surface: black_box_cli_rest_only
-    host_destructive_validation_owner: STAND-KEEPER
+      Uses the live system on the stand as a real user (scenario B).
+      Files bugs as plan_kind: bugfix tasks in feature_inbox.
+    # 0336: STAND-ANCHOR (absolute). EXPLORER ALWAYS works ON the stand
+    # as a real user, WHATEVER the stand's shape — the access method
+    # follows the product (HTTP/browser for a web app, SSH for a host,
+    # or wherever the software is deployed); host-destructive/recovery
+    # scenarios are EXPLORER's own on the disposable stand. EXPLORER is
+    # strictly forbidden from validating off-stand / local substitutes.
     responsibilities:
       - run_review_sessions_on_live_stand
-      - probe_only_via_black_box_cli_and_rest
+      - operate_on_the_stand_as_real_user_whatever_its_shape
       - file_bugs_to_feature_inbox
     forbidden_actions:
       - implement_code
       - deploy_stand
       - claim_outside_review_sessions
-      - ssh_into_stand_hosts
-      - probe_host_filesystem
-      - run_docker_or_compose_on_stand
-      - kill_processes_on_stand
-      - validate_logout_login_host_survival
+      - validate_off_stand_or_local_substitutes
     event_triggers:
       on_review_sessions_claim:
         - acquire_lease_via_stand_lease
-        - run_scenarios_against_deployed_stand_black_box_only
+        - run_scenarios_against_deployed_stand
         - file_bugs_as_feature_inbox_tasks
         - append_session_iteration_block
         - release_lease
