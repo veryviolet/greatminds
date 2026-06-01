@@ -74,18 +74,44 @@ def _tmux(*args: str) -> subprocess.CompletedProcess:
 
 
 def _launch_command(launcher: str, role: str, tool: str, mode: str) -> str:
+    """0308: shared builder for the start-agent command line.
+
+    Both ``launch.py`` (initial fleet spin-up) and ``restart.py``
+    (resurrection of a dead agent in an existing pane) call this so
+    the two paths produce IDENTICAL command strings. Pre-0308
+    ``restart`` sent only a bare Enter and relied on the
+    ``_wrapper_loop`` resident in the pane to re-exec the agent;
+    that wrapper is gone now, so restart must build the full
+    command itself.
+    """
     cmd = f"{launcher} {role} {tool}"
     if mode:
         cmd += f" --mode {mode}"
     return cmd
 
 
+# 0308: the launcher no longer installs the wrapper-loop in each
+# pane. ``_emit_tmux`` sends the launch_command + Enter directly
+# (preceded by ``C-u`` to clear any leftover bash input).
+# ``restart.py`` mirrors that sequence when resurrecting a dead
+# agent. The constants + ``_wrapper_loop`` function are retained
+# in dormant form for transitional fixtures and external scripts
+# that still import them; future task moves the circuit-breaker
+# semantics to ``restart.py`` / watchdog (per-role attempt-count
+# tracking across invocations).
 CIRCUIT_BREAKER_FAILS = 3
 CIRCUIT_BREAKER_WINDOW_SEC = 30
 
 
 def _wrapper_loop(launch_cmd: str, role: str) -> str:
-    """0160: bash one-liner that loops on Enter and re-execs the agent.
+    """0160 wrapper loop — DEPRECATED in 0308.
+
+    Kept as a no-op stub so test fixtures + external scripts that
+    still import the symbol don't break. The launcher no longer
+    installs the wrapper in each pane; ``_emit_tmux`` sends
+    ``launch_cmd`` + Enter directly.
+
+    Pre-0160 docstring (preserved for historical context):
 
     Wrapper shape (one line, no embedded newlines)::
 
@@ -193,10 +219,9 @@ def _emit_tmux(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
 
         # bash/no-role windows just open a project shell with env activated.
         if tool == "bash" or not role:
-            wrapper = ""
+            launch_cmd = ""
         else:
             launch_cmd = _launch_command(launcher, role, tool, mode)
-            wrapper = _wrapper_loop(launch_cmd, role)
 
         if first:
             cp = _tmux("new-session", "-d", "-s", session, "-n", name,
@@ -217,18 +242,21 @@ def _emit_tmux(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
         if setup.activation:
             _tmux("send-keys", "-t", f"{session}:{name}",
                   setup.activation, "Enter")
-        # 3. 0160: install the wrapper loop and start it (with trailing
-        # Enter). The wrapper prints ``press Enter to (re)start ...``
-        # and blocks at ``read -r _ </dev/tty``. Operator's first Enter
-        # launches the first agent; subsequent Enter (manual OR from
-        # ``greatminds restart``'s send-keys) launches each successive
-        # instance after the previous one exits. Pre-0160 this path
-        # pre-typed ``launch_cmd`` with NO trailing Enter — which made
-        # ``restart`` a no-op for any pane whose agent had already
-        # exited (the pane reverted to a bare bash prompt with no
-        # command to re-execute).
-        if wrapper:
-            _tmux("send-keys", "-t", f"{session}:{name}", wrapper, "Enter")
+        # 3. 0308: emit the launch_command directly + Enter. Pre-0308
+        # we installed a wrapper-loop bash one-liner that printed
+        # ``press Enter to (re)start <ROLE>...`` and blocked on
+        # ``read -r _`` — so the operator had to press Enter once per
+        # pane to actually start the agents. The wrapper also hid the
+        # actual command behind ~120 chars of bash, which made
+        # debugging confusing. 0308 removes the wrapper: clear the
+        # bash line with ``C-u`` (defense against leftover characters
+        # from earlier commands), then send the launch_command + Enter.
+        # ``restart.py`` mirrors this exact sequence when resurrecting
+        # a dead agent in an existing pane.
+        if launch_cmd:
+            _tmux("send-keys", "-t", f"{session}:{name}", "C-u")
+            _tmux("send-keys", "-t", f"{session}:{name}",
+                  launch_cmd, "Enter")
 
     _tmux("select-window", "-t", f"{session}:0")
 
