@@ -56,6 +56,7 @@ from . import migrate_task as _migrate_task_mod
 from . import migrate_stand_history as _migrate_stand_history_mod
 from . import intent_clean as _intent_clean_mod
 from . import notify_from_journal as _notify_journal_mod
+from . import journal as _journal_mod
 from . import stop_decide as _stop_decide_mod
 from . import pty_launch as _pty_launch_mod
 from . import start_agent as _start_agent_mod
@@ -84,6 +85,7 @@ cli.add_command(_migrate_stand_history_mod.migrate_stand_history,
                 name="migrate-stand-history")
 cli.add_command(_intent_clean_mod.intent_clean, name="intent-clean")
 cli.add_command(_notify_journal_mod.notify_journal, name="notify-journal")
+cli.add_command(_journal_mod.journal, name="journal")
 cli.add_command(_stop_decide_mod.stop_decide, name="stop-decide")
 cli.add_command(_pty_launch_mod.pty_launch, name="pty-launch")
 cli.add_command(_start_agent_mod.start_agent, name="start-agent")
