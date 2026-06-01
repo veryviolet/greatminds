@@ -4,6 +4,85 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.3.11 — 2026-06-01
+
+Eight verified fixes covering the REVIEWER merge direction, the
+schema/gate-check stand_evidence contract, dispatch/lease coherence,
+worktree-isolation enforcement at the CLI, uniform session-start
+canon-read across role canons, SK heartbeat refresh during long
+ansible runs, daemon install systemd enablement + repair subcommand,
+and the launch/restart wrapper-loop removal.
+
+### Added
+
+- **0303 task append-block enforces cwd under per-task worktree.**
+  `schema.worktrees.required_for_task_kinds` was declarative only;
+  implementers could silently edit main while filing impl/tests blocks
+  (TESTER's lease then rsync'd a stale worktree, multiple stand_downs).
+  New `_enforce_worktree_isolation_for_block` runs at append-block
+  entry — refuses with exit_code=2 + the `cd "$(greatminds worktree
+  path <id>)"` recipe + `GREATMINDS_SKIP_WORKTREE_CHECK=1` escape
+  hatch. Skip cases preserve current flows (non-code blocks,
+  docs/research tasks, env-var override).
+
+- **0304 uniform session-start canon-read block across 8 role canons.**
+  Only MAINTAINER had explicit canon-read guidance at session start;
+  fresh-install agents for the other 8 roles could (and did) skip
+  re-reading COORDINATE.md / schema. Each of DEVELOPER, UI-DEVELOPER,
+  TESTER, READER, TECHNICAL-WRITER, STAND-KEEPER, EXPLORER,
+  BOT-DEVELOPER now carries a uniform `## Session start (0304)`
+  section + inline-invariants block. MAINTAINER.md intentionally
+  untouched; the existing Does step 1 pattern is regression-locked.
+
+- **0307 daemon install enables unit + `greatminds daemon repair`.**
+  `greatminds daemon install` now runs `systemctl --user enable`
+  for the resolved template instance so the symlink lands under
+  `default.target.wants/` and the unit auto-starts after logout /
+  shutdown. New `greatminds daemon repair --project <name>` is the
+  one-shot fix for existing pre-fix fleets — stricter than install
+  (nonzero exit propagates because enable is the whole point).
+
+### Fixed
+
+- **0300 worktree_merge pulls origin/main before merging task
+  branch.** Pins the REVIEWER verified-merge direction. The current
+  code already did checkout main → merge task/<id> correctly; this
+  adds the regression-net tests pinning the order plus the missing
+  `git pull --ff-only origin main` step between checkout and merge so
+  main advances when origin is strictly ahead.
+
+- **0301 stand_evidence required_subfields list matches gate_check
+  expectations.** `schema.tests_block_validation.stand_evidence.
+  required_subfields` listed 3 prose fields but gate_check also
+  required `lease_id`, `result`, `commit` — every well-formed lease
+  release hit "missing" at the feature_test → feature_review gate.
+  Schema now enumerates all six; `cli/task.py` validator reads from
+  schema with a defensive 3-field fallback for partial installs.
+
+- **0302 dispatch_profile cross-checks `spec.name` against
+  `lease_meta['profile']`.** Pre-fix SK could silently run a
+  spec-loaded-by-other-means against an unrelated lease.
+  `dispatch_profile` now refuses with exit_code=2 +
+  GreatMindsError naming both values before any subprocess so a
+  misrouted dispatch can never invoke the wrong playbook.
+
+- **0305 SK heartbeat refresh during long ansible runs (Fix B).**
+  Watchdog dead-pid asks were accumulating while SK was waiting on
+  multi-minute ansible deploys. New `_start_heartbeat_refresher`
+  daemon thread touches `heartbeat.<role>` every 30s during the
+  subprocess; `execute_yaml_profile` wraps `subprocess.run` in
+  try/finally so the refresher stops on every exit path. Fix A
+  (coordd wake on `state.yaml` writes) was already in production.
+
+- **0308 launch sends `greatminds start-agent` directly + restart
+  mirrors the same sequence.** Wrapper-loop install path replaced
+  with `tmux send-keys C-u` + the launch command + Enter on each
+  pane; restart uses the same shared builder so launch and resurrect
+  share one code path. `_wrapper_loop` + `CIRCUIT_BREAKER_*`
+  retained as dormant symbols for legacy fixtures; the wrapper's
+  built-in counter is removed (failing agents retry naturally on
+  the next restart; a watchdog-side counter lands as a follow-up).
+
 ## 1.3.10 — 2026-05-27
 
 Fixes two operator-facing bugs in `greatminds update` so the command
