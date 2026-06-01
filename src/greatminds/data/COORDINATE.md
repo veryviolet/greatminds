@@ -464,9 +464,24 @@ role resuming and touching its heartbeat again.
 
 Each task gets its own working tree under
 `<project_dir>/.worktrees/<task-id>/` on branch `task/<task-id>`.
-Implementers + TESTER `cd "$(greatminds worktree path <task-id>)"`
-before editing/testing — the CLI resolves the path from schema
-policy.
+Implementers (DEVELOPER / UI-DEVELOPER / TECHNICAL-WRITER)
+`cd "$(greatminds worktree path <task-id>)"` before **editing** — the
+CLI resolves the path from schema policy.
+
+TESTER does **not** edit or execute in the worktree. TESTER's only
+execution surface is SSH probes against the **deployed stand** (after
+STAND-KEEPER rsyncs the worktree to the stand); evidence comes from the
+stand, not a local run.
+
+`uv run` / `uv run --active` is **forbidden for every role anywhere in
+the repo**: `--active` syncs the cwd project into the *active* venv —
+inside a `.worktrees/<id>/` that hijacks the fleet venv `.venv-coord`,
+writing an editable `.pth → .worktrees/<id>/src`; when the worktree is
+later pruned on merge the `.pth` dangles and every fleet agent dies at
+import (`ModuleNotFoundError: greatminds`). If an implementer
+sanity-runs tests locally, use ONLY an isolated `.venv`
+(`unset VIRTUAL_ENV && uv venv && uv pip install --python .venv/bin/python -e .`)
+— never `uv run`, never `--active`, never the fleet venv.
 
 Lifecycle:
 
