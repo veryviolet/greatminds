@@ -864,6 +864,27 @@ scenarios:
       may be filed in feature_review at end of session for audit.
 
 # ---------------------------------------------------------------------------
+# Coordination access (0337 / DOD2)
+#
+# Hard rule for EVERY role (incl. ARCHITECT-PLANNER): access to
+# coordination/ is ONLY via the greatminds CLI; raw ls/cat/grep/sed/edit
+# on coordination/ is forbidden. Why: a raw relative coordination/ path
+# breaks from a per-task worktree cwd (the worktree has no
+# coordination/); the CLI resolves the project root regardless of cwd;
+# and a direct task-yaml edit bypasses FSM validation. role_contract
+# renders this for every role (machine-readable, no prose).
+# ---------------------------------------------------------------------------
+coordination_access:
+  cli_only: true
+  rule: coordination_access_via_greatminds_cli_only
+  forbidden:
+    - raw_ls_cat_grep_sed_edit_on_coordination
+  surfaces:
+    - greatminds inbox list|show|ack|send
+    - greatminds task list|show|mv|append-block
+    - greatminds stand status
+
+# ---------------------------------------------------------------------------
 # Watchdog thresholds
 #
 # Read by greatminds watchdog. Times in seconds.

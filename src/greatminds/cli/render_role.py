@@ -96,6 +96,16 @@ def render_role(role: str, project_dir: Path | None, canon_dir: Path | None) -> 
     body_with_common = body.replace("{{COMMON}}", common)
     rendered, missing = substitute_tokens(body_with_common, tokens)
 
+    # 0337 (DOD2): append the machine-readable CLI-only coordination-access
+    # rule so it reaches the AGENT-FACING surface — `render-role` is what
+    # start-agent / the driven driver inject into each role's prompt. The
+    # role_contract render is NOT on that path; this command is.
+    from greatminds.cli.role_contract import (
+        load_coordination_access, format_coordination_access)
+    ca_block = format_coordination_access(load_coordination_access(canon_dir))
+    if ca_block:
+        rendered = rendered.rstrip() + "\n\n" + ca_block
+
     # The rendered prompt is the script's only stdout product (consumers
     # pipe / capture it via subprocess) — keep it as a plain echo, not
     # coloured, so it round-trips cleanly.

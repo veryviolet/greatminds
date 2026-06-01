@@ -57,9 +57,52 @@ def load_role_contract(canon_dir: Path, role: str
     return entry
 
 
-def render_contract(role: str, entry: dict[str, Any]) -> str:
+def load_coordination_access(canon_dir: "Path | None" = None
+                             ) -> dict[str, Any] | None:
+    """0337: read the top-level ``coordination_access`` rule from the
+    schema (the CLI-only / no-raw-fs hard rule rendered for every
+    role). Best-effort — returns None when absent/unreadable."""
+    try:
+        cd = canon_dir or find_canon_dir()
+        doc = yaml.safe_load(
+            (cd / "schema.yaml").read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return None
+    ca = doc.get("coordination_access")
+    return ca if isinstance(ca, dict) else None
+
+
+def format_coordination_access(ca: Any) -> str | None:
+    """0337: render the CLI-only coordination-access rule as a plain text
+    block (shared by ``render_contract`` and the ``render-role`` CLI so
+    the rule reaches the actual agent-facing surface). None when absent."""
+    if not isinstance(ca, dict) or not ca:
+        return None
+    lines = ["Coordination access (CLI-only — all roles):",
+             f"  - rule: {ca.get('rule', 'coordination_access_via_greatminds_cli_only')}"]
+    for f in (ca.get("forbidden") or []):
+        lines.append(f"  - forbidden: {f}")
+    for s in (ca.get("surfaces") or []):
+        lines.append(f"  - surface: {s}")
+    return "\n".join(lines)
+
+
+# Sentinel so callers can explicitly suppress the shared rule (pass
+# None) vs. let render auto-load it from canon (the default).
+_AUTO_COORD_ACCESS = object()
+
+
+def render_contract(role: str, entry: dict[str, Any],
+                    coordination_access: Any = _AUTO_COORD_ACCESS) -> str:
     """Plain-text render of one role's contract. Stable shape so
-    tests can pin the output."""
+    tests can pin the output.
+
+    0337: every role's contract includes the machine-readable
+    coordination-access rule (CLI-only; raw fs forbidden). Auto-loaded
+    from canon unless an explicit ``coordination_access`` is passed
+    (pass ``None`` to suppress)."""
+    if coordination_access is _AUTO_COORD_ACCESS:
+        coordination_access = load_coordination_access()
     out: list[str] = []
     out.append(f"ROLE: {role}")
     cat = entry.get("category")
@@ -95,6 +138,13 @@ def render_contract(role: str, entry: dict[str, Any]) -> str:
     else:
         out.append("  (none declared)")
     out.append("")
+
+    # 0337 (DOD2): the CLI-only coordination-access hard rule, rendered
+    # for EVERY role (incl. ARCHITECT-PLANNER).
+    block = format_coordination_access(coordination_access)
+    if block:
+        out.append(block)
+        out.append("")
 
     triggers = entry.get("event_triggers") or {}
     out.append("Event triggers:")
