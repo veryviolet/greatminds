@@ -484,7 +484,25 @@ def dispatch_profile(
     YAML → :func:`execute_yaml_profile`; MD →
     :func:`execute_md_profile`. Keeps the dispatch in one place so
     ``stand.py`` (and tests) only need to know about this helper.
+
+    0302: defensive cross-check — ``spec.name`` (the profile name the
+    loader resolved) MUST equal ``lease_meta['profile']`` (the
+    requested profile on the lease). Without this gate SK could
+    silently run the wrong playbook against the wrong lease (e.g. a
+    title-derived spec landing on an unrelated lease). The
+    assertion fires BEFORE any subprocess, so a misrouted dispatch
+    can never reach ansible-playbook / md prose.
     """
+    lease_profile = (lease_meta or {}).get("profile")
+    if lease_profile is not None and spec.name != lease_profile:
+        raise GreatMindsError(
+            f"dispatch_profile: spec.name={spec.name!r} != "
+            f"lease.profile={lease_profile!r} — refusing to run "
+            "wrong playbook against this lease. The profile loaded "
+            "by SK MUST come from lease_meta['profile'], not a "
+            "title-derived fallback.",
+            exit_code=2,
+        )
     if spec.format == "yaml":
         return execute_yaml_profile(
             spec, lease_meta,
