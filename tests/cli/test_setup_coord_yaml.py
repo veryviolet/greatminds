@@ -17,12 +17,13 @@ CANONICAL_WINDOWS = [
     # 0319 (0311 Phase 2e): the remaining claude workers — DEVELOPER,
     # UI-DEVELOPER, TESTER, STAND-KEEPER — migrated to the driven
     # lifecycle in one batch → coord.yaml template window mode is now
-    # 'driven' (was loop). 0323 (0311 Phase 3c) then migrated EXPLORER
-    # (codex) to driven; REVIEWER/WRITER (codex) and MAINTAINER
-    # (self-loop) stay non-driven.
+    # 'driven' (was loop). 0323/0324 (0311 Phase 3c/3d) then migrated
+    # the codex workers EXPLORER + TECHNICAL-WRITER to driven;
+    # ARCHITECT-REVIEWER (codex) and MAINTAINER (self-loop) stay
+    # non-driven.
     ("dev",        "DEVELOPER",          "claude", "driven"),
     ("ui",         "UI-DEVELOPER",       "claude", "driven"),
-    ("writer",     "TECHNICAL-WRITER",   "codex",  "loop"),
+    ("writer",     "TECHNICAL-WRITER",   "codex",  "driven"),
     ("tester",     "TESTER",             "claude", "driven"),
     # 0318 (0311 Phase 2d): READER migrated to driven lifecycle →
     # coord.yaml template window mode is now 'driven' (was loop).

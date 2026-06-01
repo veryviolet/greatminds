@@ -35,10 +35,10 @@ from greatminds.core.paths import find_canon_dir
 
 # Roles migrated to driven in this batch.
 MIGRATED = ["DEVELOPER", "UI-DEVELOPER", "TESTER", "STAND-KEEPER"]
-# Roles that MUST stay non-driven. (EXPLORER was here for Phase 2e but
-# 0323/Phase 3c migrated it to driven — dropped from this list.)
-UNTOUCHED = ["ARCHITECT-PLANNER", "MAINTAINER", "ARCHITECT-REVIEWER",
-             "TECHNICAL-WRITER"]
+# Roles that MUST stay non-driven. (EXPLORER (0323/3c) + TECHNICAL-WRITER
+# (0324/3d) were here for Phase 2e but both codex workers were migrated
+# to driven — dropped. ARCHITECT-REVIEWER (codex) is not yet migrated.)
+UNTOUCHED = ["ARCHITECT-PLANNER", "MAINTAINER", "ARCHITECT-REVIEWER"]
 
 
 def _schema() -> dict:
