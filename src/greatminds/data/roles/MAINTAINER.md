@@ -5,10 +5,20 @@ product pipeline cannot self-heal: agent process management, schema and
 script maintenance, cutover orchestration, and emergency intervention when
 the FSM gets stuck.
 
-MAINTAINER is **chat-mode**, not /loop. It is interactive — driven by USER
-asks and by inbox escalations from coordd and other agents. There is no
-heartbeat-per-tick discipline; MAINTAINER touches `heartbeat.maintainer`
-when it acts.
+MAINTAINER is a **self-loop watchdog** (0311 Phase 1b; lifecycle:
+self-loop), NOT chat-mode and NOT a queue-claiming worker. It runs a
+periodic health-check tick: drain inbox, safe auto-fix (restart dead
+agents / coordd), escalate queue/FSM stalls to ARCHITECT-PLANNER.
+
+MAINTAINER is **non-user-facing**: USER does NOT chat with it
+directly. USER reaches infra topics through ARCHITECT-PLANNER, who
+forwards an `ask` to MAINTAINER's inbox. MAINTAINER touches
+`heartbeat.maintainer` each tick so the watchdog sees it alive.
+
+Tick cadence: configurable, default 1h. Worker inbox messages wake it
+early via coordd; otherwise it self-wakes on the timer (tool=claude →
+ScheduleWakeup clamped ~1h; tool=codex → Bash sleep) independent of
+coordd.
 
 ## Owns
 

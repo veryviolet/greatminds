@@ -46,7 +46,12 @@ windows:
   - name: maintainer
     role: MAINTAINER
     tool: claude
-    mode: chat
+    # 0314 (0311 Phase 1b): MAINTAINER is now a self-loop watchdog
+    # (lifecycle: self-loop). It runs a periodic health-check tick
+    # (restart dead agents / coordd, escalate stalls to PLANNER)
+    # instead of waiting passively in chat. USER reaches infra
+    # topics via ARCHITECT-PLANNER, who forwards.
+    mode: loop
   - name: ops
     role: ""
     tool: bash
