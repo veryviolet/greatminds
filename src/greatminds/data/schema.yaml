@@ -1336,6 +1336,17 @@ claude_settings:
       - "Bash(ssh:*)"
       - "Bash(scp:*)"
       - "Bash(rsync:*)"
+      # 0313 (0311 Phase 1c): MAINTAINER is self-loop (USER-absent)
+      # and runs recovery — agent restart, daemon control, dead-pid
+      # SIGTERM. The classifier's auto-mode ceiling blocked these
+      # without explicit entries, so MAINTAINER's autonomous
+      # recovery stalled waiting for a USER who isn't there. These
+      # patterns unblock the recovery path.
+      - "Bash(greatminds restart:*)"
+      - "Bash(greatminds daemon:*)"
+      - "Bash(greatminds start-agent:*)"
+      - "Bash(kill:*)"
+      - "Bash(systemctl --user:*)"
 
 # 0277 (0276 Phase A): stand profile files. STAND-KEEPER reads a
 # profile file matching ``lease.profile`` (the enum from
