@@ -55,7 +55,13 @@ windows:
   - name: explorer
     role: EXPLORER
     tool: codex
-    mode: loop
+    # 0323 (0311 Phase 3c): EXPLORER is the first CODEX worker migrated
+    # to the driven lifecycle — coordd drives each turn through a fresh
+    # ``codex app-server`` over stdio (0321 stdio-per-turn driver) on
+    # inbox/queue events; the pane is idle bash between turns (no
+    # persistent /loop). TECHNICAL-WRITER (codex) migrates in a later
+    # phase; PLANNER / MAINTAINER / claude workers are untouched.
+    mode: driven
   - name: stand
     role: STAND-KEEPER
     tool: claude

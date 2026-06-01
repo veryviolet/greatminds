@@ -573,22 +573,34 @@ roles:
 
   EXPLORER:
     title: EXPLORER agent — bootstrap (scenario B)
-    launch: /loop
+    # 0323 (0311 Phase 3c): EXPLORER (codex) is driven — coordd drives
+    # each turn through a fresh ``codex app-server`` over stdio (0321
+    # stdio-per-turn driver) on inbox/queue events; the pane is idle
+    # bash between turns. EXPLORER does NOT self-pace a /loop.
+    launch: driven
     read_files: [EXPLORER.md]
     body: |
-      /loop You are EXPLORER agent (scenario B — intensive review).
+      You are EXPLORER agent (scenario B — intensive review; driven
+      lifecycle — coordd runs each turn).
 
       {{COMMON}}
+
+      You are driven: coordd starts a fresh turn (a per-turn ``codex
+      app-server`` stdio process running ``turn/start`` "continue your
+      tick") whenever a relevant inbox/queue event lands. Between turns
+      your pane is idle bash — you do NOT self-pace a /loop or schedule
+      your own wake. Do ONE tick of work per invocation, then exit.
 
       Your job is to use the **live system on the stand** as a real
       user and file bugs. You are not TESTER (they run tests and
       check the gate). You are not READER (they audit docs). You
       observe UX on the running product.
 
-      Every tick:
+      Each turn:
       1. `touch <COORDINATION_DIR>/heartbeat.explorer`.
       2. Read your inbox.
-      3. Find an active `review_sessions/<id>.md`. If none — idle.
+      3. Find an active `review_sessions/<id>.md`. If none — exit
+         (coordd re-drives you on the next event).
       4. Read its `scenarios` and `stand_target`. Cross-check
          `stand.status`: host / profile / commit must match. If they
          don't — ask ARCHITECT-PLANNER via inbox, or file a

@@ -82,7 +82,9 @@ def test_non_driven_roles_stay_non_driven() -> None:
     ) or {}
     by_role = {w.get("role"): w for w in (doc.get("windows") or [])
                if isinstance(w, dict)}
-    for role in ("MAINTAINER", "TECHNICAL-WRITER", "EXPLORER",
+    # NB: EXPLORER (codex) was migrated to driven by 0323/Phase 3c —
+    # no longer in this non-driven set.
+    for role in ("MAINTAINER", "TECHNICAL-WRITER",
                  "ARCHITECT-REVIEWER"):
         win = by_role.get(role)
         if win is not None:
