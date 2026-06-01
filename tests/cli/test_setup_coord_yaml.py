@@ -18,7 +18,9 @@ CANONICAL_WINDOWS = [
     ("ui",         "UI-DEVELOPER",       "claude", "loop"),
     ("writer",     "TECHNICAL-WRITER",   "codex",  "loop"),
     ("tester",     "TESTER",             "claude", "loop"),
-    ("reader",     "READER",             "claude", "loop"),
+    # 0318 (0311 Phase 2d): READER migrated to driven lifecycle →
+    # coord.yaml template window mode is now 'driven' (was loop).
+    ("reader",     "READER",             "claude", "driven"),
     ("explorer",   "EXPLORER",           "codex",  "loop"),
     ("stand",      "STAND-KEEPER",       "claude", "loop"),
     # 0314 (0311 Phase 1b): MAINTAINER is now a self-loop watchdog

@@ -34,7 +34,13 @@ windows:
   - name: reader
     role: READER
     tool: claude
-    mode: loop
+    # 0318 (0311 Phase 2d): READER is the first role migrated to the
+    # driven lifecycle — coordd spawns each turn via
+    # ``claude --resume -p`` on inbox/queue events; the pane is idle
+    # bash between turns (no persistent /loop agent). Other claude
+    # workers migrate one-at-a-time in later phases after READER
+    # verifies on avatar.
+    mode: driven
   - name: explorer
     role: EXPLORER
     tool: codex

@@ -119,11 +119,17 @@ def _project_with_lifecycle(tmp_path: Path, *,
     coord = project / "coordination"
     (coord / ".locks").mkdir(parents=True)
     (coord / cd.REGISTRY_DIR).mkdir(parents=True)
+    # 0318 migration gate: the driven driver requires the coord.yaml
+    # window mode == 'driven' (not just schema lifecycle). Set the
+    # window mode to match the lifecycle so driven-lifecycle fixtures
+    # exercise the driven branch.
+    win_mode = "driven" if lifecycle == "driven" else "loop"
     (project / "coord.yaml").write_text(yaml.safe_dump({
         "session": "test-session",
         "project_dir": str(project),
         "windows": [
-            {"name": "dev", "role": role, "tool": tool, "mode": "loop"},
+            {"name": "dev", "role": role, "tool": tool,
+             "mode": win_mode},
         ],
     }), encoding="utf-8")
     canon = project / "canon"
@@ -199,35 +205,20 @@ def test_route_event_non_driven_uses_legacy_wake(
     assert calls, "0315: interactive role must use press_enter wake"
 
 
-def test_route_event_driven_without_session_falls_back(
-    tmp_path: Path, monkeypatch,
-) -> None:
-    """A driven claude role with NO session_id in the registry
-    can't be --resume'd → falls back to the legacy wake mechanism
-    rather than spawning a broken command."""
-    coord, canon = _project_with_lifecycle(
-        tmp_path, role="DEVELOPER", lifecycle="driven", tool="claude")
-    # Overwrite registry without session_id.
-    (coord / cd.REGISTRY_DIR / "developer.json").write_text(
-        '{"role": "DEVELOPER", "tool": "claude", "pid": 1}',
-        encoding="utf-8",
-    )
+def test_route_event_driven_without_session_force_fresh() -> None:
+    """0318 supersedes the original 0315 wake-fallback: a driven
+    claude role with NO session_id (first event after launch) now
+    FORCE-SPAWNS a fresh session (``claude -p`` without --resume)
+    so the driven role bootstraps — rather than a useless wake into
+    a pane with no running agent.
 
-    monkeypatch.setattr(
-        cd, "_tmux_send_keys_driven",
-        lambda *a, **kw: pytest.fail(
-            "0315: must NOT spawn driven turn without session_id"),
-    )
-    calls: list = []
-    monkeypatch.setattr(
-        "greatminds.cli._send_enter.press_enter",
-        lambda *a, **kw: calls.append(a) or (True, "wake fallback"),
-    )
-
-    woke = cd._route_queue_event(
-        coord, canon, "feature_dev", "0001-x.yaml", verbose=False)
-    assert woke is True
-    assert calls, "0315: missing session_id must fall back to wake"
+    (The full test body lives in
+    ``test_reader_driven_migration_0318.py``; this is the
+    regression-net stub noting the 0315 behavior was intentionally
+    replaced by 0318.)"""
+    # Pin: the original assertion (wake fallback) no longer holds.
+    # See test_driven_route_force_fresh_when_no_session in 0318.
+    assert True
 
 
 # ---------- lifecycle helper ----------
