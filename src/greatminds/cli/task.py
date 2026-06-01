@@ -1628,23 +1628,39 @@ def require_block_cross_state(new_block: dict[str, Any],
     schema.tests_block_validation contract (required_when:
     plan.stand_required is true).
     """
-    # 0091 item 3 — stand_evidence subfields gate.
+    # 0091 item 3 / 0301 — stand_evidence subfields gate.
+    # 0301: read required_subfields from schema instead of hardcoding
+    # them here. Pre-0301 the validator pinned 3 fields while
+    # gate_check.extract_lease_evidence_from_tests demanded lease_id
+    # additionally → every well-formed task hit ``missing`` at mv
+    # time. Schema is now the single source of truth.
     if new_block.get("kind") == "tests":
         plan_blocks = [b for b in (data.get("blocks") or [])
                        if isinstance(b, dict) and b.get("kind") == "plan"]
         if plan_blocks and plan_blocks[-1].get("stand_required") is True:
             ev = new_block.get("stand_evidence")
-            required_subfields = (
-                "reproduction_steps",
-                "observed_without_fix",
-                "observed_with_fix",
-            )
+            try:
+                cfg = ((schema().get("tests_block_validation") or {})
+                       .get("stand_evidence") or {})
+                required_subfields = tuple(
+                    cfg.get("required_subfields") or (
+                        "reproduction_steps",
+                        "observed_without_fix",
+                        "observed_with_fix",
+                    )
+                )
+            except Exception:
+                required_subfields = (
+                    "reproduction_steps",
+                    "observed_without_fix",
+                    "observed_with_fix",
+                )
             if not isinstance(ev, dict):
                 raise GreatMindsError(
                     f"tests block on a stand_required task must set "
-                    f"stand_evidence as a mapping with the three required "
-                    f"subfields {list(required_subfields)} (task 0091 item 3; "
-                    f"schema.tests_block_validation). Got: "
+                    f"stand_evidence as a mapping with the required "
+                    f"subfields {list(required_subfields)} (0091 item 3; "
+                    f"0301; schema.tests_block_validation). Got: "
                     f"{type(ev).__name__}.",
                     exit_code=2,
                 )
@@ -1653,7 +1669,7 @@ def require_block_cross_state(new_block: dict[str, Any],
             if missing:
                 raise GreatMindsError(
                     f"tests.stand_evidence missing required subfields: "
-                    f"{missing} (task 0091 item 3; mirrors COORDINATE.md §9).",
+                    f"{missing} (0091 item 3 / 0301; schema is normative).",
                     exit_code=2,
                 )
         # 0228: TESTER-vs-SK role boundary — tests block on a
