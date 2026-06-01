@@ -336,6 +336,33 @@ def _load_claude_settings_auto_mode_from_canon(canon: Path) -> list[str]:
     return out or ["$defaults"]
 
 
+DEFAULT_CLAUDE_MODEL = "claude-opus-4-8"
+
+
+def _load_claude_settings_model_from_canon(canon: Path) -> str:
+    """0309: read ``claude_settings.model`` from schema.yaml.
+
+    Returns the configured default model id (or
+    ``DEFAULT_CLAUDE_MODEL`` when the schema lacks the field). The
+    motivating concern was fleet-level model selection: pre-0309
+    each fleet inherited claude's machine-level global default,
+    which drifted across hosts. Schema is the canonical override.
+    """
+    import yaml
+    schema_path = canon / "schema.yaml"
+    if not schema_path.is_file():
+        return DEFAULT_CLAUDE_MODEL
+    try:
+        doc = yaml.safe_load(schema_path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        return DEFAULT_CLAUDE_MODEL
+    cs = doc.get("claude_settings") or {}
+    model = cs.get("model")
+    if isinstance(model, str) and model.strip():
+        return model.strip()
+    return DEFAULT_CLAUDE_MODEL
+
+
 def _build_settings_local_json(project_dir: Path,
                                 canon: Path | None = None) -> str:
     """Return the JSON text for ``.claude/settings.local.json``.
@@ -369,6 +396,13 @@ def _build_settings_local_json(project_dir: Path,
         allow = _load_claude_settings_allow_from_canon(canon)
         auto_mode_allow = _load_claude_settings_auto_mode_from_canon(canon)
     settings = {
+        # 0309: default claude model so each fleet picks Opus 4.8
+        # without depending on machine-level claude global settings.
+        # The schema can override via ``claude_settings.model``;
+        # operator's manual override in an existing file is preserved
+        # by _ensure_claude_settings_local (additive merge).
+        "model": _load_claude_settings_model_from_canon(canon)
+                  if canon is not None else "claude-opus-4-8",
         "permissions": {"allow": allow},
         # 0267: schema-driven auto_mode raises the classifier ceiling
         # for the specific commands (push origin main, follow-tags)
@@ -437,7 +471,15 @@ def _ensure_claude_settings_local(project_dir: Path, canon: Path) -> str:
 
     canonical_allow = _load_claude_settings_allow_from_canon(canon)
     canonical_auto = _load_claude_settings_auto_mode_from_canon(canon)
+    canonical_model = _load_claude_settings_model_from_canon(canon)
     added = False
+
+    # 0309: only set ``model`` when the operator hasn't already
+    # written one. Preserves explicit manual override; sets the
+    # canon default on legacy files that pre-date 0309.
+    if "model" not in existing:
+        existing["model"] = canonical_model
+        added = True
 
     if canonical_allow:
         perms = existing.setdefault("permissions", {})
