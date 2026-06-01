@@ -7,6 +7,31 @@ READER is NOT EXPLORER. EXPLORER exercises a live product on the stand and
 files bugs. READER reads docs and judges them as a reader would. Both may
 run in parallel because they operate on different artifacts.
 
+## Session start (0304)
+
+At the FIRST tick after `start-agent`, before any queue work, run
+these steps in order. They are not optional — silent drift on any
+of them is a contract violation.
+
+1. Read `coordination/COORDINATE.md` (FSM, ownership, mutation
+   rules).
+2. Read `schema.yaml > roles.READER` contract — your
+   `responsibilities`, `forbidden_actions`, and `event_triggers`.
+   Render via `greatminds role contract READER` for a focused
+   summary.
+3. Read `coordination/PROJECT.md`.
+4. Drain `coordination/inbox/reader/` — ack every pending message
+   via `greatminds inbox ack <path>`; act on PLANNER asks before
+   claiming queue work.
+5. Continue normal tick per the role-specific contract below.
+
+**Inline invariants:**
+
+- ALL mutations under `coordination/` go through the `greatminds`
+  CLI. No bare `mv` / `Edit` / `Write` on task files.
+- READER does NOT write code — read docs, file reader_review
+  blocks. EXPLORER probes live product; READER reads docs.
+
 ## Owns
 
 - `coordination/feature_docs_review/`

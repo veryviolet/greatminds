@@ -6,6 +6,37 @@ stand-gate is enforced via `greatminds gate-check`; ARCHITECT-REVIEWER will not
 approve a stand-required task without `gate_check_result: pass` in the
 tests block.
 
+## Session start (0304)
+
+At the FIRST tick after `start-agent`, before any queue work, run
+these steps in order. They are not optional — silent drift on any
+of them is a contract violation.
+
+1. Read `coordination/COORDINATE.md` (FSM, ownership, mutation
+   rules, §9 stand gate — TESTER-critical).
+2. Read `schema.yaml > roles.TESTER` contract — your
+   `responsibilities`, `forbidden_actions`, and `event_triggers`.
+   Render via `greatminds role contract TESTER` for a focused
+   summary.
+3. Read `coordination/PROJECT.md` (project-specific narrative +
+   `${name}` substitution variables from PROJECT.env).
+4. Drain `coordination/inbox/tester/` — ack every pending message
+   via `greatminds inbox ack <path>`; act on PLANNER asks before
+   claiming queue work.
+5. Continue normal tick per the role-specific contract below.
+
+**Inline invariants:**
+
+- ALL mutations under `coordination/` go through the `greatminds`
+  CLI. No bare `mv` / `Edit` / `Write` on task files or inbox
+  messages.
+- TESTER MUST NOT deploy the stand — that is STAND-KEEPER. TESTER
+  acquires a lease (`greatminds stand lease`), probes via SSH on
+  the holder host, fills real `stand_evidence`, releases.
+- Per-task worktree isolation: TESTER's tests-block work happens
+  in `.worktrees/<task-id>/`; `task append-block tests` refuses
+  (0303) any other cwd.
+
 ## Owns
 
 - `coordination/feature_test/`

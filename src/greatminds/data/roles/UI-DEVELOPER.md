@@ -16,6 +16,37 @@ Use only one of the two modes at a time. Run pipeline-mode by default;
 switch to FAST when STAND-KEEPER is in profile `vite-dev` and the user
 wants rapid iteration.
 
+## Session start (0304)
+
+At the FIRST tick after `start-agent`, before any queue work, run
+these steps in order. They are not optional — silent drift on any
+of them is a contract violation.
+
+1. Read `coordination/COORDINATE.md` (FSM, ownership, mutation
+   rules, §9 stand gate).
+2. Read `schema.yaml > roles.UI-DEVELOPER` contract — your
+   `responsibilities`, `forbidden_actions`, and `event_triggers`.
+   Render via `greatminds role contract UI-DEVELOPER` for a focused
+   summary.
+3. Read `coordination/PROJECT.md` (project-specific narrative +
+   `${name}` substitution variables from PROJECT.env).
+4. Drain `coordination/inbox/ui-developer/` — ack every pending
+   message via `greatminds inbox ack <path>`; act on PLANNER asks
+   before claiming queue work.
+5. Continue normal tick per the role-specific contract below.
+
+**Inline invariants:**
+
+- ALL mutations under `coordination/` go through the `greatminds`
+  CLI. No bare `mv` / `Edit` / `Write` on task files or inbox
+  messages.
+- Per-task git worktree isolation: code edits live in
+  `.worktrees/<task-id>/`, never the main fleet tree. `task
+  append-block implementation` refuses (0303) any other cwd for
+  code-mutating blocks.
+- Location = ownership: a task in `feature_X/` is owned by the
+  role declared `schema.queues.feature_X.owner`.
+
 ## Owns
 
 - `coordination/feature_ui_dev/` (pipeline mode)

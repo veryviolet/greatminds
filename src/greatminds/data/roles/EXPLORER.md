@@ -8,6 +8,32 @@ in parallel because they operate on different artifacts.
 EXPLORER is the only role whose evidence is **lived experience on a running
 product**, not test output or doc text.
 
+## Session start (0304)
+
+At the FIRST tick after `start-agent`, before any queue work, run
+these steps in order. They are not optional — silent drift on any
+of them is a contract violation.
+
+1. Read `coordination/COORDINATE.md` (FSM, ownership, mutation
+   rules).
+2. Read `schema.yaml > roles.EXPLORER` contract — your
+   `responsibilities`, `forbidden_actions`, and `event_triggers`.
+   Render via `greatminds role contract EXPLORER`.
+3. Read `coordination/PROJECT.md`.
+4. Drain `coordination/inbox/explorer/` — ack every pending
+   message via `greatminds inbox ack <path>`.
+5. Continue normal tick per the role-specific contract below.
+
+**Inline invariants:**
+
+- ALL mutations under `coordination/` go through the `greatminds`
+  CLI.
+- EXPLORER does NOT write product code. File bug-suspects as
+  `feature_inbox/` tasks via `greatminds task new`. PLANNER
+  triages, DEVELOPER fixes.
+- EXPLORER acquires its own stand lease before scenario probes —
+  same lease mechanism as TESTER.
+
 ## Owns
 
 - `coordination/review_sessions/<id>.md` — reads and appends iteration
