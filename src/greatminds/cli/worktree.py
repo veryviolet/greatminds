@@ -223,8 +223,21 @@ def worktree_merge(project_dir: Path, task_id: str,
     """
     policy = policy or load_worktree_policy()
     branch = policy.branch_for(task_id)
-    # Stay on main.
+    # 0300 (upstream issue #6): merge direction MUST be
+    # ``checkout main → merge task/<id>``. Pre-0300 the upstream
+    # reporter saw `git log main` never advance because the merge
+    # ran from the task branch instead (first parent = task work,
+    # second parent = origin/main — the wrong direction; main was
+    # left orphaned). The current code is correct; the regression
+    # tests added in 0300 pin the order.
     _run_git(["checkout", "main"], cwd=project_dir)
+    # 0300: fast-forward local main against origin/main BEFORE the
+    # merge so REVIEWER's merge commit lands on top of the latest
+    # remote state, not a stale snapshot. Best-effort — when the
+    # remote is unreachable or main has diverged, we still merge
+    # against the current local main rather than blocking.
+    _run_git(["pull", "--ff-only", "origin", "main"],
+              cwd=project_dir, check=False)
     msg = summary or f"merge({task_id})"
     cp = _run_git(
         ["merge", policy.merge_strategy, "-m", msg, branch],
