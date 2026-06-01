@@ -30,6 +30,13 @@ from greatminds.cli._colors import err, info, ok, warn
 
 DEFAULT_THRESHOLDS = {
     "heartbeat_stale_seconds": 600,
+    # 0330 (0311 Phase 5): per-lifecycle override of the heartbeat
+    # stale threshold. A self-loop role (e.g. MAINTAINER) touches its
+    # heartbeat once per long cadence (~1h), so the global 600s flags it
+    # stale ~50min/hour while its pid is alive and ticking on schedule.
+    # The canon schema maps self-loop → cadence+margin; a role may also
+    # set roles.<ROLE>.heartbeat_stale_seconds for an explicit override.
+    "heartbeat_stale_seconds_by_lifecycle": {},
     "intent_orphan_seconds": 300,
     "task_stale_in_active_queue_seconds": 86400,
     "task_stale_in_review_queue_seconds": 43200,
@@ -56,6 +63,35 @@ def fmt_age(seconds: float) -> str:
     if seconds < 86400:
         return f"{seconds / 3600:.1f}h"
     return f"{seconds / 86400:.1f}d"
+
+
+def _heartbeat_threshold(hb_name: str, roles_cfg: dict,
+                         by_lifecycle: dict, default: float) -> float:
+    """0330: resolve the stale threshold for a ``heartbeat.<role>`` file.
+
+    Precedence: explicit ``roles.<ROLE>.heartbeat_stale_seconds`` →
+    ``heartbeat_stale_seconds_by_lifecycle[<role lifecycle>]`` → the
+    global default. The heartbeat filename suffix is the lowercased
+    (hyphenated) role name (e.g. ``heartbeat.stand-keeper`` →
+    STAND-KEEPER); match it case-insensitively against the schema role
+    keys. Unknown roles fall through to the default."""
+    suffix = hb_name.split(".", 1)[1] if "." in hb_name else hb_name
+    spec = None
+    for role_key, role_spec in (roles_cfg or {}).items():
+        if isinstance(role_key, str) and role_key.lower() == suffix.lower():
+            spec = role_spec if isinstance(role_spec, dict) else None
+            break
+    if spec is not None:
+        override = spec.get("heartbeat_stale_seconds")
+        if isinstance(override, (int, float)) and not isinstance(override, bool):
+            return float(override)
+        lifecycle = spec.get("lifecycle")
+        if isinstance(lifecycle, str) and lifecycle in (by_lifecycle or {}):
+            try:
+                return float(by_lifecycle[lifecycle])
+            except (TypeError, ValueError):
+                pass
+    return float(default)
 
 
 @click.command(
@@ -86,24 +122,31 @@ def watchdog(project_dir: Path | None, canon_dir: Path | None, quiet: bool) -> N
     now = time.time()
     findings = 0
 
-    # ---- Heartbeats
-    threshold = thresholds["heartbeat_stale_seconds"]
-    stale_heartbeats: list[tuple[str, float]] = []
+    # ---- Heartbeats (0330: per-role / per-lifecycle stale threshold)
+    default_hb = thresholds["heartbeat_stale_seconds"]
+    by_lifecycle = thresholds.get("heartbeat_stale_seconds_by_lifecycle") or {}
+    roles_cfg = schema.get("roles") or {}
+    threshold = default_hb  # reused by the all-fresh message below
+    stale_heartbeats: list[tuple[str, float, float]] = []
     for hb in sorted(coord.glob("heartbeat.*")):
         if not hb.is_file():
             continue
         age = now - hb.stat().st_mtime
-        if age > threshold:
-            stale_heartbeats.append((hb.name, age))
+        thr = _heartbeat_threshold(hb.name, roles_cfg, by_lifecycle,
+                                   default_hb)
+        if age > thr:
+            stale_heartbeats.append((hb.name, age, thr))
 
     if stale_heartbeats:
         findings += len(stale_heartbeats)
-        warn(f"STALE HEARTBEATS ({len(stale_heartbeats)}, threshold {fmt_age(threshold)}):")
-        for name, age in stale_heartbeats:
-            warn(f"  {name}: last touched {fmt_age(age)} ago")
+        warn(f"STALE HEARTBEATS ({len(stale_heartbeats)}):")
+        for name, age, thr in stale_heartbeats:
+            warn(f"  {name}: last touched {fmt_age(age)} ago "
+                 f"(threshold {fmt_age(thr)})")
         click.echo()
     elif not quiet:
-        info(f"heartbeats: all fresh (threshold {fmt_age(threshold)})")
+        info(f"heartbeats: all fresh (default threshold "
+             f"{fmt_age(default_hb)}; per-lifecycle overrides apply)")
 
     # ---- Orphaned intents
     threshold = thresholds["intent_orphan_seconds"]
