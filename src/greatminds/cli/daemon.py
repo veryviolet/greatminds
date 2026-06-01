@@ -287,7 +287,58 @@ def install_cmd(name: str | None, project_dir: Path | None) -> None:
     else:
         info("template unit already present, no rewrite")
     ok(f"project '{resolved}' registered → {pd}")
+
+    # 0307: enable the per-project instance unit so it lives under
+    # default.target.wants/ and survives KDE logout / shutdown.
+    # Pre-0307 the template install never ran ``systemctl --user
+    # enable`` → ``is-enabled`` stayed ``disabled; preset: enabled``
+    # → coordd was torn down with default.target on logout.
+    # ``enable`` is idempotent — re-installs reruns safely.
+    instance = _instance_unit(resolved)
+    enable_cp = _systemctl("enable", instance)
+    if enable_cp.returncode == 0:
+        ok(f"{instance} enabled (survives logout / shutdown)")
+    else:
+        warn(
+            f"`systemctl --user enable {instance}` failed (rc="
+            f"{enable_cp.returncode}); coordd may not restart after "
+            f"logout. Stderr: {(enable_cp.stderr or '').strip()[:200]}"
+        )
     info(f"next: `greatminds daemon start --project {resolved}`")
+
+
+@daemon.command("repair",
+                short_help="0307: ensure existing daemon instance is "
+                           "systemctl-enabled (one-shot for pre-0307 "
+                           "fleets that installed without --enable)")
+@click.option("--name", "name", default=None,
+              help="project name (default: coord.yaml `session`)")
+@click.option("--project-dir",
+              type=click.Path(file_okay=False, path_type=Path),
+              default=None,
+              help="project root (default: cwd)")
+def repair_cmd(name: str | None, project_dir: Path | None) -> None:
+    """0307: idempotent ``systemctl --user enable`` for the project's
+    daemon instance. Pre-0307 ``daemon install`` skipped the enable
+    step → the unit was torn down with default.target on KDE
+    logout. Existing fleets need this one-time repair to recover
+    survive-logout behavior."""
+    pd = (project_dir or Path.cwd()).resolve()
+    resolved = name or _read_session_from_coord_yaml(pd)
+    if not resolved:
+        err("--name not given and coord.yaml has no `session:` key")
+        raise click.exceptions.Exit(2)
+    instance = _instance_unit(resolved)
+    cp = _systemctl("enable", instance)
+    if cp.returncode == 0:
+        ok(f"{instance} enabled (survives logout / shutdown)")
+    else:
+        err(
+            f"`systemctl --user enable {instance}` failed "
+            f"(rc={cp.returncode}). Stderr: "
+            f"{(cp.stderr or '').strip()[:300]}"
+        )
+        raise click.exceptions.Exit(cp.returncode)
 
 
 @daemon.command("migrate", short_help="remove legacy singleton coordd.service")
