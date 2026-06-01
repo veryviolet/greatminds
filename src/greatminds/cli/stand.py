@@ -210,6 +210,52 @@ def _holder_role() -> str:
     return role
 
 
+def _lease_expired(lease: dict) -> bool:
+    """0342: True iff the lease is past ``granted_at + ttl_seconds``.
+
+    Conservative: if the timestamp or ttl can't be read, returns False
+    (treat as NOT expired) so a force-reclaim never steals a lease whose
+    expiry can't be proven."""
+    from datetime import datetime, timedelta, timezone
+    ttl = lease.get("ttl_seconds")
+    started = lease.get("granted_at") or lease.get("enqueued_at")
+    if not isinstance(ttl, (int, float)) or not started:
+        return False
+    try:
+        t0 = datetime.fromisoformat(str(started))
+    except (ValueError, TypeError):
+        return False
+    if t0.tzinfo is None:
+        t0 = t0.replace(tzinfo=timezone.utc)
+    return datetime.now(tz=timezone.utc) >= t0 + timedelta(seconds=int(ttl))
+
+
+def _holder_alive(coord: Path, holder_role: str) -> bool:
+    """0342: True iff the lease holder's agent pid (from the per-role
+    registry) is alive. Absent/unreadable registry or a dead pid →
+    False (holder not alive → safe to reclaim an expired lease)."""
+    import json
+    if not holder_role:
+        return False
+    reg = coord / ".agent_registry" / f"{holder_role.lower()}.json"
+    try:
+        data = json.loads(reg.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    pid = data.get("pid") if isinstance(data, dict) else None
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # exists, owned by another user
+    return True
+
+
 def _file_inbox_info(coord: Path, to_role: str, body: str,
                      task_ref: str = "") -> None:
     """0244: file an inbox info-message to ``to_role`` from STAND-KEEPER
@@ -420,6 +466,73 @@ def stand_release(lease_id: str, result: str) -> None:
         click.echo(f"released lease {lease_id} (result={result})")
     elif captured.get("was_cancelled"):
         click.echo(f"cancelled queued lease {lease_id}")
+
+
+@stand.command(name="reclaim")
+@click.option("--lease-id", "lease_id", default=None,
+              help="lease to reclaim (default: the active lease)")
+def stand_reclaim(lease_id: str | None) -> None:
+    """0342: reclaim an EXPIRED lease whose holder is no longer alive,
+    returning the singleton stand to ``free``.
+
+    A stale lease (a crashed holder past its ttl_seconds) otherwise
+    permanently locks the singleton — ``release`` is holder-only and
+    there was no reaper. ``reclaim`` is restricted to STAND-KEEPER /
+    ARCHITECT-PLANNER (the stand owners) and refuses to clobber a live,
+    in-TTL lease OR a lease whose holder pid is still alive: it only
+    frees a lease that is BOTH past its TTL AND held by a dead/absent
+    agent.
+    """
+    from greatminds.cli import stand_state as ss
+    role = _holder_role()
+    if role.upper() not in ("STAND-KEEPER", "ARCHITECT-PLANNER"):
+        raise GreatMindsError(
+            "only STAND-KEEPER or ARCHITECT-PLANNER may reclaim a lease",
+            exit_code=3,
+        )
+    coord = find_coord_dir()
+    captured: dict[str, Any] = {}
+
+    def mutator(state):
+        active = state.get("active_lease") or {}
+        if not active:
+            raise GreatMindsError(
+                "no active lease to reclaim; stand is not leased",
+                exit_code=3,
+            )
+        if lease_id and active.get("lease_id") != lease_id:
+            raise GreatMindsError(
+                f"lease {lease_id} is not the active lease "
+                f"({active.get('lease_id')})",
+                exit_code=3,
+            )
+        if not _lease_expired(active):
+            raise GreatMindsError(
+                "active lease is still within its TTL — a live lease "
+                "cannot be force-reclaimed; the holder must release it",
+                exit_code=3,
+            )
+        hr = active.get("holder_role") or ""
+        if _holder_alive(coord, hr):
+            raise GreatMindsError(
+                f"lease holder {hr!r} is still alive — it must release "
+                f"its own lease (reclaim is for dead/absent holders only)",
+                exit_code=3,
+            )
+        captured["lease_id"] = active.get("lease_id")
+        captured["holder"] = hr
+        state["active_lease"] = None
+        ss.record_transition(
+            state, state.get("state") or "preparing", "free", role,
+            lease_id=active.get("lease_id"),
+            reason=f"reclaimed expired lease (holder {hr} not alive)",
+        )
+
+    ss.update_stand_state(coord, mutator)
+    click.echo(
+        f"reclaimed expired lease {captured['lease_id']} "
+        f"(holder {captured['holder']} not alive); stand → free"
+    )
 
 
 @stand.command(name="down")
