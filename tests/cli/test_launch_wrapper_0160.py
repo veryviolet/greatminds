@@ -117,12 +117,13 @@ def _make_env_setup():
     return EnvSetup(env_type=None, activation="", source="test-stub")
 
 
-def test_emit_tmux_sends_wrapper_with_trailing_enter(fake_tmux,
-                                                      tmp_path) -> None:
-    """0160: ``_emit_tmux`` must send the wrapper followed by Enter so
-    the loop starts running and blocks at its first ``read``. Pre-0160
-    it sent the start-agent line WITHOUT Enter — operator's first
-    Enter then ran the agent, but no looping behavior was set up."""
+def test_emit_tmux_sends_launch_command_with_trailing_enter(
+    fake_tmux, tmp_path,
+) -> None:
+    """0308 rewrite of the 0160 test: ``_emit_tmux`` now sends the
+    bare ``greatminds start-agent <ROLE> <tool> --mode loop``
+    command directly (NOT a wrapper-loop), terminated with Enter.
+    Pre-0308 a bash wrapper-loop was installed; 0308 removed it."""
     cfg = {
         "session": "test",
         "windows": [
@@ -133,17 +134,34 @@ def test_emit_tmux_sends_wrapper_with_trailing_enter(fake_tmux,
     launch_mod._emit_tmux(tmp_path, cfg, _make_env_setup(), recreate=False)
 
     send_keys = [c for c in fake_tmux if c and c[0] == "send-keys"]
-    # Find the wrapper send-keys (the one whose argument contains
-    # ``while true``).
-    wrapper_calls = [c for c in send_keys
-                     if any("while true" in str(arg) for arg in c)]
-    assert len(wrapper_calls) == 1, (
-        f"expected exactly one wrapper send-keys; got {wrapper_calls}"
+    launch_calls = [c for c in send_keys
+                    if any("greatminds start-agent" in str(arg)
+                           for arg in c)]
+    assert len(launch_calls) == 1, (
+        f"0308: expected exactly one launch-command send-keys; "
+        f"got {launch_calls}"
     )
-    # The wrapper send-keys must end with the Enter keystroke.
-    assert wrapper_calls[0][-1] == "Enter", (
-        "0160: wrapper send-keys must terminate with Enter so the "
-        f"loop starts; got {wrapper_calls[0]}"
+    cmd_call = launch_calls[0]
+    # End with Enter so the launch command actually runs.
+    assert cmd_call[-1] == "Enter"
+    # 0308: no wrapper — the command must be the bare start-agent
+    # invocation, NOT wrapped in ``while true; do …``.
+    for arg in cmd_call:
+        if isinstance(arg, str):
+            assert "while true" not in arg, (
+                "0308: launch send-keys must NOT carry the legacy "
+                f"wrapper loop. Got: {arg}"
+            )
+    # And the C-u prefix must have fired before the launch command,
+    # to clear any leftover bash input.
+    cu_idx = next(
+        (i for i, c in enumerate(send_keys) if "C-u" in c),
+        None,
+    )
+    launch_idx = send_keys.index(cmd_call)
+    assert cu_idx is not None and cu_idx < launch_idx, (
+        f"0308: ``C-u`` clear must fire BEFORE the launch command. "
+        f"cu_idx={cu_idx}, launch_idx={launch_idx}"
     )
 
 
@@ -167,12 +185,14 @@ def test_emit_tmux_skips_wrapper_for_bash_window(fake_tmux,
     )
 
 
-def test_emit_tmux_no_longer_pre_types_bare_launcher(fake_tmux,
-                                                       tmp_path) -> None:
-    """Negative pin against the pre-0160 pattern: ``_emit_tmux`` must
-    NOT send the raw ``greatminds start-agent X claude`` line as a
-    standalone send-keys (without Enter). The 0160 fix replaces that
-    pattern with the wrapper-loop send-keys + Enter."""
+def test_emit_tmux_launch_command_terminates_with_enter(
+    fake_tmux, tmp_path,
+) -> None:
+    """0308 rewrite of the pre-0160 negative pin. The original pin
+    against the pre-0160 bug (bare command sent WITHOUT Enter) is
+    inverted by 0308: the launch command MUST land with Enter,
+    NOT wrapped in ``while true; do …``. Verify the trailing
+    keystroke is Enter for every launch-command send-keys call."""
     cfg = {
         "session": "test",
         "windows": [
@@ -184,25 +204,28 @@ def test_emit_tmux_no_longer_pre_types_bare_launcher(fake_tmux,
 
     send_keys = [c for c in fake_tmux if c and c[0] == "send-keys"]
     for c in send_keys:
-        # Find any arg that's the bare launch command.
         for arg in c:
             if not isinstance(arg, str):
                 continue
-            # Pre-0160 pattern: arg == launch cmd, no while/done around it.
-            if (arg.startswith("greatminds start-agent")
-                    and "while true" not in arg):
-                pytest.fail(
-                    "0160 regression: _emit_tmux sent the bare start-agent "
-                    f"command without the wrapper loop. send-keys call: {c}"
+            if arg.startswith("greatminds start-agent"):
+                # 0308: must NOT be wrapped in while-true.
+                assert "while true" not in arg, (
+                    f"0308 regression: launch send-keys carries the "
+                    f"legacy wrapper loop. Got: {arg}"
+                )
+                # Must end with Enter so the command runs.
+                assert c[-1] == "Enter", (
+                    f"0308: launch command send-keys must terminate "
+                    f"with Enter. Got: {c}"
                 )
 
 
-def test_emit_tmux_wrapper_includes_window_role(fake_tmux,
-                                                  tmp_path) -> None:
-    """The wrapper's role-name surfaces in the prompt the operator
-    sees. Pin: for two roles in the same session, each pane's wrapper
-    must carry its own role string (and ONLY its own role's
-    start-agent line)."""
+def test_emit_tmux_launch_command_per_role(fake_tmux,
+                                            tmp_path) -> None:
+    """0308 rewrite: each role's pane receives its own
+    ``greatminds start-agent <ROLE>`` send-keys call (no wrapper).
+    Pin: two roles in the same session → two launch-command sends,
+    each naming the correct role and ONLY that role."""
     cfg = {
         "session": "test",
         "windows": [
@@ -215,14 +238,28 @@ def test_emit_tmux_wrapper_includes_window_role(fake_tmux,
     launch_mod._emit_tmux(tmp_path, cfg, _make_env_setup(), recreate=False)
 
     send_keys = [c for c in fake_tmux if c and c[0] == "send-keys"]
-    dev_wrapper = next((c for c in send_keys
-                        if any("while true" in str(arg) for arg in c)
-                        and "DEVELOPER" in " ".join(str(a) for a in c)
-                        and "ARCHITECT-REVIEWER" not in " ".join(str(a) for a in c)),
-                       None)
-    rev_wrapper = next((c for c in send_keys
-                        if any("while true" in str(arg) for arg in c)
-                        and "ARCHITECT-REVIEWER" in " ".join(str(a) for a in c)),
-                       None)
-    assert dev_wrapper is not None, "missing DEVELOPER wrapper"
-    assert rev_wrapper is not None, "missing ARCHITECT-REVIEWER wrapper"
+    dev_cmd = next(
+        (c for c in send_keys
+         if any("greatminds start-agent DEVELOPER" in str(arg)
+                for arg in c)),
+        None,
+    )
+    rev_cmd = next(
+        (c for c in send_keys
+         if any("greatminds start-agent ARCHITECT-REVIEWER" in str(arg)
+                for arg in c)),
+        None,
+    )
+    assert dev_cmd is not None, (
+        "0308: missing DEVELOPER launch send-keys"
+    )
+    assert rev_cmd is not None, (
+        "0308: missing ARCHITECT-REVIEWER launch send-keys"
+    )
+    # No cross-contamination: each command names ONLY its own role.
+    assert all("ARCHITECT-REVIEWER" not in str(a) for a in dev_cmd
+                if isinstance(a, str)
+                and "greatminds start-agent" in a)
+    assert all("DEVELOPER " not in str(a) for a in rev_cmd
+                if isinstance(a, str)
+                and "greatminds start-agent" in a)

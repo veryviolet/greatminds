@@ -462,19 +462,45 @@ def _restart_dead_agents(
             _clear_session_files_for_bootstrap(registry_dir, role_lc)
         if needs_start:
             agent_type = (window_tool.get(name) or "claude").lower()
-            _log(f"    {name} ({role_lc}): pressing Enter to (re)start "
-                 f"[agent_type={agent_type}]")
-            # mode="bare-enter": tmux ran the launcher shell with a
-            # pre-filled `greatminds start-agent` line; a bare Enter
-            # accepts it. No role heartbeat to poll — the agent isn't
-            # running yet. verify=False because the dedicated _verify()
-            # step below does the full pid+sock+trust check.
-            ok, diag = press_enter(
-                coord_dir, session, name, role_lc, agent_type,
-                mode="bare-enter",
-                verify=False,
+            # 0308: build + send the full launch_command directly
+            # instead of relying on a wrapper-loop's bare-Enter
+            # recovery. Pre-0308 the launcher installed a
+            # ``while true; do read; <launch>; done`` wrapper in
+            # each pane and ``restart`` pressed Enter to nudge the
+            # wrapper into the next iteration. The wrapper is gone
+            # (0308); restart now mirrors launch.py's sequence:
+            # C-u to clear any leftover bash input, then the same
+            # ``greatminds start-agent <ROLE> <tool> --mode loop``
+            # command + Enter.
+            from greatminds.cli.launch import _launch_command
+            window_mode = next(
+                ((w.get("mode") or "loop") for w in windows
+                 if isinstance(w, dict) and w.get("name") == name),
+                "loop",
             )
-            _log(f"      {diag}")
+            launch_cmd = _launch_command(
+                "greatminds start-agent",
+                role_lc.upper(), agent_type, window_mode,
+            )
+            _log(
+                f"    {name} ({role_lc}): sending launch_command "
+                f"[agent_type={agent_type}, mode={window_mode}]: "
+                f"{launch_cmd}"
+            )
+            # Clear the bash line first (defense against partial
+            # text left by a crashed agent).
+            _tmux("send-keys", "-t", f"{session}:{name}", "C-u")
+            cp = _tmux(
+                "send-keys", "-t", f"{session}:{name}",
+                launch_cmd, "Enter",
+            )
+            if cp.returncode != 0:
+                _log(
+                    f"      tmux send-keys failed: "
+                    f"{(cp.stderr or '').strip()[:120]}"
+                )
+            else:
+                _log(f"      launch_command sent + Enter")
             time.sleep(0.5)
         else:
             _log(f"    {name} ({role_lc}): pid={pid} alive, skip")
