@@ -1445,10 +1445,10 @@ tools, windows, or launch modes.</p>
 <code>autoMode.allow: ["$defaults"]</code>, and the canonical
 <code>permissions.allow</code> entries from <code>schema.yaml</code> under
 <code>claude_settings.permissions.allow</code>.</p>
-<p>Those allow rules let unattended Claude loop roles perform the git operations
-they are authorized to run, such as reviewer commit, tag, push, merge, branch,
+<p>Those allow rules let unattended Claude roles perform the git operations they
+are authorized to run, such as reviewer commit, tag, push, merge, branch,
 checkout, and worktree commands. Without explicit allow rules, Claude Code can
-pause on an approval prompt that a loop-mode role cannot answer.</p>
+pause on an approval prompt that a driven or self-loop role cannot answer.</p>
 <p>Project operators can add their own <code>permissions.allow</code> entries directly in
 <code>.claude/settings.local.json</code>. Re-running <code>greatminds setup</code> unions the schema
 defaults into the existing list, deduplicates them, and preserves operator-added
@@ -1507,8 +1507,10 @@ name colliding.</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>launch<span class="w"> </span>--target<span class="w"> </span>tmux
 tmux<span class="w"> </span>a<span class="w"> </span>-t<span class="w"> </span>myproject
 </code></pre></div>
-<p>Each window in <code>coord.yaml</code> starts the configured role, tool, and mode. Chat
-roles wait for user input; loop roles poll their inbox and owned queues.</p>
+<p>Each window in <code>coord.yaml</code> starts the configured role, tool, and mode. Planner
+is the user-facing interactive role. MAINTAINER runs as a self-loop watchdog.
+Worker roles are driven by <code>coordd</code>: their panes stay idle between turns, and
+coordd starts one turn when their inbox, queue, or stand-state events change.</p>
 <h2 id="file-your-first-task">File your first task<a class="headerlink" href="#file-your-first-task" title="Permanent link">&para;</a></h2>
 <p>The normal product path starts with user feedback or an inbox task, then flows
 through planning, implementation, test or reader review, and final review:</p>

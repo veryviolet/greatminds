@@ -1280,20 +1280,27 @@
 location and encoded in <code>schema.yaml</code>.</p>
 <p>Product roles:</p>
 <ul>
-<li><code>ARCHITECT-PLANNER</code>: intake, triage, planning, and routing.</li>
-<li><code>DEVELOPER</code>: backend implementation.</li>
-<li><code>UI-DEVELOPER</code>: UI implementation or direct UI rapid iteration.</li>
-<li><code>TECHNICAL-WRITER</code>: documentation implementation.</li>
-<li><code>TESTER</code>: validates implemented code and records test evidence.</li>
-<li><code>READER</code>: reviews documentation as a fresh reader.</li>
-<li><code>ARCHITECT-REVIEWER</code>: final review, blocked-task wake-up, commit policy.</li>
-<li><code>EXPLORER</code>: live exploratory review and bug filing.</li>
-<li><code>STAND-KEEPER</code>: stand lease readiness, deployment, and recovery.</li>
+<li><code>ARCHITECT-PLANNER</code>: intake, triage, planning, and routing. Lifecycle:
+  <code>interactive</code>.</li>
+<li><code>DEVELOPER</code>: backend implementation. Lifecycle: <code>driven</code>.</li>
+<li><code>UI-DEVELOPER</code>: UI implementation or direct UI rapid iteration. Pipeline
+  lifecycle: <code>driven</code>.</li>
+<li><code>TECHNICAL-WRITER</code>: documentation implementation. Lifecycle: <code>driven</code>.</li>
+<li><code>TESTER</code>: validates implemented code and records test evidence. Lifecycle:
+  <code>driven</code>.</li>
+<li><code>READER</code>: reviews documentation as a fresh reader. Lifecycle: <code>driven</code>.</li>
+<li><code>ARCHITECT-REVIEWER</code>: final review, blocked-task wake-up, commit policy.
+  Lifecycle: <code>driven</code>.</li>
+<li><code>EXPLORER</code>: live exploratory review and bug filing. Lifecycle: <code>driven</code>.</li>
+<li><code>STAND-KEEPER</code>: stand lease readiness, deployment, and recovery. Lifecycle:
+  <code>driven</code>.</li>
 </ul>
 <p>System and entry roles:</p>
 <ul>
-<li><code>USER</code>: files feedback or chats with planner-facing roles.</li>
-<li><code>MAINTAINER</code>: infrastructure and fleet operations.</li>
+<li><code>USER</code>: files feedback or chats with planner-facing roles. Lifecycle:
+  <code>interactive</code>.</li>
+<li><code>MAINTAINER</code>: infrastructure and fleet operations. Lifecycle: <code>self-loop</code>;
+  USER reaches it through planner-mediated inbox asks rather than direct chat.</li>
 </ul>
 <p>Every active role has a heartbeat file under <code>coordination/</code>. Stale heartbeats
 are reported by <code>greatminds watchdog</code>.</p>

@@ -1273,6 +1273,134 @@
 <p>All notable changes to <strong>greatminds</strong> are documented here. Format follows
 <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a> loosely; versions
 follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
+<h2 id="1312-2026-06-01">1.3.12 — 2026-06-01<a class="headerlink" href="#1312-2026-06-01" title="Permanent link">&para;</a></h2>
+<p>Closes the 0311 reactive-fleet umbrella (Phases 1–4): every role
+declares a lifecycle in schema; MAINTAINER is a non-user-facing
+self-loop watchdog with auto_mode-allowed recovery commands; all
+claude + codex workers are coordd-driven (one turn per event over
+<code>claude -p</code>/<code>--resume</code> or a fresh <code>codex app-server</code> stdio); canon
+prose + public mkdocs site mirror the model.</p>
+<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<ul>
+<li>
+<p><strong>0312 schema role contracts gain per-role lifecycle field (Phase 1a).</strong>
+  <code>schema.roles.&lt;ROLE&gt;.lifecycle</code> ∈ {<code>interactive</code>, <code>self-loop</code>,
+  <code>driven</code>}. PLANNER + USER interactive; MAINTAINER self-loop;
+  8 workers + BOT-* driven. <code>greatminds role contract &lt;ROLE&gt;</code> renders
+  the line.</p>
+</li>
+<li>
+<p><strong>0313 MAINTAINER recovery commands in <code>auto_mode.allow</code> (Phase 1c).</strong>
+  Schema <code>claude_settings.auto_mode.allow</code> gains <code>greatminds restart/
+  daemon/start-agent</code>, <code>kill</code>, and <code>systemctl --user</code> patterns so
+  MAINTAINER's self-loop recovery survives the classifier ceiling
+  without a USER present.</p>
+</li>
+<li>
+<p><strong>0314 MAINTAINER self-loop watchdog tick (Phase 1b).</strong> Flips
+  MAINTAINER from chat to a self-loop health-check tick that
+  auto-restarts dead workers and coordd and escalates queue/FSM
+  stalls + upstream-bug candidates to PLANNER. Non-user-facing —
+  USER reaches infra topics through PLANNER. <code>data/command_START.yaml</code></p>
+</li>
+<li>
+<p><code>coord.yaml.template</code> + <code>MAINTAINER.md</code> reframed; recovery
+  commands are already allow-listed.</p>
+</li>
+<li>
+<p><strong>0315 coordd driver core spawns <code>claude --resume</code> for driven roles
+  (Phase 2a).</strong> For lifecycle=driven + tool=claude coordd RUNS each
+  turn via <code>claude --resume &lt;sid&gt; -p "continue your tick"</code> instead of
+  waking a persistent agent. Pane is idle bash between turns; per-role
+  run-lock prevents overlapping turns and sets a pending marker for
+  mid-turn events; <code>_route_queue_event</code> falls through to legacy wake
+  on missing session id / non-driven / non-claude.</p>
+</li>
+<li>
+<p><strong>0316 role contract via <code>--append-system-prompt-file</code> (Phase 2b).</strong>
+  Each driven turn is a fresh <code>claude -p</code> call, so the role contract
+  lives in the system prompt: <code>setup._seed_role_bootstraps</code> writes
+  <code>coordination/.bootstrap/&lt;role&gt;.md</code> from the existing <code>render_role</code>
+  for every role; the 0315 driver passes the file as
+  <code>--append-system-prompt-file</code>.</p>
+</li>
+<li>
+<p><strong>0317 driven driver session-reset policy at turn threshold (Phase
+  2c).</strong> <code>SESSION_RESET_TURN_THRESHOLD</code> (default 50, env override
+  <code>COORDD_SESSION_RESET_TURNS</code>). At/above the threshold the next turn
+  starts fresh (no <code>--resume</code>) with the bootstrap still riding, and
+  the per-role <code>driven_turn_count</code> resets to 1. Caps <code>claude --resume</code>
+  history growth.</p>
+</li>
+<li>
+<p><strong>0318 migrate READER to driven lifecycle (Phase 2d — first low-risk
+  pilot).</strong> <code>coord.yaml.template</code> reader window mode loop → driven,
+  bootstrap launch /loop → driven. <code>_route_queue_event</code> driven path
+  now also checks coord.yaml window mode (lifecycle=driven AND
+  tool=claude AND window_mode=driven); missing session_id forces a
+  fresh first turn instead of falling back to wake.</p>
+</li>
+<li>
+<p><strong>0319 migrate DEVELOPER + UI-DEVELOPER + TESTER + STAND-KEEPER to
+  driven (Phase 2e).</strong> Batches the remaining four claude workers
+  onto the driven driver. PLANNER (interactive) + MAINTAINER
+  (self-loop) + codex roles unchanged.</p>
+</li>
+<li>
+<p><strong>0320 codex app-server as managed <code>systemd --user</code> unit (Phase
+  3a).</strong> <code>greatminds-appserver@&lt;fleet&gt;.service</code> template carries an
+  absolute-node ExecStart + <code>Environment=PATH</code> that leads with the
+  node bin dir, so codex's <code>#!/usr/bin/env node</code> shebang resolves
+  under systemd's minimal PATH. <code>greatminds daemon install</code> enables
+  the unit when the fleet has driven+codex roles. (The driver in
+  0321 ultimately uses stdio per turn rather than the WS socket;
+  the unit is retained as harmless infrastructure for now.)</p>
+</li>
+<li>
+<p><strong>0321 coordd codex driver via stdio app-server per-turn (Phase
+  3b).</strong> For lifecycle=driven + tool=codex coordd spawns a fresh
+  <code>codex app-server</code> over stdio per event and speaks the
+  line-delimited JSON-RPC (<code>initialize</code> →
+  <code>thread/start | thread/resume</code> → <code>turn/start</code> → wait
+  <code>turn/completed</code> → exit). Per-role run-lock + pending marker;
+  async daemon thread releases the lock on completion and re-fires
+  one pending event. Pane is idle bash between turns.</p>
+</li>
+<li>
+<p><strong>0323 migrate EXPLORER (first codex worker) to driven (Phase 3c).</strong>
+  <code>coord.yaml.template</code> explorer window mode loop → driven; bootstrap
+  launch /loop → driven with codex stdio-per-turn wording. The
+  generic codex driver (0321) routes the new dispatch with no coordd
+  code change.</p>
+</li>
+<li>
+<p><strong>0324 migrate TECHNICAL-WRITER (last codex worker) to driven
+  (Phase 3d).</strong> Same config-only flip as 0323. With this both codex
+  workers run driven; ARCHITECT-REVIEWER stays non-driven for now.</p>
+</li>
+</ul>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>0325 canon docs for the reactive-fleet lifecycle model (Phase 4).</strong>
+  <code>COORDINATE.md</code> §2.1 (new) carries the lifecycle vocabulary + the
+  lifecycle × tool dispatch matrix + the systemd → coordd → MAINTAINER
+  → worker/coordd/PLANNER escalation chain. Per-role canon files gain
+  a Runtime lifecycle section; ARCHITECT-REVIEWER explicitly carries
+  the legacy-launch fallback wording. Public mkdocs pages extend the
+  window mode enum to <code>chat|loop|driven</code>, bifurcate the coordd wake
+  vs driven-spawn paths, annotate every role with its lifecycle, and
+  update the permissions paragraph from "loop-mode role" to "driven or
+  self-loop role".</li>
+</ul>
+<h3 id="operator-migration">Operator migration<a class="headerlink" href="#operator-migration" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Pre-1.3.12 fleets need a one-time <code>greatminds setup</code> regen against
+  their existing project (or hand-edit <code>coord.yaml</code> window modes for
+  the affected roles) before the driven dispatch takes effect — setup
+  never overwrites an existing <code>coord.yaml</code>. Run <code>greatminds daemon
+  repair --project &lt;name&gt;</code> if the systemd <code>--user</code> unit was installed
+  pre-1.3.11.</li>
+</ul>
 <h2 id="1311-2026-06-01">1.3.11 — 2026-06-01<a class="headerlink" href="#1311-2026-06-01" title="Permanent link">&para;</a></h2>
 <p>Eight verified fixes covering the REVIEWER merge direction, the
 schema/gate-check stand_evidence contract, dispatch/lease coherence,
@@ -1280,7 +1408,7 @@ worktree-isolation enforcement at the CLI, uniform session-start
 canon-read across role canons, SK heartbeat refresh during long
 ansible runs, daemon install systemd enablement + repair subcommand,
 and the launch/restart wrapper-loop removal.</p>
-<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0303 task append-block enforces cwd under per-task worktree.</strong>
@@ -1408,7 +1536,7 @@ upgrade promptly.</p>
 mechanism so fresh-install PLANNER agents pick up the workflow at
 tick start without an operator ping. Closes the role-contract gap
 left after the 0276 stand-profile umbrella shipped.</p>
-<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
+<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0297 PLANNER role contract gains stand-profile coordination.</strong>
   <code>schema.roles.ARCHITECT-PLANNER</code> now declares
@@ -1424,7 +1552,7 @@ left after the 0276 stand-profile umbrella shipped.</p>
 <h2 id="137-2026-05-27">1.3.7 — 2026-05-27<a class="headerlink" href="#137-2026-05-27" title="Permanent link">&para;</a></h2>
 <p>Closes the 0276 stand-profile umbrella DoD with the MD-cycle live-green
 on real avatar.</p>
-<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
+<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0295 liveness-prose MD-only canon template (Phase I of 0276).</strong>
   New <code>data/templates/stand-profiles/liveness-prose.md</code> with no YAML
@@ -1441,7 +1569,7 @@ on real avatar.</p>
 plus a chain of canon-playbook robustness fixes empirically proven on
 real avatar deploys, and pushes the schema enum so md-only profiles can
 be leased.</p>
-<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">&para;</a></h3>
+<h3 id="added_4">Added<a class="headerlink" href="#added_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0284 end-to-end stand-profile cycle tests + collection-free rsync
@@ -1492,7 +1620,7 @@ be leased.</p>
 workflow from <code>schema.yaml</code> at tick start, and plugs the orphan
 <code>active_lease</code> leak that produced <code>state=down + active_lease={...}</code>
 contradictions across the stand transitions.</p>
-<h3 id="added_4">Added<a class="headerlink" href="#added_4" title="Permanent link">&para;</a></h3>
+<h3 id="added_5">Added<a class="headerlink" href="#added_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0288 schema-driven role contracts for all 13 roles + CLI.</strong>
   <code>schema.roles.&lt;ROLE&gt;</code> now carries <code>responsibilities</code>,
@@ -1537,7 +1665,7 @@ dispatch contract is actually enforced.</p>
 <h2 id="133-2026-05-27">1.3.3 — 2026-05-27<a class="headerlink" href="#133-2026-05-27" title="Permanent link">&para;</a></h2>
 <p>Stand-profile mechanism (0276 umbrella, Phases A-G) plus a deploy-safety
 fix that unblocks Phase H avatar verification.</p>
-<h3 id="added_5">Added<a class="headerlink" href="#added_5" title="Permanent link">&para;</a></h3>
+<h3 id="added_6">Added<a class="headerlink" href="#added_6" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0277 stand_profile schema section + canon convention (Phase A).</strong>
@@ -1740,7 +1868,7 @@ files may stay as historical evidence.</p>
   is gone. Pre-1.3.0 tasks without a <code>lease_id</code> on their tests block
   return <code>missing</code>; refile via the lease API to verify.</li>
 </ul>
-<h3 id="added_6">Added<a class="headerlink" href="#added_6" title="Permanent link">&para;</a></h3>
+<h3 id="added_7">Added<a class="headerlink" href="#added_7" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Lease-based stand CLI:</strong></li>
 <li><code>greatminds stand lease --task &lt;id&gt; --worktree &lt;path&gt; --profile
@@ -1858,7 +1986,7 @@ umbrella-console-script migration. No new features.</p>
   library API; the click handlers are thin wrappers calling them,
   matching vfl's <code>create_node()</code> / <code>create_project()</code> pattern.</li>
 </ul>
-<h3 id="added_7">Added<a class="headerlink" href="#added_7" title="Permanent link">&para;</a></h3>
+<h3 id="added_8">Added<a class="headerlink" href="#added_8" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>tests/test_task_field_coercion.py</code> — pytest regression suite
   covering all three 1.1.0 bugs (20 tests, all passing). Tests:
@@ -1891,7 +2019,7 @@ internal artefacts (task files, journal, code) English.</p>
   Russian to English. Pre-1.1.0 versions on PyPI (0.1.0, 0.1.1, 1.0.0)
   shipped Russian-only canon by mistake — yank them in favour of 1.1.0+.</li>
 </ul>
-<h3 id="added_8">Added<a class="headerlink" href="#added_8" title="Permanent link">&para;</a></h3>
+<h3 id="added_9">Added<a class="headerlink" href="#added_9" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>greatminds setup --lang &lt;code&gt;</code> flag — records the agent
   user-facing language in <code>PROJECT.md</code> as <code>&lt;GREATMINDS_LANG&gt;</code>. Any
@@ -1922,7 +2050,7 @@ are consolidated into a single <code>greatminds</code> umbrella with subcommands
 <li><code>coord-init</code>, <code>coord-launch</code>, <code>coord-tmux</code> modules removed; their
   functionality is in <code>greatminds setup</code> and <code>greatminds launch</code>.</li>
 </ul>
-<h3 id="added_9">Added<a class="headerlink" href="#added_9" title="Permanent link">&para;</a></h3>
+<h3 id="added_10">Added<a class="headerlink" href="#added_10" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>greatminds.core.env</code> — adaptive Python-env detector covering 8
   scenarios: pixi, uv, poetry, conda, plain venv, external-venv
@@ -1963,7 +2091,7 @@ permissions enforced.</p>
 </ul>
 <h2 id="010-2026-05-20">0.1.0 — 2026-05-20<a class="headerlink" href="#010-2026-05-20" title="Permanent link">&para;</a></h2>
 <p>First public release.</p>
-<h3 id="added_10">Added<a class="headerlink" href="#added_10" title="Permanent link">&para;</a></h3>
+<h3 id="added_11">Added<a class="headerlink" href="#added_11" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Python package <code>greatminds</code> with 19 console entry-points covering the
   full R8 pipeline:</li>
