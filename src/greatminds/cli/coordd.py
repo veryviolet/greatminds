@@ -656,6 +656,141 @@ def _owning_role_for_queue(canon_dir: Path, queue: str) -> str | None:
     return owner.strip().upper()
 
 
+def _lifecycle_for_role(canon_dir: Path, role: str) -> str | None:
+    """0315 (0311 Phase 2a): read ``schema.roles.<ROLE>.lifecycle``
+    (interactive / self-loop / driven). Returns None when the role
+    or field is absent — caller treats that as the pre-2a wake-only
+    behavior."""
+    roles = load_schema_roles(canon_dir)
+    entry = roles.get(role) or roles.get(role.upper()) or {}
+    if not isinstance(entry, dict):
+        return None
+    lc = entry.get("lifecycle")
+    return lc.strip() if isinstance(lc, str) and lc.strip() else None
+
+
+def _driven_bootstrap_path(coord: Path, role_lower: str) -> str:
+    """0315/0316: path to the role's rendered bootstrap (system-
+    prompt) file. 0316 generates it at setup/launch via render-role;
+    0315's driver passes it to ``--append-system-prompt-file`` when
+    it exists. Returns the path string regardless of existence —
+    the caller gates on ``Path(...).is_file()``."""
+    return str(coord / ".bootstrap" / f"{role_lower}.md")
+
+
+def _driven_run_lock_path(coord: Path, role_lower: str) -> Path:
+    """Per-role run-lock marker: ``<coord>/.locks/driven-<role>.lock``.
+    Presence means a turn is currently running for that role."""
+    return coord / ".locks" / f"driven-{role_lower}.lock"
+
+
+def _driven_pending_path(coord: Path, role_lower: str) -> Path:
+    """Per-role pending marker. Set when an event arrives mid-turn;
+    the post-turn cleanup re-spawns once if present."""
+    return coord / ".locks" / f"driven-{role_lower}.pending"
+
+
+def _build_driven_claude_argv(
+    session_id: str,
+    bootstrap_file: str | None,
+    prompt: str = "continue your tick",
+) -> list[str]:
+    """0315: construct the ``claude --resume <sid> -p`` argv that
+    runs one driven turn. 0316 supplies the
+    ``--append-system-prompt-file`` so the role contract rides the
+    system prompt on every fresh ``-p`` invocation; pre-0316 the
+    bootstrap_file is None and the contract relies on --resume
+    history.
+    """
+    argv = ["claude", "--resume", session_id, "-p", prompt]
+    if bootstrap_file:
+        argv.extend(["--append-system-prompt-file", bootstrap_file])
+    return argv
+
+
+def _spawn_driven_turn(
+    coord: Path,
+    role_lower: str,
+    session_id: str,
+    pane: str | None,
+    session_name: str | None,
+    bootstrap_file: str | None,
+    verbose: bool,
+    *,
+    spawn: "callable | None" = None,
+) -> tuple[bool, str]:
+    """0315: run one turn for a driven claude role via
+    ``claude --resume -p``. Honors a per-role run-lock: if a turn is
+    already running, sets the pending marker and returns without
+    spawning a second process.
+
+    ``spawn`` is an injection seam for tests — a callable taking the
+    argv list and returning a truthy handle. Default delivers the
+    command into the role's tmux pane (the pane is idle bash
+    between turns for driven roles).
+    """
+    lock = _driven_run_lock_path(coord, role_lower)
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    if lock.exists():
+        # A turn is already running — mark pending so the post-turn
+        # cleanup re-fires once, and do NOT spawn a second process.
+        _driven_pending_path(coord, role_lower).touch()
+        if verbose:
+            print(
+                f"  0315: driven turn for {role_lower} already "
+                f"running; marked pending",
+                file=sys.stderr,
+            )
+        return (False, "run-lock held; pending set")
+
+    argv = _build_driven_claude_argv(session_id, bootstrap_file)
+    try:
+        lock.touch()
+        if spawn is not None:
+            spawn(argv)
+        else:
+            # Default: deliver the command into the role's tmux
+            # pane. The pane is idle bash between turns; sending the
+            # full command + Enter runs one -p turn.
+            if pane and session_name:
+                _tmux_send_keys_driven(session_name, pane, argv)
+        if verbose:
+            print(
+                f"  0315: spawned driven turn for {role_lower}: "
+                f"{' '.join(argv[:4])}…",
+                file=sys.stderr,
+            )
+        return (True, f"driven turn spawned for {role_lower}")
+    finally:
+        # The lock is released by the turn's own completion hook in
+        # the full design; for the synchronous spawn seam used by
+        # tests + the tmux-send path (fire-and-forget), we leave the
+        # lock for the post-turn sweep. To avoid a permanent stuck
+        # lock when no completion hook exists yet, clear it here when
+        # using the default tmux path (best-effort — a real
+        # completion signal supersedes this in a later phase).
+        if spawn is None:
+            try:
+                lock.unlink()
+            except OSError:
+                pass
+
+
+def _tmux_send_keys_driven(session: str, pane: str,
+                           argv: list[str]) -> None:
+    """Deliver a driven-turn command into the role's tmux pane.
+    Mirrors 0308's direct-launch sequence: C-u clear, then the
+    quoted command + Enter."""
+    import shlex
+    cmd = " ".join(shlex.quote(a) for a in argv)
+    subprocess.run(["tmux", "send-keys", "-t", f"{session}:{pane}", "C-u"],
+                   capture_output=True)
+    subprocess.run(
+        ["tmux", "send-keys", "-t", f"{session}:{pane}", cmd, "Enter"],
+        capture_output=True,
+    )
+
+
 def _route_queue_event(coord: Path, canon_dir: Path,
                        queue: str, filename: str, verbose: bool) -> bool:
     """0204: wake the owning role of ``queue`` when a file lands there.
@@ -710,6 +845,42 @@ def _route_queue_event(coord: Path, canon_dir: Path,
     coord_yaml_doc = _read_coord_yaml(project_dir)
     located = _window_and_tool_for_role(coord_yaml_doc, owner)
     tool = (located[1] if located else "").lower()
+
+    # 0315 (0311 Phase 2a): driven claude roles are no longer just
+    # woken — coordd RUNS the turn via ``claude --resume -p``. The
+    # pane is idle bash between turns. Only claude + lifecycle=driven
+    # take this path; everything else falls through to the legacy
+    # wake mechanism below (interactive / self-loop / codex stay on
+    # press_enter / SIGINT until Phase 3 covers codex).
+    lifecycle = _lifecycle_for_role(canon_dir, owner)
+    if lifecycle == "driven" and tool == "claude":
+        reg = read_registry(coord / REGISTRY_DIR, owner.lower())
+        session_id = (reg or {}).get("session_id") or ""
+        if not session_id:
+            if verbose:
+                print(
+                    f"  0315: driven role {owner} has no session_id "
+                    f"in registry; falling back to wake",
+                    file=sys.stderr,
+                )
+        else:
+            session_name = (coord_yaml_doc.get("session") or "").strip() \
+                if coord_yaml_doc else ""
+            pane = (located[0] if located else "").strip()
+            bootstrap_file = _driven_bootstrap_path(coord, owner.lower())
+            ok, diag = _spawn_driven_turn(
+                coord, owner.lower(), session_id, pane, session_name,
+                bootstrap_file if bootstrap_file and
+                Path(bootstrap_file).is_file() else None,
+                verbose,
+            )
+            if verbose:
+                print(
+                    f"  0315: driven dispatch for {owner}: {diag}",
+                    file=sys.stderr,
+                )
+            return ok
+
     mechanism = _wake_mechanism_for_tool(tool)
     if mechanism == "sigint_deepest_descendant":
         sigint_sleeping_descendant(coord, owner, verbose)
