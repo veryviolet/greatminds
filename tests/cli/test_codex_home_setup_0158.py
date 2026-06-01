@@ -65,13 +65,22 @@ def test_generated_config_has_top_level_developer_instructions(tmp_path: Path) -
     cfg = project / "coordination" / ".codex-home" / "developer" / "config.toml"
     text = cfg.read_text(encoding="utf-8")
     assert text.startswith("developer_instructions ="), text[:200]
-    assert "[profiles.developer]" in text
+    # 0332: the profile table is split out to developer.config.toml; the
+    # base config.toml must NOT carry [profiles.developer] (codex 0.135).
+    assert "[profiles.developer]" not in text
+    layer = (project / "coordination" / ".codex-home" / "developer"
+             / "developer.config.toml").read_text(encoding="utf-8")
+    assert "model = " in layer
 
 
-def test_generated_config_has_profile_section(tmp_path: Path) -> None:
-    """The generated config.toml carries ``[profiles.<role>]`` with the
-    three required fields. ``codex --profile <role>`` errors when the
-    section is missing (the fleet-blocker 0153 vintage)."""
+def test_generated_config_splits_profile_into_layer(tmp_path: Path) -> None:
+    """0332 (codex 0.135 profile-v2): the shipped ``[profiles.<role>]``
+    table is SPLIT out of config.toml into the sibling
+    ``<role>.config.toml`` profile layer (top-level keys). The base
+    config.toml must NOT carry a ``[profiles.<role>]`` table — codex
+    0.135 ``--profile <role>`` rejects it. (Was 0158's
+    test_generated_config_has_profile_section, which required the
+    in-config table; 0332 supersedes that.)"""
     canon = tmp_path / "canon"
     project = tmp_path / "project"
     project.mkdir()
@@ -86,12 +95,17 @@ def test_generated_config_has_profile_section(tmp_path: Path) -> None:
 
     setup_mod._setup_codex_homes_per_role(canon, project)
 
-    text = (project / "coordination" / ".codex-home" / "developer"
-            / "config.toml").read_text(encoding="utf-8")
-    assert "[profiles.developer]" in text
-    assert "model = " in text
-    assert "approval_policy = " in text
-    assert "sandbox_mode = " in text
+    home = project / "coordination" / ".codex-home" / "developer"
+    base = (home / "config.toml").read_text(encoding="utf-8")
+    layer = (home / "developer.config.toml").read_text(encoding="utf-8")
+    # Base: developer_instructions retained, NO profile table.
+    assert "developer_instructions" in base
+    assert "[profiles.developer]" not in base
+    # Layer: the three profile keys, TOP-LEVEL (no wrapper table).
+    assert "[profiles." not in layer
+    assert "model = " in layer
+    assert "approval_policy = " in layer
+    assert "sandbox_mode = " in layer
 
 
 # ---------- idempotency ----------
