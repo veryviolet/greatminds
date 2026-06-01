@@ -609,10 +609,17 @@ def _setup_codex_homes_per_role(canon: Path,
     ``<project>/coordination/.codex-home/<role>/config.toml``.
 
     Replaces the pre-0158 ``~/.codex/<role>.config.toml`` mechanism that
-    codex 0.130.0 silently stopped reading. codex 0.130+ only loads
-    ``$CODEX_HOME/config.toml``; ``--profile <role>`` then selects the
-    ``[profiles.<role>]`` section within. start_agent.py sets
-    ``CODEX_HOME=<project>/coordination/.codex-home/<role>`` at launch.
+    codex 0.130.0 silently stopped reading. start_agent.py sets
+    ``CODEX_HOME=<project>/coordination/.codex-home/<role>`` at launch
+    and passes ``--profile <role>``.
+
+    0332 (codex 0.135 CONFIG_PROFILE_V2): the per-role home is now SPLIT
+    — ``config.toml`` is the BASE (developer_instructions + per-project
+    trust + UX), with NO ``[profiles.<role>]`` table; ``<role>.config.toml``
+    is the profile LAYER (model / approval_policy / sandbox_mode as
+    TOP-LEVEL keys) that ``--profile <role>`` layers on top. Pre-0.135
+    bundled the profile table inside config.toml, which 0.135 rejects
+    when ``--profile`` is passed.
 
     0162: after copying the shipped role profile, append
     ``[[skills.config]]`` entries for canon SKILL.md folders so codex
@@ -641,6 +648,7 @@ def _setup_codex_homes_per_role(canon: Path,
         return (0, 0)
     written = 0
     skipped = 0
+    proj = str(project_dir.resolve())
     for src in sorted(src_dir.glob("*.config.toml")):
         role = src.stem.replace(".config", "")
         role_home = homes_root / role
@@ -649,32 +657,62 @@ def _setup_codex_homes_per_role(canon: Path,
         except OSError:
             continue
         dst = role_home / "config.toml"
+        layer_dst = role_home / f"{role}.config.toml"
         if dst.is_file():
             skipped += 1
             continue
         try:
-            shutil.copyfile(src, dst)
+            # 0332 (codex 0.135 CONFIG_PROFILE_V2): `--profile <role>`
+            # now LAYERS ``$CODEX_HOME/<role>.config.toml`` on top of the
+            # base ``config.toml`` and REJECTS a ``[profiles.<role>]``
+            # table (or top-level ``profile=`` selector) inside
+            # config.toml. The shipped per-role profile bundles the base
+            # (developer_instructions) with a trailing ``[profiles.<role>]``
+            # table; we SPLIT it: base → config.toml (no profile table),
+            # profile keys → <role>.config.toml (the layer, top-level).
+            text = src.read_text(encoding="utf-8")
+            marker = f"[profiles.{role}]"
+            if marker in text:
+                base_text, _, after = text.partition(marker)
+                layer_text = after.strip("\n")
+            else:
+                base_text, layer_text = text, ""
+            m = re.search(r'^\s*model\s*=\s*"([^"]+)"', layer_text, re.M)
+            model = m.group(1) if m else "gpt-5.5"
+            # Base config.toml: developer_instructions (+ any non-profile
+            # content) + per-project trust so a CODEX_HOME-scoped launch
+            # doesn't prompt + UX nudges. NO [profiles.<role>].
+            base = base_text.rstrip() + "\n"
+            base += (
+                f'\n[projects."{proj}"]\n'
+                'trust_level = "trusted"\n'
+                '\n[tui.model_availability_nux]\n'
+                f'"{model}" = 4\n'
+                '\n[notice]\n'
+                'hide_rate_limit_model_nudge = true\n'
+            )
             # 0162: append [[skills.config]] entries for canon skill
-            # folders. codex 0.130 reads these from config.toml and
-            # registers each path's SKILL.md at agent startup.
+            # folders (still valid on 0.135 — not a profile table).
             skill_dirs = _codex_skill_dirs_for_role(canon, role)
             if skill_dirs:
-                with dst.open("a", encoding="utf-8") as f:
-                    f.write(
-                        "\n\n# 0162: canon skills (SKILL.md folders) "
-                        "registered for codex 0.130+ via the\n"
-                        "# ``skills.config`` array. Each entry's path "
-                        "points at a directory containing\n"
-                        "# SKILL.md; codex enumerates them at startup. "
-                        "These are operator-owned after\n"
-                        "# first write — to pick up new shipped skills, "
-                        "delete this file and re-run\n"
-                        "# `greatminds setup <project>`.\n"
-                    )
-                    for sd in skill_dirs:
-                        f.write("\n[[skills.config]]\n")
-                        f.write(f'path = "{sd}"\n')
-                        f.write("enabled = true\n")
+                base += (
+                    "\n\n# 0162: canon skills (SKILL.md folders) "
+                    "registered for codex via the\n"
+                    "# ``skills.config`` array. Operator-owned after "
+                    "first write — to pick up new\n"
+                    "# shipped skills, delete this home and re-run "
+                    "`greatminds setup <project>`.\n"
+                )
+                for sd in skill_dirs:
+                    base += (f"\n[[skills.config]]\npath = \"{sd}\"\n"
+                             "enabled = true\n")
+            dst.write_text(base, encoding="utf-8")
+            # Profile layer: model/approval_policy/sandbox_mode as
+            # TOP-LEVEL keys (read by ``--profile <role>`` on 0.135+).
+            layer_dst.write_text(
+                (layer_text.rstrip() + "\n") if layer_text else "",
+                encoding="utf-8",
+            )
             written += 1
         except OSError:
             continue
