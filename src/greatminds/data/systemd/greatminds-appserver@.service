@@ -1,0 +1,38 @@
+[Unit]
+Description=greatminds codex app-server for project %i (one per fleet)
+After=default.target
+
+[Service]
+Type=simple
+# 0320 (0311 Phase 3a): driven codex roles run their turns through the
+# codex app-server protocol (thread/start + turn/start, Phase 3b/0321),
+# not PTY keystrokes. The app-server is hosted ONCE per fleet here and
+# listens on a per-project unix socket under $XDG_RUNTIME_DIR (%t). All
+# of the fleet's codex worker threads attach to this single server.
+#
+# `codex app-server` is flagged experimental; `--listen unix://PATH`
+# runs the protocol server in the foreground on a UDS — the right shape
+# for systemd Type=simple supervision (foreground process, no
+# self-daemonising). The control-socket / remote-control variants
+# (`codex remote-control start`, `codex app-server daemon start`)
+# self-background and would need Type=forking + a PIDFile; the
+# foreground listener is simpler and survives restart the same way.
+#
+# ExecStart invokes node EXPLICITLY with an absolute interpreter path:
+# __NODE_BIN__ (the running node, resolved via shutil.which) runs
+# __CODEX_BIN__ (the codex JS entry, also absolute). This is the
+# 0320-iter2 fix for the GATE failure: unlike greatminds (a
+# console_scripts entry whose shebang is an absolute venv-python path),
+# codex's shebang is the RELATIVE `#!/usr/bin/env node`, and
+# systemd --user runs with a minimal PATH that lacks the nvm node bin
+# dir → `env: node: No such file or directory` (status=127, restart
+# loop). Naming node explicitly bypasses the env-node shebang;
+# Environment=PATH (__NODE_DIR__ first) additionally lets any node
+# subprocess codex spawns resolve.
+Environment=PATH=__NODE_DIR__:/usr/local/bin:/usr/bin:/bin:%h/.local/bin
+ExecStart=__NODE_BIN__ __CODEX_BIN__ app-server --listen unix://%t/greatminds-appserver-%i.sock
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
