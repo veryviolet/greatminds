@@ -389,6 +389,10 @@ def stand_release(lease_id: str, result: str) -> None:
                 holder, lease_id=lease_id,
                 reason=f"release ({result})",
             )
+            # 0343: the documented "pops the next FIFO queue entry"
+            # must actually happen — promote the head lease so a queued
+            # validation activates without a manual re-lease.
+            captured["promoted"] = ss.promote_head_on_free(state, holder)
             return
         # Look in queue — cancellation case.
         queue = state.get("queue") or []
@@ -417,7 +421,11 @@ def stand_release(lease_id: str, result: str) -> None:
 
     ss.update_stand_state(coord, mutator)
     if captured.get("was_active"):
-        click.echo(f"released lease {lease_id} (result={result})")
+        msg = f"released lease {lease_id} (result={result})"
+        if captured.get("promoted"):
+            msg += (f"; auto-promoted queued lease "
+                    f"{captured['promoted']} → preparing")
+        click.echo(msg)
     elif captured.get("was_cancelled"):
         click.echo(f"cancelled queued lease {lease_id}")
 
@@ -484,6 +492,8 @@ def stand_up(reason: str) -> None:
         )
     coord = find_coord_dir()
 
+    captured: dict[str, Any] = {}
+
     def mutator(state):
         if state.get("state") != "down":
             raise GreatMindsError(
@@ -498,9 +508,17 @@ def stand_up(reason: str) -> None:
         # for older state files written before 0289).
         state["active_lease"] = None
         ss.record_transition(state, "down", "free", role, reason=reason)
+        # 0343: resuming from down with a non-empty queue must promote
+        # the head lease (down→free→preparing), not leave it stranded.
+        captured["promoted"] = ss.promote_head_on_free(state, role)
 
     ss.update_stand_state(coord, mutator)
-    click.echo(f"state → free: {reason}")
+    if captured.get("promoted"):
+        click.echo(
+            f"state → free: {reason}; auto-promoted queued lease "
+            f"{captured['promoted']} → preparing")
+    else:
+        click.echo(f"state → free: {reason}")
 
 
 @stand.command(name="ready")
