@@ -694,6 +694,8 @@ def _build_driven_claude_argv(
     session_id: str,
     bootstrap_file: str | None,
     prompt: str = "continue your tick",
+    *,
+    fresh: bool = False,
 ) -> list[str]:
     """0315: construct the ``claude --resume <sid> -p`` argv that
     runs one driven turn. 0316 supplies the
@@ -701,11 +703,79 @@ def _build_driven_claude_argv(
     system prompt on every fresh ``-p`` invocation; pre-0316 the
     bootstrap_file is None and the contract relies on --resume
     history.
+
+    0317: ``fresh=True`` starts a NEW session (no ``--resume``) when
+    the session-reset threshold trips — claude mints a fresh
+    session-id, the caller records it. The bootstrap (system prompt)
+    carries the full contract so the new session isn't context-blind.
     """
-    argv = ["claude", "--resume", session_id, "-p", prompt]
+    if fresh:
+        argv = ["claude", "-p", prompt]
+    else:
+        argv = ["claude", "--resume", session_id, "-p", prompt]
     if bootstrap_file:
         argv.extend(["--append-system-prompt-file", bootstrap_file])
     return argv
+
+
+# 0317: session-reset policy. ``claude --resume`` accumulates
+# history across driven turns; past a threshold the context gets
+# expensive + noisy. The driver tracks a per-role turn count in
+# the registry and starts a fresh session (no --resume) once the
+# count crosses ``SESSION_RESET_TURN_THRESHOLD``. Configurable via
+# the env override; default 50.
+SESSION_RESET_TURN_THRESHOLD = int(
+    os.environ.get("COORDD_SESSION_RESET_TURNS", "50")
+)
+
+
+def _driven_turn_count(reg: dict | None) -> int:
+    """Current driven-turn count for the role (0 when absent)."""
+    if not reg:
+        return 0
+    try:
+        return int(reg.get("driven_turn_count") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _should_reset_session(reg: dict | None,
+                          threshold: int = SESSION_RESET_TURN_THRESHOLD
+                          ) -> bool:
+    """0317: True when the role's accumulated turn count has reached
+    the reset threshold — the next turn should start fresh."""
+    return _driven_turn_count(reg) >= threshold
+
+
+def _record_driven_turn(registry_dir: Path, role_lower: str,
+                        *, reset: bool,
+                        new_session_id: str | None = None) -> None:
+    """0317: update the role's registry after a driven turn.
+
+    - ``reset=False`` → increment ``driven_turn_count``.
+    - ``reset=True``  → set ``driven_turn_count = 1`` (this turn is
+      the first of the new session) and, when ``new_session_id`` is
+      given, write it to ``session_id``.
+
+    Best-effort: a missing / unreadable registry is left alone (the
+    driver tolerates count starting from 0 again)."""
+    f = registry_dir / f"{role_lower}.json"
+    try:
+        reg = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    if not isinstance(reg, dict):
+        return
+    if reset:
+        reg["driven_turn_count"] = 1
+        if new_session_id:
+            reg["session_id"] = new_session_id
+    else:
+        reg["driven_turn_count"] = _driven_turn_count(reg) + 1
+    try:
+        f.write_text(json.dumps(reg, indent=2) + "\n", encoding="utf-8")
+    except OSError:
+        pass
 
 
 def _spawn_driven_turn(
@@ -718,11 +788,18 @@ def _spawn_driven_turn(
     verbose: bool,
     *,
     spawn: "callable | None" = None,
+    reg: dict | None = None,
 ) -> tuple[bool, str]:
     """0315: run one turn for a driven claude role via
     ``claude --resume -p``. Honors a per-role run-lock: if a turn is
     already running, sets the pending marker and returns without
     spawning a second process.
+
+    0317: applies the session-reset policy. When the role's
+    ``driven_turn_count`` (from ``reg``) has reached
+    ``SESSION_RESET_TURN_THRESHOLD``, this turn starts a FRESH
+    session (no --resume) and the registry's count resets to 1.
+    Otherwise --resume continues and the count increments.
 
     ``spawn`` is an injection seam for tests — a callable taking the
     argv list and returning a truthy handle. Default delivers the
@@ -743,7 +820,10 @@ def _spawn_driven_turn(
             )
         return (False, "run-lock held; pending set")
 
-    argv = _build_driven_claude_argv(session_id, bootstrap_file)
+    # 0317: decide resume-vs-fresh from the accumulated turn count.
+    reset = _should_reset_session(reg)
+    argv = _build_driven_claude_argv(
+        session_id, bootstrap_file, fresh=reset)
     try:
         lock.touch()
         if spawn is not None:
@@ -754,13 +834,23 @@ def _spawn_driven_turn(
             # full command + Enter runs one -p turn.
             if pane and session_name:
                 _tmux_send_keys_driven(session_name, pane, argv)
+        # 0317: record the turn. On reset, count → 1 (this is the
+        # first turn of a new session); claude mints the new sid and
+        # the next tick reads it via stream-json / registry refresh.
+        # We don't have the new sid synchronously here (claude emits
+        # it), so reset records count=1 and leaves session_id for the
+        # agent's own registry write; a non-reset turn just bumps.
+        _record_driven_turn(coord / REGISTRY_DIR, role_lower,
+                            reset=reset)
         if verbose:
+            mode = "FRESH (reset)" if reset else "--resume"
             print(
-                f"  0315: spawned driven turn for {role_lower}: "
-                f"{' '.join(argv[:4])}…",
+                f"  0315/0317: spawned driven turn ({mode}) for "
+                f"{role_lower}: {' '.join(argv[:4])}…",
                 file=sys.stderr,
             )
-        return (True, f"driven turn spawned for {role_lower}")
+        return (True, f"driven turn spawned for {role_lower}"
+                      f"{' (session reset)' if reset else ''}")
     finally:
         # The lock is released by the turn's own completion hook in
         # the full design; for the synchronous spawn seam used by
@@ -873,6 +963,7 @@ def _route_queue_event(coord: Path, canon_dir: Path,
                 bootstrap_file if bootstrap_file and
                 Path(bootstrap_file).is_file() else None,
                 verbose,
+                reg=reg,  # 0317: turn-count drives session-reset
             )
             if verbose:
                 print(
