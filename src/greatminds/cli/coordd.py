@@ -884,6 +884,375 @@ def _tmux_send_keys_driven(session: str, pane: str,
     )
 
 
+# ---------------------------------------------------------------------------
+# 0321 (0311 Phase 3b): codex driver via the codex app-server protocol.
+#
+# Symmetric to the claude ``-p`` driver (2a/0315): for a role with
+# lifecycle == driven AND tool == codex AND coord.yaml window mode ==
+# driven, coordd drives each turn through a FRESH ``codex app-server``
+# process over STDIO (no --listen) — line-delimited JSON-RPC:
+# ``initialize`` → ``thread/start`` (first turn, baseInstructions = the
+# role contract, the 2b/0316 analogue of claude's
+# --append-system-prompt-file) or ``thread/resume`` (subsequent) →
+# ``turn/start`` ("continue your tick") → wait ``turn/completed`` —
+# instead of PTY keystrokes. Both drivers spawn one process per turn.
+#
+# iter-3 (PLANNER transport decision after two live-GATE failures): the
+# WS ``--listen unix://`` control socket (iter-1 direct, iter-2 via
+# ``codex app-server proxy``) cannot be driven without a real WS client
+# / the daemon's managed-standalone install; the stdio transport sheds
+# that entire class of problems and matches our line-delimited framing.
+# A per-role run-lock (shared with the claude path) prevents a second
+# turn while one is in flight; the blocking turn runs in a daemon
+# thread so coordd's event loop is not held. 0320's --listen WS unit is
+# now vestigial to the driver (kept, cleanup later).
+# ---------------------------------------------------------------------------
+
+
+def _codex_appserver_argv() -> list[str]:
+    """0321-iter3: argv for a per-turn ``codex app-server`` over STDIO
+    (no ``--listen``). PLANNER transport decision: drop the WS/socket
+    layer entirely and drive a fresh ``codex app-server`` per turn over
+    stdin/stdout line-delimited JSON-RPC — symmetric to claude's
+    ``claude -p`` per-turn spawn (both = fresh process per turn).
+    Verified on the host: ``codex app-server`` stdio speaks
+    ``{json}\\n`` framing (initialize → response, then notifications).
+
+    Prefers an absolute ``<node> <codex.js>`` (codex's shebang is the
+    relative ``#!/usr/bin/env node`` and coordd under systemd may lack
+    node on PATH — the 0320 lesson), falling back to bare ``codex``."""
+    import shutil
+    codex = shutil.which("codex")
+    node = shutil.which("node")
+    if codex and node:
+        return [str(Path(node).resolve()),
+                str(Path(codex).resolve()), "app-server"]
+    if codex:
+        return [str(Path(codex).resolve()), "app-server"]
+    return ["codex", "app-server"]
+
+
+def _codex_appserver_env() -> dict:
+    """Environment for the per-turn ``codex app-server``: PATH prepended
+    with node's dir so codex's env-node shebang + any node subprocess
+    resolve even under systemd's minimal PATH."""
+    import shutil
+    env = dict(os.environ)
+    node = shutil.which("node")
+    if node:
+        env["PATH"] = (str(Path(node).resolve().parent) + os.pathsep
+                       + env.get("PATH", ""))
+    return env
+
+
+def _build_thread_start_request(req_id: int,
+                                base_instructions: str | None,
+                                cwd: str | None) -> dict:
+    """app-server ``thread/start`` JSON-RPC request. ``baseInstructions``
+    carries the role contract; ``cwd`` roots the thread at the project."""
+    params: dict = {}
+    if base_instructions:
+        params["baseInstructions"] = base_instructions
+    if cwd:
+        params["cwd"] = cwd
+    return {"jsonrpc": "2.0", "id": req_id,
+            "method": "thread/start", "params": params}
+
+
+def _build_turn_start_request(req_id: int, thread_id: str,
+                              prompt: str = "continue your tick") -> dict:
+    """app-server ``turn/start`` JSON-RPC request. ``input`` is the
+    UserInput array — a single ``text`` item is the driven nudge."""
+    return {"jsonrpc": "2.0", "id": req_id, "method": "turn/start",
+            "params": {"threadId": thread_id,
+                       "input": [{"type": "text", "text": prompt}]}}
+
+
+def _build_initialize_request(req_id: int) -> dict:
+    """app-server ``initialize`` handshake (required before thread/turn
+    methods over stdio). ``clientInfo`` is mandatory per the schema."""
+    return {"jsonrpc": "2.0", "id": req_id, "method": "initialize",
+            "params": {"clientInfo": {
+                "name": "greatminds-coordd", "title": "greatminds",
+                "version": "0"}}}
+
+
+def _build_thread_resume_request(req_id: int, thread_id: str) -> dict:
+    """app-server ``thread/resume`` — re-attach a persisted thread on a
+    subsequent turn (the per-turn stdio process is fresh, but the thread
+    state is persisted by codex, so we resume by id)."""
+    return {"jsonrpc": "2.0", "id": req_id, "method": "thread/resume",
+            "params": {"threadId": thread_id}}
+
+
+class _CodexStdioSession:
+    """Thin line-delimited JSON-RPC client over a spawned
+    ``codex app-server`` stdio process. One session drives exactly one
+    turn (initialize → thread/start|resume → turn/start → wait
+    turn/completed), then the process is closed. Verified framing:
+    ``{json}\\n`` per message."""
+
+    def __init__(self, proc) -> None:
+        self._proc = proc
+        self._buf = b""
+
+    def _read_msg(self, deadline: float) -> dict:
+        import select as _select
+        import time as _time
+        fd = self._proc.stdout.fileno()
+        while True:
+            # drain any complete line already buffered
+            while b"\n" in self._buf:
+                raw, self._buf = self._buf.split(b"\n", 1)
+                if not raw.strip():
+                    continue
+                try:
+                    return json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+            remaining = deadline - _time.monotonic()
+            if remaining <= 0:
+                raise OSError("timeout reading app-server message")
+            r, _w, _e = _select.select([fd], [], [], remaining)
+            if not r:
+                raise OSError("timeout reading app-server message")
+            chunk = os.read(fd, 65536)
+            if not chunk:
+                raise OSError("app-server closed before response")
+            self._buf += chunk
+
+    def send(self, request: dict) -> None:
+        self._proc.stdin.write(
+            (json.dumps(request) + "\n").encode("utf-8"))
+        self._proc.stdin.flush()
+
+    def call(self, request: dict, deadline: float) -> dict:
+        """Send a request and return its id-matched response (skipping
+        notifications / other ids)."""
+        want = request.get("id")
+        self.send(request)
+        while True:
+            msg = self._read_msg(deadline)
+            if isinstance(msg, dict) and msg.get("id") == want:
+                return msg
+
+    def wait_turn_completed(self, thread_id: str, deadline: float) -> dict:
+        """Read notifications until ``turn/completed`` for ``thread_id``."""
+        while True:
+            msg = self._read_msg(deadline)
+            if (isinstance(msg, dict)
+                    and msg.get("method") == "turn/completed"
+                    and ((msg.get("params") or {}).get("threadId")
+                         in (thread_id, None))):
+                return msg
+
+
+def _drive_codex_turn_stdio(
+    coord: Path, role_lower: str, thread_id: str,
+    base_instructions: str | None, cwd: str | None, verbose: bool,
+    *, turn_timeout: float = 1800.0, handshake_timeout: float = 60.0,
+) -> str:
+    """0321-iter3: drive ONE codex turn over a fresh ``codex app-server``
+    stdio process. Blocking — intended to run in a daemon thread (or
+    synchronously in tests against a fake server). Returns the threadId
+    (minted on the first turn). Raises OSError on transport failure.
+
+    Sequence: spawn → ``initialize`` → ``thread/start`` (first turn,
+    baseInstructions) or ``thread/resume`` (subsequent) → ``turn/start``
+    → wait ``turn/completed`` → close (process exits)."""
+    import subprocess as _sp
+    import time as _time
+    argv = _codex_appserver_argv()
+    try:
+        proc = _sp.Popen(
+            argv, stdin=_sp.PIPE, stdout=_sp.PIPE, stderr=_sp.DEVNULL,
+            env=_codex_appserver_env(), cwd=cwd or None,
+        )
+    except OSError as exc:
+        raise OSError(f"failed to spawn codex app-server: {exc}")
+    sess = _CodexStdioSession(proc)
+    try:
+        hs_deadline = _time.monotonic() + handshake_timeout
+        sess.call(_build_initialize_request(1), hs_deadline)
+        if thread_id:
+            sess.call(_build_thread_resume_request(2, thread_id),
+                      hs_deadline)
+        else:
+            resp = sess.call(
+                _build_thread_start_request(2, base_instructions, cwd),
+                hs_deadline)
+            thread_id = (
+                (((resp or {}).get("result") or {}).get("thread") or {})
+                .get("id") or "")
+            if not thread_id:
+                raise OSError(
+                    f"thread/start returned no threadId: {resp!r}"[:200])
+            _record_codex_thread(coord / REGISTRY_DIR, role_lower,
+                                 thread_id)
+        sess.send(_build_turn_start_request(3, thread_id))
+        sess.wait_turn_completed(
+            thread_id, _time.monotonic() + turn_timeout)
+        if verbose:
+            print(
+                f"  0321: codex turn/completed for {role_lower} "
+                f"(thread {thread_id})",
+                file=sys.stderr,
+            )
+        return thread_id
+    finally:
+        for stream in (proc.stdin, proc.stdout):
+            try:
+                if stream:
+                    stream.close()
+            except OSError:
+                pass
+        try:
+            proc.terminate()
+            proc.wait(timeout=5)
+        except Exception:  # noqa: BLE001 — best-effort cleanup
+            try:
+                proc.kill()
+            except OSError:
+                pass
+
+
+def _codex_thread_id(reg: dict | None) -> str:
+    """Read the role's persisted app-server threadId (analogue of the
+    claude ``session_id``). Empty when absent → first turn creates it."""
+    if not reg:
+        return ""
+    v = reg.get("thread_id")
+    return v if isinstance(v, str) else ""
+
+
+def _record_codex_thread(registry_dir: Path, role_lower: str,
+                         thread_id: str) -> None:
+    """Persist the app-server threadId in the role's registry so
+    subsequent events reuse the thread (best-effort)."""
+    f = registry_dir / f"{role_lower}.json"
+    try:
+        reg = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        reg = {}
+    if not isinstance(reg, dict):
+        reg = {}
+    reg["thread_id"] = thread_id
+    try:
+        f.write_text(json.dumps(reg, indent=2) + "\n", encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _spawn_driven_codex_turn(
+    coord: Path,
+    role_lower: str,
+    base_instructions: str | None,
+    cwd: str | None,
+    verbose: bool,
+    *,
+    transport: "callable | None" = None,
+    reg: dict | None = None,
+    run_async: bool = True,
+) -> tuple[bool, str]:
+    """0321-iter3: drive one codex turn over a per-turn ``codex
+    app-server`` stdio process. Symmetric to ``_spawn_driven_turn``
+    (claude ``-p``) — both spawn a fresh process per turn.
+
+    Honors the per-role run-lock (shared with the claude path): a turn
+    in flight → set the pending marker and return without spawning a
+    second turn. On the first turn (no threadId in the registry) the
+    stdio sequence issues ``thread/start`` (baseInstructions =
+    contract) and records the threadId; later turns ``thread/resume``
+    the persisted id. The actual turn runs to ``turn/completed``.
+
+    ``transport`` is a test seam — a callable taking a JSON-RPC request
+    dict and returning the response dict; when given, the request
+    SEQUENCE (initialize → thread/start|resume → turn/start) is driven
+    synchronously through it and the run-lock is left held for run-lock
+    assertions. Without it, the blocking stdio turn runs in a daemon
+    thread (``run_async``) so coordd's event loop is not held for the
+    turn's duration; the thread releases the run-lock and re-fires one
+    pending event on completion.
+    """
+    lock = _driven_run_lock_path(coord, role_lower)
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    if lock.exists():
+        _driven_pending_path(coord, role_lower).touch()
+        if verbose:
+            print(
+                f"  0321: codex turn for {role_lower} already running; "
+                f"marked pending",
+                file=sys.stderr,
+            )
+        return (False, "run-lock held; pending set")
+
+    lock.touch()
+    thread_id = _codex_thread_id(reg)
+
+    # Test seam: drive the request sequence synchronously through the
+    # injected transport (no real codex process). Leave the lock held
+    # for run-lock observability (mirrors the claude test path).
+    if transport is not None:
+        try:
+            transport(_build_initialize_request(1))
+            if thread_id:
+                transport(_build_thread_resume_request(2, thread_id))
+            else:
+                resp = transport(_build_thread_start_request(
+                    2, base_instructions, cwd))
+                thread_id = (
+                    (((resp or {}).get("result") or {}).get("thread")
+                     or {}).get("id") or "")
+                if not thread_id:
+                    return (False,
+                            f"thread/start returned no threadId: "
+                            f"{resp!r}"[:200])
+                _record_codex_thread(coord / REGISTRY_DIR, role_lower,
+                                     thread_id)
+            transport(_build_turn_start_request(3, thread_id))
+            return (True,
+                    f"codex turn driven for {role_lower} "
+                    f"(thread {thread_id})")
+        except Exception as exc:  # noqa: BLE001
+            return (False, f"codex transport failed: {exc}"[:200])
+
+    def _worker() -> None:
+        try:
+            _drive_codex_turn_stdio(
+                coord, role_lower, thread_id, base_instructions, cwd,
+                verbose)
+        except Exception as exc:  # noqa: BLE001 — log, never crash coordd
+            if verbose:
+                print(
+                    f"  0321: codex turn for {role_lower} failed: {exc}",
+                    file=sys.stderr,
+                )
+        finally:
+            try:
+                lock.unlink()
+            except OSError:
+                pass
+            # Re-fire one event that arrived mid-turn.
+            pend = _driven_pending_path(coord, role_lower)
+            if pend.exists():
+                try:
+                    pend.unlink()
+                except OSError:
+                    pass
+                _spawn_driven_codex_turn(
+                    coord, role_lower, base_instructions, cwd, verbose,
+                    reg=read_registry(coord / REGISTRY_DIR, role_lower),
+                )
+
+    if not run_async:
+        _worker()
+        return (True, f"codex turn driven for {role_lower}")
+    import threading
+    threading.Thread(target=_worker, daemon=True,
+                     name=f"codex-turn-{role_lower}").start()
+    return (True, f"codex turn dispatched (async) for {role_lower}")
+
+
 def _route_queue_event(coord: Path, canon_dir: Path,
                        queue: str, filename: str, verbose: bool) -> bool:
     """0204: wake the owning role of ``queue`` when a file lands there.
@@ -981,6 +1350,37 @@ def _route_queue_event(coord: Path, canon_dir: Path,
         if verbose:
             print(
                 f"  0315/0318: driven dispatch for {owner}: {diag}",
+                file=sys.stderr,
+            )
+        return ok
+
+    # 0321 (0311 Phase 3b): driven codex roles run through the codex
+    # app-server (0320), not PTY keystrokes — symmetric to the claude
+    # ``-p`` driver above. iter-3 (PLANNER transport decision):
+    # spawn a fresh ``codex app-server`` over STDIO per turn —
+    # initialize → thread/start|resume → turn/start → turn/completed —
+    # symmetric to claude's per-turn ``-p`` spawn (no persistent socket;
+    # 0320's --listen WS unit is now vestigial to the driver). Same 0318
+    # migration gate (lifecycle + window mode == driven) so unmigrated
+    # codex roles keep the SIGINT wake.
+    if lifecycle == "driven" and tool == "codex" \
+            and window_mode == "driven":
+        reg = read_registry(coord / REGISTRY_DIR, owner.lower())
+        bootstrap_file = _driven_bootstrap_path(coord, owner.lower())
+        base_instructions = None
+        try:
+            bp = Path(bootstrap_file)
+            if bp.is_file():
+                base_instructions = bp.read_text(encoding="utf-8")
+        except OSError:
+            base_instructions = None
+        ok, diag = _spawn_driven_codex_turn(
+            coord, owner.lower(), base_instructions,
+            str(coord.parent), verbose, reg=reg,
+        )
+        if verbose:
+            print(
+                f"  0321: codex dispatch for {owner}: {diag}",
                 file=sys.stderr,
             )
         return ok
