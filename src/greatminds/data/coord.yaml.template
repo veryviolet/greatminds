@@ -18,11 +18,21 @@ windows:
   - name: dev
     role: DEVELOPER
     tool: claude
-    mode: loop
+    # 0319 (0311 Phase 2e): the remaining claude workers — DEVELOPER,
+    # UI-DEVELOPER, TESTER, STAND-KEEPER — migrate to the driven
+    # lifecycle in one batch (the mechanism was proven by READER/0318
+    # on avatar; only the per-role config differs). coordd spawns each
+    # turn via ``claude --resume -p`` on inbox/queue events; the pane
+    # is idle bash between turns (no persistent /loop agent). PLANNER
+    # (interactive), MAINTAINER (self-loop safety net) and the codex
+    # roles (REVIEWER/TECHNICAL-WRITER/EXPLORER — Phase 3) are NOT
+    # touched.
+    mode: driven
   - name: ui
     role: UI-DEVELOPER
     tool: claude
-    mode: loop
+    # 0319 (0311 Phase 2e): migrated to driven in the batch above.
+    mode: driven
   - name: writer
     role: TECHNICAL-WRITER
     tool: codex
@@ -30,7 +40,8 @@ windows:
   - name: tester
     role: TESTER
     tool: claude
-    mode: loop
+    # 0319 (0311 Phase 2e): migrated to driven in the batch above.
+    mode: driven
   - name: reader
     role: READER
     tool: claude
@@ -48,7 +59,13 @@ windows:
   - name: stand
     role: STAND-KEEPER
     tool: claude
-    mode: loop
+    # 0319 (0311 Phase 2e): migrated to driven in the batch above.
+    # STAND-KEEPER's ``.stand`` state events (TESTER lease acquire /
+    # release) now drive a turn via ``claude --resume -p`` instead of
+    # a press_enter wake. Behavioural proof for the batch is on the
+    # representative role (DEVELOPER) on avatar; SK is confirmed at
+    # the config + argv-driver level (see 0319 plan GATE step 3).
+    mode: driven
   - name: maintainer
     role: MAINTAINER
     tool: claude

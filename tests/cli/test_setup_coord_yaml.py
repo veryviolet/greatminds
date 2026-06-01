@@ -14,15 +14,20 @@ from greatminds.cli import daemon as daemon_mod
 CANONICAL_WINDOWS = [
     ("planner",    "ARCHITECT-PLANNER",  "claude", "chat"),
     ("reviewer",   "ARCHITECT-REVIEWER", "codex",  "loop"),
-    ("dev",        "DEVELOPER",          "claude", "loop"),
-    ("ui",         "UI-DEVELOPER",       "claude", "loop"),
+    # 0319 (0311 Phase 2e): the remaining claude workers — DEVELOPER,
+    # UI-DEVELOPER, TESTER, STAND-KEEPER — migrated to the driven
+    # lifecycle in one batch → coord.yaml template window mode is now
+    # 'driven' (was loop). codex roles (REVIEWER/WRITER/EXPLORER) and
+    # MAINTAINER (self-loop) stay non-driven.
+    ("dev",        "DEVELOPER",          "claude", "driven"),
+    ("ui",         "UI-DEVELOPER",       "claude", "driven"),
     ("writer",     "TECHNICAL-WRITER",   "codex",  "loop"),
-    ("tester",     "TESTER",             "claude", "loop"),
+    ("tester",     "TESTER",             "claude", "driven"),
     # 0318 (0311 Phase 2d): READER migrated to driven lifecycle →
     # coord.yaml template window mode is now 'driven' (was loop).
     ("reader",     "READER",             "claude", "driven"),
     ("explorer",   "EXPLORER",           "codex",  "loop"),
-    ("stand",      "STAND-KEEPER",       "claude", "loop"),
+    ("stand",      "STAND-KEEPER",       "claude", "driven"),
     # 0314 (0311 Phase 1b): MAINTAINER is now a self-loop watchdog
     # → mode=loop in the coord.yaml template (was chat).
     ("maintainer", "MAINTAINER",         "claude", "loop"),
