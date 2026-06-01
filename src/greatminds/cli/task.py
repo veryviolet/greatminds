@@ -300,6 +300,24 @@ def find_task(coord: Path, task_id: str) -> tuple[Path, str] | None:
     """
     if not coord.is_dir():
         return None
+    # 0326: unify id intake — also accept a full filename and a path
+    # (absolute, cwd-relative, or coordination-relative) so every
+    # subcommand resolves identically. If the arg points at an existing
+    # task file, return it directly; otherwise reduce it to the bare
+    # stem (strip any directory + ``.yaml``/``.md``) and fall through to
+    # the short-id / full-stem / slug-prefix scan below.
+    if isinstance(task_id, str) and task_id:
+        cand = Path(task_id)
+        for p in (cand, coord / cand, coord.parent / cand):
+            try:
+                if p.is_file() and p.suffix in (".yaml", ".md"):
+                    return (p.resolve(), p.parent.name)
+            except OSError:
+                pass
+        if cand.suffix in (".yaml", ".md"):
+            task_id = cand.stem
+        elif "/" in task_id or os.sep in task_id:
+            task_id = cand.name
     seq_only = bool(_SEQ_ONLY_RE.match(task_id))
     seq_prefix = f"{int(task_id):04d}-" if seq_only else None
     exact_candidates: list[tuple[Path, str]] = []
@@ -2557,18 +2575,27 @@ def task_list(queue) -> None:
 
 
 @task.command(name="validate")
-@click.option("--id", "task_id", default=None)
-@click.option("--file", "file_path", default=None)
-def task_validate(task_id, file_path) -> None:
-    if (task_id is None) == (file_path is None):
-        raise click.UsageError("exactly one of --id or --file is required")
+@click.argument("task_arg", metavar="ID", required=False, default=None)
+@click.option("--id", "id_opt", default=None,
+              help="(back-compat) task id — same as the positional ID")
+@click.option("--file", "file_path", default=None,
+              help="explicit path to a .yaml task file")
+def task_validate(task_arg, id_opt, file_path) -> None:
+    # 0326: unified id intake — positional ID accepts short id / full
+    # filename / path (resolved via find_task), identical to show/paths/
+    # mv/append-block. --id / --file kept as back-compat. Exactly one.
+    sources = [s for s in (task_arg, id_opt, file_path) if s is not None]
+    if len(sources) != 1:
+        raise click.UsageError(
+            "provide exactly one of: ID (positional), --id, or --file")
     coord = find_coord_dir()
     if file_path is not None:
         path = Path(file_path)
     else:
-        found = find_task(coord, task_id)
+        arg = task_arg if task_arg is not None else id_opt
+        found = find_task(coord, arg)
         if found is None:
-            raise GreatMindsError(f"task {task_id} not found")
+            raise GreatMindsError(f"task {arg} not found")
         path = found[0]
     if path.suffix != ".yaml":
         raise GreatMindsError(f"only .yaml supported; got {path.suffix}", exit_code=2)
@@ -2577,8 +2604,20 @@ def task_validate(task_id, file_path) -> None:
 
 
 @task.command(name="paths")
-def task_paths() -> None:
+@click.argument("task_arg", metavar="[ID]", required=False, default=None)
+def task_paths(task_arg) -> None:
+    # 0326: with an ID (short id / full filename / path, resolved via
+    # find_task) print that task's resolved file path + queue; without
+    # an ID print the project's coordination paths (the legacy behavior).
     coord = find_coord_dir()
+    if task_arg is not None:
+        found = find_task(coord, task_arg)
+        if found is None:
+            raise GreatMindsError(f"task {task_arg} not found")
+        path, queue = found
+        click.echo(f"queue: {queue}")
+        click.echo(f"path:  {path}")
+        return
     canon = find_canon_dir()
     click.echo(f"coord:        {coord}")
     click.echo(f"canon:        {canon}")
