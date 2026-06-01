@@ -140,6 +140,35 @@ def render_prompt(role: str, project_dir: Path) -> str:
     return proc.stdout.rstrip()
 
 
+def bootstrap_path(coord: Path, role: str) -> Path:
+    """0316 (0311 Phase 2b): path to a role's rendered bootstrap
+    (system-prompt) file: ``<coord>/.bootstrap/<role-lower>.md``.
+
+    The driven driver (0315) passes this to claude's
+    ``--append-system-prompt-file`` so the role contract rides the
+    system prompt on every fresh ``-p`` turn — independent of the
+    --resume history. Single source of the path so coordd + setup +
+    launch agree."""
+    return coord / ".bootstrap" / f"{role.lower()}.md"
+
+
+def write_role_bootstrap(coord: Path, project_dir: Path,
+                         role: str) -> Path:
+    """0316: render the role contract via render-role and write it to
+    the bootstrap file. Returns the path. Called at setup / launch so
+    a fresh ``.bootstrap/<role>.md`` exists for the driven driver to
+    reference.
+
+    Best-effort caller contract: render failures raise GreatMindsError
+    (the bootstrap is load-bearing for driven roles); callers that
+    want graceful degradation wrap in try/except."""
+    rendered = render_prompt(role, project_dir)
+    target = bootstrap_path(coord, role)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(rendered + "\n", encoding="utf-8")
+    return target
+
+
 def set_terminal_title(role: str) -> None:
     """Set the OSC 0 terminal title to ``role``; safe no-op if no tty."""
     try:

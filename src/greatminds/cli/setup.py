@@ -257,6 +257,34 @@ def _ensure_project_md(coord: Path, canon: Path, force: bool,
     return status
 
 
+def _seed_role_bootstraps(coord: Path, project_dir: Path) -> int:
+    """0316 (0311 Phase 2b): render each role's contract to
+    ``coordination/.bootstrap/<role>.md`` for the driven driver's
+    ``--append-system-prompt-file``.
+
+    Returns the count successfully written. Best-effort per role: a
+    render-role failure logs a warning and continues (the driven
+    driver gates on file existence and falls back to --resume
+    history). Roles whose render fails simply don't get a bootstrap
+    file this run.
+    """
+    from greatminds.cli.start_agent import write_role_bootstrap
+    written = 0
+    # The canonical role names render-role understands are the
+    # command_START roles; ROLES_LOWER carries the lowercase set.
+    for r in ROLES_LOWER:
+        role_upper = r.upper()
+        try:
+            write_role_bootstrap(coord, project_dir, role_upper)
+            written += 1
+        except Exception as exc:  # noqa: BLE001 — best-effort seed
+            warn(
+                f"  role bootstrap for {role_upper} skipped "
+                f"(render-role failed: {str(exc)[:80]})"
+            )
+    return written
+
+
 def _seed_stand_profiles(coord: Path, canon: Path) -> tuple[int, int]:
     """0281 (0276 Phase E): copy canon stand-profile presets into
     ``coord/stand-profiles/``.
@@ -1297,6 +1325,16 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     # NOT overwritten.
     sp_copied, sp_skipped = _seed_stand_profiles(coord, canon)
     info(f"  stand-profiles: {sp_copied} copied, {sp_skipped} exist")
+
+    # 0316 (0311 Phase 2b): seed per-role bootstrap (system-prompt)
+    # files under coordination/.bootstrap/<role>.md from render-role.
+    # The driven driver (0315) passes these to claude's
+    # ``--append-system-prompt-file`` so the role contract rides the
+    # system prompt on every fresh ``-p`` turn. Best-effort: a
+    # render-role failure for one role warns but doesn't abort setup
+    # (the agent falls back to --resume history without the file).
+    bs_written = _seed_role_bootstraps(coord, project_dir)
+    info(f"  role bootstraps: {bs_written} written")
 
     # .claude/settings.local.json — Stop hook + schema's claude_settings
     # permissions.allow rules (0191). Merge-on-existing preserves any
