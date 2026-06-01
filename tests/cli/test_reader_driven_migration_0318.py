@@ -68,21 +68,27 @@ def test_command_start_reader_launch_is_driven() -> None:
     assert "self-pace" in low
 
 
-def test_other_claude_workers_not_migrated_yet() -> None:
-    """0318 migrates ONLY READER. The coord template's other claude
-    workers (tester) must stay mode=loop — one-at-a-time migration."""
+def test_non_driven_roles_stay_non_driven() -> None:
+    """0318 migrated READER first; 0319 then migrated the remaining
+    claude workers (DEV/UI-DEV/TESTER/STAND-KEEPER) as a batch. The
+    roles that are NOT part of the driven model — MAINTAINER
+    (self-loop) and the codex workers (Phase 3) — must still stay
+    non-driven. (This test originally pinned 'TESTER stays loop' for
+    the one-at-a-time phase; 0319 superseded that, so it now guards
+    the roles that genuinely remain non-driven.)"""
     doc = yaml.safe_load(
         (find_canon_dir() / "coord.yaml.template").read_text(
             encoding="utf-8")
     ) or {}
     by_role = {w.get("role"): w for w in (doc.get("windows") or [])
                if isinstance(w, dict)}
-    # TESTER is claude in the template — must NOT be driven yet.
-    tester = by_role.get("TESTER")
-    if tester is not None:
-        assert tester.get("mode") != "driven", (
-            "0318: only READER migrates this phase; TESTER stays loop"
-        )
+    for role in ("MAINTAINER", "TECHNICAL-WRITER", "EXPLORER",
+                 "ARCHITECT-REVIEWER"):
+        win = by_role.get(role)
+        if win is not None:
+            assert win.get("mode") != "driven", (
+                f"{role} must stay non-driven (got {win.get('mode')!r})"
+            )
 
 
 # ---------- launch leaves driven pane idle ----------
