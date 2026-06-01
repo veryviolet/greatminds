@@ -54,12 +54,18 @@ def _tests_block(stand_evidence=None) -> dict:
 
 
 def test_tests_block_accepts_complete_stand_evidence_mapping():
-    """Happy path: all three subfields set non-empty."""
+    """Happy path: all schema-required subfields set non-empty.
+    0301 added lease_id/result/commit alongside the legacy 3
+    prose fields — fixture extended."""
     data = _task_with_plan(stand_required=True)
     block = _tests_block(stand_evidence={
         "reproduction_steps": "ssh avatar; cmd1; cmd2",
         "observed_without_fix": "heartbeat stuck at +420s",
         "observed_with_fix": "heartbeat advanced within 10s",
+        # 0301: schema also requires lease_id / result / commit.
+        "lease_id": "lease-uuid",
+        "result": "pass",
+        "commit": "deadbeef",
     })
     # Must not raise.
     require_block_cross_state(block, data)
@@ -150,7 +156,9 @@ def test_coerce_value_passes_mapping_to_tests_block_via_cli():
     block = _tests_block(stand_evidence=coerce_value(
         "stand_evidence",
         "{reproduction_steps: x, observed_without_fix: y, "
-        "observed_with_fix: z}",
+        "observed_with_fix: z, "
+        # 0301: schema-required lease metadata fields.
+        "lease_id: lease-uuid, result: pass, commit: deadbeef}",
     ))
     data = _task_with_plan(stand_required=True)
     # Must not raise.

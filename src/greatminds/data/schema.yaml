@@ -963,10 +963,24 @@ stand:
 
 tests_block_validation:
   stand_evidence:
+    # 0301 (upstream issue #5): aligned with what
+    # gate_check.extract_lease_evidence_from_tests actually
+    # validates. Pre-0301 the schema listed only the three
+    # free-form prose fields below; ``gate-check`` ALSO required
+    # ``lease_id`` (from the release flow) before treating the
+    # evidence as valid → every well-formed task hit
+    # ``missing`` at the mv-to-feature_review gate.
     required_subfields:
+      # Free-form prose (TESTER writes during the lease cycle).
       - reproduction_steps
       - observed_without_fix
       - observed_with_fix
+      # 0301: lease-release evidence (lease_id is the gate's hard
+      # requirement; ``result`` and ``commit`` are derived with
+      # fallbacks but listed here for the contract surface).
+      - lease_id
+      - result
+      - commit
     required_when: plan.stand_required
   # 0228: TESTER must run own functional probes against the
   # prepared stand. STAND-KEEPER's observed_with_fix is infra-
