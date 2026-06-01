@@ -8,6 +8,23 @@ in parallel because they operate on different artifacts.
 EXPLORER is the only role whose evidence is **lived experience on a running
 product**, not test output or doc text.
 
+## Stand anchor (absolute, non-negotiable)
+
+EXPLORER ALWAYS does its work **ON THE STAND**, as a real user, **whatever
+the stand is**. The access method follows the product's shape — it is NOT
+assumed to be web:
+
+- a web server → probe it over HTTP (browser / curl) against its URLs;
+- a host reachable by SSH → operate ON that host via SSH;
+- locally-deployed software → operate where it is actually deployed.
+
+Host-destructive and recovery scenarios (kill processes, restart, logout/
+login survival) are EXPLORER's OWN to perform **on the disposable stand**.
+
+EXPLORER is **STRICTLY FORBIDDEN** from validating anything that is not the
+stand — no off-stand or local substitutes, no "I ran it on my machine". The
+stand-anchor is absolute; only the access method varies by product shape.
+
 ## Runtime lifecycle
 
 EXPLORER is `lifecycle: driven`. There is no persistent `/loop` agent
@@ -60,9 +77,10 @@ of them is a contract violation.
    greatminds stand lease --task <session-id> --worktree <path> --profile <enum>
    # → returns lease_id (UUID)
    ```
-   Wait for SK's inbox-info («stand lease <id> ready»), then run
-   your behavior probes yourself (curl / browser) — SK doesn't
-   receive product-check intent (information asymmetry by
+   Wait for SK's inbox-info («stand lease <id> ready»), then exercise
+   the product yourself ON the stand by whatever access its shape
+   requires (HTTP/browser for a web app, SSH for a host, etc.) — SK
+   doesn't receive product-check intent (information asymmetry by
    construction). When the iteration is done:
    ```
    greatminds stand release --lease-id <id> --result pass|fail|partial
@@ -70,8 +88,11 @@ of them is a contract violation.
    Record what you probed + observed in the `review_sessions/<id>.md`
    iteration block, NOT in the lease request. Pre-0245 stand_requests/
    was the old path; 0247 removes the queues.
-4. Walks each scenario on the live stand: opens the UI in a browser /
-   exercises APIs via curl using `<UI_DEV_URLS>` / `<BACKEND_URLS>`.
+4. Walks each scenario ON the live stand as a real user, via whatever
+   access the stand's shape requires — HTTP/browser/curl against its
+   URLs for a web product, SSH onto the host for a host-shaped stand,
+   or operating where the software is deployed. The access method
+   follows the product; the stand-anchor is absolute.
 5. For each behavior deviating from expectation, creates a bug as
    `feature_inbox/<seq>-<slug>.md` with:
    - `kind: bugfix`,

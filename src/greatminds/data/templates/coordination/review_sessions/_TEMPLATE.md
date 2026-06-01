@@ -20,12 +20,7 @@ stand_target:
   profile: full-deploy
   commit: <sha or current-working-tree>
 scenarios:
-  # 0331: EXPLORER surface is BLACK-BOX (deployed CLI + REST/browser on
-  # published URLs) ONLY — no ssh, no host filesystem, no docker, no
-  # kill/logout host-lifecycle steps. Route host-destructive lifecycle
-  # validation to STAND-KEEPER, not EXPLORER (schema.roles.EXPLORER
-  # review_session_surface / host_destructive_validation_owner).
-  - <scenario 1: black-box step — what to try via CLI/REST, what to expect>
+  - <scenario 1: what to try, what to expect>
   - <scenario 2: ...>
 status: open | concluded
 ---
