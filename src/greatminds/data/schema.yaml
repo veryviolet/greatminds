@@ -854,7 +854,23 @@ scenarios:
 # Read by greatminds watchdog. Times in seconds.
 # ---------------------------------------------------------------------------
 watchdog:
-  heartbeat_stale_seconds: 600          # 10 min
+  # 0330 (0311 Phase 5): heartbeat staleness is meaningful only relative
+  # to a role's EXPECTED cadence / max-idle. A heartbeat is touched while
+  # a role runs a tick; non-continuous roles legitimately idle between
+  # ticks (driven panes are idle bash between events; self-loop wakes on
+  # a long timer; interactive is human-paced). A single 600s global
+  # falsely flagged every alive-but-idle role stale (EXPLORER 0329:
+  # maintainer/tester/writer/explorer all "stale" while pids alive). So
+  # the threshold is per-lifecycle; the tight 600s default applies only
+  # to genuinely CONTINUOUS-signal roles (e.g. a UI fast heartbeat). The
+  # authoritative liveness check for event-driven roles is the dead-pid
+  # registry scan below, NOT heartbeat age. A role may also set
+  # roles.<ROLE>.heartbeat_stale_seconds for an explicit override.
+  heartbeat_stale_seconds: 600          # 10 min — continuous-signal roles only
+  heartbeat_stale_seconds_by_lifecycle:
+    self-loop: 4200                     # 70 min — MAINTAINER ~1h cadence + margin
+    driven: 14400                       # 4 h — workers idle between events (pane idle bash)
+    interactive: 86400                  # 24 h — human-paced (PLANNER); effectively excluded
   intent_orphan_seconds: 300            # 5 min
   task_stale_in_active_queue_seconds: 86400   # 24 h
   task_stale_in_review_queue_seconds: 43200   # 12 h
