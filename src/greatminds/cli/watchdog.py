@@ -65,6 +65,25 @@ def fmt_age(seconds: float) -> str:
     return f"{seconds / 86400:.1f}d"
 
 
+def _heartbeat_role_key(hb_name: str, roles_cfg: dict) -> str | None:
+    """0345: resolve a ``heartbeat.<suffix>`` filename to its schema role
+    key, or None when no role matches (legacy / non-role file).
+
+    The suffix is the lowercased hyphenated role name; a trailing
+    ``.fast`` (UI-DEVELOPER's parallel-pipeline heartbeat) is stripped
+    before matching. e.g. ``heartbeat.stand-keeper`` → STAND-KEEPER,
+    ``heartbeat.ui-developer.fast`` → UI-DEVELOPER. ``heartbeat.planner``
+    / ``heartbeat.review_sessions`` (window/queue names, not roles) →
+    None."""
+    suffix = hb_name.split(".", 1)[1] if "." in hb_name else hb_name
+    if suffix.endswith(".fast"):
+        suffix = suffix[: -len(".fast")]
+    for role_key in (roles_cfg or {}):
+        if isinstance(role_key, str) and role_key.lower() == suffix.lower():
+            return role_key
+    return None
+
+
 def _heartbeat_threshold(hb_name: str, roles_cfg: dict,
                          by_lifecycle: dict, default: float) -> float:
     """0330: resolve the stale threshold for a ``heartbeat.<role>`` file.
@@ -75,13 +94,9 @@ def _heartbeat_threshold(hb_name: str, roles_cfg: dict,
     (hyphenated) role name (e.g. ``heartbeat.stand-keeper`` →
     STAND-KEEPER); match it case-insensitively against the schema role
     keys. Unknown roles fall through to the default."""
-    suffix = hb_name.split(".", 1)[1] if "." in hb_name else hb_name
-    spec = None
-    for role_key, role_spec in (roles_cfg or {}).items():
-        if isinstance(role_key, str) and role_key.lower() == suffix.lower():
-            spec = role_spec if isinstance(role_spec, dict) else None
-            break
-    if spec is not None:
+    role_key = _heartbeat_role_key(hb_name, roles_cfg)
+    spec = (roles_cfg or {}).get(role_key) if role_key else None
+    if isinstance(spec, dict):
         override = spec.get("heartbeat_stale_seconds")
         if isinstance(override, (int, float)) and not isinstance(override, bool):
             return float(override)
@@ -128,10 +143,20 @@ def watchdog(project_dir: Path | None, canon_dir: Path | None, quiet: bool) -> N
     roles_cfg = schema.get("roles") or {}
     threshold = default_hb  # reused by the all-fresh message below
     stale_heartbeats: list[tuple[str, float, float]] = []
+    # 0345: heartbeat files that map to NO schema role (e.g. legacy
+    # ``heartbeat.planner`` / ``heartbeat.review_sessions`` — window /
+    # queue names left on a long-lived coordination dir, not role
+    # heartbeats) are NOT active-fleet liveness signals. Counting them
+    # stale falsely reports a healthy ready fleet as failing. Segregate
+    # them: report informationally, never as a finding.
+    non_role_heartbeats: list[tuple[str, float]] = []
     for hb in sorted(coord.glob("heartbeat.*")):
         if not hb.is_file():
             continue
         age = now - hb.stat().st_mtime
+        if _heartbeat_role_key(hb.name, roles_cfg) is None:
+            non_role_heartbeats.append((hb.name, age))
+            continue
         thr = _heartbeat_threshold(hb.name, roles_cfg, by_lifecycle,
                                    default_hb)
         if age > thr:
@@ -147,6 +172,10 @@ def watchdog(project_dir: Path | None, canon_dir: Path | None, quiet: bool) -> N
     elif not quiet:
         info(f"heartbeats: all fresh (default threshold "
              f"{fmt_age(default_hb)}; per-lifecycle overrides apply)")
+    if non_role_heartbeats and not quiet:
+        info(f"heartbeats: {len(non_role_heartbeats)} non-role/legacy "
+             f"file(s) ignored (not active-fleet liveness): "
+             f"{', '.join(n for n, _ in non_role_heartbeats)}")
 
     # ---- Orphaned intents
     threshold = thresholds["intent_orphan_seconds"]

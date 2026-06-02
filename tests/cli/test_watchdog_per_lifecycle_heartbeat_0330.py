@@ -89,6 +89,11 @@ def _canon(tmp_path: Path) -> Path:
             "MAINTAINER": {"lifecycle": "self-loop"},
             "TESTER": {"lifecycle": "driven"},
             "ARCHITECT-PLANNER": {"lifecycle": "interactive"},
+            # A real role with NO lifecycle entry → continuous-signal:
+            # keeps the tight 600s default (used by the continuous-signal
+            # test below). 0345: only KNOWN-role heartbeats are eligible
+            # to be flagged stale; non-role files are ignored.
+            "UI-DEVELOPER": {},
         },
         "watchdog": {
             "heartbeat_stale_seconds": 600,
@@ -163,16 +168,22 @@ def test_each_lifecycle_flagged_past_its_own_window(tmp_path: Path):
 
 
 def test_continuous_signal_role_keeps_tight_default(tmp_path: Path):
-    """A role with no lifecycle entry (continuous-signal / unknown) keeps
-    the tight 600s default and is flagged at 11min."""
+    """A KNOWN role with no lifecycle entry (continuous-signal) keeps the
+    tight 600s default and is flagged at 11min.
+
+    0345: the heartbeat must map to a real schema role — UI-DEVELOPER has
+    no lifecycle entry in the fixture, so it keeps the default. (A
+    non-role filename like the old ``heartbeat.ui-fast`` is now ignored
+    as legacy, not flagged — see test_watchdog_non_role_heartbeats_0345.)
+    """
     canon = _canon(tmp_path)
     project = _project(tmp_path)
     coord = project / "coordination"
-    _touch_age(coord / "heartbeat.ui-fast", 660)  # 11 min, no schema role
+    _touch_age(coord / "heartbeat.ui-developer", 660)  # 11 min, default thr
 
     result = _run(project, canon)
     assert result.exit_code == 0, result.output
-    assert "heartbeat.ui-fast" in _stale_section(result.output)
+    assert "heartbeat.ui-developer" in _stale_section(result.output)
 
 
 def test_dead_pid_still_flagged_regardless_of_heartbeat(tmp_path: Path):
