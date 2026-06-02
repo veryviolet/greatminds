@@ -4,6 +4,40 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.4.1 — 2026-06-02
+
+Patch release: brings the shipped EXPLORER codex profile in line with
+the 0336 stand-anchor. Until this patch lands on the fleet, EXPLORER's
+seeded codex profile keeps injecting a stale web-only boundary that
+overrides the canon and blocks on-stand validation.
+
+### Fixed
+
+- **0344 EXPLORER codex profile carries the 0336 stand-anchor.** The
+  shipped `src/greatminds/data/codex/profiles/explorer.config.toml`
+  `developer_instructions` still carried the stale web-only boundary
+  ("NEVER ssh into stand hosts. NEVER docker/docker compose. NEVER
+  ls/cat host filesystem. REST API + DB ... ONLY"), which the
+  running EXPLORER read at every turn via the seeded
+  `coordination/.codex-home/explorer/` layer. Replaced with the 0336
+  stand-anchor: EXPLORER always works ON the stand as a real user
+  whatever the product shape — HTTP/browser for web, ssh + host CLI
+  for host/CLI products, wherever deployed; host-destructive +
+  recovery scenarios are EXPLORER's on the disposable stand;
+  off-stand and local substitutes strictly forbidden. The
+  coordination-access CLI-only rule is retained as a separate,
+  correctly-scoped clause (it scopes `coordination/` I/O via the
+  greatminds CLI; it is NOT about probing the deployed product).
+  `[profiles.explorer]` table unchanged.
+
+  Operator migration: `greatminds setup` seeds
+  `coordination/.codex-home/explorer/` once without overwrite. For
+  the LIVE EXPLORER to stop injecting the stale boundary,
+  MAINTAINER / STAND-KEEPER must re-seed / refresh
+  `coordination/.codex-home/explorer/` from the corrected shipped
+  profile after upgrading the fleet to 1.4.1 (or the next on-avatar
+  deploy regenerates it).
+
 ## 1.4.0 — 2026-06-02
 
 Minor release closing the 0311 Phase 5 stand-robustness work + the DOD2
