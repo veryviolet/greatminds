@@ -9,7 +9,14 @@ Type=simple
 # via shutil.which). This makes per-project venv installs (`uv add
 # greatminds`) work without requiring a global ~/.local/bin/greatminds.
 ExecStart=__GREATMINDS_BIN__ coordd --project %i
-Restart=on-failure
+# 0346: Restart=always (was on-failure). coordd exits 0 on SIGTERM (its
+# loop catches KeyboardInterrupt and returns cleanly), so on-failure did
+# NOT restart it after an external `kill -TERM` — a killed coordd stayed
+# dead and the fleet lost its wake/drive daemon until manual restart.
+# `always` resurrects coordd after any external kill OR a crash, while a
+# deliberate `systemctl --user stop` is still honoured (systemd never
+# auto-restarts a commanded stop, regardless of Restart=).
+Restart=always
 RestartSec=2
 
 [Install]

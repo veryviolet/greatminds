@@ -222,7 +222,11 @@ def _template_unit_body() -> str:
         "[Service]\n"
         "Type=simple\n"
         f"ExecStart={exec_cmd} coordd --project %i\n"
-        "Restart=on-failure\n"
+        # 0346: always (not on-failure) — coordd exits 0 on SIGTERM, so
+        # on-failure left a killed coordd dead. always resurrects it
+        # after an external kill/crash; a commanded `systemctl stop` is
+        # still honoured.
+        "Restart=always\n"
         "RestartSec=2\n"
         "\n"
         "[Install]\n"
