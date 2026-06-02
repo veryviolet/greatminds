@@ -82,17 +82,15 @@ def test_command_start_writer_launch_is_driven() -> None:
 
 
 def test_all_codex_workers_now_driven() -> None:
-    """0323 + 0324: both codex WORKERS (EXPLORER, TECHNICAL-WRITER) are
-    driven. ARCHITECT-REVIEWER (codex) stays non-driven this phase."""
+    """All three codex workers — EXPLORER, TECHNICAL-WRITER, and
+    ARCHITECT-REVIEWER — are driven. The only non-driven codex seat is
+    PLANNER (interactive chat)."""
     by_role = {w.get("role"): w for w in
                (_coord_template().get("windows") or [])
                if isinstance(w, dict)}
-    assert by_role.get("EXPLORER", {}).get("mode") == "driven"
-    assert by_role.get("TECHNICAL-WRITER", {}).get("mode") == "driven"
-    reviewer = by_role.get("ARCHITECT-REVIEWER")
-    if reviewer is not None:
-        assert reviewer.get("mode") != "driven", (
-            "0324: ARCHITECT-REVIEWER stays non-driven this phase"
+    for role in ("EXPLORER", "TECHNICAL-WRITER", "ARCHITECT-REVIEWER"):
+        assert by_role.get(role, {}).get("mode") == "driven", (
+            f"codex worker {role} must be driven"
         )
 
 
@@ -104,11 +102,12 @@ def _env_setup():
         env_type=None, activation="", source="(test)")
 
 
-def test_launch_leaves_driven_writer_pane_idle(
+def test_launch_creates_no_window_for_driven_writer(
     tmp_path: Path, monkeypatch,
 ):
-    """0324: a mode=driven codex writer window must NOT receive a
-    start-agent send-keys — the pane stays idle bash for coordd."""
+    """A driven codex writer gets NO tmux pane — coordd runs each of its
+    turns as a managed subprocess. launch creates a window only for the
+    paned roles and skips the driven one entirely."""
     calls: list = []
     import subprocess as _sp
     monkeypatch.setattr(
@@ -124,20 +123,21 @@ def test_launch_leaves_driven_writer_pane_idle(
     cfg = {
         "session": "test",
         "windows": [
+            {"name": "maintainer", "role": "MAINTAINER", "tool": "claude",
+             "mode": "loop"},
             {"name": "writer", "role": "TECHNICAL-WRITER",
              "tool": "codex", "mode": "driven"},
         ],
     }
     launch_mod._emit_tmux(tmp_path, cfg, _env_setup(), recreate=False)
-    send_keys = [c for c in calls
-                 if c and c[0] == "tmux" and c[1] == "send-keys"]
-    for c in send_keys:
-        for arg in c:
-            if isinstance(arg, str):
-                assert "greatminds start-agent" not in arg, (
-                    "0324: driven codex pane must NOT receive a "
-                    f"start-agent command. Got: {arg}"
-                )
+    created = set()
+    for c in calls:
+        if "-n" in c:
+            created.add(c[c.index("-n") + 1])
+    assert "maintainer" in created, "paned role must get a window"
+    assert "writer" not in created, (
+        "driven codex role must NOT get a tmux window"
+    )
 
 
 # ---------- coordd drives the migrated writer via codex stdio ----------

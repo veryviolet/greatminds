@@ -1197,8 +1197,10 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     header("\nproject-root config:")
 
     # coord.yaml generation (init-style: never overwrite a user-edited file).
-    # The canonical 11-window roster lives in src/greatminds/data/coord.yaml.template;
-    # we substitute {SESSION, PROJECT_DIR} into it and write to <project>/coord.yaml.
+    # The canonical roster lives in src/greatminds/data/coord.yaml.template
+    # (3 paned roles — planner / maintainer / dashboard — plus the driven
+    # roles coordd runs as paneless subprocesses); we substitute
+    # {SESSION, PROJECT_DIR} into it and write to <project>/coord.yaml.
     coord_yaml_path = project_dir / "coord.yaml"
     resolved_session: str | None = None
     if coord_yaml_path.is_file():

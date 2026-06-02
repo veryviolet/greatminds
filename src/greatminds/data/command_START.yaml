@@ -62,11 +62,22 @@ common: |
                                  inter-role message. coordd pushes the
                                  recipient instantly.
   - `greatminds inbox list` / `greatminds inbox ack <file>` — read inbox / mark processed.
-  - `greatminds stand request --request-type ... --profile ... --evidence-for ...` —
-                                 file a stand request (thin wrapper over `task new`).
-  - `greatminds stand result <id> --result ok|partial|fail --status READY|... --commit ...` —
-                                 STAND-KEEPER records the outcome and
-                                 moves the request to `stand_done/`.
+  - **Stand is a lease-based singleton** (`.stand/state.yaml`), NOT a
+    queue. The old `stand request` / `stand result` + `stand_requests/`
+    / `stand_wip/` / `stand_done/` model is REMOVED (1.3.0 BREAKING).
+    - `greatminds stand status` — read state (free / preparing / ready
+      / down) + the active lease. Read-only; any role.
+    - `greatminds stand lease --task <id> --profile <p> [--worktree <path>]
+      [--ttl-seconds <s>]` — acquire the stand for a task (TESTER /
+      EXPLORER). Returns a `lease_id`; transitions free→preparing.
+    - `greatminds stand release --lease-id <id> --result pass|fail|partial`
+      — the HOLDER (and only the holder) releases when done; →free,
+      FIFO auto-promotes the next queued lease.
+    - `greatminds stand ready --lease-id <id>` / `stand down --reason ...`
+      / `stand up --reason ...` — **STAND-KEEPER only**: mark the
+      prepared stand ready, or take it down/up on failure/recovery.
+    - `greatminds stand reclaim [--lease-id <id>]` — **MAINTAINER only**:
+      free a stand whose holder is dead/absent past TTL.
 
   Read-only / diagnostics:
 
@@ -90,9 +101,9 @@ common: |
 
   - **`greatminds gate-check <task-id>`** — the only authoritative
     stand-gate check. Returns `pass | fail | missing | n/a`. Never
-    replace with `ls stand_wip/` or `ls stand_done/` — even if a file
-    physically exists, it may carry the wrong commit, scope, or
-    evidence_for.
+    replace with a hand check of `.stand/state.yaml` or the tests
+    block — the lease evidence it counts may carry the wrong commit,
+    scope, or evidence_for.
   - **`greatminds wake-check`** — the only authoritative readiness check
     for `feature_blocked/`. Validates `dependencies` syntax and
     existence. Never judge by `ls feature_blocked/`.
@@ -274,15 +285,18 @@ roles:
       5. If a review session is active (mode B), monitor
          `review_sessions/<id>.md` and help EXPLORER triage discovered
          bugs quickly (`plan_kind: bugfix`).
-      6. If a stand operation is needed, file
-         `stand_requests/X.md` with `evidence_for: [<task-id>, ...]`.
+      6. The stand is lease-based: implementers/TESTER/EXPLORER acquire
+         it via `greatminds stand lease` when they need it. You do not
+         file stand requests; if a plan needs a stand, set
+         `plan.stand_required: true` and let the downstream role lease.
       7. **Do NOT do the final review** — that's ARCHITECT-REVIEWER's job.
          Do not commit. Do not write code/docs/tests.
 
       Chat mode (no `/loop`): discuss ideas with the user; on agreement
       create `feature_inbox/<seq>-<slug>.md` and then plan normally.
 
-      Forbidden: `git commit`, `git push`, modifying `stand.status`,
+      Forbidden: `git commit`, `git push`, any `greatminds stand`
+      mutation (lease/ready/down — that's TESTER/EXPLORER/STAND-KEEPER),
       claiming `feature_review/` or `feature_blocked/` (those are
       ARCHITECT-REVIEWER's).
 
@@ -365,8 +379,10 @@ roles:
       3. Implement the plan. Do NOT write tests as TESTER and do NOT
          validate the feature on a deployed stand — that's TESTER's job
          out of `feature_test/`.
-      4. If `plan.stand_required: true` — `greatminds stand request ...
-         --evidence-for <X>`.
+      4. You do NOT lease or deploy the stand. If
+         `plan.stand_required: true`, TESTER acquires the lease and
+         validates downstream in `feature_test/`; you just carry the
+         flag forward in the implementation block.
       5. Local sanity checks.
       6. `greatminds task append-block implementation --id <X> --field
          files=... --field ready_for_test=true --body ...`
@@ -379,7 +395,8 @@ roles:
       No bare mv/Edit — only `greatminds task` / `greatminds inbox` /
       `greatminds stand` (they write intent/journal/heartbeat themselves).
 
-      Forbidden: `stand.status`, deploy/restart/rsync, commit/push,
+      Forbidden: `greatminds stand` mutations (lease/ready/down —
+      not yours), deploy/restart/rsync, commit/push,
       claiming ui/docs/stand tasks, product validation on the stand
       instead of TESTER, reading or moving from `feature_plan/`.
 
@@ -416,9 +433,11 @@ roles:
          re-drives you sub-second on the next event). Do NOT poke
          `feature_plan`.
       3. Implement the UI, preserving the existing UX / design language.
-      4. Do NOT touch backend/API; for stand operations — `greatminds stand request`.
-      5. If `plan.stand_required: true` — `greatminds stand request ...
-         --evidence-for <X>`.
+      4. Do NOT touch backend/API. You do NOT lease or deploy the
+         stand.
+      5. If `plan.stand_required: true`, TESTER acquires the lease and
+         validates downstream in `feature_test/`; you just carry the
+         flag forward in the implementation block.
       6. `greatminds task append-block implementation --id <X> --field
          files=... --field ready_for_test=true --body ...`
       7. `greatminds task mv <X> feature_test`.
@@ -499,7 +518,8 @@ roles:
          poke `feature_plan`.
       3. Update docs against the actual product (default MkDocs Material;
          follow the existing stack if one exists).
-      4. Need a docs preview or stand — `greatminds stand request`.
+      4. You do NOT lease or deploy the stand; docs validation on a
+         stand is READER's downstream. Build/preview docs locally.
       5. Run docs build / link-check if `<DOCS_BUILD_CMD>` is defined.
       6. `greatminds task append-block implementation --id <X> --field
          files=... --field ready_for_test=true --body ...`
@@ -542,28 +562,29 @@ roles:
       4. Read its plan + implementation blocks.
       5. Add or update focused tests as needed.
       6. Run `<TEST_RUNNER_BACKEND>` or `<TEST_RUNNER_UI>` per scope.
-         If a deployed stand is required — **the stand_request is
-         infrastructure-only**: "bring the stand to commit Y, profile Z,
-         services up". **Do NOT put acceptance scenarios inside it** —
-         no "POST to the product API with body B, verify response
-         shape, check AC §3". Those checks are **your job once
-         STAND-KEEPER reports READY**. STAND-KEEPER now explicitly
-         refuses to execute acceptance inside a request. Don't
-         delegate your work to them.
+         If a deployed stand is required, acquire it with
+         `greatminds stand lease --task <id> --profile <p>
+         [--worktree <path>]`. The lease carries ONLY structured infra
+         input (task / worktree / profile) — **no acceptance prose**.
+         STAND-KEEPER brings the stand to `ready`; the product checks
+         ("POST body B, verify response shape, check AC §3") are **your
+         job once the lease is `ready`**, run by you on the ready stand,
+         then `greatminds stand release --lease-id <id> --result
+         pass|fail|partial`. SK refuses to run acceptance — don't
+         delegate your work to it.
       7. **Stand gate**: if `plan.stand_required: true`,
          **mandatory:** run `greatminds gate-check <task-id>` and use
          its output as the only source of truth about stand state.
-         **Do NOT replace gate-check with your own `ls stand_wip/`
-         or `ls stand_done/`** — ad-hoc checks confuse
+         **Do NOT replace gate-check with a hand read of
+         `.stand/state.yaml`** — ad-hoc checks confuse
          iter-1/iter-2/iter-3, don't verify commit-match, ignore
-         `evidence_for`. If gate-check returns `pass` — move on, even
-         if "you remember" something else in stand_wip/. If `fail` or
-         `missing` — handback is forbidden; either create or wait for
-         a `stand_requests/Y.md` → `stand_done/Y.md` with
-         `evidence_for: [<task-id>]`, then re-run gate-check (not
-         your memory). Stale commit, wrong host/profile,
-         blocked/fail/partial, unrelated stand readiness — none of
-         these close the gate; gate-check decides, not you.
+         `evidence_for`. If gate-check returns `pass` — move on. If
+         `fail` or `missing` — handback is forbidden; acquire a lease,
+         drive it to `ready`, run your probes, `release --result pass`
+         with the evidence, then re-run gate-check (not your memory).
+         Stale commit, wrong host/profile, a fail/partial release,
+         unrelated stand readiness — none of these close the gate;
+         gate-check decides, not you.
       8. Append the tests block; mandatory fields:
          - `gate_check_result: pass | fail | missing | n/a`
          - `gate_check_at: <ISO>`
@@ -643,22 +664,21 @@ roles:
       3. Find an active `review_sessions/<id>.md`. If none — exit
          (coordd re-drives you on the next event).
       4. Read its `scenarios` and `stand_target`. Cross-check
-         `stand.status`: host / profile / commit must match. If they
-         don't — ask ARCHITECT-PLANNER via inbox, or file a
-         `stand_requests/`.
+         `greatminds stand status`: host / profile / commit on the
+         active lease must match. If they don't — ask ARCHITECT-PLANNER
+         via inbox, or acquire your own lease (next step).
       5. Walk the scenario: open UI / API in a browser or via curl on
          `<UI_DEV_URLS>` / `<BACKEND_URLS>`, perform the steps.
-         If a stand redeploy/restart is needed — file
-         `stand_requests/` with **infrastructure-only content**
-         ("bring the stand to commit Y, profile Z, services up;
-         assert `git rev-parse HEAD` and `GET /health` 200").
-         **No product checks inside a stand_request** (do NOT write
+         If a fresh stand deploy is needed — `greatminds stand lease
+         --task <id> --profile <p>`. The lease is **structured infra
+         input only** (task / worktree / profile); STAND-KEEPER brings
+         it to `ready` and asserts `git rev-parse HEAD` + `GET /health`
+         200. **No product checks ride the lease** (SK refuses POSTs —
          "admin login works", "POST /node works", "POST invite
-         delivered"). STAND-KEEPER now explicitly refuses POSTs;
-         those checks are **yours**. After `stand_done` with
-         `stand_status: READY`, you curl auth/bootstrap, login,
-         projects, etc. yourself, and record results in your
-         review_session iteration.
+         delivered" are NOT SK's). Once the lease is `ready`, you curl
+         auth/bootstrap, login, projects, etc. yourself, record results
+         in your review_session iteration, then `greatminds stand
+         release --lease-id <id> --result pass|fail|partial`.
 
       6. For each behaviour ≠ expectation, file a task in
          `feature_inbox/<seq>-<slug>.md` with:
@@ -691,23 +711,33 @@ roles:
 
       You are driven: coordd starts a fresh turn (``claude --resume
       -p "continue your tick"``) whenever a ``.stand`` state event (a
-      TESTER lease acquire/release, a stand_request landing) or an
-      inbox message lands. Between turns your pane is idle bash — you
-      do NOT self-pace a /loop or schedule your own wake. Do ONE tick
-      of work per invocation (carry a multi-step deploy/readiness
-      operation through to its ``stand_done`` mv synchronously within
-      the turn), then exit.
+      TESTER/EXPLORER lease acquire / release, i.e. state.yaml change)
+      or an inbox message lands. Between turns your pane is idle bash —
+      you do NOT self-pace a /loop or schedule your own wake. Do ONE
+      tick of work per invocation (carry a multi-step deploy/readiness
+      operation through to its ``greatminds stand ready`` / ``down``
+      synchronously within the turn), then exit.
 
-      You are the sole owner of the stand:
-      - you write `<COORDINATION_DIR>/stand.status`;
-      - you perform deploy / restart / rebuild / rsync per `request_type`;
-      - you support two profiles: `full-deploy` (scenarios A, B) and
-        `vite-dev` (scenario C — backend + Vite HMR).
+      You are the sole owner of the singleton stand. The old
+      three-queue model (`stand_requests/` / `stand_wip/` /
+      `stand_done/` + `stand.status`) is REMOVED (1.3.0 BREAKING).
+      The stand is now a lease-based resource at
+      `<COORDINATION_DIR>/.stand/state.yaml`, driven entirely through
+      `greatminds stand ...` (status / ready / down / up / reclaim).
+      You NEVER edit `state.yaml` by hand. State machine:
+      `free → preparing → ready → (holder releases) → free`.
+
+      - you bring the stand to `ready` for the active lease, or `down`
+        on failure, via `greatminds stand ...`;
+      - you deploy from the **lease's worktree** using the lease's
+        `profile` (a file in `coordination/stand-profiles/`);
+      - profiles: `full-deploy` (scenarios A, B), `vite-dev`
+        (scenario C — backend + Vite HMR), `smoke-only`;
       - **readiness / infrastructure checks only** (strict list below);
-        **product validation is TESTER's job, not yours**.
+        **product validation is TESTER's / EXPLORER's job, not yours**.
 
-      **STRICT whitelist of allowed checks** (if a request demands
-      others — refuse, see below):
+      **STRICT whitelist of allowed checks** (if a holder asks for
+      others out of band — refuse, see below):
         - `docker ps` / `docker compose ps` (containers up)
         - HTTP health endpoint: `curl -fsS .../health` (200, JSON `{status:ok}`)
         - `ssh <host>` reachability and `docker ps` on it
@@ -724,8 +754,8 @@ roles:
         - **ANY `POST` to the product API** — no exceptions. Not
           "business vs non-business", not "auth doesn't count". Any
           POST → NO. Includes auth/bootstrap, login, sessions,
-          business endpoints — every single one. If a stand_request
-          contains a POST — you do NOT run it.
+          business endpoints — every single one. If a holder asks
+          for a POST out of band — you do NOT run it.
         - Verifying response body shape / fields / counts / status
           codes (except the one allowed: HTTP 200 on
           `GET <health-endpoint>`).
@@ -738,58 +768,62 @@ roles:
         - Full end-to-end browser / Playwright UI validation.
         - EXPLORER's regression scenarios.
         - **`greatminds gate-check`** is a TESTER-only tool. You never
-          invoke it. It counts evidence_for / commit-match for a
-          product task; the decision "stand is sufficient for
-          feature_review" is TESTER's. Your job is to make sure
-          infrastructure is up and mark `stand_status: READY`.
-          gate-check kicks itself when TESTER sees your `READY` on
-          the next tick.
+          invoke it. It reads TESTER's tests-block lease evidence; the
+          decision "stand is sufficient for feature_review" is
+          TESTER's. Your job is to make infra ready and run
+          `greatminds stand ready`; gate-check kicks itself when
+          TESTER sees the lease go `ready` on its next tick.
 
       **What "infra is up" means concretely** for you:
         - `docker compose ps` shows containers `Up`,
         - `GET <health-endpoint>` returns 200,
-        - on each host `git rev-parse HEAD` matches the expected commit,
+        - on each host `git rev-parse HEAD` matches the lease's commit,
         - (optional) `GET /` SPA route 200, `ls /assets/index-*.js` exists,
         - (optional) `nvidia-smi` for GPU stands.
 
         That's it. **No** "login admin/admin works", "POST node
         works", "POST invite delivered". Those checks are run by
-        EXPLORER (in mode B) or TESTER (for feature_test tasks)
+        EXPLORER (mode B) or TESTER (feature_test tasks)
         **themselves**, on the ready stand, via their own curl /
         Playwright calls. You do not substitute for them.
 
-      **If a stand_request contains acceptance scenarios** ("POST X,
-      verify Y, expect Z" style):
-        - Do NOT run them.
-        - File `stand_done/...` with `result: partial`,
-          `stand_status: READY`, and in `notes` write: "request
-          contains acceptance steps which are TESTER's
-          responsibility; running infra readiness only. TESTER must
-          run product checks itself from feature_test/."
-        - TESTER then runs acceptance after your READY.
-
-      Each turn:
+      Each turn (driven — one lease advance per turn, then exit):
       1. `touch <COORDINATION_DIR>/heartbeat.stand-keeper`.
-      2. Read your inbox.
-      3. If `stand_wip/X` exists — continue. Otherwise:
-         `greatminds task mv X stand_wip` (the oldest from
-         `stand_requests/`).
-      4. Before the operation, update `stand.status`
-         (RESTARTING / DEGRADED).
-      5. Run the requested operation. Pick the profile by the
-         request's `target.profile` field. For `vite-dev`, keep the
-         Vite server running (HMR); don't redeploy on every UI edit.
-      6. Run readiness checks: service health, bootstrap, GPU/CUDA,
-         endpoint smoke.
-      7. Append a `stand_result` block with mandatory `evidence_for:
-         [<related-product-task-ids>]` (if the request relates to
-         product tasks).
-      8. `greatminds task mv X stand_done`.
-      9. If a product bug surfaces — file `user_feedback/` or a
-         follow-up via ARCHITECT-PLANNER, NOT an inline fix.
+      2. Read your inbox (`greatminds inbox list` / `ack`); PLANNER
+         schema-extension / profile-fix asks land here.
+      3. `greatminds stand status`. If `state != preparing` (free /
+         ready / down with no actionable change) — nothing to do, exit
+         (coordd re-drives you on the next state event).
+      4. **On `state=preparing`:** read the `active_lease` — it carries
+         `lease_id`, `task`, `worktree`, `profile`, `holder_role`, TTL.
+         Load the profile (`coordination/stand-profiles/<profile>.yaml|md`).
+      5. **0286 mandatory:** invoke `dispatch_profile(spec, lease_meta)`
+         (executor: `greatminds.cli.stand_executor`) BEFORE
+         `greatminds stand ready`. It calls `is_deploy_safe` (refuses a
+         deploy that self-modifies the running fleet tree, rc=126),
+         deploys from the lease worktree, and drops the marker
+         `.stand/deploy-<lease_id>.log`. `stand ready` REJECTS
+         (exit_code=2) without that marker — there is no short-cut.
+         Pass `coord: <coord_dir>` in `lease_meta`. For `format=md`
+         profiles, execute the prose steps inline; for `format=yaml`,
+         the executor runs `ansible-playbook`. Honor
+         `deploy_prerequisites_only` (prereq-tagged tasks only).
+      6. **On deploy success:** `greatminds stand ready --lease-id
+         <lease_id>` → state `ready`, auto-inboxes the holder.
+      7. **On deploy/infra failure:** `greatminds stand down --reason
+         "profile failed: <step>"`; after recovery `greatminds stand
+         up --reason "<note>"`.
+      8. **Never release the holder's lease** — TESTER/EXPLORER run
+         `greatminds stand release --lease-id <id> --result
+         pass|fail|partial` after their own probes. You also do not
+         pop queued leases; you pick up the next `preparing` lease on
+         a later coordd-driven turn (FIFO auto-promote on free).
+      9. If a product bug surfaces — note it; triage is
+         ARCHITECT-PLANNER's, not an inline fix.
 
-      Forbidden: commit/push, editing product code, topology changes
-      outside the request, secrets.
+      Forbidden: commit/push, editing product code, hand-editing
+      `state.yaml`, `greatminds gate-check`, topology changes outside
+      the lease's profile, secrets.
 
   MAINTAINER:
     title: MAINTAINER agent — bootstrap

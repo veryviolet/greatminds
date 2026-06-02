@@ -35,10 +35,10 @@ from greatminds.core.paths import find_canon_dir
 
 # Roles migrated to driven in this batch.
 MIGRATED = ["DEVELOPER", "UI-DEVELOPER", "TESTER", "STAND-KEEPER"]
-# Roles that MUST stay non-driven. (EXPLORER (0323/3c) + TECHNICAL-WRITER
-# (0324/3d) were here for Phase 2e but both codex workers were migrated
-# to driven — dropped. ARCHITECT-REVIEWER (codex) is not yet migrated.)
-UNTOUCHED = ["ARCHITECT-PLANNER", "MAINTAINER", "ARCHITECT-REVIEWER"]
+# Roles that MUST stay non-driven: only the two paned, resident seats.
+# Every worker — including the codex ones (ARCHITECT-REVIEWER, EXPLORER,
+# TECHNICAL-WRITER) — is driven.
+UNTOUCHED = ["ARCHITECT-PLANNER", "MAINTAINER"]
 
 
 def _schema() -> dict:
@@ -163,31 +163,33 @@ def _fake_run_collector(calls: list):
     ("dev", "DEVELOPER"), ("ui", "UI-DEVELOPER"),
     ("tester", "TESTER"), ("stand", "STAND-KEEPER"),
 ])
-def test_launch_leaves_driven_pane_idle(
+def test_launch_creates_no_window_for_driven_role(
     tmp_path: Path, monkeypatch, name: str, role: str,
 ):
-    """0319: a mode=driven window must NOT receive a start-agent
-    send-keys — the pane stays idle bash for coordd to drive."""
+    """A mode=driven role gets NO tmux pane — coordd runs each of its
+    turns as a managed subprocess. launch creates a window only for
+    the paned roles and skips the driven one entirely."""
     calls: list = []
     monkeypatch.setattr(
         launch_mod.subprocess, "run", _fake_run_collector(calls))
     cfg = {
         "session": "test",
         "windows": [
+            {"name": "maintainer", "role": "MAINTAINER", "tool": "claude",
+             "mode": "loop"},
             {"name": name, "role": role, "tool": "claude",
              "mode": "driven"},
         ],
     }
     launch_mod._emit_tmux(tmp_path, cfg, _env_setup(), recreate=False)
-    send_keys = [c for c in calls
-                 if c and c[0] == "tmux" and c[1] == "send-keys"]
-    for c in send_keys:
-        for arg in c:
-            if isinstance(arg, str):
-                assert "greatminds start-agent" not in arg, (
-                    f"0319: driven {role} pane must NOT receive a "
-                    f"start-agent command. Got: {arg}"
-                )
+    created = set()
+    for c in calls:
+        if "-n" in c:
+            created.add(c[c.index("-n") + 1])
+    assert "maintainer" in created, "paned role must get a window"
+    assert name not in created, (
+        f"driven {role} must NOT get a tmux window"
+    )
 
 
 # ---------- coordd drives the migrated roles ----------
@@ -233,23 +235,26 @@ def test_coordd_drives_developer_when_window_driven(
         tmp_path, role="DEVELOPER", queue="feature_dev",
         session_id="sess-dev")
 
-    spawned: list = []
-    monkeypatch.setattr(
-        cd, "_tmux_send_keys_driven",
-        lambda session, pane, argv: spawned.append(argv),
-    )
+    captured: list = []
+
+    def _fake_spawn(coord_, role_lower, session_id, pane, session_name,
+                    bf, verbose, *, reg=None, force_fresh=False, **kw):
+        captured.append((role_lower, session_id, force_fresh))
+        return (True, "test")
+
+    monkeypatch.setattr(cd, "_spawn_driven_turn", _fake_spawn)
     monkeypatch.setattr(
         "greatminds.cli._send_enter.press_enter",
         lambda *a, **kw: pytest.fail(
-            "0319: driven DEVELOPER must NOT use press_enter wake"),
+            "driven DEVELOPER must NOT use press_enter wake"),
     )
 
     woke = cd._route_queue_event(
         coord, canon, "feature_dev", "0001-x.yaml", verbose=False)
     assert woke is True
-    assert len(spawned) == 1
-    assert spawned[0][:2] == ["claude", "--resume"]
-    assert "sess-dev" in spawned[0]
+    assert len(captured) == 1
+    # Existing session → --resume continuation (not force-fresh).
+    assert captured[0] == ("developer", "sess-dev", False)
 
 
 def test_coordd_drives_stand_keeper_on_stand_event(
@@ -263,20 +268,22 @@ def test_coordd_drives_stand_keeper_on_stand_event(
         tmp_path, role="STAND-KEEPER", queue=".stand",
         session_id="sess-sk")
 
-    spawned: list = []
-    monkeypatch.setattr(
-        cd, "_tmux_send_keys_driven",
-        lambda session, pane, argv: spawned.append(argv),
-    )
+    captured: list = []
+
+    def _fake_spawn(coord_, role_lower, session_id, pane, session_name,
+                    bf, verbose, *, reg=None, force_fresh=False, **kw):
+        captured.append((role_lower, session_id, force_fresh))
+        return (True, "test")
+
+    monkeypatch.setattr(cd, "_spawn_driven_turn", _fake_spawn)
     monkeypatch.setattr(
         "greatminds.cli._send_enter.press_enter",
         lambda *a, **kw: pytest.fail(
-            "0319: driven STAND-KEEPER must NOT use press_enter wake"),
+            "driven STAND-KEEPER must NOT use press_enter wake"),
     )
 
     woke = cd._route_queue_event(
         coord, canon, ".stand", "state.yaml", verbose=False)
     assert woke is True
-    assert len(spawned) == 1
-    assert spawned[0][:2] == ["claude", "--resume"]
-    assert "sess-sk" in spawned[0]
+    assert len(captured) == 1
+    assert captured[0] == ("stand-keeper", "sess-sk", False)

@@ -39,3 +39,5 @@ The CLI validates schema, role permissions and transitions.
 
 [profiles.architect-planner]
 model = "gpt-5.5"
+approval_policy = "never"
+sandbox_mode = "danger-full-access"

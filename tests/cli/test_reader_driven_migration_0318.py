@@ -69,23 +69,17 @@ def test_command_start_reader_launch_is_driven() -> None:
 
 
 def test_non_driven_roles_stay_non_driven() -> None:
-    """0318 migrated READER first; 0319 then migrated the remaining
-    claude workers (DEV/UI-DEV/TESTER/STAND-KEEPER) as a batch. The
-    roles that are NOT part of the driven model — MAINTAINER
-    (self-loop) and the codex workers (Phase 3) — must still stay
-    non-driven. (This test originally pinned 'TESTER stays loop' for
-    the one-at-a-time phase; 0319 superseded that, so it now guards
-    the roles that genuinely remain non-driven.)"""
+    """Only the paned roles stay non-driven: ARCHITECT-PLANNER
+    (interactive chat) and MAINTAINER (self-loop watchdog). Every
+    worker — including the codex ones (ARCHITECT-REVIEWER, EXPLORER,
+    TECHNICAL-WRITER) — is driven."""
     doc = yaml.safe_load(
         (find_canon_dir() / "coord.yaml.template").read_text(
             encoding="utf-8")
     ) or {}
     by_role = {w.get("role"): w for w in (doc.get("windows") or [])
                if isinstance(w, dict)}
-    # NB: the codex workers EXPLORER (0323/3c) + TECHNICAL-WRITER
-    # (0324/3d) were migrated to driven — no longer in this non-driven
-    # set. ARCHITECT-REVIEWER (codex) is not yet migrated.
-    for role in ("MAINTAINER", "ARCHITECT-REVIEWER"):
+    for role in ("ARCHITECT-PLANNER", "MAINTAINER"):
         win = by_role.get(role)
         if win is not None:
             assert win.get("mode") != "driven", (
@@ -101,10 +95,12 @@ def _env_setup():
         env_type=None, activation="", source="(test)")
 
 
-def test_launch_leaves_driven_pane_idle(tmp_path: Path, monkeypatch):
-    """0318: a mode=driven role window must NOT receive a
-    start-agent send-keys — the pane stays idle bash for coordd to
-    drive."""
+def test_launch_creates_no_window_for_driven_role(
+    tmp_path: Path, monkeypatch,
+):
+    """Driven roles get NO tmux pane — coordd runs each of their turns
+    as a managed subprocess. launch creates a window only for the
+    paned roles and skips the driven one entirely."""
     calls: list = []
     import subprocess as _sp
     monkeypatch.setattr(
@@ -120,20 +116,21 @@ def test_launch_leaves_driven_pane_idle(tmp_path: Path, monkeypatch):
     cfg = {
         "session": "test",
         "windows": [
+            {"name": "maintainer", "role": "MAINTAINER", "tool": "claude",
+             "mode": "loop"},
             {"name": "reader", "role": "READER", "tool": "claude",
              "mode": "driven"},
         ],
     }
     launch_mod._emit_tmux(tmp_path, cfg, _env_setup(), recreate=False)
-    send_keys = [c for c in calls
-                 if c and c[0] == "tmux" and c[1] == "send-keys"]
-    for c in send_keys:
-        for arg in c:
-            if isinstance(arg, str):
-                assert "greatminds start-agent" not in arg, (
-                    "0318: driven pane must NOT receive a "
-                    f"start-agent command. Got: {arg}"
-                )
+    created = set()
+    for c in calls:
+        if "-n" in c:
+            created.add(c[c.index("-n") + 1])
+    assert "maintainer" in created, "paned role must get a window"
+    assert "reader" not in created, (
+        "driven role must NOT get a tmux window"
+    )
 
 
 def test_launch_non_driven_role_still_starts(tmp_path: Path, monkeypatch):
@@ -226,15 +223,19 @@ def test_driven_route_force_fresh_when_no_session(
         '{"role": "READER", "tool": "claude", "pid": 1}',
         encoding="utf-8")
 
-    spawned: list = []
-    monkeypatch.setattr(
-        cd, "_tmux_send_keys_driven",
-        lambda session, pane, argv: spawned.append(argv),
-    )
+    captured: dict = {}
+
+    def _fake_spawn(coord_, role_lower, session_id, pane, session_name,
+                    bf, verbose, *, reg=None, force_fresh=False, **kw):
+        captured.update(role=role_lower, session_id=session_id,
+                        force_fresh=force_fresh)
+        return (True, "test")
+
+    monkeypatch.setattr(cd, "_spawn_driven_turn", _fake_spawn)
     monkeypatch.setattr(
         "greatminds.cli._send_enter.press_enter",
         lambda *a, **kw: pytest.fail(
-            "0318: driven role with no session must spawn fresh, "
+            "driven role with no session must spawn fresh, "
             "NOT fall back to wake"),
     )
 
@@ -242,5 +243,8 @@ def test_driven_route_force_fresh_when_no_session(
         coord, canon, "feature_docs_review", "0001-x.yaml",
         verbose=False)
     assert woke is True
-    assert spawned, "0318: must spawn a fresh driven turn"
-    assert "--resume" not in spawned[0]
+    # No session_id in the registry → routing must request a FRESH
+    # session (force_fresh=True), not a --resume continuation.
+    assert captured.get("role") == "reader"
+    assert captured.get("session_id") == ""
+    assert captured.get("force_fresh") is True

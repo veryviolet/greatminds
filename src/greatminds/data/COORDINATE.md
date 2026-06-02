@@ -307,8 +307,8 @@ Convention:
   prerequisite section for MD. This is used when TESTER must verify the
   deployment pipeline itself after SK prepares only the host prerequisites.
 
-Schema source-of-truth: `schema.stand_profile` (added in 0277 / 0276 Phase A).
-Runtime loader + validator land in 0276 Phase B+.
+Schema source-of-truth: `schema.stand_profile`. The runtime loader and
+validator read profiles from there.
 
 ---
 
@@ -341,7 +341,7 @@ task bounces back to DEVELOPER / PLANNER. The §8 `gate_check_pass`
 rule still applies; this strict definition is **on top of**
 `gate_check_pass`, not in place of it.
 
-**0228: TESTER vs STAND-KEEPER role boundary.** STAND-KEEPER's readiness
+**TESTER vs STAND-KEEPER role boundary.** STAND-KEEPER's readiness
 records prove infrastructure only (container UP, version, `/health` 200,
 schema sane). They are NOT test results.
 TESTER's `tests` block on a `scope: backend|ui` task MUST also
@@ -442,10 +442,13 @@ is a way to ask a question without escalating to handback.
 
 `greatminds watchdog` reports:
 
-- stale heartbeats (older than `schema.watchdog.heartbeat_stale_seconds`),
 - orphaned intent files (older than `intent_orphan_seconds`),
+- registry entries whose `pid` is no longer alive,
 - tasks idle in active queues beyond the per-queue threshold,
-- tasks idle in review queues beyond the per-queue threshold.
+- tasks idle in review queues beyond the per-queue threshold,
+- orphan worktrees (no matching active task).
+
+Heartbeat is **not** a watchdog concern (see §12).
 
 The watchdog never moves files. `ARCHITECT-REVIEWER` is expected to run it
 each tick and follow up on findings.
@@ -454,22 +457,25 @@ each tick and follow up on findings.
 
 ## 12. Heartbeats
 
-Every active agent touches its heartbeat at least once every five minutes:
+A heartbeat is **not** a periodic-liveness signal. It is an
+**in-flight-turn hang detector**, owned by `coordd`:
 
 ```
 coordination/heartbeat.<role>
 ```
 
-See `schema.yaml roles.*.heartbeat` for the exact filename per role. The
-FAST-mode UI-DEVELOPER uses `heartbeat.ui-developer.fast` so it does not
-conflict with a parallel pipeline-mode UI-DEVELOPER.
-
-A stale heartbeat means "probably stalled". Recovery is simply the same
-role resuming and touching its heartbeat again.
+While `coordd` holds a driven role's run-lock — i.e. a turn is in flight —
+the turn's subprocess is expected to advance that role's heartbeat. If the
+run-lock has been held *and* the heartbeat has not advanced for longer than
+`schema.heartbeat.hang_threshold_seconds`, the turn is considered hung.
+`coordd` does **not** kill it; it escalates once to `MAINTAINER` (an inbox
+ask), and `MAINTAINER` decides what to do. A turn that completes normally
+releases the lock, so a cold heartbeat with no held lock is simply an idle
+role between turns — not a hang.
 
 ---
 
-## 12.5 Per-task worktrees (0185)
+## 12.5 Per-task worktrees
 
 Each task gets its own working tree under
 `<project_dir>/.worktrees/<task-id>/` on branch `task/<task-id>`.
@@ -508,8 +514,7 @@ Lifecycle:
   the task needs another amendment/review cycle.
 - `greatminds task mv ... archive` removes the task worktree.
 
-This replaces the 0115/0166 file-lock model. Lock-release handling from
-0166 is obsolete; operators should look in `.worktrees/` for in-flight
+There is no file-lock model: operators look in `.worktrees/` for in-flight
 code instead of looking for lock files. STAND-KEEPER rsyncs the worktree
 (not the main project tree) when the active stand lease names the task and
 worktree. Policy lives in `schema.yaml > worktrees:`.

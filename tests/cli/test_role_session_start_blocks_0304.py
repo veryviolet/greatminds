@@ -138,15 +138,16 @@ def test_session_start_precedes_owns_section() -> None:
 # ---------- MAINTAINER untouched ----------
 
 
-def test_maintainer_still_has_its_legacy_session_start_in_does() -> None:
-    """MAINTAINER's pre-existing 'At each session start' inside
-    ## Does is the reference pattern; 0304 must NOT delete it.
-    (We didn't add the 0304-tagged section here because
-    MAINTAINER's existing prose already covers the contract.)"""
+def test_maintainer_retains_its_per_tick_start_guidance() -> None:
+    """MAINTAINER is the reference pattern: its doc must keep explicit
+    start-of-tick guidance. As the self-loop watchdog it phrases this as
+    'At each self-loop tick' (plus a '## Bootstrap (self-loop)' block)
+    rather than the worker roles' '## Session start' heading."""
     text = (find_canon_dir() / "roles" / "MAINTAINER.md") \
         .read_text(encoding="utf-8")
-    assert "At each session start" in text or \
-        "## Session start" in text, (
-        "0304: MAINTAINER.md must retain its existing session-start "
-        "guidance"
-    )
+    assert (
+        "At each self-loop tick" in text
+        or "## Bootstrap (self-loop)" in text
+        or "At each session start" in text
+        or "## Session start" in text
+    ), "MAINTAINER.md must retain explicit start-of-tick guidance"

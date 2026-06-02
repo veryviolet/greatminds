@@ -80,14 +80,13 @@ def test_command_start_explorer_launch_is_driven() -> None:
 
 
 def test_non_driven_roles_stay_non_driven() -> None:
-    """0323 migrated EXPLORER; 0324 then migrated TECHNICAL-WRITER. The
-    roles that remain non-driven are ARCHITECT-REVIEWER (codex) and
-    MAINTAINER (self-loop). (This originally pinned 'TECHNICAL-WRITER
-    stays non-driven' for Phase 3c; 0324/Phase 3d superseded that.)"""
+    """Only the two paned, resident seats stay non-driven:
+    ARCHITECT-PLANNER (interactive chat) and MAINTAINER (self-loop).
+    Every worker, codex ones included, is driven."""
     by_role = {w.get("role"): w for w in
                (_coord_template().get("windows") or [])
                if isinstance(w, dict)}
-    for role in ("ARCHITECT-REVIEWER", "MAINTAINER"):
+    for role in ("ARCHITECT-PLANNER", "MAINTAINER"):
         win = by_role.get(role)
         if win is not None:
             assert win.get("mode") != "driven", (
@@ -103,11 +102,12 @@ def _env_setup():
         env_type=None, activation="", source="(test)")
 
 
-def test_launch_leaves_driven_explorer_pane_idle(
+def test_launch_creates_no_window_for_driven_explorer(
     tmp_path: Path, monkeypatch,
 ):
-    """0323: a mode=driven codex window must NOT receive a start-agent
-    send-keys — the pane stays idle bash for coordd to drive."""
+    """A driven codex role gets NO tmux pane — coordd runs each of its
+    turns as a managed subprocess. launch creates a window only for the
+    paned roles and skips the driven one entirely."""
     calls: list = []
     import subprocess as _sp
     monkeypatch.setattr(
@@ -123,20 +123,21 @@ def test_launch_leaves_driven_explorer_pane_idle(
     cfg = {
         "session": "test",
         "windows": [
+            {"name": "maintainer", "role": "MAINTAINER", "tool": "claude",
+             "mode": "loop"},
             {"name": "explorer", "role": "EXPLORER", "tool": "codex",
              "mode": "driven"},
         ],
     }
     launch_mod._emit_tmux(tmp_path, cfg, _env_setup(), recreate=False)
-    send_keys = [c for c in calls
-                 if c and c[0] == "tmux" and c[1] == "send-keys"]
-    for c in send_keys:
-        for arg in c:
-            if isinstance(arg, str):
-                assert "greatminds start-agent" not in arg, (
-                    "0323: driven codex pane must NOT receive a "
-                    f"start-agent command. Got: {arg}"
-                )
+    created = set()
+    for c in calls:
+        if "-n" in c:
+            created.add(c[c.index("-n") + 1])
+    assert "maintainer" in created, "paned role must get a window"
+    assert "explorer" not in created, (
+        "driven codex role must NOT get a tmux window"
+    )
 
 
 # ---------- coordd drives the migrated EXPLORER via codex stdio ----------

@@ -348,34 +348,46 @@ def test_install_claude_pretrust_handles_malformed_json(tmp_path, monkeypatch):
     assert "unreadable" in result
 
 
-def test_shipped_codex_profiles_carry_heartbeat_directive():
-    """Regression for task 0060: every shipped codex profile MUST tell
-    the agent to call a read-only greatminds CLI at the FIRST step of
-    every tick. The CLI's side-effect is the heartbeat write that
-    coordd / watchdog / stalled_agent_sweep depend on. Without this,
-    codex agents on the avatar fleet never wrote heartbeat.<role>
-    (TESTER's 0051 cell 3 finding)."""
+def test_driven_codex_profiles_carry_heartbeat_directive():
+    """Every DRIVEN codex role's profile MUST tell the agent to call a
+    read-only greatminds CLI at the FIRST step of every tick. That
+    call's side effect is the heartbeat write that coordd's in-flight-
+    turn hang detector reads while the role's run-lock is held — without
+    it a long driven turn would look hung.
+
+    Interactive / self-loop roles (the PLANNER chat seat, the MAINTAINER
+    watchdog) run no coordd-driven turns, so the per-tick heartbeat
+    directive does not apply to them and their profiles are exempt."""
+    import yaml
     from greatminds.core.paths import find_canon_dir
-    profiles_dir = find_canon_dir() / "codex" / "profiles"
+    canon = find_canon_dir()
+    roles = (yaml.safe_load(
+        (canon / "schema.yaml").read_text(encoding="utf-8")) or {}
+    ).get("roles") or {}
+    profiles_dir = canon / "codex" / "profiles"
     profiles = list(profiles_dir.glob("*.config.toml"))
     assert profiles, "no shipped codex profiles found"
+    checked = 0
     for p in profiles:
+        role_lower = p.stem.replace(".config", "")
+        if (roles.get(role_lower.upper()) or {}).get("lifecycle") != "driven":
+            continue
+        checked += 1
         text = p.read_text(encoding="utf-8")
-        # Required header anchor — same wording shipped by PLANNER's plan body.
         assert "## Mandatory tick heartbeat" in text, (
             f"{p.name} missing heartbeat header"
         )
-        # Must instruct an explicit greatminds CLI call.
-        assert "greatminds task list" in text, (
-            f"{p.name} missing 'greatminds task list <queue>' directive"
+        # The directive must instruct a read-only greatminds CLI call as
+        # the heartbeat-writing first step. The exact command is
+        # role-specific (e.g. ``greatminds task list <queue>`` for a
+        # queue-claiming worker, ``greatminds stand status`` for SK).
+        assert "greatminds " in text, (
+            f"{p.name} missing a read-only greatminds CLI directive"
         )
-        # Must reference the role's heartbeat file explicitly so the
-        # operator/agent can connect the dots.
-        role_lower = p.stem.replace(".config", "")
         assert f"heartbeat.{role_lower}" in text, (
             f"{p.name} missing 'heartbeat.{role_lower}' reference"
         )
-        # Must emphasize first-step-every-tick.
         assert "FIRST step of every tick" in text, (
             f"{p.name} missing first-step-every-tick emphasis"
         )
+    assert checked, "expected at least one driven codex profile to check"

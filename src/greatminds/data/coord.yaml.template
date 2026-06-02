@@ -4,89 +4,66 @@
 # `session` MUST be unique per project on a single user — the systemd
 # template unit instance name (greatminds-daemon@<session>.service) and the
 # tmux session name both derive from it.
+#
+# Two kinds of entries under `windows:`:
+#   - PANE roles (mode: chat | loop) get a real tmux window. Only the
+#     human-facing / resident roles are paned: PLANNER (interactive
+#     chat), MAINTAINER (self-loop watchdog), plus the `dashboard`
+#     placeholder pane (a future daemon-rendered task-status table).
+#   - DRIVEN roles (mode: driven) get NO tmux window. coordd runs each
+#     of their turns as a managed subprocess (claude -p / codex
+#     app-server), holds the per-role run-lock for the turn, and
+#     captures output to coordination/.turns/<role>-<ts>.log. They are
+#     listed here only so coordd knows each role's tool (claude/codex);
+#     `greatminds launch` skips creating a window for them.
 session: __SESSION__
 project_dir: __PROJECT_DIR__
 windows:
+  # --- paned, human-facing / resident roles ---
   - name: planner
     role: ARCHITECT-PLANNER
     tool: codex
     mode: chat
+  - name: maintainer
+    role: MAINTAINER
+    tool: claude
+    mode: loop
+  - name: dashboard
+    role: ""
+    tool: bash
+    # Placeholder pane. A later change has the daemon render a live
+    # task-status table here; for now it is a plain project shell.
+    mode: dashboard
+  # --- driven roles (no pane; coordd drives each turn as a subprocess) ---
   - name: reviewer
     role: ARCHITECT-REVIEWER
     tool: codex
-    mode: loop
+    mode: driven
   - name: dev
     role: DEVELOPER
     tool: claude
-    # 0319 (0311 Phase 2e): the remaining claude workers — DEVELOPER,
-    # UI-DEVELOPER, TESTER, STAND-KEEPER — migrate to the driven
-    # lifecycle in one batch (the mechanism was proven by READER/0318
-    # on avatar; only the per-role config differs). coordd spawns each
-    # turn via ``claude --resume -p`` on inbox/queue events; the pane
-    # is idle bash between turns (no persistent /loop agent). PLANNER
-    # (interactive), MAINTAINER (self-loop safety net) and the codex
-    # roles (REVIEWER/TECHNICAL-WRITER/EXPLORER — Phase 3) are NOT
-    # touched.
     mode: driven
   - name: ui
     role: UI-DEVELOPER
     tool: claude
-    # 0319 (0311 Phase 2e): migrated to driven in the batch above.
     mode: driven
   - name: writer
     role: TECHNICAL-WRITER
     tool: codex
-    # 0324 (0311 Phase 3d): TECHNICAL-WRITER is the last CODEX worker
-    # migrated to the driven lifecycle (after EXPLORER/0323) — coordd
-    # drives each turn through a fresh ``codex app-server`` over stdio
-    # (0321 stdio-per-turn driver) on inbox/queue events; the pane is
-    # idle bash between turns (no persistent /loop). PLANNER /
-    # MAINTAINER / ARCHITECT-REVIEWER / claude workers are untouched.
     mode: driven
   - name: tester
     role: TESTER
     tool: claude
-    # 0319 (0311 Phase 2e): migrated to driven in the batch above.
     mode: driven
   - name: reader
     role: READER
     tool: claude
-    # 0318 (0311 Phase 2d): READER is the first role migrated to the
-    # driven lifecycle — coordd spawns each turn via
-    # ``claude --resume -p`` on inbox/queue events; the pane is idle
-    # bash between turns (no persistent /loop agent). Other claude
-    # workers migrate one-at-a-time in later phases after READER
-    # verifies on avatar.
     mode: driven
   - name: explorer
     role: EXPLORER
     tool: codex
-    # 0323 (0311 Phase 3c): EXPLORER is the first CODEX worker migrated
-    # to the driven lifecycle — coordd drives each turn through a fresh
-    # ``codex app-server`` over stdio (0321 stdio-per-turn driver) on
-    # inbox/queue events; the pane is idle bash between turns (no
-    # persistent /loop). TECHNICAL-WRITER (codex) migrates in a later
-    # phase; PLANNER / MAINTAINER / claude workers are untouched.
     mode: driven
   - name: stand
     role: STAND-KEEPER
     tool: claude
-    # 0319 (0311 Phase 2e): migrated to driven in the batch above.
-    # STAND-KEEPER's ``.stand`` state events (TESTER lease acquire /
-    # release) now drive a turn via ``claude --resume -p`` instead of
-    # a press_enter wake. Behavioural proof for the batch is on the
-    # representative role (DEVELOPER) on avatar; SK is confirmed at
-    # the config + argv-driver level (see 0319 plan GATE step 3).
     mode: driven
-  - name: maintainer
-    role: MAINTAINER
-    tool: claude
-    # 0314 (0311 Phase 1b): MAINTAINER is now a self-loop watchdog
-    # (lifecycle: self-loop). It runs a periodic health-check tick
-    # (restart dead agents / coordd, escalate stalls to PLANNER)
-    # instead of waiting passively in chat. USER reaches infra
-    # topics via ARCHITECT-PLANNER, who forwards.
-    mode: loop
-  - name: ops
-    role: ""
-    tool: bash

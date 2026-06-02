@@ -10,14 +10,39 @@
 version: 1
 
 # ---------------------------------------------------------------------------
+# Glossary
+#
+# Single home for the text definition of every token used elsewhere in
+# this file. A section that references a token (roles, queues, steps,
+# enums, …) carries ONLY the token; its meaning is defined here, once.
+# Agents read schema.yaml directly and resolve tokens against this
+# glossary — there is no separate render step.
+# ---------------------------------------------------------------------------
+glossary:
+  roles:
+    ARCHITECT-PLANNER: "Intake triage, planning (writes the plan block, sets stand_required), and per-scope routing from feature_plan to feature_dev / feature_ui_dev / feature_docs. Interactive chat partner for the USER. Writes review_sessions but does not claim from it — EXPLORER owns review-session iteration."
+    ARCHITECT-REVIEWER: "Final review with stand-evidence verification (gate_check result in the tests block), commit, and push if policy allows. Owns feature_blocked wake-up: runs greatminds wake-check at the start of each tick."
+    DEVELOPER: "Backend / product-code implementation. Claims from feature_dev/ (placed there by ARCHITECT-PLANNER routing scope:backend tasks)."
+    UI-DEVELOPER: "UI implementation. Pipeline mode claims from feature_ui_dev/ (placed there by ARCHITECT-PLANNER routing scope:ui tasks), writes the implementation block, hands off to feature_test/. A FAST chat variant (scenario C, Vite HMR) does not claim from the queue."
+    TECHNICAL-WRITER: "Documentation implementation. Claims from feature_docs/ (placed there by ARCHITECT-PLANNER routing scope:docs tasks); hands off to feature_docs_review/."
+    TESTER: "Validates implemented features on a deployed stand. Acquires the stand by lease, probes once it is ready, and runs greatminds gate-check before mv to feature_review/."
+    READER: "Reads docs as a fresh user; validates clarity and accuracy; routes the result out of feature_docs_review/."
+    EXPLORER: "Uses the live system on the stand as a real user (scenario B), whatever the stand's shape. Files bugs as kind:bugfix tasks in feature_inbox/."
+    STAND-KEEPER: "Owns the singleton stand resource (state.yaml-driven, lease-based). Brings the active lease to ready via a deploy profile, or down on failure. Supports profiles full-deploy (scenarios A, B), vite-dev (scenario C — backend + Vite HMR), and smoke-only."
+    USER: "Writes user_feedback/ or initiates an ARCHITECT-PLANNER chat. Never creates implementation tasks directly."
+    MAINTAINER: "System operator, self-loop watchdog. Handles infrastructure the product pipeline cannot self-heal: agent restart, dead-pid recovery, greatminds CLI + schema.yaml maintenance, cutover orchestration. Receives asks at inbox/maintainer/ from coordd and from product agents when an issue is structural/schema rather than product. Sweeps PROACTIVELY every tick (an empty inbox is NOT 'nothing to do'): reclaims stale stand leases past TTL with a dead/absent holder, restarts dead agents and coordd, and escalates stalled task/queue chains to ARCHITECT-PLANNER. Does NOT claim product queues, triage user_feedback, or write plans."
+    BOT-USER: "Bot-stream entry; independent of the product pipeline."
+    BOT-DEVELOPER: "Bot-stream implementer; independent of the product pipeline."
+
+# ---------------------------------------------------------------------------
 # Queues
 #
 # Each queue is a directory under coordination/. Field meanings:
 #
 #   owner    — role responsible for the queue's content AND the single
 #              role that claims from it (moves files out). Location =
-#              ownership; ambiguity by content fields (scope, etc.) was
-#              removed in the R8 refactor.
+#              ownership; content fields (scope, etc.) never determine
+#              ownership.
 #   writers  — roles allowed to write into the queue (own files + add
 #              blocks to files they own).
 #   kind     — `active` (normal hand-off point), `parking` (waiting on
@@ -100,12 +125,12 @@ queues:
       live-stand exploration, files bugs as feature_inbox entries.
       ARCHITECT-PLANNER writes the initial session file (target,
       scenarios, stand_target) but does NOT claim from this queue.
-  # 0247 (0242e / 1.3.0 BREAKING): stand_requests, stand_wip,
-  # stand_done queues REMOVED. The lease-based singleton stand
-  # resource (schema.stand.resource + .stand/state.yaml) replaces
-  # the three-queue model. See 0242 for the full design rationale.
+  # 1.3.0 BREAKING: the stand_requests / stand_wip / stand_done
+  # queues are REMOVED. The lease-based singleton stand resource
+  # (schema.stand.resource + .stand/state.yaml) replaces the
+  # three-queue model.
   #
-  # 0269: ``.stand`` is the inotify watch path for state.yaml lease
+  # ``.stand`` is the inotify watch path for state.yaml lease
   # lifecycle events (free → preparing → ready → released → free).
   # It is NOT a claim-from queue — STAND-KEEPER's loop reads the
   # state file directly via the lease API. Listing it here lets
@@ -150,11 +175,11 @@ queues:
 # ---------------------------------------------------------------------------
 # Roles
 #
-# Each role lists its category, launch modes, heartbeat filename, and the
-# queues it may claim from. Roles with `launch_modes` containing `chat` may be
-# started without a /loop body for interactive use.
+# Each role lists its category, lifecycle, and the queues it may claim
+# from. `lifecycle` (interactive | self-loop | driven) is how the agent
+# is woken; launch mechanics = f(lifecycle, coord.yaml tool).
 # ---------------------------------------------------------------------------
-# 0288: per-role machine-readable contracts.
+# Per-role machine-readable contracts.
 #
 # Each role declares:
 #   - responsibilities: list[str]      — high-level duties.
@@ -172,29 +197,19 @@ queues:
 roles:
   ARCHITECT-PLANNER:
     category: product
-    # 0312 (0311 Phase 1a): lifecycle classifies how the agent is
-    # driven — interactive (human-paced chat), self-loop (wakes
-    # itself on a timer), or driven (woken by coordd on queue +
-    # inbox events). Orthogonal to coord.yaml's `tool`. Phase 2/3
-    # selects launch mechanics as f(lifecycle, tool).
+    # lifecycle classifies how the agent is driven — interactive
+    # (human-paced chat), self-loop (wakes itself on a timer), or
+    # driven (woken by coordd on queue + inbox events). Orthogonal
+    # to coord.yaml's `tool`; launch mechanics = f(lifecycle, tool).
     lifecycle: interactive
-    launch_modes: [chat, loop]
-    heartbeat: heartbeat.architect-planner
     claims_from: [user_feedback, feature_inbox, feature_plan]
-    description: |
-      Intake triage, planning (writes plan block, sets stand_required),
-      and per-scope routing from feature_plan to feature_dev /
-      feature_ui_dev / feature_docs. Interactive chat partner for the
-      user. Writes to review_sessions but does not claim from it —
-      EXPLORER owns review-session iteration.
     responsibilities:
       - triage_user_feedback
       - write_plan_blocks
       - route_tasks_per_scope
       - chat_partner_for_user
       - file_review_sessions
-      # 0297: fresh-install gap closure — PLANNER must know about
-      # the stand-profile mechanism out of the box.
+      # PLANNER must know the stand-profile mechanism out of the box.
       - coordinate_stand_profile_tasks_via_schema_and_canon
       - file_schema_extension_task_on_lease_enum_block
     forbidden_actions:
@@ -215,9 +230,8 @@ roles:
         - write_plan_block
         - set_stand_required
         - route_to_feature_dev_or_feature_ui_dev_or_feature_docs
-      # 0297: stand_down classifiers — PLANNER reads SK's
-      # auto-notification (0291) and routes the fix per the
-      # down_reason signature.
+      # stand_down classifiers — PLANNER reads SK's auto-notification
+      # and routes the fix per the down_reason signature.
       on_stand_down_yaml_playbook_error:
         - read_down_reason_from_inbox_info
         - file_bugfix_task_for_coordination_stand_profiles_yaml
@@ -233,13 +247,7 @@ roles:
   ARCHITECT-REVIEWER:
     category: product
     lifecycle: driven
-    launch_modes: [loop]
-    heartbeat: heartbeat.architect-reviewer
     claims_from: [feature_review, feature_blocked]
-    description: |
-      Final review with stand-evidence verification (via greatminds gate-check
-      result in tests block), commit, push if policy allows. Owns
-      feature_blocked wake-up: runs greatminds wake-check at start of each tick.
     responsibilities:
       - verify_evidence_chain
       - commit_and_merge
@@ -266,12 +274,7 @@ roles:
   DEVELOPER:
     category: product
     lifecycle: driven
-    launch_modes: [loop]
-    heartbeat: heartbeat.developer
     claims_from: [feature_dev]
-    description: |
-      Backend/product-code implementation. Picks up from feature_dev/
-      (placed there by ARCHITECT-PLANNER routing scope:backend tasks).
     responsibilities:
       - implement_backend_features
       - write_unit_tests
@@ -291,18 +294,7 @@ roles:
   UI-DEVELOPER:
     category: product
     lifecycle: driven
-    launch_modes: [loop, chat]
-    heartbeat: heartbeat.ui-developer
-    heartbeat_fast: heartbeat.ui-developer.fast
     claims_from: [feature_ui_dev]
-    description: |
-      UI implementation. Two modes:
-      - loop: pipeline mode, claims from feature_ui_dev (placed there by
-        ARCHITECT-PLANNER routing scope:ui tasks); writes implementation
-        block; hands off to feature_test.
-      - chat: scenario C (UI rapid iteration with Vite HMR). Does NOT
-        claim from feature_ui_dev; touches heartbeat.ui-developer.fast
-        instead of the pipeline heartbeat to avoid contention.
     responsibilities:
       - implement_ui_features
       - run_ui_tests
@@ -320,12 +312,7 @@ roles:
   TECHNICAL-WRITER:
     category: product
     lifecycle: driven
-    launch_modes: [loop]
-    heartbeat: heartbeat.technical-writer
     claims_from: [feature_docs]
-    description: |
-      Documentation implementation. Picks up from feature_docs/
-      (placed there by ARCHITECT-PLANNER routing scope:docs tasks).
     responsibilities:
       - write_documentation
       - file_implementation_block
@@ -341,12 +328,7 @@ roles:
   TESTER:
     category: product
     lifecycle: driven
-    launch_modes: [loop]
-    heartbeat: heartbeat.tester
     claims_from: [feature_test]
-    description: |
-      Tests code on a deployed stand. Before mv to feature_review must
-      run greatminds gate-check and record the result in the tests block.
     responsibilities:
       - probe_feature_on_deployed_stand
       - fill_real_stand_evidence
@@ -356,7 +338,7 @@ roles:
       - run_ansible_locally
       - fill_fake_stand_evidence
       - claim_outside_feature_test
-      # 0333: TESTER's only execution surface is SSH probes against the
+      # TESTER's only execution surface is SSH probes against the
       # DEPLOYED stand — never a local test run. `uv run`/`uv run
       # --active` from a worktree syncs it into the active fleet venv
       # (.venv-coord), dangling its editable .pth on worktree prune →
@@ -375,10 +357,7 @@ roles:
   READER:
     category: product
     lifecycle: driven
-    launch_modes: [loop]
-    heartbeat: heartbeat.reader
     claims_from: [feature_docs_review]
-    description: Reads docs as a fresh user; validates clarity and accuracy.
     responsibilities:
       - validate_doc_clarity_as_fresh_user
       - append_reader_review_block
@@ -394,13 +373,8 @@ roles:
   EXPLORER:
     category: product
     lifecycle: driven
-    launch_modes: [loop]
-    heartbeat: heartbeat.explorer
     claims_from: [review_sessions]
-    description: |
-      Uses the live system on the stand as a real user (scenario B).
-      Files bugs as plan_kind: bugfix tasks in feature_inbox.
-    # 0336: STAND-ANCHOR (absolute). EXPLORER ALWAYS works ON the stand
+    # STAND-ANCHOR (absolute). EXPLORER ALWAYS works ON the stand
     # as a real user, WHATEVER the stand's shape — the access method
     # follows the product (HTTP/browser for a web app, SSH for a host,
     # or wherever the software is deployed); host-destructive/recovery
@@ -426,18 +400,10 @@ roles:
   STAND-KEEPER:
     category: service
     lifecycle: driven
-    launch_modes: [loop]
-    heartbeat: heartbeat.stand-keeper
-    # 0247: stand_requests queue removed; SK now watches
-    # coordination/.stand/state.yaml for lease grants (event-driven
-    # via coordd inotify on .stand/).
+    # No stand queue: SK watches coordination/.stand/state.yaml for
+    # lease grants (event-driven via coordd inotify on .stand/).
     claims_from: []
     profiles: [full-deploy, vite-dev]
-    description: |
-      Owns the singleton stand resource (state.yaml-driven, post-0247).
-      Supports two profiles:
-      - full-deploy: backend deploy on remote stand (scenarios A, B).
-      - vite-dev: backend + Vite dev server with HMR (scenario C).
     responsibilities:
       - serve_singleton_stand_via_lease
       - deploy_via_profile_executor
@@ -459,12 +425,7 @@ roles:
     category: entry
     # USER is the human entry point — interactive by definition.
     lifecycle: interactive
-    launch_modes: [chat]
-    heartbeat: heartbeat.user
     claims_from: []
-    description: |
-      Writes user_feedback or initiates ARCHITECT-PLANNER chat. Never
-      creates implementation tasks directly.
     responsibilities:
       - file_user_feedback
       - chat_with_planner
@@ -475,29 +436,11 @@ roles:
     event_triggers: {}
   MAINTAINER:
     category: system
-    # 0312: MAINTAINER is self-loop — it wakes itself to drain its
-    # inbox + run recovery (no queue-claim, USER-absent operation).
-    # launch_modes is loop (self-loop watchdog), not chat — it
-    # self-paces a recovery tick, it is not a human-paced chat seat.
+    # MAINTAINER is self-loop — it wakes itself to drain its inbox +
+    # run recovery (no queue-claim, USER-absent operation). It
+    # self-paces a recovery tick; it is not a human-paced chat seat.
     lifecycle: self-loop
-    launch_modes: [loop]
-    heartbeat: heartbeat.maintainer
     claims_from: []
-    description: |
-      System operator. Handles infrastructure work the product pipeline
-      cannot self-heal: agent restart, dead-pid recovery, bin/* and
-      schema.yaml maintenance, cutover orchestration, USER chat partner
-      for infra topics. Receives asks at inbox/maintainer/ from coordd
-      (dead pids, stand-blocked escalation) and from product agents
-      when their issue is structural/schema rather than product.
-      Does NOT claim from any product queue; does NOT triage user_feedback
-      or write plans (that is ARCHITECT-PLANNER's job).
-      As a self-loop watchdog MAINTAINER also sweeps PROACTIVELY on
-      every tick (not only when an inbox ask arrives): it reclaims stale
-      stand leases that are past TTL with a dead/absent holder, restarts
-      dead agents and coordd, and escalates stalled task/queue chains to
-      ARCHITECT-PLANNER. An empty inbox is NOT "nothing to do" — the sweep
-      still runs.
     responsibilities:
       - agent_restart
       - dead_pid_recovery
@@ -527,10 +470,7 @@ roles:
   BOT-USER:
     category: bot
     lifecycle: driven
-    launch_modes: [loop]
-    heartbeat: heartbeat.bot-user
     claims_from: [bot_done, bot_verified]
-    description: Bot stream entry; not touched in this refactor.
     responsibilities:
       - verify_bot_output
     forbidden_actions:
@@ -542,10 +482,7 @@ roles:
   BOT-DEVELOPER:
     category: bot
     lifecycle: driven
-    launch_modes: [loop]
-    heartbeat: heartbeat.bot-developer
     claims_from: [bot_inbox]
-    description: Bot stream implementer; not touched in this refactor.
     responsibilities:
       - implement_bot_change
     forbidden_actions:
@@ -565,7 +502,7 @@ roles:
 # the move is legal.
 # ---------------------------------------------------------------------------
 transitions:
-  # `requires:` is LOAD-BEARING since task 0103. Each name must have a
+  # `requires:` is LOAD-BEARING. Each name must have a
   # registered validator in cli/task.py SCHEMA_REQUIRES_VALIDATORS;
   # unknown names raise an error at mv time (no silent documentary
   # keys). The validators run AFTER can_role_move and after the
@@ -600,7 +537,7 @@ transitions:
     to: archive
     by: ARCHITECT-PLANNER
     requires: []
-  # Task 0102: review_sessions archive requires terminal-state evidence
+  # review_sessions archive requires terminal-state evidence
   # (at least one session_iteration block, or a blocked block whose
   # reason names "withdrawn"/"abandoned"/"obsoleted"). Prevents a
   # single role silently wiping an empty or in-progress session.
@@ -614,7 +551,7 @@ transitions:
     to: archive
     by: EXPLORER
     requires: [review_session_terminal_block]
-  # Withdrawal path for in-lifecycle work (task 0100): PLANNER may NOT
+  # Withdrawal path for in-lifecycle work: PLANNER may NOT
   # archive directly from per-scope implementer queues — that silently
   # discards already-written impl/tests/review blocks. The canonical
   # withdraw path is:
@@ -632,13 +569,13 @@ transitions:
   #   feature_review → archive  by ARCHITECT-PLANNER   requires: []
   # REVIEWER may archive blocked tasks that USER decides not to unblock
   # (dependency was retracted, task obsoleted, etc).
-  # Task 0102 (3): latest blocked.reason must name a withdrawn-class
-  # token; refuses single-role wipe of waiting-but-recoverable work.
+  # Latest blocked.reason must name a withdrawn-class token; refuses
+  # single-role wipe of waiting-but-recoverable work.
   - from: feature_blocked
     to: archive
     by: ARCHITECT-REVIEWER
     requires: [feature_blocked_withdrawn_reason]
-  # 0247 (1.3.0): stand_done → archive transition removed alongside
+  # 1.3.0: stand_done → archive transition removed alongside
   # the queue. Lease-based stand model has no terminal-queue
   # equivalent — release evidence lands on the product task's
   # tests block directly.
@@ -730,12 +667,12 @@ transitions:
     to: any_resume_to_queue
     by: ARCHITECT-REVIEWER
     requires: [all_dependencies_exist_per_wake_check]
-  # 0247 (1.3.0): stand_requests → stand_wip → stand_done transitions
+  # 1.3.0: stand_requests → stand_wip → stand_done transitions
   # removed alongside their queues. State transitions now happen on
   # the singleton stand resource via the lease API
   # (greatminds stand lease/ready/release/down/up) — see
   # schema.stand.resource.transitions.
-  # 0195: rollback paths from verified/. Two destinations:
+  # Rollback paths from verified/. Two destinations:
   #   - archive       — "withdraw" (the verified work has been reverted
   #                     at code level; FSM record now matches reality)
   #   - feature_review — "revisit" (REVIEWER decides verified work
@@ -816,9 +753,9 @@ task_kinds:
       - reason
       - dependencies      # list of "<queue>/<task-id>.md"
       - resume_to         # queue name from this schema
-  # 0247 (1.3.0): stand_request task-kind removed. Lease-based
-  # singleton stand resource replaces the per-request task-file
-  # model; see schema.stand.resource for the new state machine.
+  # 1.3.0: stand_request task-kind removed. Lease-based singleton
+  # stand resource replaces the per-request task-file model; see
+  # schema.stand.resource for the new state machine.
   review_session:
     required_initial_fields:
       - id
@@ -875,12 +812,12 @@ scenarios:
     active_roles: [UI-DEVELOPER, STAND-KEEPER]
     stand_profile: vite-dev
     notes: |
-      UI-DEVELOPER runs in chat mode (heartbeat.ui-developer.fast). Does not
+      UI-DEVELOPER runs in chat mode. Does not
       claim from feature_plan/feature_ui_dev. Optional session-summary task
       may be filed in feature_review at end of session for audit.
 
 # ---------------------------------------------------------------------------
-# Coordination access (0337 / DOD2)
+# Coordination access
 #
 # Hard rule for EVERY role (incl. ARCHITECT-PLANNER): access to
 # coordination/ is ONLY via the greatminds CLI; raw ls/cat/grep/sed/edit
@@ -901,28 +838,29 @@ coordination_access:
     - greatminds stand status
 
 # ---------------------------------------------------------------------------
+# Heartbeat — in-flight-turn hang detection (driven model)
+#
+# heartbeat is NOT a periodic liveness signal. Between turns a driven
+# pane is idle bash — that is normal, not "stale". heartbeat matters in
+# exactly one situation: coordd dispatched a turn to an agent and holds
+# that role's run-lock. The agent touches coordination/heartbeat.<role>
+# as a side effect of every greatminds CLI call, so a progressing turn
+# keeps it fresh. If a turn is in-flight (run-lock held) AND the
+# heartbeat has not advanced for `hang_threshold_seconds`, the turn is
+# hung: coordd escalates to MAINTAINER (it does NOT kill or re-drive —
+# MAINTAINER decides). When no turn is in-flight, heartbeat age is
+# ignored. Liveness of a persistent process is the dead-pid registry
+# scan, not heartbeat.
+# ---------------------------------------------------------------------------
+heartbeat:
+  hang_threshold_seconds: 300   # in-flight turn with no heartbeat progress → escalate MAINTAINER
+
+# ---------------------------------------------------------------------------
 # Watchdog thresholds
 #
 # Read by greatminds watchdog. Times in seconds.
 # ---------------------------------------------------------------------------
 watchdog:
-  # 0330 (0311 Phase 5): heartbeat staleness is meaningful only relative
-  # to a role's EXPECTED cadence / max-idle. A heartbeat is touched while
-  # a role runs a tick; non-continuous roles legitimately idle between
-  # ticks (driven panes are idle bash between events; self-loop wakes on
-  # a long timer; interactive is human-paced). A single 600s global
-  # falsely flagged every alive-but-idle role stale (EXPLORER 0329:
-  # maintainer/tester/writer/explorer all "stale" while pids alive). So
-  # the threshold is per-lifecycle; the tight 600s default applies only
-  # to genuinely CONTINUOUS-signal roles (e.g. a UI fast heartbeat). The
-  # authoritative liveness check for event-driven roles is the dead-pid
-  # registry scan below, NOT heartbeat age. A role may also set
-  # roles.<ROLE>.heartbeat_stale_seconds for an explicit override.
-  heartbeat_stale_seconds: 600          # 10 min — continuous-signal roles only
-  heartbeat_stale_seconds_by_lifecycle:
-    self-loop: 4200                     # 70 min — MAINTAINER ~1h cadence + margin
-    driven: 14400                       # 4 h — workers idle between events (pane idle bash)
-    interactive: 86400                  # 24 h — human-paced (PLANNER); effectively excluded
   intent_orphan_seconds: 300            # 5 min
   task_stale_in_active_queue_seconds: 86400   # 24 h
   task_stale_in_review_queue_seconds: 43200   # 12 h
@@ -945,7 +883,7 @@ inbox:
 # that calls `greatminds check-git-permission commit` and exits non-zero
 # when $GREATMINDS_ROLE is not in the allowed list. Forbidden verbs are
 # `git` subcommands the project never wants any agent to use (force
-# operations, history rewrites). Task 0091 item 2.
+# operations, history rewrites).
 # ---------------------------------------------------------------------------
 git_permissions:
   commit: [ARCHITECT-REVIEWER]
@@ -965,30 +903,25 @@ git_permissions:
 #
 # When plan.stand_required is true, the tests block MUST contain a
 # stand_evidence mapping with the three subfields below. Enforced by
-# validate_block in cli/task.py. Task 0091 item 3.
+# validate_block in cli/task.py.
 # ---------------------------------------------------------------------------
-# 0233: systemic commit-drift fix. STAND-KEEPER deploys the EXACT
-# commit the requesting task's impl.base_commit names, not whatever
-# main HEAD happens to be at SK-run time. Resolution strategy:
-# greatminds stand request looks up evidence_for[0]'s impl block,
-# extracts base_commit, and stores it as ``target_commit`` on the
-# stand_request file. PROJECT.md's deploy recipe reads
-# ``target_commit`` and runs ``git checkout <sha>`` on each host
-# before the rsync/compose flow. After stand_result records, SK
+# Systemic commit-drift fix. STAND-KEEPER deploys the EXACT commit the
+# requesting task's impl.base_commit names, not whatever main HEAD
+# happens to be at SK-run time. The deploy resolves the target commit
+# from the lease's task impl.base_commit and checks it out on each
+# host before the rsync/compose flow; after evidence records, SK
 # optionally reverts the host to main (post_stand_main_revert).
 #
-# Pairs with 0229 worktree_fingerprint: 0233 covers committed-state
-# identity, 0229 covers uncommitted-overlay identity. Either passing
-# proves «stand tested what impl describes».
+# Pairs with worktree_fingerprint: the committed-state identity covers
+# what was deployed, the uncommitted-overlay identity covers the
+# worktree. Either passing proves «stand tested what impl describes».
 stand:
   deploy_strategy:
     target_commit_resolution: evidence_for_impl_base_commit
     post_stand_main_revert: true
-  # 0243 (0242a / Phase 1 of 0242): stand resource state machine.
-  # Singleton resource per project; FIFO lease queue; token-gated
-  # access. Replaces the stand_requests/stand_wip/stand_done three-
-  # queue model in 1.3.0. Phase 1 ships read-only — schema + state
-  # file + status CLI. Mutating CLI lands in 0244.
+  # Stand resource state machine. Singleton resource per project;
+  # FIFO lease queue; token-gated access. Replaces the
+  # stand_requests/stand_wip/stand_done three-queue model in 1.3.0.
   resource:
     states: [free, preparing, ready, down]
     transitions:
@@ -1019,13 +952,12 @@ stand:
       ttl_seconds_default: 14400        # 4h
       ttl_warn_window_seconds: 300      # 5min warn before auto-release
       auto_release_on_no_response: true
-      # 0271: worktree-path constraint. Stand deploys MUST come from a
+      # Worktree-path constraint. Stand deploys MUST come from a
       # per-task isolated branch checkout under .worktrees/<seq>; the
       # main fleet tree would self-modify the running host (the very
-      # processes we're deploying). Pre-0271 SK's whitelist rejected
-      # the wrong path at runtime — leaving TESTER's lease orphaned
-      # in preparing/. Now the CLI validates at acquire-time so the
-      # mistake never reaches state.yaml.
+      # processes we're deploying). The CLI validates the worktree
+      # path at acquire-time so a wrong path never reaches state.yaml
+      # and never leaves TESTER's lease orphaned in preparing/.
       worktree_constraint:
         pattern: "{project_dir}/.worktrees/{seq}[-<slug>]"
         description: |
@@ -1042,36 +974,32 @@ stand:
         - stand_probe_*: requires holder of active_lease's lease_id
       enforcement_layer: cli
     state_file: .stand/state.yaml       # under coordination/
-    # 0244 (0242b / Phase 2): profile enum the lease CLI validates
-    # ``--profile`` against. SK's deploy playbook per value lives
-    # in PROJECT.md (out of scope for 0244 — separate design).
-    # 0296: ``liveness-prose`` added — md-only profile (no yaml
-    # twin) for exercising ``execute_md_profile`` end-to-end on
-    # real avatar. Canon template ships in templates/stand-profiles/.
+    # Profile enum the lease CLI validates ``--profile`` against.
+    # SK's deploy playbook per value lives in PROJECT.md.
+    # ``liveness-prose`` is an md-only profile (no yaml twin) for
+    # exercising ``execute_md_profile`` end-to-end on a real stand.
+    # Canon templates ship in templates/stand-profiles/.
     profiles_allowed: [full-deploy, vite-dev, smoke-only, liveness-prose]
 
 tests_block_validation:
   stand_evidence:
-    # 0301 (upstream issue #5): aligned with what
-    # gate_check.extract_lease_evidence_from_tests actually
-    # validates. Pre-0301 the schema listed only the three
-    # free-form prose fields below; ``gate-check`` ALSO required
-    # ``lease_id`` (from the release flow) before treating the
-    # evidence as valid → every well-formed task hit
-    # ``missing`` at the mv-to-feature_review gate.
+    # Aligned with what gate_check.extract_lease_evidence_from_tests
+    # actually validates: the three free-form prose fields below PLUS
+    # ``lease_id`` (from the release flow). If lease_id is absent,
+    # gate-check returns ``missing`` at the mv-to-feature_review gate.
     required_subfields:
       # Free-form prose (TESTER writes during the lease cycle).
       - reproduction_steps
       - observed_without_fix
       - observed_with_fix
-      # 0301: lease-release evidence (lease_id is the gate's hard
+      # Lease-release evidence (lease_id is the gate's hard
       # requirement; ``result`` and ``commit`` are derived with
       # fallbacks but listed here for the contract surface).
       - lease_id
       - result
       - commit
     required_when: plan.stand_required
-  # 0228: TESTER must run own functional probes against the
+  # TESTER must run own functional probes against the
   # prepared stand. STAND-KEEPER's observed_with_fix is infra-
   # readiness only (UP, version, /health 200). TESTER's
   # functional_probes + tester_observations are TESTER's own
@@ -1097,18 +1025,16 @@ layout:
   journal: journal.ndjson
   intent_dir: intent/
   inbox_dir: inbox/
-  heartbeat_glob: 'heartbeat.*'
   stand_status: stand.status
 
 # ---------------------------------------------------------------------------
-# Event-wake dispatch table (task 0186)
+# Event-wake dispatch table
 #
 # coord.yaml's ``tool:`` field per window selects which wake mechanism
-# coordd uses for that role on inbox/queue events. Pre-0186 chat-mode
-# (claude) roles had no event-wake at all — inbox messages to PLANNER
-# / MAINTAINER never auto-triggered a tick. 0186 adds the tmux-send-
-# keys mechanism that injects a literal keystroke + Enter into the
-# chat-mode pane, identical to operator-typed input.
+# coordd uses for that role on inbox/queue events. Chat-mode (claude)
+# roles are woken via the tmux-send-keys mechanism that injects a
+# literal keystroke + Enter into the chat-mode pane, identical to
+# operator-typed input.
 #
 # Mechanisms live as functions in cli/coordd.py
 # (sigint_sleeping_descendant, tmux_send_keys_wake). This table maps
@@ -1116,23 +1042,22 @@ layout:
 # ---------------------------------------------------------------------------
 event_wake:
   by_tool:
-    codex:  sigint_deepest_descendant   # existing 0150 path
+    codex:  sigint_deepest_descendant   # sleeping-descendant SIGINT
     cursor: sigint_deepest_descendant
-    claude: tmux_send_keys              # 0186: chat-mode nudge
+    claude: tmux_send_keys              # chat-mode nudge
   tmux_send_keys:
     keys: "check inbox and continue your tick"
     enter: true
     rate_limit_seconds: 5
 
 # ---------------------------------------------------------------------------
-# 0174: FSM single-source-of-truth tables.
+# FSM single-source-of-truth tables.
 #
-# Pre-0174 these tables lived as hardcoded constants in cli/task.py:
-# STREAM_BLOCK_KINDS, BLOCK_KIND_ROLES, QUEUE_BLOCK_KINDS, IMPL_ROLE_BY_SCOPE,
-# PRODUCT_KINDS, PRODUCT_SCOPES, PRIORITIES, PLAN_KINDS, MODES, STAND_*,
-# TEST_RESULTS, GATE_CHECK_RESULTS, REVIEW_OUTCOMES, READER_OUTCOMES.
-#
-# 0174 moves the DATA here; cli/task.py loads + reads at module-import.
+# These tables are the DATA the FSM runs on (stream block kinds,
+# block-kind roles, queue block kinds, impl role by scope, product
+# kinds/scopes/priorities, plan kinds, modes, stand enums, test
+# results, gate-check results, review/reader outcomes). cli/task.py
+# loads + reads them at module-import.
 # Validator FUNCTION bodies stay in code (registered by name in the
 # transitions[*].requires lists). Adding a new block_kind / scope /
 # enum value becomes a schema-only edit — no code change needed for
@@ -1146,7 +1071,7 @@ streams:
     allowed_block_kinds:
       [triage, plan, implementation, tests, reader_review, review, blocked, rollback]
     intake_queues: [feature_inbox, user_feedback]
-  # 0247 (1.3.0): stand stream removed. The lease-based singleton
+  # 1.3.0: stand stream removed. The lease-based singleton
   # stand resource replaces the request/wip/done task-file model;
   # see schema.stand.resource for the new state machine.
   review_session:
@@ -1182,7 +1107,7 @@ block_kinds:
     authored_by: [EXPLORER]
   blocked:
     # author = current owner of the queue, resolved at runtime
-  # 0195: rollback block — REVIEWER's witdraw/revisit marker for a
+  # rollback block — REVIEWER's withdraw/revisit marker for a
   # task already in verified/. Must carry non-empty ``reason:``.
   rollback:
     authored_by: [ARCHITECT-REVIEWER]
@@ -1202,13 +1127,13 @@ queue_accepts_blocks:
   feature_blocked:     [blocked]
   user_feedback:       [triage, blocked]
   review_sessions:     [session_iteration, blocked]
-  # 0247 (1.3.0): stand_requests/wip/done queue_accepts_blocks
-  # entries removed alongside the queues themselves.
-  verified:            [rollback]  # 0195: rollback only; terminal otherwise
+  # 1.3.0: stand_requests/wip/done queue_accepts_blocks entries
+  # removed alongside the queues themselves.
+  verified:            [rollback]  # rollback only; terminal otherwise
   archive:             []
 
 # Implementation-block scope → which role's queue feeds it. Used by
-# 0134's intake-rejection + 0174's role-of-implementer dispatch.
+# intake-rejection + the role-of-implementer dispatch.
 assignee_role_by_scope:
   backend: DEVELOPER
   ui:      UI-DEVELOPER
@@ -1230,7 +1155,7 @@ stand_enums:
   statuses:      [READY, DEGRADED, DOWN, BLOCKED]
 
 # ---------------------------------------------------------------------------
-# 0185: per-task git worktree policy (replaces 0115/0166 file-locks).
+# Per-task git worktree policy (replaces the older file-locks).
 #
 # Each task gets its own working tree under <project_dir>/<base_path>/
 # <task-id>/ on branch <branch_prefix><task-id>. Implementer agents
@@ -1254,7 +1179,7 @@ worktrees:
   conflict_handback_to: feature_dev        # where REVIEWER hands back on conflict
   required_for_task_kinds: [feature, bugfix, ops]
 
-# 0175: USER-curated marketplace plugin lists for `greatminds setup`.
+# USER-curated marketplace plugin lists for `greatminds setup`.
 # Verified 2026-05-25 against anthropics/claude-plugins-official.
 # Codex side deferred — operator hasn't curated yet, empty list per
 # role logs deferral and continues.
@@ -1272,7 +1197,7 @@ plugins:
     TECHNICAL-WRITER: []
     EXPLORER:         []
 
-# 0193: agent-uttered visual markers.
+# Agent-uttered visual markers.
 #
 # After each successful greatminds task mv / append-block / inbox
 # send, the agent ends its turn-reply with one markdown line per
@@ -1313,7 +1238,7 @@ visual_events:
     emoji: "🟣"
     template: "{emoji} **SENT** {kind} → {to_role} {task_ref}"
 
-# 0191: Claude Code auto-mode permissions for claude-host roles.
+# Claude Code auto-mode permissions for claude-host roles.
 #
 # /loop REVIEWER (and any other claude-host role that needs to run
 # destructive git ops) cannot do `git commit/tag/push/merge` without
@@ -1324,7 +1249,7 @@ visual_events:
 # structured-config-first directive. Operator may extend per-project
 # by editing settings.local.json directly; setup merges via union,
 # never overwriting existing operator entries.
-# 0199: coordd periodic PyPI version check. Every
+# coordd periodic PyPI version check. Every
 # `check_interval_seconds`, coordd compares the installed greatminds
 # version against PyPI's latest; if newer, it sends ONE info-message
 # to `notify_target`. Notify-only — MAINTAINER decides when to
@@ -1337,7 +1262,7 @@ auto_update:
   mode: notify_only               # future: auto_execute
   source: pypi                    # future: git_tag
 
-# 0198: gate `greatminds report-upstream` to MAINTAINER only. Other
+# Gate `greatminds report-upstream` to MAINTAINER only. Other
 # roles file bug-suspects via `greatminds inbox send MAINTAINER
 # --kind ask`. CLI refuses for non-allowed agent roles; operator-
 # mode (no GREATMINDS_ROLE) bypasses the gate.
@@ -1347,7 +1272,7 @@ report_upstream:
   triage_inbox_target: MAINTAINER
   upstream_repo_required: true
 
-# 0274: canonical list of system variables greatminds reads out of
+# Canonical list of system variables greatminds reads out of
 # the box. ``setup`` generates ``coordination/PROJECT.env`` from this
 # section, pre-populating each var with its description / acquire
 # instructions. Users add their own KEY=value to PROJECT.env after
@@ -1376,15 +1301,15 @@ claude_settings:
       - "Bash(git worktree:*)"
       - "Bash(git checkout:*)"
       - "Bash(git branch:*)"
-      # 0267: REVIEWER's rollback path (verified → revert) needs git
+      # REVIEWER's rollback path (verified → revert) needs git
       # revert; TESTER's stand probe needs ssh/scp; STAND-KEEPER's
-      # deploy uses rsync. Pre-0267 these were typed manually with `!`
-      # prefix on every invocation.
+      # deploy uses rsync. Without these allow rules they had to be
+      # typed manually with the `!` prefix on every invocation.
       - "Bash(git revert:*)"
       - "Bash(ssh:*)"
       - "Bash(scp:*)"
       - "Bash(rsync:*)"
-  # 0267: classifier auto-mode ceiling. Without explicit auto_mode
+  # Classifier auto-mode ceiling. Without explicit auto_mode
   # entries the classifier blocks `git push origin main` even when
   # permissions.allow contains `Bash(git push:*)`. These rules raise
   # the ceiling so REVIEWER's automated cut-and-push pipeline works
@@ -1395,17 +1320,16 @@ claude_settings:
       - "Bash(git push origin main:*)"
       - "Bash(git push origin main --follow-tags:*)"
       - "Bash(git push --follow-tags:*)"
-      # 0273: ssh/scp/rsync also need to live in auto_mode.allow,
-      # not just permissions.allow. 0267 added them to permissions
-      # but the classifier's auto-mode ceiling is a SEPARATE gate —
-      # TESTER's avatar probe from an --permission-mode auto pane
-      # was still being challenged for USER session auth on every
-      # invocation. Parallel entries unblock the auto-mode panes.
+      # ssh/scp/rsync also need to live in auto_mode.allow, not just
+      # permissions.allow — the classifier's auto-mode ceiling is a
+      # SEPARATE gate. Without the parallel entries a stand probe from
+      # a --permission-mode auto pane is still challenged for USER
+      # session auth on every invocation.
       - "Bash(ssh:*)"
       - "Bash(scp:*)"
       - "Bash(rsync:*)"
-      # 0313 (0311 Phase 1c): MAINTAINER is self-loop (USER-absent)
-      # and runs recovery — agent restart, daemon control, dead-pid
+      # MAINTAINER is self-loop (USER-absent) and runs recovery —
+      # agent restart, daemon control, dead-pid
       # SIGTERM. The classifier's auto-mode ceiling blocked these
       # without explicit entries, so MAINTAINER's autonomous
       # recovery stalled waiting for a USER who isn't there. These
@@ -1416,8 +1340,8 @@ claude_settings:
       - "Bash(kill:*)"
       - "Bash(systemctl --user:*)"
 
-# 0277 (0276 Phase A): stand profile files. STAND-KEEPER reads a
-# profile file matching ``lease.profile`` (the enum from
+# Stand profile files. STAND-KEEPER reads a profile file matching
+# ``lease.profile`` (the enum from
 # stand.resource.profiles_allowed) from a canonical directory at
 # lease-grant time and executes it as part of the deploy. Two
 # dialects supported on disk:
@@ -1446,7 +1370,7 @@ stand_profile:
   # that prepare the stand for the real probe).
   deploy_prerequisites_only_flag: deploy_prerequisites_only
 
-# 0291: STAND-KEEPER lifecycle notifications. SK files inbox-info
+# STAND-KEEPER lifecycle notifications. SK files inbox-info
 # automatically on these events so PLANNER (or another role) doesn't
 # need to poll state.yaml. Keep the map small — only events PLANNER
 # must react to. ARCHITECT-PLANNER is the canonical target for

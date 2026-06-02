@@ -11,29 +11,27 @@ from greatminds.cli import setup as setup_mod
 from greatminds.cli import daemon as daemon_mod
 
 
+# Canonical coord.yaml layout: exactly three paned roles (the
+# human-facing / resident seats) plus the eight driven workers. Driven
+# roles get NO tmux pane — coordd runs each of their turns as a managed
+# subprocess — but they are still listed so coordd knows each role's
+# tool. PLANNER is interactive chat (codex), MAINTAINER is the self-loop
+# watchdog (claude), and `dashboard` is a placeholder pane for a future
+# daemon-rendered task-status table.
 CANONICAL_WINDOWS = [
-    ("planner",    "ARCHITECT-PLANNER",  "claude", "chat"),
-    ("reviewer",   "ARCHITECT-REVIEWER", "codex",  "loop"),
-    # 0319 (0311 Phase 2e): the remaining claude workers — DEVELOPER,
-    # UI-DEVELOPER, TESTER, STAND-KEEPER — migrated to the driven
-    # lifecycle in one batch → coord.yaml template window mode is now
-    # 'driven' (was loop). 0323/0324 (0311 Phase 3c/3d) then migrated
-    # the codex workers EXPLORER + TECHNICAL-WRITER to driven;
-    # ARCHITECT-REVIEWER (codex) and MAINTAINER (self-loop) stay
-    # non-driven.
+    # --- paned, human-facing / resident roles ---
+    ("planner",    "ARCHITECT-PLANNER",  "codex",  "chat"),
+    ("maintainer", "MAINTAINER",         "claude", "loop"),
+    ("dashboard",  "",                   "bash",   "dashboard"),
+    # --- driven roles (no pane; coordd drives each turn) ---
+    ("reviewer",   "ARCHITECT-REVIEWER", "codex",  "driven"),
     ("dev",        "DEVELOPER",          "claude", "driven"),
     ("ui",         "UI-DEVELOPER",       "claude", "driven"),
     ("writer",     "TECHNICAL-WRITER",   "codex",  "driven"),
     ("tester",     "TESTER",             "claude", "driven"),
-    # 0318 (0311 Phase 2d): READER migrated to driven lifecycle →
-    # coord.yaml template window mode is now 'driven' (was loop).
     ("reader",     "READER",             "claude", "driven"),
     ("explorer",   "EXPLORER",           "codex",  "driven"),
     ("stand",      "STAND-KEEPER",       "claude", "driven"),
-    # 0314 (0311 Phase 1b): MAINTAINER is now a self-loop watchdog
-    # → mode=loop in the coord.yaml template (was chat).
-    ("maintainer", "MAINTAINER",         "claude", "loop"),
-    ("ops",        "",                   "bash",   None),
 ]
 
 

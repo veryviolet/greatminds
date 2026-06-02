@@ -89,21 +89,22 @@ def test_spawn_run_lock_blocks_second_turn(tmp_path: Path) -> None:
     assert "pending" in diag.lower()
 
 
-def test_spawn_seam_leaves_lock_for_completion_hook(
+def test_spawn_seam_releases_lock_when_it_returns(
     tmp_path: Path,
 ) -> None:
-    """With an explicit ``spawn`` seam (test / async path), the
-    lock is left in place for a completion hook to clear — proves
-    the run-lock survives the spawn call so concurrent events
-    serialize."""
+    """The synchronous ``spawn`` seam (tests) acquires the run-lock,
+    runs the spawn, records the turn, then releases the lock before
+    returning. In production there is no completion hook: the worker
+    thread holds the lock for the full turn and releases it on
+    subprocess exit — so a second event mid-turn serializes via the
+    held lock + pending marker (covered by the run-lock tests above)."""
     coord = _coord(tmp_path)
     cd._spawn_driven_turn(
         coord, "tester", "sess-x", "tester", "test-session",
         None, verbose=False, spawn=lambda argv: None,
     )
-    assert cd._driven_run_lock_path(coord, "tester").exists(), (
-        "0315: run-lock must persist after spawn seam for the "
-        "completion hook to clear"
+    assert not cd._driven_run_lock_path(coord, "tester").exists(), (
+        "spawn seam must release the run-lock when it returns"
     )
 
 
@@ -159,24 +160,27 @@ def test_route_event_drives_claude_driven_role(
     coord, canon = _project_with_lifecycle(
         tmp_path, role="DEVELOPER", lifecycle="driven", tool="claude")
 
-    spawned: list = []
-    monkeypatch.setattr(
-        cd, "_tmux_send_keys_driven",
-        lambda session, pane, argv: spawned.append(argv),
-    )
+    captured: list = []
+
+    def _fake_spawn(coord_, role_lower, session_id, pane, session_name,
+                    bf, verbose, *, reg=None, force_fresh=False, **kw):
+        captured.append((role_lower, session_id, force_fresh))
+        return (True, "test")
+
+    monkeypatch.setattr(cd, "_spawn_driven_turn", _fake_spawn)
     # press_enter must NOT be the path taken.
     monkeypatch.setattr(
         "greatminds.cli._send_enter.press_enter",
         lambda *a, **kw: pytest.fail(
-            "0315: driven role must NOT use press_enter wake"),
+            "driven role must NOT use press_enter wake"),
     )
 
     woke = cd._route_queue_event(
         coord, canon, "feature_dev", "0001-x.yaml", verbose=False)
     assert woke is True
-    assert len(spawned) == 1
-    assert spawned[0][:2] == ["claude", "--resume"]
-    assert "sess-abc" in spawned[0]
+    # Driven claude with an existing session → the claude ``-p``
+    # subprocess path, resuming that session (not force-fresh).
+    assert captured == [("developer", "sess-abc", False)]
 
 
 def test_route_event_non_driven_uses_legacy_wake(
@@ -189,9 +193,9 @@ def test_route_event_non_driven_uses_legacy_wake(
         tool="claude")
 
     monkeypatch.setattr(
-        cd, "_tmux_send_keys_driven",
+        cd, "_spawn_driven_turn",
         lambda *a, **kw: pytest.fail(
-            "0315: interactive role must NOT be driven-spawned"),
+            "interactive role must NOT be driven-spawned"),
     )
     calls: list = []
     monkeypatch.setattr(

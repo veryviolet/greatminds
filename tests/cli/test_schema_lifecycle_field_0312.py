@@ -88,17 +88,17 @@ def test_workers_are_driven() -> None:
         )
 
 
-# ---------- lifecycle is orthogonal to tool / launch_modes ----------
+# ---------- lifecycle supersedes the old launch_modes field ----------
 
 
-def test_lifecycle_does_not_replace_launch_modes() -> None:
-    """0312 is additive: ``launch_modes`` (and every other existing
-    role field) survive. Lifecycle is a NEW orthogonal axis."""
+def test_launch_modes_removed_from_roles() -> None:
+    """``lifecycle`` is the single axis that decides how a role is
+    driven. The old per-role ``launch_modes`` field was dead (no code
+    read it) and has been removed — no role entry carries it."""
     roles = _roles()
     for name, entry in roles.items():
-        # launch_modes was present pre-0312 for every role.
-        assert "launch_modes" in entry, (
-            f"0312 regression: role {name!r} lost launch_modes"
+        assert "launch_modes" not in entry, (
+            f"role {name!r} still carries the removed launch_modes field"
         )
 
 

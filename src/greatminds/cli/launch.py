@@ -183,9 +183,22 @@ def _wrapper_loop(launch_cmd: str, role: str) -> str:
 def _emit_tmux(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
                recreate: bool) -> None:
     session = cfg.get("session") or "agents"
-    windows = cfg.get("windows") or []
-    if not isinstance(windows, list) or not windows:
+    all_windows = cfg.get("windows") or []
+    if not isinstance(all_windows, list) or not all_windows:
         err("coord.yaml: windows must be a non-empty list")
+        raise click.exceptions.Exit(1)
+
+    # Driven roles have NO tmux pane — coordd runs each turn as a managed
+    # subprocess (claude -p / codex app-server) and captures output to
+    # coordination/.turns/. The tmux session is only the human-facing /
+    # resident panes: interactive (PLANNER), self-loop (MAINTAINER), the
+    # dashboard, and any bare bash window. Driven entries stay in
+    # coord.yaml so coordd can read their tool — they just don't get a
+    # window. (coord.yaml still drives coordd's per-role tool lookup.)
+    windows = [w for w in all_windows
+               if (w.get("mode") or "").lower() != "driven"]
+    if not windows:
+        err("coord.yaml: no non-driven (pane) windows to create")
         raise click.exceptions.Exit(1)
 
     # tmux is required on PATH.

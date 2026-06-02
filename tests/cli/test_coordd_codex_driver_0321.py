@@ -70,23 +70,35 @@ def test_build_thread_resume_request_shape() -> None:
 
 
 def test_codex_appserver_argv_is_stdio(monkeypatch) -> None:
-    """iter-3: the driver spawns ``codex app-server`` over STDIO (no
+    """The driver spawns ``codex app-server`` over STDIO (no
     ``--listen``, no ``proxy``); node is named explicitly when it
-    resolves (env-node shebang lesson)."""
+    resolves (env-node shebang lesson). The headless turn also carries
+    the sandbox/approval ``-c`` overrides so a coordd-spawned codex
+    server starts without bubblewrap and runs its tools unattended."""
     import shutil
     monkeypatch.setattr(shutil, "which", lambda b: {
         "codex": "/nvm/bin/codex", "node": "/nvm/bin/node"}.get(b))
     argv = cd._codex_appserver_argv()
-    assert argv[-1] == "app-server"
+    assert "app-server" in argv
     assert "--listen" not in argv and "proxy" not in argv
     assert argv[0].endswith("/node")
     assert any(a.endswith("/codex") for a in argv[:2])
+    # Headless overrides: no bubblewrap sandbox, auto-approve tools.
+    assert "sandbox_mode=danger-full-access" in argv
+    assert "approval_policy=never" in argv
 
 
 def test_codex_appserver_argv_fallback_bare_codex(monkeypatch) -> None:
     import shutil
+    import glob
+    # Neither PATH nor the nvm glob resolves codex → bare fallback.
     monkeypatch.setattr(shutil, "which", lambda b: None)
-    assert cd._codex_appserver_argv() == ["codex", "app-server"]
+    monkeypatch.setattr(glob, "glob", lambda *a, **k: [])
+    assert cd._codex_appserver_argv() == [
+        "codex", "app-server",
+        "-c", "sandbox_mode=danger-full-access",
+        "-c", "approval_policy=never",
+    ]
 
 
 # ---------- _drive_codex_turn_stdio: end-to-end over real stdio ----------
@@ -345,25 +357,31 @@ def test_route_event_claude_driven_not_codex_path(
     monkeypatch.setattr(
         cd, "_spawn_driven_codex_turn",
         lambda *a, **kw: pytest.fail(
-            "0321: claude role must NOT hit the codex driver"),
+            "claude role must NOT hit the codex driver"),
     )
-    spawned: list = []
-    monkeypatch.setattr(
-        cd, "_tmux_send_keys_driven",
-        lambda session, pane, argv: spawned.append(argv),
-    )
+    captured: list = []
+
+    def _fake_spawn(coord_, role_lower, session_id, *a, **kw):
+        captured.append((role_lower, session_id))
+        return (True, "test")
+
+    monkeypatch.setattr(cd, "_spawn_driven_turn", _fake_spawn)
 
     woke = cd._route_queue_event(
         coord, canon, "feature_dev", "0001-x.yaml", verbose=False)
     assert woke is True
-    assert spawned and spawned[0][:2] == ["claude", "--resume"]
+    # Driven claude → the claude ``-p`` subprocess path, with the
+    # role's existing session resumed.
+    assert captured == [("developer", "sess-d")]
 
 
-def test_route_event_codex_not_driven_uses_sigint(
+def test_route_event_self_loop_codex_uses_tmux_send_keys(
     tmp_path: Path, monkeypatch,
 ) -> None:
-    """Regression net: a codex role whose lifecycle != driven keeps the
-    legacy SIGINT wake — the codex driver must NOT fire."""
+    """A codex role whose lifecycle is self-loop runs a LIVE TUI in a
+    pane: it must be woken by typing into the pane (press_enter /
+    tmux_send_keys), NEVER by SIGINT — Ctrl-C to a live codex TUI quits
+    it. The codex driver must not fire either."""
     coord, canon = _project_codex_driven(
         tmp_path, tool="codex", lifecycle="self-loop",
         role="TECHNICAL-WRITER", queue="feature_docs")
@@ -371,14 +389,19 @@ def test_route_event_codex_not_driven_uses_sigint(
     monkeypatch.setattr(
         cd, "_spawn_driven_codex_turn",
         lambda *a, **kw: pytest.fail(
-            "0321: non-driven codex role must NOT hit the codex driver"),
+            "non-driven codex role must NOT hit the codex driver"),
     )
-    woke_calls: list = []
     monkeypatch.setattr(
         cd, "sigint_sleeping_descendant",
-        lambda *a, **kw: woke_calls.append(a) or None,
+        lambda *a, **kw: pytest.fail(
+            "self-loop codex (live TUI) must NOT be woken by SIGINT"),
+    )
+    pressed: list = []
+    monkeypatch.setattr(
+        "greatminds.cli._send_enter.press_enter",
+        lambda *a, **kw: pressed.append(a) or (True, "wake ok"),
     )
     woke = cd._route_queue_event(
         coord, canon, "feature_docs", "0001-x.yaml", verbose=False)
     assert woke is True
-    assert woke_calls, "0321: non-driven codex keeps SIGINT wake"
+    assert pressed, "self-loop codex must be woken via tmux send-keys"

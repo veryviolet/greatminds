@@ -72,6 +72,70 @@ STALE_KICK_ENABLED = os.environ.get("COORDD_STALE_KICK", "0") == "1"
 STALE_CHECK_INTERVAL_SEC = float(os.environ.get("COORDD_STALE_CHECK_INTERVAL_SEC", "60"))
 STALE_KICK_SEC           = float(os.environ.get("COORDD_STALE_KICK_SEC",           "900"))
 KICK_MIN_INTERVAL_SEC    = float(os.environ.get("COORDD_KICK_MIN_INTERVAL_SEC",    "600"))
+
+# In-flight-turn hang detection. A driven turn runs as a coordd
+# subprocess holding the role's run-lock for the turn's duration. If the
+# lock has been held longer than the hang threshold AND the role's
+# heartbeat has not advanced within that window, the turn is hung —
+# coordd escalates ONCE to MAINTAINER (it does NOT kill; MAINTAINER
+# decides). The threshold is the single global schema.heartbeat.
+# hang_threshold_seconds (env override for ops).
+HANG_CHECK_INTERVAL_SEC  = float(os.environ.get("COORDD_HANG_CHECK_INTERVAL_SEC", "30"))
+HANG_THRESHOLD_DEFAULT   = 300.0
+
+
+def _hang_threshold_seconds(canon_dir: Path) -> float:
+    """Read schema.heartbeat.hang_threshold_seconds (the in-flight-turn
+    hang bound). Falls back to HANG_THRESHOLD_DEFAULT. Env override:
+    COORDD_HANG_THRESHOLD_SEC."""
+    env = os.environ.get("COORDD_HANG_THRESHOLD_SEC")
+    if env:
+        try:
+            return float(env)
+        except ValueError:
+            pass
+    try:
+        doc = yaml.safe_load(
+            (canon_dir / "schema.yaml").read_text(encoding="utf-8")) or {}
+        val = (doc.get("heartbeat") or {}).get("hang_threshold_seconds")
+        if isinstance(val, (int, float)) and not isinstance(val, bool) and val > 0:
+            return float(val)
+    except (OSError, yaml.YAMLError):
+        pass
+    return HANG_THRESHOLD_DEFAULT
+
+
+def write_hang_report(coord: Path, role_lower: str, lock_age: float,
+                      hb_age: "float | None", now_ts: float) -> None:
+    """File an inbox/maintainer ask: a driven turn for <role> appears
+    hung (run-lock held + heartbeat not advancing). coordd does NOT
+    kill — MAINTAINER diagnoses and decides."""
+    target = coord / "inbox" / "maintainer"
+    target.mkdir(parents=True, exist_ok=True)
+    p = target / f"ask-{int(now_ts)}-hung-{role_lower}.yaml"
+    if p.exists():
+        return
+    hb = f"{hb_age:.0f}s" if hb_age is not None else "never (no heartbeat this turn)"
+    body = (
+        f"Role {role_lower.upper()} has a DRIVEN turn that appears HUNG. "
+        f"coordd dispatched a turn (run-lock held {lock_age:.0f}s) but the "
+        f"role's heartbeat has not advanced ({hb} since last touch) — the "
+        f"turn's subprocess is running but making no progress. coordd does "
+        f"NOT kill it. Diagnose and decide: kill the turn subprocess + clear "
+        f"coordination/.locks/driven-{role_lower}.lock so coordd can re-drive, "
+        f"or investigate why the turn stalled (MCP init, blocked tool, rate "
+        f"limit). Turn output: coordination/.turns/{role_lower}-*.log."
+    )
+    text = (
+        "to_role: MAINTAINER\n"
+        "from_role: coordd\n"
+        "kind: ask\n"
+        "task_ref: ''\n"
+        f"sent_at: '{time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(now_ts))}'\n"
+        "answered_at: null\n"
+        "body: |\n  " + body.replace("\n", "\n  ") + "\n"
+    )
+    p.write_text(text, encoding="utf-8")
 # Heartbeat-freshness guard for push_to_role keystroke injection.
 # If a role's heartbeat.<role> file is younger than this many seconds,
 # the agent is treated as actively working — coordd refuses to inject
@@ -101,17 +165,7 @@ NO_STALE_KICK_ROLES = NO_KEYSTROKE_INJECT_ROLES
 DEAD_CHECK_INTERVAL_SEC  = float(os.environ.get("COORDD_DEAD_CHECK_INTERVAL_SEC",  "60"))
 DEAD_REPORT_INTERVAL_SEC = float(os.environ.get("COORDD_DEAD_REPORT_INTERVAL_SEC", "600"))
 
-# Stalled-agent sweep (task 0017): even with no pending work, an agent
-# whose heartbeat goes cold past `STALLED_THRESHOLD_DEFAULT` is treated
-# as stuck (typically: Anthropic server-side rate-limit aborted the turn
-# before `ScheduleWakeup` got called). Coordd nudges it through the same
-# input_sock channel `push_to_role` uses. Defaults match
-# `schema.watchdog.heartbeat_stale_seconds` so "stale" is one definition
-# across the system. Overridable per-project via `coord.yaml: coordd:`.
-STALLED_SWEEP_INTERVAL_DEFAULT = 300.0   # 5 min
-STALLED_THRESHOLD_DEFAULT      = 600.0   # 10 min
-
-# 0345: periodic orphaned-intent reaping. An intent file is left behind
+# Periodic orphaned-intent reaping. An intent file is left behind
 # when an agent crashes mid-tick (intent written, task never moved); the
 # `intent-clean` reaper existed but nothing RAN it, so orphans piled up
 # for hours on a long-lived coordination dir and surfaced as watchdog
@@ -438,228 +492,6 @@ def write_dead_report(coord: Path, role: str, reg: dict, now_ts: float) -> None:
     p.write_text(text, encoding="utf-8")
 
 
-def _read_coordd_config(project_dir: Path) -> tuple[float, float]:
-    """Read coord.yaml ``coordd:`` block; fall back to defaults.
-
-    Returns ``(stalled_sweep_interval_seconds, stalled_threshold_seconds)``.
-    Invalid (non-numeric, ``<= 0``) values trigger a stderr warning and
-    fall back to the module-level defaults. Missing block or missing
-    coord.yaml → silent defaults. Cheap (one yaml.safe_load); coordd
-    calls this at startup, not per-sweep.
-    """
-    interval = STALLED_SWEEP_INTERVAL_DEFAULT
-    threshold = STALLED_THRESHOLD_DEFAULT
-    coord_yaml_path = project_dir / "coord.yaml"
-    if yaml is None or not coord_yaml_path.is_file():
-        return interval, threshold
-    try:
-        cfg = yaml.safe_load(coord_yaml_path.read_text(encoding="utf-8"))
-    except yaml.YAMLError:
-        return interval, threshold
-    if not isinstance(cfg, dict):
-        return interval, threshold
-    sub = cfg.get("coordd")
-    if not isinstance(sub, dict):
-        return interval, threshold
-
-    def _coerce(key: str, default: float) -> float:
-        v = sub.get(key)
-        if v is None:
-            return default
-        if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0:
-            return float(v)
-        print(
-            f"coordd: invalid coord.yaml: coordd.{key}={v!r}; using default {default}",
-            file=sys.stderr,
-        )
-        return default
-
-    return (
-        _coerce("stalled_sweep_interval_seconds", interval),
-        _coerce("stalled_threshold_seconds", threshold),
-    )
-
-
-def _load_coord_yaml_doc(project_dir: Path) -> dict:
-    """Best-effort coord.yaml parse — returns {} on any failure."""
-    p = project_dir / "coord.yaml"
-    if yaml is None or not p.is_file():
-        return {}
-    try:
-        data = yaml.safe_load(p.read_text(encoding="utf-8"))
-    except yaml.YAMLError:
-        return {}
-    return data if isinstance(data, dict) else {}
-
-
-def _mode_for_role(coord_yaml: dict, role_upper: str) -> str | None:
-    """Return ``coord.yaml.windows[N].mode`` for the entry whose ``role``
-    matches ``role_upper`` (case-insensitive). ``None`` if no matching
-    entry — used by ``_stalled_agent_sweep`` to flag orphan heartbeats.
-    """
-    windows = coord_yaml.get("windows") if isinstance(coord_yaml, dict) else None
-    if not isinstance(windows, list):
-        return None
-    for w in windows:
-        if not isinstance(w, dict):
-            continue
-        rw = (w.get("role") or "").strip().upper()
-        if rw == role_upper:
-            return w.get("mode") or None
-    return None
-
-
-def _stalled_agent_sweep(
-    project_dir: Path,
-    coord_yaml: dict,
-    threshold_seconds: float,
-    verbose: bool = False,
-) -> int:
-    """One pass over heartbeats; nudge stalled loop-mode agents.
-
-    Closes the rate-limit-stall hole: Anthropic server-side rate limits
-    abort a tick before ``ScheduleWakeup`` is called, leaving the agent
-    pid alive but heartbeat cold forever. This sweep detects that state
-    and pokes the agent's input_sock to wake it up.
-
-    Per-heartbeat behavior (see plan 0017 §Behavior contract):
-
-      - fresh (age < threshold)  → skip silently
-      - FAST suffix (``.fast``)  → skip (scenario-C chat session)
-      - orphan (no coord.yaml entry) → skip with WARN
-      - mode != "loop"            → skip silently (chat is USER-paced)
-      - dead pid                  → skip (``greatminds restart`` territory)
-      - missing registry / input_sock → skip silently
-      - otherwise → ``push_to_role`` (reuses existing socket I/O,
-        PUSH_FRESH_GUARD_SEC, alive-check, fallback chain — no
-        duplicate socket code).
-
-    Returns count of nudges sent.
-    """
-    coord = project_dir / "coordination"
-    if not coord.is_dir():
-        return 0
-    nudge_count = 0
-    now = time.time()
-    for hb_path in sorted(coord.glob("heartbeat.*")):
-        try:
-            age = now - hb_path.stat().st_mtime
-        except OSError:
-            continue
-        if age < threshold_seconds:
-            continue
-        # `heartbeat.<role-lower>` or `heartbeat.<role-lower>.fast`.
-        suffix = hb_path.name[len("heartbeat."):]
-        if suffix.endswith(".fast"):
-            if verbose:
-                print(
-                    f"  stalled-sweep skip: {hb_path.name} (FAST/chat mode)",
-                    file=sys.stderr,
-                )
-            continue
-        role_lower = suffix
-        role_upper = role_lower.upper()
-        mode = _mode_for_role(coord_yaml, role_upper)
-        if mode is None:
-            if verbose:
-                print(
-                    f"coordd: WARN orphan heartbeat {hb_path.name} — "
-                    f"no matching role in coord.yaml; skipping nudge",
-                    file=sys.stderr,
-                )
-            continue
-        if mode != "loop":
-            if verbose:
-                print(
-                    f"  stalled-sweep skip: {role_upper} mode={mode!r} (not loop)",
-                    file=sys.stderr,
-                )
-            continue
-        # task 0051 iter-6 (REVIEWER changes_requested): route through
-        # the unified press_enter primitive so AGENT_ENTER_KEYS, heartbeat
-        # verification, trust-prompt detection, and SIGSTOP rejection
-        # all reach the stalled-sweep path. Previously this called
-        # push_to_role directly, which bypassed those guards. The sweep
-        # has already filtered by `stalled_threshold_seconds` (heartbeat
-        # is necessarily stale at this point), so press_enter's lack of
-        # an explicit fresh-guard is correct — bypass-fresh semantics
-        # are met by the sweep's own gating.
-        session = coord_yaml.get("session")
-        window = _window_for_role(coord_yaml, role_upper)
-        registry_dir = coord / REGISTRY_DIR
-        reg = read_registry(registry_dir, role_lower)
-        agent_type = ((reg.get("tool") if isinstance(reg, dict) else None)
-                      or "claude").lower()
-        if session and window:
-            try:
-                from greatminds.cli._send_enter import press_enter
-                ok, diag = press_enter(
-                    coord, session, window, role_lower, agent_type,
-                    mode="wake",
-                    verify=True,
-                )
-                if ok:
-                    nudge_count += 1
-                    if verbose:
-                        print(
-                            f"  nudged stalled {role_upper} via press_enter "
-                            f"(heartbeat {age:.0f}s old): {diag}",
-                            file=sys.stderr,
-                        )
-                elif verbose:
-                    print(
-                        f"  stalled-sweep press_enter FAILED for {role_upper} "
-                        f"(heartbeat {age:.0f}s old): {diag}",
-                        file=sys.stderr,
-                    )
-            except Exception as exc:  # primitive itself is best-effort; don't crash sweep
-                if verbose:
-                    print(
-                        f"  stalled-sweep press_enter raised for {role_upper}: "
-                        f"{exc}; falling back to push_to_role",
-                        file=sys.stderr,
-                    )
-                if push_to_role(coord, role_lower,
-                                f"<stalled-sweep: heartbeat {age:.0f}s old>",
-                                verbose, bypass_fresh_guard=True):
-                    nudge_count += 1
-        else:
-            # No session/window in coord.yaml — press_enter can't address
-            # the pane, so fall back to push_to_role (which only uses the
-            # input_sock / tty channel; no tmux send-keys fallback).
-            if push_to_role(coord, role_lower,
-                            f"<stalled-sweep: heartbeat {age:.0f}s old>",
-                            verbose, bypass_fresh_guard=True):
-                nudge_count += 1
-                if verbose:
-                    print(
-                        f"  nudged stalled {role_upper} via push_to_role "
-                        f"fallback (heartbeat {age:.0f}s old; no session/window "
-                        f"in coord.yaml)",
-                        file=sys.stderr,
-                    )
-    return nudge_count
-
-
-def _window_for_role(coord_yaml: dict, role_upper: str) -> str | None:
-    """Look up the tmux window name for ``role_upper`` from coord.yaml.
-
-    Returns ``None`` if coord.yaml has no windows list or no match.
-    Used by ``_stalled_agent_sweep`` to address capture-pane / send-keys.
-    """
-    windows = coord_yaml.get("windows")
-    if not isinstance(windows, list):
-        return None
-    for w in windows:
-        if not isinstance(w, dict):
-            continue
-        if (w.get("role") or "").upper() == role_upper:
-            name = w.get("name")
-            if isinstance(name, str) and name:
-                return name
-    return None
-
-
 def _owning_role_for_queue(canon_dir: Path, queue: str) -> str | None:
     """0204: resolve the owner role for a queue per schema.
 
@@ -709,8 +541,23 @@ def _driven_bootstrap_path(coord: Path, role_lower: str) -> str:
 
 def _driven_run_lock_path(coord: Path, role_lower: str) -> Path:
     """Per-role run-lock marker: ``<coord>/.locks/driven-<role>.lock``.
-    Presence means a turn is currently running for that role."""
+    Presence means a turn is currently running for that role. The
+    lock is held for the FULL turn duration (the turn runs as a
+    coordd-managed subprocess in a daemon thread), so its presence +
+    mtime drive both per-role serialization and hang detection."""
     return coord / ".locks" / f"driven-{role_lower}.lock"
+
+
+def _turn_log_path(coord: Path, role_lower: str) -> Path:
+    """Per-turn output log: ``<coord>/.turns/<role>-<ISO>.log``.
+
+    Driven roles have NO tmux pane (the turn runs as a coordd
+    subprocess), so the captured stdout/stderr of each turn is the
+    operator-visible record of what the agent did."""
+    d = coord / ".turns"
+    d.mkdir(parents=True, exist_ok=True)
+    ts = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    return d / f"{role_lower}-{ts}.log"
 
 
 def _driven_pending_path(coord: Path, role_lower: str) -> Path:
@@ -867,67 +714,95 @@ def _spawn_driven_turn(
             )
         return (False, "run-lock held; pending set")
 
-    # 0317: decide resume-vs-fresh from the accumulated turn count.
-    # 0318: force_fresh (no session_id yet — first turn / killed
-    # pane) also starts a fresh session.
+    # Decide resume-vs-fresh from the accumulated turn count;
+    # force_fresh (no session_id yet — first turn) also starts fresh.
     reset = force_fresh or _should_reset_session(reg)
     argv = _build_driven_claude_argv(
         session_id, bootstrap_file, fresh=reset)
-    try:
-        lock.touch()
-        if spawn is not None:
+
+    # Test seam: a synchronous spawn callable. Leave the lock held for
+    # run-lock assertions, then release (no real subprocess / thread).
+    if spawn is not None:
+        try:
+            lock.touch()
             spawn(argv)
-        else:
-            # Default: deliver the command into the role's tmux
-            # pane. The pane is idle bash between turns; sending the
-            # full command + Enter runs one -p turn.
-            if pane and session_name:
-                _tmux_send_keys_driven(session_name, pane, argv)
-        # 0317: record the turn. On reset, count → 1 (this is the
-        # first turn of a new session); claude mints the new sid and
-        # the next tick reads it via stream-json / registry refresh.
-        # We don't have the new sid synchronously here (claude emits
-        # it), so reset records count=1 and leaves session_id for the
-        # agent's own registry write; a non-reset turn just bumps.
-        _record_driven_turn(coord / REGISTRY_DIR, role_lower,
-                            reset=reset)
-        if verbose:
-            mode = "FRESH (reset)" if reset else "--resume"
-            print(
-                f"  0315/0317: spawned driven turn ({mode}) for "
-                f"{role_lower}: {' '.join(argv[:4])}…",
-                file=sys.stderr,
-            )
-        return (True, f"driven turn spawned for {role_lower}"
-                      f"{' (session reset)' if reset else ''}")
-    finally:
-        # The lock is released by the turn's own completion hook in
-        # the full design; for the synchronous spawn seam used by
-        # tests + the tmux-send path (fire-and-forget), we leave the
-        # lock for the post-turn sweep. To avoid a permanent stuck
-        # lock when no completion hook exists yet, clear it here when
-        # using the default tmux path (best-effort — a real
-        # completion signal supersedes this in a later phase).
-        if spawn is None:
+            _record_driven_turn(coord / REGISTRY_DIR, role_lower, reset=reset)
+            return (True, f"driven turn spawned for {role_lower}"
+                          f"{' (session reset)' if reset else ''}")
+        finally:
             try:
                 lock.unlink()
             except OSError:
                 pass
 
+    # Production: run ``claude -p`` as a coordd-managed subprocess in a
+    # daemon thread. The run-lock is held for the FULL turn duration
+    # (released on process exit) so coordd serializes per-role turns and
+    # can detect a hung turn (lock held + heartbeat not advancing).
+    # Driven roles have NO tmux pane — stdout/stderr is captured to
+    # ``.turns/<role>-<ts>.log`` as the operator-visible turn record.
+    # ``--output-format json`` makes claude emit a single result object
+    # carrying ``session_id``, which we record so the next ``--resume``
+    # turn continues the same session.
+    lock.touch()
+    run_argv = argv + ["--output-format", "json"]
 
-def _tmux_send_keys_driven(session: str, pane: str,
-                           argv: list[str]) -> None:
-    """Deliver a driven-turn command into the role's tmux pane.
-    Mirrors 0308's direct-launch sequence: C-u clear, then the
-    quoted command + Enter."""
-    import shlex
-    cmd = " ".join(shlex.quote(a) for a in argv)
-    subprocess.run(["tmux", "send-keys", "-t", f"{session}:{pane}", "C-u"],
-                   capture_output=True)
-    subprocess.run(
-        ["tmux", "send-keys", "-t", f"{session}:{pane}", cmd, "Enter"],
-        capture_output=True,
-    )
+    def _worker() -> None:
+        new_sid: str | None = None
+        try:
+            proc = subprocess.run(
+                run_argv, cwd=str(coord.parent),
+                capture_output=True, text=True,
+            )
+            try:
+                _turn_log_path(coord, role_lower).write_text(
+                    f"$ {' '.join(run_argv)}\n\n"
+                    f"=== stdout ===\n{proc.stdout}\n"
+                    f"=== stderr ===\n{proc.stderr}\n"
+                    f"=== rc={proc.returncode} ===\n",
+                    encoding="utf-8",
+                )
+            except OSError:
+                pass
+            try:
+                obj = json.loads(proc.stdout)
+                new_sid = (obj.get("session_id") if isinstance(obj, dict)
+                           else None) or None
+            except (ValueError, TypeError, AttributeError):
+                new_sid = None
+        except Exception as exc:  # noqa: BLE001 — log, never crash coordd
+            if verbose:
+                print(f"  driven claude turn for {role_lower} failed: "
+                      f"{exc}", file=sys.stderr)
+        finally:
+            _record_driven_turn(coord / REGISTRY_DIR, role_lower,
+                                reset=reset, new_session_id=new_sid)
+            try:
+                lock.unlink()
+            except OSError:
+                pass
+            # Re-fire one event that arrived mid-turn.
+            pend = _driven_pending_path(coord, role_lower)
+            if pend.exists():
+                try:
+                    pend.unlink()
+                except OSError:
+                    pass
+                _spawn_driven_turn(
+                    coord, role_lower, (new_sid or session_id),
+                    pane, session_name, bootstrap_file, verbose,
+                    reg=read_registry(coord / REGISTRY_DIR, role_lower),
+                )
+
+    import threading
+    threading.Thread(target=_worker, daemon=True,
+                     name=f"claude-turn-{role_lower}").start()
+    if verbose:
+        mode = "FRESH (reset)" if reset else "--resume"
+        print(f"  driven claude turn dispatched ({mode}, subprocess) for "
+              f"{role_lower}", file=sys.stderr)
+    return (True, f"driven claude turn dispatched (async) for {role_lower}"
+                  f"{' (session reset)' if reset else ''}")
 
 
 # ---------------------------------------------------------------------------
@@ -1171,6 +1046,19 @@ def _drive_codex_turn_stdio(
         sess.send(_build_turn_start_request(3, thread_id))
         sess.wait_turn_completed(
             thread_id, _time.monotonic() + turn_timeout)
+        # Per-turn record (driven roles have no pane). Minimal for now —
+        # marks the turn ran to completion + the thread it ran on. Full
+        # assistant-transcript capture from the app-server notification
+        # stream is a later enhancement.
+        try:
+            _turn_log_path(coord, role_lower).write_text(
+                f"codex app-server turn for {role_lower}\n"
+                f"thread_id: {thread_id}\n"
+                f"status: turn/completed\n",
+                encoding="utf-8",
+            )
+        except OSError:
+            pass
         if verbose:
             print(
                 f"  0321: codex turn/completed for {role_lower} "
@@ -1473,7 +1361,8 @@ def _route_queue_event(coord: Path, canon_dir: Path,
     if driven is not None:
         return driven
 
-    mechanism = _wake_mechanism_for_tool(tool)
+    mechanism = _wake_mechanism_for_tool(
+        tool, _lifecycle_for_role(canon_dir, owner))
     if mechanism == "sigint_deepest_descendant":
         sigint_sleeping_descendant(coord, owner, verbose)
         if verbose:
@@ -1489,7 +1378,7 @@ def _route_queue_event(coord: Path, canon_dir: Path,
             if coord_yaml_doc else ""
         window = (located[0] if located else "").strip()
         ok, diag = press_enter(
-            coord, session, window, owner.lower(), "claude",
+            coord, session, window, owner.lower(), tool or "claude",
             mode="wake", verify=False,
         )
         if verbose:
@@ -1729,13 +1618,23 @@ def _window_mode_for_role(coord_yaml: dict | None, role: str) -> str:
     return ""
 
 
-def _wake_mechanism_for_tool(tool: str) -> str:
-    """0186: schema-driven dispatch table. ``coord.yaml``'s ``tool:``
-    field per window selects which wake mechanism coordd uses for
-    that role. Defaults preserve pre-0186 behavior: codex/cursor →
-    sigint (the 0150 path); claude → tmux_send_keys (NEW). Other
-    tools → None (no event wake, falls back to natural ScheduleWakeup
-    / interval polling)."""
+def _wake_mechanism_for_tool(tool: str, lifecycle: str | None = None) -> str:
+    """Schema-driven wake-mechanism dispatch.
+
+    LIFECYCLE WINS over tool. interactive / self-loop roles (PLANNER,
+    MAINTAINER) run a LIVE TUI in a tmux pane: SIGINT to a live
+    codex/claude process is Ctrl-C — the agent QUITS. They must be woken
+    only by typing into the pane (tmux_send_keys), NEVER sigint. The
+    sigint mechanism is for a loop agent blocked on a `bash sleep`
+    descendant (where the deepest descendant is the sleep, safe to
+    interrupt) — not for an interactive TUI. So force tmux_send_keys for
+    interactive/self-loop regardless of tool.
+
+    For all other lifecycles the per-tool table applies. ``coord.yaml``'s
+    ``tool:`` field selects the mechanism; defaults: codex/cursor →
+    sigint, claude → tmux_send_keys; unknown tools → "" (no event wake)."""
+    if lifecycle in ("interactive", "self-loop"):
+        return "tmux_send_keys"
     try:
         from greatminds.core.paths import find_canon_dir
         doc = yaml.safe_load(
@@ -1825,12 +1724,10 @@ def push_to_role(coord: Path, role: str, file_path: str, verbose: bool,
     heartbeat is stale (idle / asleep / waiting), where interrupting
     the sleep IS the goal.
 
-    ``bypass_fresh_guard=True`` (task 0017) — callers that have already
-    made the staleness decision against their own threshold
-    (``_stalled_agent_sweep`` with ``stalled_threshold_seconds``, which
-    may be < 60s) skip this guard. The sweep already filtered by
-    heartbeat age; double-checking with a fixed 60s ceiling would
-    suppress every threshold below 60s. Pid liveness check still runs.
+    ``bypass_fresh_guard=True`` — callers that have already made the
+    staleness decision against their own threshold skip this guard
+    (double-checking with a fixed 60s ceiling would suppress every
+    threshold below 60s). Pid liveness check still runs.
     """
     if not bypass_fresh_guard and role.lower() not in NO_KEYSTROKE_INJECT_ROLES:
         hb_path = coord / f"heartbeat.{role.lower()}"
@@ -2024,26 +1921,24 @@ def coordd(project_dir: Path | None, project_name: str | None,
             file=sys.stderr,
         )
 
-    # Per-role timestamp of last stale-kick we issued. Throttles so we
-    # don't pile pushes on a role that's genuinely waiting/retrying.
-    last_kick: dict[str, float] = {}
-    last_stale_check: float = 0.0
+    # In-flight-turn hang detection (replaces the old stale-kick /
+    # stalled-sweep heartbeat-cold nudges, which were a loop-mode
+    # concept). A driven turn runs as a coordd subprocess holding the
+    # role's run-lock; if the lock is held past the hang threshold with
+    # no heartbeat progress, escalate ONCE to MAINTAINER.
+    hang_threshold = _hang_threshold_seconds(canon_dir)
+    last_hang_report: dict[str, float] = {}
+    last_hang_check: float = 0.0
 
-    # Per-role timestamp of last dead-pid report issued to PLANNER's
+    # Per-role timestamp of last dead-pid report issued to MAINTAINER's
     # inbox. Throttles so a long-dead agent doesn't flood the inbox.
     last_dead_report: dict[str, float] = {}
     last_dead_check: float = 0.0
-
-    # Stalled-agent sweep (task 0017): periodic poke for loop-mode
-    # agents whose heartbeat went cold past threshold. Config is read
-    # once at startup; restart coordd to pick up coord.yaml changes.
-    stalled_sweep_interval, stalled_threshold = _read_coordd_config(project_dir)
-    last_stalled_sweep: float = 0.0
     if verbose:
         print(
-            f"coordd: stalled-sweep enabled "
-            f"(interval {stalled_sweep_interval:.0f}s, "
-            f"threshold {stalled_threshold:.0f}s)",
+            f"coordd: hang detection enabled "
+            f"(in-flight turn, threshold {hang_threshold:.0f}s → "
+            f"escalate MAINTAINER)",
             file=sys.stderr,
         )
 
@@ -2177,7 +2072,8 @@ def coordd(project_dir: Path | None, project_name: str | None,
                     verbose, trigger=f" (inbox {Path(path).name})")
                 if driven is not None:
                     continue
-                mechanism = _wake_mechanism_for_tool(tool)
+                mechanism = _wake_mechanism_for_tool(
+                    tool, _lifecycle_for_role(canon_dir, role))
                 if mechanism == "sigint_deepest_descendant":
                     sigint_sleeping_descendant(coord, role, verbose)
                     push_to_role(coord, role, path, verbose)
@@ -2187,7 +2083,7 @@ def coordd(project_dir: Path | None, project_name: str | None,
                         if coord_yaml_doc else ""
                     window = (located[0] if located else "").strip()
                     press_enter(
-                        coord, session, window, role.lower(), "claude",
+                        coord, session, window, role.lower(), tool or "claude",
                         mode="wake", verify=False,
                     )
                 else:
@@ -2204,33 +2100,41 @@ def coordd(project_dir: Path | None, project_name: str | None,
             # Drop known entries for files agents have processed and deleted.
             known &= current
 
-            # Step 3: stale-heartbeat kick. For each live role whose
-            # heartbeat is older than STALE_KICK_SEC AND that has pending
-            # work, push a wake — but at most once per KICK_MIN_INTERVAL_SEC.
-            # Rationale: transient API errors / rate-limits can leave an
-            # agent waiting at the prompt with no self-wake scheduled. We
-            # don't try to detect "rate limit" specifically — we just
-            # observe that the heartbeat has gone cold while work is
-            # waiting, and nudge.
+            # Step 3: in-flight-turn hang detection. A driven turn runs
+            # as a coordd subprocess holding the role's run-lock
+            # (.locks/driven-<role>.lock) for the turn's full duration.
+            # If the lock has been held past the hang threshold AND the
+            # role's heartbeat has not advanced within that window, the
+            # turn is hung (subprocess alive but no progress) — escalate
+            # ONCE to MAINTAINER (coordd does NOT kill; MAINTAINER
+            # decides). Between turns the lock is absent → nothing is
+            # checked, so an idle driven pane is never flagged.
             now_ts = time.time()
-            if STALE_KICK_ENABLED and now_ts - last_stale_check >= STALE_CHECK_INTERVAL_SEC:
-                last_stale_check = now_ts
-                for role_lower in list_live_roles(registry):
-                    if role_lower in NO_STALE_KICK_ROLES:
-                        continue  # human-paced chat role — never kick
-                    age = heartbeat_age_seconds(coord, role_lower)
-                    if age is None or age < STALE_KICK_SEC:
-                        continue
-                    if not role_has_pending_work(coord, schema_roles, role_lower):
-                        continue
-                    if now_ts - last_kick.get(role_lower, 0.0) < KICK_MIN_INTERVAL_SEC:
-                        continue
-                    if push_to_role(
-                        coord, role_lower,
-                        f"<stale-kick: heartbeat {age:.0f}s old>",
-                        verbose,
-                    ):
-                        last_kick[role_lower] = now_ts
+            if now_ts - last_hang_check >= HANG_CHECK_INTERVAL_SEC:
+                last_hang_check = now_ts
+                locks_dir = coord / ".locks"
+                if locks_dir.is_dir():
+                    for lk in sorted(locks_dir.glob("driven-*.lock")):
+                        role_lower = lk.name[len("driven-"):-len(".lock")]
+                        try:
+                            lock_age = now_ts - lk.stat().st_mtime
+                        except OSError:
+                            continue
+                        if lock_age < hang_threshold:
+                            continue  # turn young — not hung yet
+                        hb_age = heartbeat_age_seconds(coord, role_lower)
+                        if hb_age is not None and hb_age < hang_threshold:
+                            continue  # heartbeat fresh → turn is progressing
+                        if now_ts - last_hang_report.get(role_lower, 0.0) < hang_threshold:
+                            continue  # already escalated recently
+                        write_hang_report(coord, role_lower, lock_age,
+                                          hb_age, now_ts)
+                        last_hang_report[role_lower] = now_ts
+                        if verbose:
+                            print(f"  hang: role={role_lower} run-lock held "
+                                  f"{lock_age:.0f}s, heartbeat "
+                                  f"{('%.0fs' % hb_age) if hb_age is not None else 'never'}"
+                                  f" → escalated MAINTAINER", file=sys.stderr)
 
             # Step 4: dead-pid watch. For each role in the registry,
             # if pid is no longer alive, file an ask to PLANNER's inbox.
@@ -2288,27 +2192,12 @@ def coordd(project_dir: Path | None, project_name: str | None,
                         if verbose:
                             print(f"  dead-report failed for {role}: {exc}", file=sys.stderr)
 
-            # Step 5: stalled-agent sweep (task 0017) — nudge loop-mode
-            # agents whose heartbeat has gone cold past
-            # `stalled_threshold_seconds`. Independent of Step 3's
-            # opt-in stale-kick (which also requires pending work);
-            # this sweep fires unconditionally on heartbeat age alone.
-            if now_ts - last_stalled_sweep >= stalled_sweep_interval:
-                last_stalled_sweep = now_ts
-                coord_yaml_doc = _load_coord_yaml_doc(project_dir)
-                try:
-                    _stalled_agent_sweep(
-                        project_dir, coord_yaml_doc,
-                        stalled_threshold, verbose,
-                    )
-                except Exception as exc:  # noqa: BLE001 — sweep must never crash the loop
-                    if verbose:
-                        print(
-                            f"coordd: stalled-sweep error: {exc}",
-                            file=sys.stderr,
-                        )
+            # (The old stalled-agent sweep that nudged loop-mode agents
+            # on cold heartbeat is gone — a loop-mode concept. Driven
+            # turns are coordd subprocesses with hang detection (Step 3);
+            # idle driven panes are normal, not "stalled".)
 
-            # Step 6: PyPI version auto-check (task 0199). Throttled
+            # Step 6: PyPI version auto-check. Throttled
             # by schema.auto_update.check_interval_seconds. Sends one
             # inbox info to notify_target when a newer version is
             # detected; doesn't re-spam until either (a) coordd

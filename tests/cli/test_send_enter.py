@@ -329,8 +329,10 @@ def test_prefers_input_sock_when_available_in_wake_mode(
         coord_dir, "s", "dev", "developer", "claude", mode="wake",
     )
     assert ok, diag
-    # Two writes: WAKE_TEXT then \r.
-    assert sent == [b"continue your tick", b"\r"]
+    # Two writes: WAKE_TEXT then the Enter key. claude's submit on
+    # input_sock is sent as \r\n (bare \r intermittently fails to fire
+    # the submit over the socket).
+    assert sent == [b"continue your tick", b"\r\n"]
     # tmux send-keys NOT called for the key transport itself.
     sk = [c for c in tmux.calls if c[:2] == ["tmux", "send-keys"]]
     assert sk == []
