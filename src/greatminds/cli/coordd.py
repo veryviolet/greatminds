@@ -178,7 +178,24 @@ class _InotifyWatcher:
         for sub in INOTIFY_QUEUE_DIRS:
             d = coord / sub
             if not d.is_dir():
-                continue
+                # 0341: the singleton stand's ``.stand/`` dir is created
+                # lazily by the first ``stand lease`` (update_stand_state
+                # mkdir). If coordd starts BEFORE any lease (fresh deploy
+                # / restart), this watch would never attach — and because
+                # the direct queue→owner route (``_route_queue_event``)
+                # fires on inotify events ONLY (the poll fallback yields
+                # no events), NO stand lifecycle change would ever wake
+                # STAND-KEEPER. SK then has to be nudged by hand. Create
+                # the dir up front so the watch always attaches and the
+                # first ``state.yaml`` write (lease grant / preparing)
+                # routes to SK like any other queue→owner event.
+                if sub == ".stand":
+                    try:
+                        d.mkdir(parents=True, exist_ok=True)
+                    except OSError:
+                        continue
+                else:
+                    continue
             try:
                 wd = self._inotify.add_watch(str(d), self._flags)
                 self._wd_to_queue[wd] = sub
@@ -1315,12 +1332,13 @@ def _route_queue_event(coord: Path, canon_dir: Path,
     # 0318 (Phase 2d) migration gate: the driven driver fires only
     # when BOTH the schema lifecycle == 'driven' AND the coord.yaml
     # window mode == 'driven'. This is the per-fleet, one-at-a-time
-    # migration switch — Phase 2d flips READER's window to driven;
-    # STAND-KEEPER (lifecycle=driven in schema but still woken on
-    # .stand state events, mode != driven) keeps the press_enter
-    # wake path until its own migration phase. Everything else
-    # (interactive / self-loop / codex / unmigrated) falls through
-    # to the legacy wake mechanism below.
+    # migration switch. STAND-KEEPER is now migrated (window mode ==
+    # driven), so a ``.stand`` state event runs an SK turn via the
+    # driven branch below — the same direct queue→owner route every
+    # other driven role uses (0341 ensures the ``.stand`` watch is
+    # always attached so the event reaches here). Unmigrated roles
+    # (chat / loop window mode), self-loop, and unmigrated codex roles
+    # still fall through to the legacy wake mechanism further down.
     lifecycle = _lifecycle_for_role(canon_dir, owner)
     window_mode = _window_mode_for_role(coord_yaml_doc, owner)
     if lifecycle == "driven" and tool == "claude" \
