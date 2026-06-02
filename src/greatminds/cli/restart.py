@@ -462,6 +462,30 @@ def _restart_dead_agents(
             _clear_session_files_for_bootstrap(registry_dir, role_lc)
         if needs_start:
             agent_type = (window_tool.get(name) or "claude").lower()
+            window_mode = next(
+                ((w.get("mode") or "loop") for w in windows
+                 if isinstance(w, dict) and w.get("name") == name),
+                "loop",
+            )
+            # 0348: driven roles run NO persistent agent — the pane is
+            # idle bash between turns and coordd drives each turn
+            # (claude --resume -p / codex app-server), forcing a fresh
+            # session on the first event after a kill. So an absent
+            # registry for a driven role is NORMAL, not a dead agent;
+            # restart must NOT emit ``start-agent <ROLE> <tool> --mode
+            # driven`` (start-agent only accepts loop|chat → it errored
+            # out and left the role MISSING). Mirror launch.py, which
+            # skips ``mode == "driven"`` windows for the same reason:
+            # recovery is the next coordd event, not a persistent launch.
+            # --reset still clears session files above so that next
+            # event force-freshes the session.
+            if window_mode == "driven":
+                _log(
+                    f"    {name} ({role_lc}): driven role — no persistent "
+                    f"agent to (re)start; coordd re-drives on the next "
+                    f"event (force-fresh session). Skipping start-agent."
+                )
+                continue
             # 0308: build + send the full launch_command directly
             # instead of relying on a wrapper-loop's bare-Enter
             # recovery. Pre-0308 the launcher installed a
@@ -473,11 +497,6 @@ def _restart_dead_agents(
             # ``greatminds start-agent <ROLE> <tool> --mode loop``
             # command + Enter.
             from greatminds.cli.launch import _launch_command
-            window_mode = next(
-                ((w.get("mode") or "loop") for w in windows
-                 if isinstance(w, dict) and w.get("name") == name),
-                "loop",
-            )
             launch_cmd = _launch_command(
                 "greatminds start-agent",
                 role_lc.upper(), agent_type, window_mode,
@@ -518,7 +537,32 @@ def _verify(
     fail = 0
     total = 0
     pending_trust: list[str] = []
+    window_mode_by_name = {
+        w.get("name"): (w.get("mode") or "loop")
+        for w in windows if isinstance(w, dict) and w.get("name")
+    }
     for name, role_lc in _iter_role_windows(windows):
+        # 0348: driven roles run no persistent agent — the pane is idle
+        # bash between turns, so an absent registry / no input_sock is
+        # the EXPECTED steady state, NOT a failure. Their liveness is
+        # validated by coordd (the next event force-freshes a turn), not
+        # by a persistent registry entry. Report informationally and
+        # never count toward `total`/`fail` (pre-0348 they were flagged
+        # MISSING and restart exited non-zero on a healthy driven fleet).
+        if window_mode_by_name.get(name) == "driven":
+            data = _load_registry(registry_dir / f"{role_lc}.json")
+            if data is None:
+                click.echo(f"    {role_lc:<22} driven (coordd-managed; "
+                           f"idle bash between turns)")
+            else:
+                try:
+                    pid = int(data.get("pid") or 0)
+                except (TypeError, ValueError):
+                    pid = 0
+                state = "mid-turn" if _pid_alive(pid) else "idle"
+                click.echo(f"    {role_lc:<22} driven ({state}; "
+                           f"coordd-managed)")
+            continue
         total += 1
         reg_path = registry_dir / f"{role_lc}.json"
         data = _load_registry(reg_path)
