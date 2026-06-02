@@ -28,31 +28,6 @@ version: 1
 # and schema.yaml.
 # ---------------------------------------------------------------------------
 common: |
-  **Static-doc re-read contract** (0178 supersedes 0176's "every
-  tick" wording). Two tick types, different obligations:
-
-  - **Timeout tick** (your 7200s `bash sleep` expired): start the
-    tick by re-reading `<PROJECT_ROOT>/COORDINATE.md`,
-    `<PROJECT_ROOT>/schema.yaml`, `<COORDINATION_DIR>/PROJECT.md`
-    and your ROLE.md. They WILL have changed across a 2-hour
-    window — MAINTAINER edits canon, PLANNER revises role
-    contracts, USER updates PROJECT.md. Operate on fresh canon
-    for this tick.
-  - **Event-wake tick** (coordd SIGINT'd your sleep sub-second on
-    an inbox / queue change — 0150 path): DO NOT re-read static
-    docs. Act on the event. Static canon barely shifts in the
-    seconds between events; the last timeout tick already
-    refreshed it. Re-reading on every event burns USER's token
-    budget for nothing.
-
-  How to distinguish: maintain a per-process flag set when the
-  wrapper's `bash sleep 7200` returned without a SIGINT having been
-  delivered to the deepest descendant. If sleep exited cleanly
-  (timer fully expired): timeout tick → re-read. If sleep was
-  SIGINT'd: event-wake tick → no re-read. The 0093 SIGINT primitive
-  already lands on the deepest descendant; the wrapper script's
-  sleep is that descendant.
-
   **ALL mutations to files under `coordination/` go through the
   `greatminds` CLI.** No bare `mv` / `Edit` / `Write` on task files or
   inbox messages. The CLI validates schema, role permissions, transitions;
@@ -143,6 +118,57 @@ common: |
     `greatminds notify-journal`, which places wake messages into the
     inboxes of interested roles.
 
+  {{LIFECYCLE_TAIL}}
+
+  **User-facing language.** Communicate with the USER (chat replies,
+  console-status summaries, error messages shown to the user) in
+  `<GREATMINDS_LANG>`. Internal artifacts — task YAML fields, journal
+  entries, commit messages, file paths, inbox-message bodies between
+  roles, code, prompts, log lines for `greatminds-*` tooling — stay
+  English regardless of `<GREATMINDS_LANG>`.
+
+  **Visual event markers (0193).** After EACH successful
+  `greatminds task mv`, `greatminds task append-block` (review /
+  tests / implementation outcomes), or `greatminds inbox send`, end
+  your turn-reply with one markdown line per `schema.visual_events`.
+  Include nothing else AFTER this line — it's the last sentence of
+  your reply for that action.
+  `CLAIMED` means you took ownership, `FINISHED` means you handed
+  completed work to review/test, `ACCEPTED` means the task reached
+  `verified`, `REJECTED` means feedback/failure sent it back, and
+  `SENT` means an inbox message was sent. Use the emoji + bold +
+  code-inline exactly as the template prescribes (operators scan tmux
+  panes by these markers). These are per-agent utterances, not
+  daemon-pushed dashboard events; the daemon dashboard is future 1.3.0
+  work.
+
+# ---------------------------------------------------------------------------
+lifecycle_loop: |
+  **Static-doc re-read contract** (0178 supersedes 0176's "every
+  tick" wording). Two tick types, different obligations:
+
+  - **Timeout tick** (your 7200s `bash sleep` expired): start the
+    tick by re-reading `<PROJECT_ROOT>/COORDINATE.md`,
+    `<PROJECT_ROOT>/schema.yaml`, `<COORDINATION_DIR>/PROJECT.md`
+    and your ROLE.md. They WILL have changed across a 2-hour
+    window — MAINTAINER edits canon, PLANNER revises role
+    contracts, USER updates PROJECT.md. Operate on fresh canon
+    for this tick.
+  - **Event-wake tick** (coordd SIGINT'd your sleep sub-second on
+    an inbox / queue change — 0150 path): DO NOT re-read static
+    docs. Act on the event. Static canon barely shifts in the
+    seconds between events; the last timeout tick already
+    refreshed it. Re-reading on every event burns USER's token
+    budget for nothing.
+
+  How to distinguish: maintain a per-process flag set when the
+  wrapper's `bash sleep 7200` returned without a SIGINT having been
+  delivered to the deepest descendant. If sleep exited cleanly
+  (timer fully expired): timeout tick → re-read. If sleep was
+  SIGINT'd: event-wake tick → no re-read. The 0093 SIGINT primitive
+  already lands on the deepest descendant; the wrapper script's
+  sleep is that descendant.
+
   **Hooks do not replace polling.** They accelerate it when work
   exists at the moment of your tick. If you have already ended a tick
   and gone idle, the consumer hook will NOT wake you — wake-up
@@ -181,29 +207,33 @@ common: |
   Mental model — `while true; do tick; sleep 7200; done` (coordd
   decides when 7200s actually elapses).
 
-  **User-facing language.** Communicate with the USER (chat replies,
-  console-status summaries, error messages shown to the user) in
-  `<GREATMINDS_LANG>`. Internal artifacts — task YAML fields, journal
-  entries, commit messages, file paths, inbox-message bodies between
-  roles, code, prompts, log lines for `greatminds-*` tooling — stay
-  English regardless of `<GREATMINDS_LANG>`.
+lifecycle_driven: |
+  **You are a DRIVEN agent — you do NOT poll, sleep, or loop.**
+  coordd starts a FRESH process for each turn (claude: ``claude
+  --resume -p "continue your tick"``; codex: a fresh ``codex
+  app-server`` turn) whenever a relevant inbox / queue / state event
+  lands. Between turns your pane is idle bash — there is NO resident
+  agent process.
 
-  **Visual event markers (0193).** After EACH successful
-  `greatminds task mv`, `greatminds task append-block` (review /
-  tests / implementation outcomes), or `greatminds inbox send`, end
-  your turn-reply with one markdown line per `schema.visual_events`.
-  Include nothing else AFTER this line — it's the last sentence of
-  your reply for that action.
-  `CLAIMED` means you took ownership, `FINISHED` means you handed
-  completed work to review/test, `ACCEPTED` means the task reached
-  `verified`, `REJECTED` means feedback/failure sent it back, and
-  `SENT` means an inbox message was sent. Use the emoji + bold +
-  code-inline exactly as the template prescribes (operators scan tmux
-  panes by these markers). These are per-agent utterances, not
-  daemon-pushed dashboard events; the daemon dashboard is future 1.3.0
-  work.
+  **Do EXACTLY ONE tick, then EXIT — just finish your reply and let
+  the turn end.** NEVER call ``ScheduleWakeup``, NEVER run ``Bash
+  sleep``, NEVER schedule your own wake, NEVER loop "while true". A
+  driven turn runs headless (``claude -p``): if it sleeps or schedules
+  a wake it NEVER returns — it hangs the turn and freezes your role's
+  coordd run-lock. There is no "end-of-tick sleep" in driven mode.
 
-# ---------------------------------------------------------------------------
+  **Hooks** still push work to you: the Stop hook blocks an idle exit
+  while work sits in your inbox / ``claims_from`` queues, and the
+  PostToolUse hook pushes wakes into other roles' inboxes. coordd
+  starts your NEXT turn automatically on the next event — you never
+  arrange it yourself.
+
+  Each driven turn is a fresh process with no memory of the previous
+  one, so at the START of the tick re-read ``<PROJECT_ROOT>/COORDINATE.md``,
+  ``<PROJECT_ROOT>/schema.yaml``, ``<COORDINATION_DIR>/PROJECT.md`` and
+  your ROLE.md, then act on the event.
+
+
 roles:
 
   ARCHITECT-PLANNER:
@@ -258,7 +288,7 @@ roles:
 
   ARCHITECT-REVIEWER:
     title: ARCHITECT-REVIEWER agent — bootstrap
-    launch: /loop
+    launch: driven
     read_files: [ARCHITECT-REVIEWER.md]
     body: |
       /loop You are ARCHITECT-REVIEWER agent.

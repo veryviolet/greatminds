@@ -961,12 +961,21 @@ def _codex_appserver_argv() -> list[str]:
     return ["codex", "app-server"]
 
 
-def _codex_appserver_env() -> dict:
+def _codex_appserver_env(role_lower: str | None = None) -> dict:
     """Environment for the per-turn ``codex app-server``: PATH prepended
     with node's dir so codex's env-node shebang + any node subprocess
-    resolve even under systemd's minimal PATH."""
+    resolve even under systemd's minimal PATH.
+
+    0311 driven fix: coordd has no role of its own, so a codex driven turn
+    spawned as a coordd subprocess (unlike the claude path, which inherits
+    ``export GREATMINDS_ROLE`` from the pane shell) would run with NO
+    ``GREATMINDS_ROLE`` — the agent's ``greatminds inbox list`` then reads
+    the wrong/empty inbox and the turn does nothing. Set it explicitly to
+    the driven role so codex agents see their own inbox/queues."""
     import shutil
     env = dict(os.environ)
+    if role_lower:
+        env["GREATMINDS_ROLE"] = role_lower.upper()
     node = shutil.which("node")
     if node:
         env["PATH"] = (str(Path(node).resolve().parent) + os.pathsep
@@ -1095,7 +1104,7 @@ def _drive_codex_turn_stdio(
     try:
         proc = _sp.Popen(
             argv, stdin=_sp.PIPE, stdout=_sp.PIPE, stderr=_sp.DEVNULL,
-            env=_codex_appserver_env(), cwd=cwd or None,
+            env=_codex_appserver_env(role_lower), cwd=cwd or None,
         )
     except OSError as exc:
         raise OSError(f"failed to spawn codex app-server: {exc}")

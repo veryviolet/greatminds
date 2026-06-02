@@ -94,6 +94,15 @@ def render_role(role: str, project_dir: Path | None, canon_dir: Path | None) -> 
 
     body = role_entry.get("body", "")
     body_with_common = body.replace("{{COMMON}}", common)
+    # 0311 lifecycle fix: the inter-tick tail is lifecycle-specific. A driven
+    # role must NEVER sleep/ScheduleWakeup/loop — a headless ``claude -p`` turn
+    # that sleeps never returns and freezes coordd's run-lock. Self-loop / chat
+    # roles keep the "sleep 7200 / infinite loop" tail. Substitute the right
+    # one for the role's launch mode into the {{LIFECYCLE_TAIL}} placeholder.
+    launch = (role_entry.get("launch") or "").lower()
+    tail_key = "lifecycle_driven" if launch == "driven" else "lifecycle_loop"
+    tail = (data.get(tail_key) or "").rstrip()
+    body_with_common = body_with_common.replace("{{LIFECYCLE_TAIL}}", tail)
     rendered, missing = substitute_tokens(body_with_common, tokens)
 
     # 0337 (DOD2): append the machine-readable CLI-only coordination-access
