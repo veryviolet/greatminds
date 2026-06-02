@@ -477,8 +477,10 @@ roles:
     category: system
     # 0312: MAINTAINER is self-loop — it wakes itself to drain its
     # inbox + run recovery (no queue-claim, USER-absent operation).
+    # launch_modes is loop (self-loop watchdog), not chat — it
+    # self-paces a recovery tick, it is not a human-paced chat seat.
     lifecycle: self-loop
-    launch_modes: [chat]
+    launch_modes: [loop]
     heartbeat: heartbeat.maintainer
     claims_from: []
     description: |
@@ -490,12 +492,20 @@ roles:
       when their issue is structural/schema rather than product.
       Does NOT claim from any product queue; does NOT triage user_feedback
       or write plans (that is ARCHITECT-PLANNER's job).
+      As a self-loop watchdog MAINTAINER also sweeps PROACTIVELY on
+      every tick (not only when an inbox ask arrives): it reclaims stale
+      stand leases that are past TTL with a dead/absent holder, restarts
+      dead agents and coordd, and escalates stalled task/queue chains to
+      ARCHITECT-PLANNER. An empty inbox is NOT "nothing to do" — the sweep
+      still runs.
     responsibilities:
       - agent_restart
       - dead_pid_recovery
       - schema_yaml_maintenance
       - cutover_orchestration
       - infra_chat_for_user
+      # proactive watchdog sweep each self-loop tick (not reactive-only)
+      - proactive_stall_sweep
     forbidden_actions:
       - claim_product_queues
       - triage_user_feedback
@@ -508,6 +518,12 @@ roles:
         - escalate_or_diagnose_infra
       on_release_cut_ask:
         - run_release_pipeline
+      # the self-loop tick itself is a trigger — proactively sweep
+      # every tick, before idling, even with an empty inbox.
+      on_self_loop_tick:
+        - reclaim_stale_stand_lease_past_ttl_with_dead_holder
+        - restart_dead_agents_and_coordd_via_greatminds_restart
+        - escalate_stalled_or_stuck_chains_to_planner_via_inbox
   BOT-USER:
     category: bot
     lifecycle: driven

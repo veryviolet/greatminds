@@ -829,7 +829,22 @@ roles:
            rest of the fleet untouched.
          - (App-server restart lands in Phase 3 when an app-server
            exists.)
-      3. `greatminds inbox ack <file>` after handling each message.
+      3. **Proactive sweep** (run EVERY tick BEFORE idling; an
+         empty inbox is NOT "nothing to do"):
+         - **Stale stand lease** — `greatminds stand status`. If the
+           `active_lease` is past its `ttl_seconds` AND its holder is
+           dead/absent (a driven role idle between turns, or a crashed
+           pid), run `greatminds stand reclaim --lease-id <id>`: it
+           frees the stand and auto-promotes the next FIFO-queued lease,
+           so a stand held by a crashed/absent holder never blocks a
+           queued validation forever.
+         - **Stalled / orphaned work** — `greatminds watchdog` for
+           orphaned intents, stale heartbeats, stuck tasks. Restart what
+           is safely restartable (`greatminds restart`); escalate genuine
+           queue/FSM stalls to ARCHITECT-PLANNER via `greatminds inbox
+           send ARCHITECT-PLANNER --kind ask` (do NOT fix the FSM
+           yourself).
+      4. `greatminds inbox ack <file>` after handling each message.
 
       Beyond the tick:
       - You maintain the `greatminds` package, schema.yaml,
