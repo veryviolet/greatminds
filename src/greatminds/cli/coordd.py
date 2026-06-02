@@ -111,6 +111,18 @@ DEAD_REPORT_INTERVAL_SEC = float(os.environ.get("COORDD_DEAD_REPORT_INTERVAL_SEC
 STALLED_SWEEP_INTERVAL_DEFAULT = 300.0   # 5 min
 STALLED_THRESHOLD_DEFAULT      = 600.0   # 10 min
 
+# 0345: periodic orphaned-intent reaping. An intent file is left behind
+# when an agent crashes mid-tick (intent written, task never moved); the
+# `intent-clean` reaper existed but nothing RAN it, so orphans piled up
+# for hours on a long-lived coordination dir and surfaced as watchdog
+# findings. coordd now reaps them on this cadence using the same
+# safe-by-default logic (only intents older than the min-age whose task
+# already left the from-queue). Min-age comes from
+# schema.watchdog.intent_orphan_seconds.
+INTENT_REAP_INTERVAL_SEC = float(
+    os.environ.get("COORDD_INTENT_REAP_INTERVAL_SEC", "300"))
+INTENT_ORPHAN_MIN_AGE_DEFAULT = 300.0
+
 # 0199: PyPI version check. Defaults match schema.auto_update.
 # Operator can override per-project via env (test/dev convenience).
 AUTO_UPDATE_CHECK_INTERVAL_DEFAULT = 14400.0   # 4h
@@ -1478,6 +1490,22 @@ def _last_journal_actor_for(coord: Path, filename: str) -> str | None:
     return None
 
 
+def _load_intent_orphan_min_age(canon_dir: Path) -> float:
+    """0345: read ``schema.watchdog.intent_orphan_seconds`` (the min age
+    before an orphaned intent may be reaped). Falls back to the default
+    on any read/parse failure so coordd never crashes over config."""
+    try:
+        import yaml as _yaml
+        doc = _yaml.safe_load(
+            (canon_dir / "schema.yaml").read_text(encoding="utf-8")) or {}
+        val = (doc.get("watchdog") or {}).get("intent_orphan_seconds")
+        if isinstance(val, (int, float)) and not isinstance(val, bool):
+            return float(val)
+    except Exception:
+        pass
+    return INTENT_ORPHAN_MIN_AGE_DEFAULT
+
+
 def _load_auto_update_config(canon_dir: Path) -> dict:
     """0199: read ``auto_update:`` from schema.yaml.
 
@@ -1970,6 +1998,17 @@ def coordd(project_dir: Path | None, project_name: str | None,
     auto_update_cfg = _load_auto_update_config(canon_dir)
     last_auto_update_check: float = 0.0
     last_notified_version: str | None = None
+
+    # 0345: orphaned-intent reaping cadence + min-age (from schema).
+    intent_orphan_min_age = _load_intent_orphan_min_age(canon_dir)
+    last_intent_reap: float = 0.0
+    if verbose:
+        print(
+            f"coordd: intent reaping enabled "
+            f"(interval {INTENT_REAP_INTERVAL_SEC:.0f}s, "
+            f"min-age {intent_orphan_min_age:.0f}s)",
+            file=sys.stderr,
+        )
     if verbose:
         print(
             f"coordd: auto_update enabled "
@@ -2217,6 +2256,30 @@ def coordd(project_dir: Path | None, project_name: str | None,
                     if verbose:
                         print(
                             f"coordd: auto_update check error: {exc}",
+                            file=sys.stderr,
+                        )
+
+            # Step 7 (0345): reap orphaned intent files. Throttled to
+            # INTENT_REAP_INTERVAL_SEC; uses the shared intent-clean core
+            # (only removes intents older than the min-age whose task has
+            # already left its from-queue). Maintenance, not a task/queue
+            # mutation — coordd's read-only-on-content charter holds.
+            if now_ts - last_intent_reap >= INTENT_REAP_INTERVAL_SEC:
+                last_intent_reap = now_ts
+                try:
+                    from greatminds.cli.intent_clean import reap_orphan_intents
+                    counts = reap_orphan_intents(coord, intent_orphan_min_age)
+                    if verbose and counts["removed"]:
+                        print(
+                            f"coordd: reaped {counts['removed']} orphaned "
+                            f"intent(s) (kept_active={counts['kept_active']}, "
+                            f"kept_recent={counts['kept_recent']})",
+                            file=sys.stderr,
+                        )
+                except Exception as exc:  # noqa: BLE001 — never crash loop
+                    if verbose:
+                        print(
+                            f"coordd: intent reap error: {exc}",
                             file=sys.stderr,
                         )
         except KeyboardInterrupt:

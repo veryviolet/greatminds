@@ -37,6 +37,65 @@ def strip_coord_prefix(s: str) -> str:
     return s
 
 
+def reap_orphan_intents(coord: Path, min_age_sec: float = 300.0,
+                        dry_run: bool = False,
+                        log=None) -> dict[str, int]:
+    """0345: garbage-collect orphaned intent files. Shared core used by
+    the ``intent-clean`` CLI AND coordd's periodic reaper.
+
+    An intent is reaped when it is older than ``min_age_sec`` AND its
+    task no longer sits in the intent's ``from`` queue (the mv completed
+    or the task was withdrawn). Recently-created intents and intents
+    whose task is still in-flight are kept. ``log`` is an optional
+    ``(level, message)`` callback (``level`` ∈ removed/dry/warn) for the
+    CLI's coloured output; coordd passes None (silent).
+
+    Returns ``{removed, kept_active, kept_recent}``.
+    """
+    counts = {"removed": 0, "kept_active": 0, "kept_recent": 0}
+    idir = coord / "intent"
+    if not idir.is_dir():
+        return counts
+    now = time.time()
+    for f in sorted(idir.glob("*.json")):
+        try:
+            age = now - f.stat().st_mtime
+        except OSError:
+            continue
+        if age < min_age_sec:
+            counts["kept_recent"] += 1
+            continue
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            if log:
+                log("warn", f"unparseable intent {f.name} (age {int(age)}s)")
+            continue
+        from_q = strip_coord_prefix(str(data.get("from", "")))
+        task_id = str(data.get("task", ""))
+        # Task still in its from-queue → a (long) operation is in
+        # progress; do NOT delete.
+        if from_q and task_id and task_in_queue(coord, from_q, task_id):
+            counts["kept_active"] += 1
+            continue
+        if dry_run:
+            if log:
+                log("dry", f"would remove {f.name} (age {int(age)}s, "
+                           f"from {from_q})")
+        else:
+            try:
+                f.unlink()
+            except OSError as exc:
+                if log:
+                    log("warn", f"cannot unlink {f.name}: {exc}")
+                continue
+            if log:
+                log("removed", f"removed {f.name} (age {int(age)}s, "
+                               f"from {from_q})")
+        counts["removed"] += 1
+    return counts
+
+
 @click.command(name="intent-clean", short_help="garbage-collect orphaned intent files", help=__doc__)
 @click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
               default=None, help="project root (default: cwd)")
@@ -57,40 +116,20 @@ def intent_clean(project_dir: Path | None, min_age_sec: int, dry_run: bool, quie
             info("intent/: no directory, nothing to do")
         return
 
-    now = time.time()
-    removed = 0
-    kept_active = 0
-    kept_recent = 0
-    for f in sorted(idir.glob("*.json")):
-        age = now - f.stat().st_mtime
-        if age < min_age_sec:
-            kept_recent += 1
-            continue
-        try:
-            data = json.loads(f.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            warn(f"  unparseable intent {f.name} (age {int(age)}s)")
-            continue
-        from_q = strip_coord_prefix(str(data.get("from", "")))
-        task_id = str(data.get("task", ""))
-        # If from-queue resolves and the task still sits there, the agent
-        # is in the middle of a (long) operation; do NOT delete.
-        if from_q and task_id and task_in_queue(coord, from_q, task_id):
-            kept_active += 1
-            continue
-        if dry_run:
-            info(f"  [dry] would remove {f.name} (age {int(age)}s, from {from_q})")
+    def _log(level: str, message: str) -> None:
+        if level == "removed":
+            ok(f"  {message}")
+        elif level == "dry":
+            info(f"  [dry] {message}")
         else:
-            try:
-                f.unlink()
-                ok(f"  removed {f.name} (age {int(age)}s, from {from_q})")
-            except OSError as exc:
-                warn(f"  cannot unlink {f.name}: {exc}")
-                continue
-        removed += 1
+            warn(f"  {message}")
 
-    if not quiet or removed:
-        info(f"intent-clean: removed={removed} kept_active={kept_active} kept_recent={kept_recent}")
+    counts = reap_orphan_intents(coord, float(min_age_sec),
+                                 dry_run=dry_run, log=_log)
+    if not quiet or counts["removed"]:
+        info(f"intent-clean: removed={counts['removed']} "
+             f"kept_active={counts['kept_active']} "
+             f"kept_recent={counts['kept_recent']}")
 
 
 if __name__ == "__main__":
