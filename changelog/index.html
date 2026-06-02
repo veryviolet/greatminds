@@ -1408,12 +1408,105 @@
 <p>All notable changes to <strong>greatminds</strong> are documented here. Format follows
 <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a> loosely; versions
 follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
+<h2 id="142-2026-06-02">1.4.2 — 2026-06-02<a class="headerlink" href="#142-2026-06-02" title="Permanent link">&para;</a></h2>
+<p>Patch release: SAFETY + the recovery-chain fixes the on-stand
+validation surfaced after 1.4.1 shipped.</p>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<ul>
+<li>
+<p><strong>0349 SAFETY: EXPLORER host-destructive actions must target the
+  avatar stand only.</strong> EXPLORER had no machine-target boundary, and a
+  recent campaign ran <code>kill</code> against local coordd on the dev fleet —
+  host-destructive work hit the local greatminds-dev fleet instead of
+  the avatar stand. The codex profile now spells out: "the stand" =
+  the AVATAR host (deployed <code>/srv/greatminds-stand</code>), a DIFFERENT
+  machine from EXPLORER's own process host. Every host-destructive /
+  lifecycle / recovery command (kill, pkill, kill -TERM/-KILL/-SIGINT,
+  systemctl stop/restart/kill, killing coordd / driven-worker /
+  codex-app-server, logout, reboot) MUST run on the avatar via
+  <code>ssh &lt;STAND_HOST&gt;</code>. Strictly forbidden against localhost or the
+  local greatminds-dev fleet (greatminds-daemon@greatminds-dev +
+  coordd). "The local host is NOT the stand; never damage it."
+  Unresolvable destructive command → do not run; file a blocker. The
+  0344 stand-anchor is preserved (ssh remains allowed for on-stand
+  operation); the 0331-era no-host blanket is not re-added.</p>
+</li>
+<li>
+<p><strong>0345 watchdog ignores non-role heartbeat files + coordd
+  periodically reaps orphan intents.</strong> On a healthy reactive fleet
+  watchdog flagged <code>heartbeat.planner</code> + <code>heartbeat.review_sessions</code>
+  as stale, but those names are a tmux WINDOW name and a QUEUE name,
+  not role heartbeats — the per-lifecycle threshold could not resolve
+  them and fell back to the 600s default. Filename resolution now
+  SEGREGATES non-role files (window / queue / unknown stems) into a
+  single info line ("heartbeats: N non-role/legacy file(s) ignored:
+  ..."). Orphan intents also piled up because the reaper existed but
+  nothing ran it automatically; the safe reaping core is extracted
+  into <code>intent_clean.reap_orphan_intents</code> and coordd runs it
+  periodically (default 300s), wrapped so it never crashes the loop.</p>
+</li>
+<li>
+<p><strong>0346 coordd systemd unit <code>Restart=always</code> so external kills
+  resurrect coordd.</strong> The coordd systemd template unit used
+  <code>Restart=on-failure</code>. coordd catches SIGTERM and returns cleanly,
+  so an external <code>kill -TERM</code> produced exit 0/SUCCESS and on-failure
+  did NOT restart the killed coordd (<code>NRestarts=0</code>, unit went dead).
+  Now <code>Restart=always</code> (RestartSec=2) in both the shipped canon unit
+  and the inline fallback body. Systemd resurrects coordd after any
+  external kill / crash; a deliberate <code>systemctl --user stop</code> or
+  <code>greatminds daemon stop</code> is still honored (systemd never
+  auto-restarts a commanded stop regardless of <code>Restart=</code>), so update
+  / restart flows are unaffected.</p>
+</li>
+<li>
+<p><strong>0347 coordd Step-2 inbox-scan drives migrated driven roles via
+  the shared driver.</strong> coordd drove driven roles only from the
+  queue/.stand path; the inbox-scan woke every role via
+  sigint_deepest_descendant / press_enter. A driven role's pane is
+  idle bash between turns, so an inbox wake of a killed driven codex
+  worker sigint'd a dead pane — nothing re-drove or re-registered it
+  (agent status stayed not-registered). Extracted the dispatch
+  decision into <code>_maybe_drive_driven_role</code>: lifecycle==driven AND
+  coord.yaml window mode==driven → route through the driver
+  (claude_driver for tool=claude, codex_driver for tool=codex); else
+  None and the caller falls back to the legacy wake. <code>_route_queue_event</code>
+  and the Step-2 inbox-scan both use the shared helper. A killed
+  driven codex worker re-registers on the next event via a
+  force-fresh turn.</p>
+</li>
+<li>
+<p><strong>0348 <code>greatminds restart</code> skips driven windows + reports them as
+  coordd-managed.</strong> restart's <code>_relaunch</code> built the launch command
+  with the coord.yaml window mode verbatim, so a driven role got
+  <code>greatminds start-agent &lt;ROLE&gt; codex --mode driven</code>; <code>--mode</code> is
+  <code>Choice(loop|chat)</code> and errored, restart exited non-zero, the role
+  was left MISSING. launch.py already SKIPS mode==driven windows;
+  restart now mirrors that — <code>_relaunch</code> skips driven windows (recovery
+  is the next coordd event; --reset still clears session files), and
+  <code>_verify</code> reports driven roles as <code>driven (coordd-managed)</code> and
+  excludes them from total/fail (pre-0348 they were flagged MISSING
+  on a healthy driven fleet).</p>
+</li>
+</ul>
+<h3 id="operator-migration">Operator migration<a class="headerlink" href="#operator-migration" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Re-seed <code>coordination/.codex-home/explorer/</code> so the 0349 + 0344
+  clauses reach the LIVE EXPLORER. <code>greatminds setup</code> seeds the
+  per-role codex homes once without overwrite, so MAINTAINER /
+  STAND-KEEPER must refresh <code>coordination/.codex-home/explorer/</code> from
+  the corrected shipped profile after the .venv-coord clean-wheel
+  upgrade. Preserve <code>auth.json</code> in the per-role home during the
+  refresh.</li>
+<li>Run <code>greatminds daemon install</code> (or <code>greatminds daemon repair</code>) +
+  <code>systemctl --user daemon-reload</code> so the existing greatminds-daemon
+  unit picks up the 0346 <code>Restart=always</code> directive.</li>
+</ul>
 <h2 id="141-2026-06-02">1.4.1 — 2026-06-02<a class="headerlink" href="#141-2026-06-02" title="Permanent link">&para;</a></h2>
 <p>Patch release: brings the shipped EXPLORER codex profile in line with
 the 0336 stand-anchor. Until this patch lands on the fleet, EXPLORER's
 seeded codex profile keeps injecting a stale web-only boundary that
 overrides the canon and blocks on-stand validation.</p>
-<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0344 EXPLORER codex profile carries the 0336 stand-anchor.</strong> The
   shipped <code>src/greatminds/data/codex/profiles/explorer.config.toml</code>
@@ -1581,7 +1674,7 @@ documentation refresh.</p>
   <code>greatminds stand lease</code> / <code>stand release</code>.</p>
 </li>
 </ul>
-<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0341 coordd watches <code>.stand</code> up front so lifecycle changes wake
@@ -1730,7 +1823,7 @@ prose + public mkdocs site mirror the model.</p>
   update the permissions paragraph from "loop-mode role" to "driven or
   self-loop role".</li>
 </ul>
-<h3 id="operator-migration">Operator migration<a class="headerlink" href="#operator-migration" title="Permanent link">&para;</a></h3>
+<h3 id="operator-migration_1">Operator migration<a class="headerlink" href="#operator-migration_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Pre-1.3.12 fleets need a one-time <code>greatminds setup</code> regen against
   their existing project (or hand-edit <code>coord.yaml</code> window modes for
@@ -1779,7 +1872,7 @@ and the launch/restart wrapper-loop removal.</p>
   (nonzero exit propagates because enable is the whole point).</p>
 </li>
 </ul>
-<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0300 worktree_merge pulls origin/main before merging task
@@ -1830,7 +1923,7 @@ and the launch/restart wrapper-loop removal.</p>
 <p>Fixes two operator-facing bugs in <code>greatminds update</code> so the command
 works correctly on projects managed by uv / poetry / pipenv and stops
 resurrecting torn-down fleet sessions.</p>
-<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_4">Fixed<a class="headerlink" href="#fixed_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0299 update branches by <code>detect_env_setup</code> + skips fleet restart
   when tmux session absent.</strong> <code>update</code> used to call pip even when the
@@ -1853,7 +1946,7 @@ resurrecting torn-down fleet sessions.</p>
 <p>Critical fix for the chat-mode UserPromptSubmit deadlock that
 shipped across the 1.3.x line. Operators on existing projects should
 upgrade promptly.</p>
-<h3 id="fixed_4">Fixed<a class="headerlink" href="#fixed_4" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_5">Fixed<a class="headerlink" href="#fixed_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0298 stop-decide <code>user-prompt-submit</code> phase no longer emits
   <code>decision: block</code>.</strong> <code>greatminds stop-decide</code> returned the same
@@ -1935,7 +2028,7 @@ be leased.</p>
   rejection.</p>
 </li>
 </ul>
-<h3 id="fixed_5">Fixed<a class="headerlink" href="#fixed_5" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_6">Fixed<a class="headerlink" href="#fixed_6" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0292 <code>full-deploy.yaml</code> install step uses <code>uv pip</code>.</strong> <code>uv venv</code>
@@ -1970,7 +2063,7 @@ contradictions across the stand transitions.</p>
   role list</code> CLI surface the rendered contract. Existing
   <code>roles/*.md</code> prose remains; doc-shrinkage follow-up deferred.</li>
 </ul>
-<h3 id="fixed_6">Fixed<a class="headerlink" href="#fixed_6" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_7">Fixed<a class="headerlink" href="#fixed_7" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0289 stand release/down/up nullify <code>active_lease</code>.</strong> Pre-fix
   <code>stand down</code> left the triggering lease set, and <code>stand up</code> did
@@ -1984,7 +2077,7 @@ contradictions across the stand transitions.</p>
 <h2 id="134-2026-05-27">1.3.4 — 2026-05-27<a class="headerlink" href="#134-2026-05-27" title="Permanent link">&para;</a></h2>
 <p>Followup patch tightening the SK runtime gate so the stand-profile
 dispatch contract is actually enforced.</p>
-<h3 id="fixed_7">Fixed<a class="headerlink" href="#fixed_7" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_8">Fixed<a class="headerlink" href="#fixed_8" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0286 three-layer deploy lock.</strong> SK could still mark state=ready
   without invoking ansible-playbook because the <code>is_deploy_safe</code>
@@ -2063,7 +2156,7 @@ fix that unblocks Phase H avatar verification.</p>
   Lease-level override wins over spec value.</p>
 </li>
 </ul>
-<h3 id="fixed_8">Fixed<a class="headerlink" href="#fixed_8" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_9">Fixed<a class="headerlink" href="#fixed_9" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0285 SK deploy-bypass closed — <code>is_deploy_safe</code> classifier.</strong> SK
   was refusing every deploy that touched the main fleet tree, even
@@ -2082,7 +2175,7 @@ fix that unblocks Phase H avatar verification.</p>
 emergency wake fix. Five verified tasks merged on local main; all
 empirically validated via real avatar SSH stand probes (no shape-only
 evidence).</p>
-<h3 id="fixed_9">Fixed<a class="headerlink" href="#fixed_9" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_10">Fixed<a class="headerlink" href="#fixed_10" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0258 — complete BREAKING removal of stand-stream runtime.</strong>
@@ -2156,7 +2249,7 @@ input_sock channel + leaf SIGINT; end-to-end probe (filed
 feature_inbox/9999.yaml → coordd inotify → press_enter →
 input_sock → SIGINT to PLANNER's own Bash subprocess exit 130)
 confirms the full chain.</p>
-<h3 id="fixed_10">Fixed<a class="headerlink" href="#fixed_10" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_11">Fixed<a class="headerlink" href="#fixed_11" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0259 coordd inotify wake uses <code>input_sock</code> via <code>press_enter</code>.</strong>
   Pre-0259, coordd's chat-mode wake (<code>tmux_send_keys_wake</code>) sent
@@ -2266,7 +2359,7 @@ in a single step.</p>
 <p>Bug-fix release. Three regressions found in 1.1.0 real-world use, plus a
 critical wake-up channel regression introduced silently by the 1.0.0
 umbrella-console-script migration. No new features.</p>
-<h3 id="fixed_11">Fixed<a class="headerlink" href="#fixed_11" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_12">Fixed<a class="headerlink" href="#fixed_12" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>task append-block --body-file</code> option missing.</strong> Dropped during the
   argparse→click conversion. The plan orchestrator and several agent
@@ -2413,7 +2506,7 @@ plan → dev) confirmed against a fresh project: 7+ journal
 transitions, schema validation rejects malformed blocks, role
 permissions enforced.</p>
 <h2 id="011-2026-05-20">0.1.1 — 2026-05-20<a class="headerlink" href="#011-2026-05-20" title="Permanent link">&para;</a></h2>
-<h3 id="fixed_12">Fixed<a class="headerlink" href="#fixed_12" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_13">Fixed<a class="headerlink" href="#fixed_13" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>greatminds-coord-launch</code> and <code>greatminds-coord-tmux</code> now find a
   sibling <code>greatminds-start-agent</code> in the same venv via
