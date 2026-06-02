@@ -16,7 +16,7 @@
         <link rel="prev" href="../transitions/">
       
       
-        <link rel="next" href="../../recipes/filing-a-bug/">
+        <link rel="next" href="../lifecycle/">
       
       
         
@@ -310,6 +310,26 @@
   
   
   Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../operations/runbook/" class="md-tabs__link">
+          
+  
+  
+  Operations
 
         </a>
       </li>
@@ -1130,6 +1150,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lifecycle Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1167,7 +1215,7 @@
   <span class="md-ellipsis">
     
   
-    Recipes
+    Operations
   
 
     
@@ -1180,6 +1228,93 @@
         
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/runbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runbook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Recipes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1443,8 +1578,10 @@
 
 
 <h1 id="daemon-and-agents">Daemon and Agents<a class="headerlink" href="#daemon-and-agents" title="Permanent link">&para;</a></h1>
-<p><code>greatminds launch</code> starts the configured agent windows. Each window is defined
-in <code>coord.yaml</code> with:</p>
+<p><code>greatminds launch</code> starts the configured agent windows. Fresh fleets should
+launch from the fixed coordination venv, for example
+<code>./.venv-coord/bin/greatminds launch --target tmux</code>. Each window is defined in
+<code>coord.yaml</code> with:</p>
 <ul>
 <li>window name</li>
 <li>role</li>
@@ -1488,6 +1625,9 @@ window's <code>coord.yaml</code> <code>tool:</code> value:</p>
 <li><code>codex</code> driven roles run one fresh <code>codex app-server</code> stdio process for the
   turn; the app-server thread id is persisted for continuity.</li>
 </ul>
+<p>Driven roles do one tick, then exit. They do not schedule long sleeps or run a
+persistent <code>/loop</code>; their next turn comes from the next inbox, queue, or stand
+event.</p>
 <p>This reactive path replaces short idle polling for normal queue and inbox
 changes. Reaction time should be the daemon watcher interval plus one driven
 spawn or wake signal, not a role's fallback sleep value.</p>
@@ -1515,6 +1655,9 @@ send, the agent ends its own chat reply with the matching marker line.</p>
    coalesce into one prompt.</li>
 <li>Run <code>greatminds watchdog</code> to check dead pids, stale heartbeats, and orphaned
    intents.</li>
+<li>Run <code>greatminds agent status [ROLE]</code> to inspect the recorded pid, liveness,
+   session id, venv, heartbeat age, and input socket without reading registry
+   files by hand.</li>
 </ol>
 <h2 id="visual-event-markers">Visual event markers<a class="headerlink" href="#visual-event-markers" title="Permanent link">&para;</a></h2>
 <p>Operators can scan live tmux panes by the marker at the end of an agent reply.

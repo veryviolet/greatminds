@@ -319,6 +319,26 @@
   
   
   
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../operations/runbook/" class="md-tabs__link">
+          
+  
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
     
   
   
@@ -1017,6 +1037,121 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lifecycle Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/runbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runbook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1049,10 +1184,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
             
   
   
@@ -1070,8 +1205,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_6">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1345,21 +1480,24 @@
 <h1 id="e2e-testing">E2E Testing<a class="headerlink" href="#e2e-testing" title="Permanent link">&para;</a></h1>
 <p>For stand-required work, the test path has two evidence streams:</p>
 <ol>
-<li>Stand evidence from <code>STAND-KEEPER</code>.</li>
-<li>Test evidence from <code>TESTER</code>.</li>
+<li>Stand readiness from <code>STAND-KEEPER</code>, recorded through the lease state.</li>
+<li>Product verification from <code>TESTER</code>, recorded in the task's <code>tests</code> block.</li>
 </ol>
 <p>The tester runs the appropriate checks, then runs:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>gate-check<span class="w"> </span>TASK_ID
 </code></pre></div>
-<p>The result is recorded in the tests block. A passing gate means the stand
-evidence matches the task and commit. A missing or failing gate keeps the task
-out of final review.</p>
+<p>The result is recorded in the tests block. A passing gate means TESTER's
+stand evidence names the task, lease, worktree, and implementation commit. A
+missing or failing gate keeps the task out of final review.</p>
 <h2 id="typical-flow">Typical flow<a class="headerlink" href="#typical-flow" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code>feature_dev -&gt; feature_test -&gt; feature_review -&gt; verified
 </code></pre></div>
 <p>If tests fail, <code>TESTER</code> records the failure and returns the task to the
 implementation queue. If the task is blocked on a named dependency, the owner
 parks it in <code>feature_blocked/</code> with a blocked block.</p>
+<p><code>STAND-KEEPER</code> does not run product acceptance tests. It deploys or recovers
+the stand, marks the lease ready, and leaves functional probes to TESTER or
+EXPLORER.</p>
 
 
 

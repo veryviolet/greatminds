@@ -325,6 +325,26 @@
     
     
       <li class="md-tabs__item">
+        <a href="../../operations/runbook/" class="md-tabs__link">
+          
+  
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
         <a href="../../recipes/filing-a-bug/" class="md-tabs__link">
           
   
@@ -1113,6 +1133,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lifecycle Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1150,7 +1198,7 @@
   <span class="md-ellipsis">
     
   
-    Recipes
+    Operations
   
 
     
@@ -1163,6 +1211,93 @@
         
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/runbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runbook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Recipes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1417,7 +1552,8 @@ the old <code>stand_requests/</code>, <code>stand_wip/</code>, and <code>stand_d
 <div class="highlight"><pre><span></span><code>coordination/.stand/state.yaml
 </code></pre></div>
 <p><code>greatminds stand status</code> reads that file and prints the current state, active
-lease, pending FIFO queue, and recent transition history.</p>
+lease, pending FIFO queue, and recent transition history. Use the CLI output as
+the source of truth; do not inspect or edit <code>state.yaml</code> directly.</p>
 <p>The stand has four states:</p>
 <table>
 <thead>
@@ -1452,6 +1588,13 @@ leases wait in FIFO order in the same state file.</p>
 <p>The role that needs a live stand requests a lease:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>lease<span class="w"> </span>--task<span class="w"> </span>&lt;task-id&gt;<span class="w"> </span>--worktree<span class="w"> </span>&lt;path&gt;<span class="w"> </span>--profile<span class="w"> </span>&lt;profile&gt;
 </code></pre></div>
+<p><code>--worktree</code> must point at the task's isolated worktree under
+<code>&lt;project&gt;/.worktrees/</code>, not the main fleet checkout. The usual form is:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>lease<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--task<span class="w"> </span>&lt;task-id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--worktree<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>greatminds<span class="w"> </span>worktree<span class="w"> </span>path<span class="w"> </span>&lt;task-id&gt;<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--profile<span class="w"> </span>full-deploy
+</code></pre></div>
 <p>If the stand is <code>free</code>, the lease becomes active and the state moves to
 <code>preparing</code>. If another lease is active, the new lease is appended to the FIFO
 queue. The command prints the <code>lease_id</code>; the requester must keep that token.</p>
@@ -1463,7 +1606,9 @@ the lease profile. On success:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>ready<span class="w"> </span>--lease-id<span class="w"> </span>&lt;lease-id&gt;
 </code></pre></div>
 <p>That moves the state to <code>ready</code> and files an inbox-info message to the holder:
-<code>stand lease &lt;lease-id&gt; ready; task=&lt;task-id&gt;</code>.</p>
+<code>stand lease &lt;lease-id&gt; ready; task=&lt;task-id&gt;</code>. <code>STAND-KEEPER</code> may only mark a
+lease ready after the configured stand profile has run and left its deploy
+marker.</p>
 <p>The holder, usually <code>TESTER</code> or <code>EXPLORER</code>, then runs its own probes against
 the prepared stand and releases the lease:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>release<span class="w"> </span>--lease-id<span class="w"> </span>&lt;lease-id&gt;<span class="w"> </span>--result<span class="w"> </span>pass<span class="p">|</span>fail<span class="p">|</span>partial
@@ -1494,7 +1639,8 @@ its own <code>functional_probes</code> plus <code>stand_evidence.tester_observat
 <code>greatminds gate-check &lt;task-id&gt;</code> reads that tests-block evidence first.</p>
 <p>The old queue artifacts are removed from the active workflow. Do not create
 new <code>stand_requests/</code>, <code>stand_wip/</code>, or <code>stand_done/</code> tasks for current stand
-operations.</p>
+operations, and do not use the removed <code>stand request</code> or <code>stand result</code>
+commands in new instructions.</p>
 
 
 
