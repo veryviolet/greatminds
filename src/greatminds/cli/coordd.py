@@ -742,6 +742,23 @@ def _build_driven_claude_argv(
         argv = ["claude", "-p", prompt]
     else:
         argv = ["claude", "--resume", session_id, "-p", prompt]
+    # 0311 driven fix: a headless ``claude -p`` turn that uses ANY tool blocks
+    # on MCP-server initialization before it can act. The fleet's default MCP
+    # discovery includes heavy npm-exec browser servers (playwright,
+    # chrome-devtools) that hang on startup, so the turn never returns and
+    # freezes coordd's run-lock — the driven "hang". Driven pipeline roles
+    # need NO MCP (they work via Read/Edit/Bash + the ``greatminds`` CLI), so
+    # suppress all MCP discovery with --strict-mcp-config (no --mcp-config flag
+    # ⇒ zero MCP servers spawned). Built-in tools (Bash/Read/Edit) still work.
+    argv.append("--strict-mcp-config")
+    # 0311 driven fix (root cause of the hang): without an explicit permission
+    # mode a headless ``claude -p`` turn runs in ``default`` mode, so every
+    # tool call (Bash / the ``greatminds`` CLI) requires interactive approval.
+    # In headless mode there is no approver, so the turn BLOCKS forever on the
+    # first gated tool call — the driven "hang". Interactive agents already use
+    # ``--permission-mode auto`` (start_agent.py); driven turns must too so the
+    # agent can run its tools unattended.
+    argv.extend(["--permission-mode", "auto"])
     if bootstrap_file:
         argv.extend(["--append-system-prompt-file", bootstrap_file])
     return argv
