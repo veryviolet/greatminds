@@ -4,6 +4,163 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.4.0 — 2026-06-02
+
+Minor release closing the 0311 Phase 5 stand-robustness work + the DOD2
+operator-CLI batch, on top of the 1.3.12 reactive-fleet base. Highlights:
+per-lifecycle watchdog thresholds, codex 0.135 profile-v2 split, the
+CLI-only coordination-access rule wired to the actual agent prompt
+surface, a journal-tail / agent-status / task id-intake unification, a
+coordd .stand watch-up-front + STAND-KEEPER auto-wake, an expired-lease
+reclaim + queue-head auto-promote, the canon TESTER-local-exec ban, the
+EXPLORER stand-only contract restore, and a full reactive-fleet
+documentation refresh.
+
+### Added
+
+- **0337 CLI-only coordination access rule reaches the render-role
+  agent surface (DOD2).** New `schema.coordination_access` declares
+  `rule=coordination_access_via_greatminds_cli_only`,
+  `forbidden=raw_ls_cat_grep_sed_edit_on_coordination`, and the
+  canonical CLI surfaces. `cli/render_role.py` appends the rendered
+  rule after the role body so `greatminds render-role <ROLE>` carries
+  it for every role — every driven turn and every `start-agent`
+  injects the rule into the prompt. iter-1 wired it only to
+  `role_contract.render_contract` which the agent path never calls;
+  iter-2 closes that wiring blind spot.
+
+- **0338 `greatminds journal tail` — read-only filterable view of
+  `coordination/journal.ndjson` (DOD2).** `-n N` (default 20),
+  `--role R` matches both the `actor` and `role` fields
+  (case-insensitive), `--task T` exact / prefix / leading-zero seq
+  (`0338` matches `0338-foo`), `--project-dir`. Read-only: opens
+  for reading only; bad JSON lines skipped; missing journal → clear
+  error.
+
+- **0339 `greatminds agent status` — per-role pid / alive /
+  session_id / venv / heartbeat_age / input_sock (DOD2).** Replaces
+  raw `cat .agent_registry/<role>.json` with a clean contract
+  surface. Alive via `os.kill(pid, 0)` (PermissionError treated as
+  alive — never report a healthy holder dead). Venv read from
+  `/proc/<pid>/environ` of the live process (dead pid / non-Linux
+  → null). `--json` for machine-readable consumers. No-arg lists
+  every registered role; `<ROLE>` returns one (unregistered still
+  emits a stable not-registered record).
+
+- **0342 `greatminds stand reclaim` — TTL+holder-alive reaper for
+  expired singleton leases.** STAND-KEEPER / ARCHITECT-PLANNER only.
+  Frees a lease only when BOTH the lease is past `ttl_seconds` AND
+  the holder agent is dead/absent (registry pid via `os.kill(pid, 0)`;
+  absent registry → not alive). Conservative: unparseable ttl or
+  PermissionError → NOT reclaimable. Refuses (exit 3) for no lease /
+  in-TTL / holder-alive / non-SK/PLANNER caller / mismatched
+  `--lease-id`. Closes the dead-holder + expired-lease permanent
+  singleton lock.
+
+### Changed
+
+- **0326 unify `greatminds task` subcommand id intake (DOD2).**
+  `find_task` now accepts short id, full filename, and absolute /
+  cwd-relative / coordination-relative path in addition to the
+  existing forms; every id-taking subcommand resolves the same forms
+  with one error shape (`task <X> not found`). `task validate` gains
+  a positional ID (with `--id` / `--file` back-compat). `task paths`
+  gains an optional ID printing that task's queue + path; bare
+  `task paths` still prints global coordination paths. `show / mv /
+  append-block` inherit the new forms via `find_task`.
+
+- **0330 per-lifecycle heartbeat stale thresholds for non-continuous
+  roles (Phase 5 of 0311).** Watchdog used a single 600s window for
+  every role, so alive-but-idle self-loop / driven / interactive
+  roles were falsely flagged stale while their pids were live.
+  `schema.watchdog.heartbeat_stale_seconds_by_lifecycle` now widens
+  the window per lifecycle: `self-loop: 4200` (MAINTAINER ~1h cadence
+  + margin), `driven: 14400` (4h — workers idle between events),
+  `interactive: 86400` (24h — human-paced). Global 600s retained as
+  continuous-signal default; explicit per-role override still wins.
+  Dead-pid registry scan remains the authoritative event-driven
+  liveness signal — a dead pid is still flagged regardless of
+  heartbeat age.
+
+- **0332 codex 0.135 profile-v2 — `greatminds setup` emits the
+  per-role codex split layout (Phase 5 of 0311).** codex 0.135.0
+  rejects `--profile <role>` when `CODEX_HOME/config.toml` carries a
+  `[profiles.<role>]` table or top-level `profile=` selector. Setup
+  now splits the shipped `codex/profiles/<role>.config.toml` at the
+  `[profiles.<role>]` marker — everything before becomes the base
+  `config.toml`; the keys after become a sibling `<role>.config.toml`
+  layer. `start_agent.py --profile <role>` unchanged (reads the
+  layer); idempotent re-run preserves an operator-edited base.
+
+- **0333 canon forbids TESTER local execution + `uv run --active`
+  fleet-wide.** Root-cause fix for the recurring `.venv-coord`
+  editable contamination (fleet-wide `ModuleNotFoundError:
+  greatminds` after worktree prune). COORDINATE.md §12.5: the
+  cd-into-worktree line no longer names TESTER nor says
+  editing/testing; implementers cd in to EDIT only; TESTER does NOT
+  edit or execute in the worktree — its only execution surface is
+  SSH probes against the deployed stand after STAND-KEEPER rsync.
+  Fleet-wide ban: `uv run` / `uv run --active` is forbidden for
+  every role anywhere in the repo (hijacks the active venv →
+  dangling `.pth` on prune). `schema.yaml`
+  `TESTER.forbidden_actions += run_local_tests,
+  uv_run_or_active_against_fleet_venv` (machine-readable; rides the
+  role-contract render).
+
+- **0336 revert 0331 — restore the EXPLORER stand-only contract
+  (Phase 5 of 0311).** 0331 inverted EXPLORER: it forbade the stand
+  host and forced local CLI/REST-only ("black-box"), the opposite
+  of EXPLORER's role (operate ON the live system as a real user).
+  Surgical removal of the 0331 schema / canon / template / test
+  additions. New "Stand anchor (absolute, non-negotiable)" section
+  in EXPLORER.md codifies that EXPLORER always operates ON THE STAND
+  with whatever access shape the product carries (HTTP / SSH /
+  wherever it is actually deployed); host-destructive + recovery
+  on the disposable stand; off-stand and local substitutes
+  strictly forbidden. `test_explorer_stand_anchor_0336.py` pins
+  the anchor.
+
+- **0340 DOD2 full reactive-fleet documentation refresh.** New
+  `docs/architecture/lifecycle.md` (lifecycle × tool matrix +
+  recovery chain) and `docs/operations/runbook.md` (CLI-only
+  discipline, fleet-venv direct-binary launch, court-fix /
+  venv-recovery / wake-SK / diagnostics). Updates across
+  `docs/architecture/daemon-and-agents`,
+  `docs/cli-reference/index`, `docs/concepts/{inbox, queues, roles,
+  scenarios, stand-operations}`, `docs/index`,
+  `docs/recipes/e2e-testing`, and `mkdocs.yml`. Canon
+  `src/greatminds/data/COORDINATE.md` §12 migrated to stand-lease
+  wording; new root `COORDINATE.md` publication mirror; eight role
+  canons migrated from `stand_request` / `evidence_for` to
+  `greatminds stand lease` / `stand release`.
+
+### Fixed
+
+- **0341 coordd watches `.stand` up front so lifecycle changes wake
+  STAND-KEEPER.** Root cause for "stand transitions don't wake
+  STAND-KEEPER without a manual nudge":
+  `_InotifyWatcher._add_initial_watches` skipped any dir absent at
+  startup, but `.stand/` is created lazily by the first stand lease.
+  When coordd started BEFORE any lease (fresh deploy / restart —
+  the common case), the `.stand` watch never attached. coordd now
+  creates `.stand` up front and attaches its watch even when absent
+  at startup; the first `state.yaml` write surfaces a routed `.stand`
+  event like any other queue→owner event. With SK now mode=driven a
+  `.stand` event runs an SK driven turn via the existing driven
+  branch.
+
+- **0343 freeing the singleton auto-promotes the next FIFO queue
+  entry.** The `stand release` docstring promised "pops the next
+  FIFO queue entry" but freeing the singleton did NOT promote the
+  head; the stand sat free with pending queued leases never
+  auto-activating. New `promote_head_on_free(state, by_role)` helper
+  pops the head, grants it (`granted_at` now, `ready_at=None`), sets
+  `active_lease`, drains the head from the queue, clears
+  `down_reason`, records `free→preparing`. Wired into `stand release`
+  (active→free) and `stand up` (down→free) AFTER their →free
+  record_transition; `stand down` intentionally does NOT promote
+  (incident halt).
+
 ## 1.3.12 — 2026-06-01
 
 Closes the 0311 reactive-fleet umbrella (Phases 1–4): every role
