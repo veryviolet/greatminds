@@ -39,3 +39,7 @@ greatminds task mv TASK_ID feature_test
 
 The CLI validates role permissions, required readiness fields, schema shape,
 journal entries, intents, and heartbeat side effects.
+
+Use `greatminds task show`, `greatminds task list`, and
+`greatminds task paths` for state inspection. Do not substitute directory
+listings for CLI checks when deciding ownership or readiness.

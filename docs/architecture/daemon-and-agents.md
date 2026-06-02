@@ -1,7 +1,9 @@
 # Daemon and Agents
 
-`greatminds launch` starts the configured agent windows. Each window is defined
-in `coord.yaml` with:
+`greatminds launch` starts the configured agent windows. Fresh fleets should
+launch from the fixed coordination venv, for example
+`./.venv-coord/bin/greatminds launch --target tmux`. Each window is defined in
+`coord.yaml` with:
 
 - window name
 - role
@@ -48,6 +50,10 @@ For driven roles, `coordd` starts one turn instead of waking an existing loop:
 - `codex` driven roles run one fresh `codex app-server` stdio process for the
   turn; the app-server thread id is persisted for continuity.
 
+Driven roles do one tick, then exit. They do not schedule long sleeps or run a
+persistent `/loop`; their next turn comes from the next inbox, queue, or stand
+event.
+
 This reactive path replaces short idle polling for normal queue and inbox
 changes. Reaction time should be the daemon watcher interval plus one driven
 spawn or wake signal, not a role's fallback sleep value.
@@ -78,6 +84,9 @@ If a role does not react to new work, check these in order:
    coalesce into one prompt.
 8. Run `greatminds watchdog` to check dead pids, stale heartbeats, and orphaned
    intents.
+9. Run `greatminds agent status [ROLE]` to inspect the recorded pid, liveness,
+   session id, venv, heartbeat age, and input socket without reading registry
+   files by hand.
 
 ## Visual event markers
 

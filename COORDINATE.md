@@ -485,7 +485,7 @@ stand, not a local run.
 `uv run` / `uv run --active` is **forbidden for every role anywhere in
 the repo**: `--active` syncs the cwd project into the *active* venv —
 inside a `.worktrees/<id>/` that hijacks the fleet venv `.venv-coord`,
-writing an editable `.pth → .worktrees/<id>/src`; when the worktree is
+writing an editable `.pth -> .worktrees/<id>/src`; when the worktree is
 later pruned on merge the `.pth` dangles and every fleet agent dies at
 import (`ModuleNotFoundError: greatminds`). If an implementer
 sanity-runs tests locally, use ONLY an isolated `.venv`

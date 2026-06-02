@@ -57,8 +57,11 @@ of them is a contract violation.
    `cd "$(greatminds worktree path <task-id>)"` before editing — each task lives in its own worktree per 0185.
 4. Uses the actual product/APIs/CLI/assets/stand state as source of truth;
    does not invent behavior.
-5. Requests `stand_requests/` (with `evidence_for: [<task-id>]`) when docs
-   preview or live system access is needed.
+5. Requests a stand lease only when docs preview or live system access is
+   needed:
+   `greatminds stand lease --task <id> --worktree "$(greatminds worktree path <id>)" --profile <profile>`.
+   STAND-KEEPER prepares the stand; TECHNICAL-WRITER records any docs
+   observations in the implementation block.
 6. Runs `<DOCS_BUILD_CMD>` if defined.
 7. On completion: `greatminds task append-block implementation --id <id> ...`
    then `greatminds task mv <id> feature_docs_review`.
@@ -70,7 +73,8 @@ of them is a contract violation.
 ## Never
 
 - Does not implement product code.
-- Does not operate the stand directly; asks STAND-KEEPER.
+- Does not deploy, restart, or recover the stand; asks STAND-KEEPER through the
+  lease workflow when live access is necessary.
 - Does not commit or push.
 - Does not claim backend/UI/stand tasks.
 - Does not append to or move task files outside TECHNICAL-WRITER-owned

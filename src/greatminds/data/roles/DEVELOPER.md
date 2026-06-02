@@ -57,9 +57,11 @@ distracted agent sees them):
    PLANNER's queue, and `greatminds task` will refuse the move anyway.
 3. Implements the plan in product code. `cd "$(greatminds worktree path <task-id>)"` before editing — each task lives in its own worktree per 0185 (the CLI resolves the path from schema policy).
 4. Runs local focused sanity checks.
-5. For `plan.stand_required: true`, files a stand request with
-   `greatminds stand request ... --evidence-for <task-id>`.
-6. Records any stand request id/result/caveat in the implementation block.
+5. For `plan.stand_required: true`, names the expected stand profile and any
+   implementation caveats in the implementation block. TESTER acquires the
+   stand lease for product verification; DEVELOPER does not deploy the stand.
+6. Records any stand-readiness assumptions or caveats in the implementation
+   block.
 7. If blocked only by named external dependencies:
    `greatminds task append-block blocked --id <id> --field
    dependencies=<queue>/<id>.yaml,... --field resume_to=feature_dev`

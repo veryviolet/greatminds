@@ -2,8 +2,8 @@
 
 For stand-required work, the test path has two evidence streams:
 
-1. Stand evidence from `STAND-KEEPER`.
-2. Test evidence from `TESTER`.
+1. Stand readiness from `STAND-KEEPER`, recorded through the lease state.
+2. Product verification from `TESTER`, recorded in the task's `tests` block.
 
 The tester runs the appropriate checks, then runs:
 
@@ -11,9 +11,9 @@ The tester runs the appropriate checks, then runs:
 greatminds gate-check TASK_ID
 ```
 
-The result is recorded in the tests block. A passing gate means the stand
-evidence matches the task and commit. A missing or failing gate keeps the task
-out of final review.
+The result is recorded in the tests block. A passing gate means TESTER's
+stand evidence names the task, lease, worktree, and implementation commit. A
+missing or failing gate keeps the task out of final review.
 
 ## Typical flow
 
@@ -24,3 +24,7 @@ feature_dev -> feature_test -> feature_review -> verified
 If tests fail, `TESTER` records the failure and returns the task to the
 implementation queue. If the task is blocked on a named dependency, the owner
 parks it in `feature_blocked/` with a blocked block.
+
+`STAND-KEEPER` does not run product acceptance tests. It deploys or recovers
+the stand, marks the lease ready, and leaves functional probes to TESTER or
+EXPLORER.

@@ -66,6 +66,9 @@ nav:
       - Filesystem Layout: architecture/filesystem-layout.md
       - Transitions: architecture/transitions.md
       - Daemon and Agents: architecture/daemon-and-agents.md
+      - Lifecycle Model: architecture/lifecycle.md
+  - Operations:
+      - Runbook: operations/runbook.md
   - Recipes:
       - Filing a Bug: recipes/filing-a-bug.md
       - Planning a Feature: recipes/planning-a-feature.md

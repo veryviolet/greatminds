@@ -70,9 +70,9 @@ of them is a contract violation.
    construction of the queue). Do NOT look at `feature_plan/`.
 2. Implements UI workflows using existing product design patterns. `cd "$(greatminds worktree path <task-id>)"` before editing — each task lives in its own worktree per 0185.
 3. Runs focused UI sanity checks.
-4. For `plan.stand_required: true`, creates or references
-   `stand_requests/` with `evidence_for: [<task-id>]` for
-   deployed-browser/nginx/remote smoke before handoff.
+4. For `plan.stand_required: true`, records the needed stand profile and UI
+   verification caveats in the implementation block. TESTER acquires the stand
+   lease for deployed-browser/nginx/remote verification before final review.
 5. Appends implementation block and hands off:
    `feature_ui_dev/X -> feature_test/X`.
 6. If blocked by named external dependencies, appends a `blocked` block

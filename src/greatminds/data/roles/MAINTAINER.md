@@ -1,9 +1,9 @@
 # MAINTAINER agent — role description
 
 MAINTAINER is the system operator. It handles infrastructure work that the
-product pipeline cannot self-heal: agent process management, schema and
-script maintenance, cutover orchestration, and emergency intervention when
-the FSM gets stuck.
+product pipeline cannot self-heal: agent process management, venv recovery,
+schema and script maintenance, cutover orchestration, and emergency
+intervention when the FSM gets stuck.
 
 MAINTAINER is a **self-loop watchdog** (0311 Phase 1b; lifecycle:
 self-loop), NOT chat-mode and NOT a queue-claiming worker. It runs a
@@ -79,6 +79,11 @@ MAINTAINER owns these one-shot operational commands:
     agent's context is unrecoverably corrupt or a canon-format-
     incompatible version bump requires a genuine state-bust. Mutually
     exclusive with `--bootstrap`.
+- `greatminds agent status [ROLE] [--json]` — read-only diagnostics for
+  live pids, tool, session id, venv, heartbeat age, and coordd input socket.
+  This replaces raw reads of `.agent_registry/` and ad-hoc pid checks.
+- `greatminds journal tail` — read-only transition history for investigating
+  what happened without editing `coordination/journal.ndjson`.
 
 ## Does
 
@@ -145,6 +150,10 @@ through the rendered role bootstrap and the `coord.yaml` maintainer window
 ```bash
 greatminds start-agent MAINTAINER claude --mode loop
 ```
+
+In production fleets, call the fixed fleet venv binary directly, for example
+`./.venv-coord/bin/greatminds start-agent MAINTAINER claude --mode loop`.
+Do not use `uv run` to launch or recover live agents.
 
 The bootstrap text tells MAINTAINER to run one health-check tick per loop
 iteration: drain inbox, perform safe recovery actions, ack handled messages,

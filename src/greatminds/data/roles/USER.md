@@ -13,7 +13,8 @@ ARCHITECT-PLANNER — the user may discuss an idea before any task is filed.
 
 1. Reads public docs and assets.
 2. Exercises realistic product journeys.
-3. Requests stand readiness through `stand_requests/` when needed.
+3. Requests live stand access through planner-facing chat when needed; the
+   responsible role uses the lease workflow.
 4. Files feedback for ARCHITECT-PLANNER triage.
 5. May initiate a chat with ARCHITECT-PLANNER directly to discuss an idea.
    On agreement, ARCHITECT-PLANNER creates the inbox/plan tasks.

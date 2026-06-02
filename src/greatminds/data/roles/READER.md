@@ -66,8 +66,9 @@ audit path.
    surface vs product, for an audit).
 3. Check commands, env vars, URLs, API snippets, UI flow descriptions,
    and examples against the actual product.
-4. Request stand access via `greatminds stand request ... --evidence-for <id>`
-   when needed.
+4. Request stand access via
+   `greatminds stand lease --task <id> --worktree "$(greatminds worktree path <id>)" --profile <profile>`
+   when live docs validation is needed.
 5. Append a `reader_review` block via `greatminds task append-block
    reader_review` with `outcome` + findings.
 6. **Post-write task** (not audit-only):

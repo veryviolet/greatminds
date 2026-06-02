@@ -16,9 +16,11 @@ heartbeats, and a launcher for tmux-based fleets.
 - A `coordination/` tree with queues such as `feature_inbox/`,
   `feature_plan/`, `feature_dev/`, `feature_docs/`, `feature_test/`,
   `feature_review/`, and `verified/`.
-- A `greatminds` CLI for task moves, inbox messages, stand requests, role
-  rendering, watchdog checks, and fleet launch.
-- A per-project daemon that watches inboxes and nudges idle agents.
+- A `greatminds` CLI for task moves, inbox messages, stand leases, role
+  rendering, journal views, agent diagnostics, watchdog checks, and fleet
+  launch.
+- A per-project daemon that watches inboxes, queue files, and stand state,
+  then wakes or drives the owning role.
 
 ## Start here
 

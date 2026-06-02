@@ -14,6 +14,7 @@ Use the CLI:
 ```bash
 greatminds inbox send DEVELOPER --kind ask --task TASK_ID --body "Question text"
 greatminds inbox list
+greatminds inbox show MESSAGE_FILE
 greatminds inbox ack MESSAGE_FILE
 ```
 

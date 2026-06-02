@@ -24,8 +24,13 @@ System and entry roles:
 
 - `USER`: files feedback or chats with planner-facing roles. Lifecycle:
   `interactive`.
-- `MAINTAINER`: infrastructure and fleet operations. Lifecycle: `self-loop`;
-  USER reaches it through planner-mediated inbox asks rather than direct chat.
+- `MAINTAINER`: non-user-facing infrastructure and fleet operations.
+  Lifecycle: `self-loop`; USER reaches it through planner-mediated inbox asks
+  rather than direct chat. It handles daemon and agent recovery, venv repair,
+  canon cutover, and escalation of FSM stalls to the planner.
 
 Every active role has a heartbeat file under `coordination/`. Stale heartbeats
 are reported by `greatminds watchdog`.
+
+For lifecycle mechanics across tools, see
+[Lifecycle Model](../architecture/lifecycle.md).

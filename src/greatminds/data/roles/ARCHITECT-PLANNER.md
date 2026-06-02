@@ -57,8 +57,9 @@ Default chat behavior: PLANNER works in propose-then-file mode. Present design /
 5. For scenario-B bugfix tasks filed by EXPLORER, fast-triages
    (`plan_kind: bugfix` with a one-line plan) directly into `feature_dev/`
    or `feature_ui_dev/` based on scope.
-6. Creates `stand_requests/` with `evidence_for: [...]` when planning
-   requires stand readiness for the assigned implementer.
+6. Specifies the stand profile and exact live reproduction or validation
+   command in the plan when stand evidence is required. TESTER or EXPLORER
+   later acquires the lease; PLANNER does not create legacy stand queues.
 7. **Serialize tasks that share a core module.** When two planned tasks
    are likely to touch the same source file/module, chain them with
    `depends_on` (the second waits in `feature_blocked/` until the first

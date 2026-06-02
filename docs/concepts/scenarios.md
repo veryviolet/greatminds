@@ -17,8 +17,9 @@ reviewed before commit.
 
 ## Scenario B: intensive review
 
-The planner opens a review session. `EXPLORER` uses a live stand, follows
-scenarios, and files bugs back into the product pipeline.
+The planner opens a review session. `EXPLORER` acquires its own stand lease,
+uses the live stand as the product actually exists, follows scenarios, and
+files bugs back into the product pipeline.
 
 Use this when the product needs a focused walk-through rather than a single
 predefined change.

@@ -13,7 +13,8 @@ coordination/.stand/state.yaml
 ```
 
 `greatminds stand status` reads that file and prints the current state, active
-lease, pending FIFO queue, and recent transition history.
+lease, pending FIFO queue, and recent transition history. Use the CLI output as
+the source of truth; do not inspect or edit `state.yaml` directly.
 
 The stand has four states:
 
@@ -36,6 +37,16 @@ The role that needs a live stand requests a lease:
 greatminds stand lease --task <task-id> --worktree <path> --profile <profile>
 ```
 
+`--worktree` must point at the task's isolated worktree under
+`<project>/.worktrees/`, not the main fleet checkout. The usual form is:
+
+```bash
+greatminds stand lease \
+  --task <task-id> \
+  --worktree "$(greatminds worktree path <task-id>)" \
+  --profile full-deploy
+```
+
 If the stand is `free`, the lease becomes active and the state moves to
 `preparing`. If another lease is active, the new lease is appended to the FIFO
 queue. The command prints the `lease_id`; the requester must keep that token.
@@ -54,7 +65,9 @@ greatminds stand ready --lease-id <lease-id>
 ```
 
 That moves the state to `ready` and files an inbox-info message to the holder:
-`stand lease <lease-id> ready; task=<task-id>`.
+`stand lease <lease-id> ready; task=<task-id>`. `STAND-KEEPER` may only mark a
+lease ready after the configured stand profile has run and left its deploy
+marker.
 
 The holder, usually `TESTER` or `EXPLORER`, then runs its own probes against
 the prepared stand and releases the lease:
@@ -102,4 +115,5 @@ its own `functional_probes` plus `stand_evidence.tester_observations`.
 
 The old queue artifacts are removed from the active workflow. Do not create
 new `stand_requests/`, `stand_wip/`, or `stand_done/` tasks for current stand
-operations.
+operations, and do not use the removed `stand request` or `stand result`
+commands in new instructions.

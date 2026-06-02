@@ -41,8 +41,8 @@ path until that fleet config is updated.
      necessary but NOT sufficient to ship a stand-required fix,
    - **§9.1 fix-for-self-blocker carve-out**: if `tests.stand_evidence`
      has all three fields AND TESTER explicitly cites a
-     chicken-and-egg in the tests block (the stand_done's
-     partial/fail result is caused by a verification-infra limitation
+     chicken-and-egg in the tests block (the lease result's
+     partial/fail status is caused by a verification-infra limitation
      that THIS task's fix demonstrably removes), REVIEWER may approve
      without `tests.gate_check_result: pass`. REVIEWER MUST cite the
      carve-out and the tests block's chicken-and-egg explanation in
@@ -65,7 +65,8 @@ path until that fleet config is updated.
 - Does not plan new work or triage `user_feedback/` (that is
   ARCHITECT-PLANNER).
 - Does not implement product code, tests, or docs.
-- Does not operate the stand (uses `stand_requests/`).
+- Does not deploy, restart, recover, or release the stand. Stand operation
+  belongs to STAND-KEEPER and the lease holder.
 - Does not skip `greatminds gate-check` for stand-required tasks; the gate is
   evidence, not a courtesy.
 - Does not use `git add .` or stage paths outside the declared list.
