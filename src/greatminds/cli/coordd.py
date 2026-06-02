@@ -967,7 +967,7 @@ def _codex_appserver_argv() -> list[str]:
     Prefers an absolute ``<node> <codex.js>`` (codex's shebang is the
     relative ``#!/usr/bin/env node`` and coordd under systemd may lack
     node on PATH — the 0320 lesson), falling back to bare ``codex``."""
-    import shutil
+    import shutil, glob
     # 0311 driven fix: codex app-server's Linux sandbox uses bubblewrap, which
     # needs user-namespace creation — unavailable under the systemd user
     # service, so the server aborts at startup ("needs access to create user
@@ -979,13 +979,26 @@ def _codex_appserver_argv() -> list[str]:
     # these and fails (bubblewrap) without.
     cfg = ["-c", "sandbox_mode=danger-full-access",
            "-c", "approval_policy=never"]
+    # 0311 driven fix (codex never spawned under systemd): coordd's systemd
+    # user-service PATH does NOT include the nvm node bin dir, so
+    # ``shutil.which("codex")`` returns None and the argv fell back to a bare
+    # ``codex`` → FileNotFoundError → the codex turn silently never spawned.
+    # Resolve codex by PATH first, then fall back to the nvm node installs,
+    # and run it with the node co-located with the codex bin (version match)
+    # so a fresh systemd-spawned turn finds both binaries by absolute path.
     codex = shutil.which("codex")
-    node = shutil.which("node")
-    if codex and node:
-        return [str(Path(node).resolve()),
-                str(Path(codex).resolve()), "app-server", *cfg]
+    if not codex:
+        cands = sorted(glob.glob(
+            str(Path.home() / ".nvm/versions/node/*/bin/codex")))
+        if cands:
+            codex = cands[-1]
     if codex:
-        return [str(Path(codex).resolve()), "app-server", *cfg]
+        codex_bin = Path(codex)
+        codex_js = str(codex_bin.resolve())
+        node_sib = codex_bin.parent / "node"
+        node = (str(node_sib) if node_sib.exists()
+                else (shutil.which("node") or "node"))
+        return [node, codex_js, "app-server", *cfg]
     return ["codex", "app-server", *cfg]
 
 
