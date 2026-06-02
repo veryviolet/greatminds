@@ -968,14 +968,25 @@ def _codex_appserver_argv() -> list[str]:
     relative ``#!/usr/bin/env node`` and coordd under systemd may lack
     node on PATH — the 0320 lesson), falling back to bare ``codex``."""
     import shutil
+    # 0311 driven fix: codex app-server's Linux sandbox uses bubblewrap, which
+    # needs user-namespace creation — unavailable under the systemd user
+    # service, so the server aborts at startup ("needs access to create user
+    # namespaces") and the codex driven turn never runs. Disable the sandbox
+    # (sandbox_mode=danger-full-access) and auto-approve tools
+    # (approval_policy=never) via -c overrides so a headless driven codex turn
+    # starts and runs its tools unattended — symmetric to the claude path's
+    # --permission-mode auto. Verified: initialize handshake succeeds with
+    # these and fails (bubblewrap) without.
+    cfg = ["-c", "sandbox_mode=danger-full-access",
+           "-c", "approval_policy=never"]
     codex = shutil.which("codex")
     node = shutil.which("node")
     if codex and node:
         return [str(Path(node).resolve()),
-                str(Path(codex).resolve()), "app-server"]
+                str(Path(codex).resolve()), "app-server", *cfg]
     if codex:
-        return [str(Path(codex).resolve()), "app-server"]
-    return ["codex", "app-server"]
+        return [str(Path(codex).resolve()), "app-server", *cfg]
+    return ["codex", "app-server", *cfg]
 
 
 def _codex_appserver_env(role_lower: str | None = None) -> dict:
