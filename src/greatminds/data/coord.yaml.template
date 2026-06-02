@@ -9,7 +9,7 @@ project_dir: __PROJECT_DIR__
 windows:
   - name: planner
     role: ARCHITECT-PLANNER
-    tool: claude
+    tool: codex
     mode: chat
   - name: reviewer
     role: ARCHITECT-REVIEWER
