@@ -2239,10 +2239,22 @@ def coordd(project_dir: Path | None, project_name: str | None,
             # the throttle slot is reset so a future death gets reported.
             if now_ts - last_dead_check >= DEAD_CHECK_INTERVAL_SEC:
                 last_dead_check = now_ts
+                _dp_coord_yaml = _read_coord_yaml(coord.parent)
                 for reg_file in sorted(registry.glob("*.json")):
                     role = reg_file.stem
                     reg = read_registry(registry, role)
                     if reg is None:
+                        continue
+                    # 0311 driven fix: a driven role has NO persistent pid
+                    # (idle bash between turns; coordd spawns each turn), so
+                    # the dead-pid watch otherwise reports EVERY driven role as
+                    # dead forever and floods inbox/maintainer/. Skip driven
+                    # roles — their liveness is coordd's per-turn concern, not
+                    # a persistent-pid check.
+                    _role_u = role.upper()
+                    if (_lifecycle_for_role(canon_dir, _role_u) == "driven"
+                            and _window_mode_for_role(
+                                _dp_coord_yaml, _role_u) == "driven"):
                         continue
                     pid = reg.get("pid")
                     try:
