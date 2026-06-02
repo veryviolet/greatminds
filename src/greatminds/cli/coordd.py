@@ -1270,6 +1270,67 @@ def _spawn_driven_codex_turn(
     return (True, f"codex turn dispatched (async) for {role_lower}")
 
 
+def _maybe_drive_driven_role(coord: Path, canon_dir: Path,
+                             coord_yaml_doc: dict | None,
+                             located: tuple | None, role: str,
+                             verbose: bool, trigger: str = "") -> bool | None:
+    """0347: run one driven turn for ``role`` via the appropriate driver
+    (claude ``--resume -p`` / codex app-server) when it is a MIGRATED
+    driven role (schema lifecycle == driven AND coord.yaml window mode
+    == driven). Returns the driver's bool result, or None when the role
+    is NOT driven so the caller falls back to the legacy wake mechanism.
+
+    Shared by ``_route_queue_event`` (queue / ``.stand`` events) AND the
+    inbox-scan dispatch (Step 2). Before 0347 only the queue path drove
+    driven roles; an inbox wake event fell through to sigint/press_enter
+    against an IDLE bash pane, so a killed driven worker (e.g. a codex
+    TECHNICAL-WRITER) was never re-driven / re-registered. Routing both
+    paths through this helper makes a wake event recreate the worker on
+    the next turn (force-fresh session when there's no prior session)."""
+    tool = (located[1] if located else "").lower()
+    lifecycle = _lifecycle_for_role(canon_dir, role)
+    window_mode = _window_mode_for_role(coord_yaml_doc, role)
+    if lifecycle != "driven" or window_mode != "driven":
+        return None
+    if tool == "claude":
+        reg = read_registry(coord / REGISTRY_DIR, role.lower())
+        session_id = (reg or {}).get("session_id") or ""
+        session_name = (coord_yaml_doc.get("session") or "").strip() \
+            if coord_yaml_doc else ""
+        pane = (located[0] if located else "").strip()
+        bootstrap_file = _driven_bootstrap_path(coord, role.lower())
+        bf = (bootstrap_file if bootstrap_file and
+              Path(bootstrap_file).is_file() else None)
+        ok, diag = _spawn_driven_turn(
+            coord, role.lower(), session_id, pane, session_name,
+            bf, verbose, reg=reg, force_fresh=(not session_id),
+        )
+        if verbose:
+            print(f"  0315/0318/0347: driven dispatch for {role}"
+                  f"{trigger}: {diag}", file=sys.stderr)
+        return ok
+    if tool == "codex":
+        reg = read_registry(coord / REGISTRY_DIR, role.lower())
+        bootstrap_file = _driven_bootstrap_path(coord, role.lower())
+        base_instructions = None
+        try:
+            bp = Path(bootstrap_file)
+            if bp.is_file():
+                base_instructions = bp.read_text(encoding="utf-8")
+        except OSError:
+            base_instructions = None
+        ok, diag = _spawn_driven_codex_turn(
+            coord, role.lower(), base_instructions,
+            str(coord.parent), verbose, reg=reg,
+        )
+        if verbose:
+            print(f"  0321/0347: codex dispatch for {role}"
+                  f"{trigger}: {diag}", file=sys.stderr)
+        return ok
+    # Driven but an unknown tool — no driver; let the caller fall back.
+    return None
+
+
 def _route_queue_event(coord: Path, canon_dir: Path,
                        queue: str, filename: str, verbose: bool) -> bool:
     """0204: wake the owning role of ``queue`` when a file lands there.
@@ -1339,69 +1400,16 @@ def _route_queue_event(coord: Path, canon_dir: Path,
     # always attached so the event reaches here). Unmigrated roles
     # (chat / loop window mode), self-loop, and unmigrated codex roles
     # still fall through to the legacy wake mechanism further down.
-    lifecycle = _lifecycle_for_role(canon_dir, owner)
-    window_mode = _window_mode_for_role(coord_yaml_doc, owner)
-    if lifecycle == "driven" and tool == "claude" \
-            and window_mode == "driven":
-        reg = read_registry(coord / REGISTRY_DIR, owner.lower())
-        session_id = (reg or {}).get("session_id") or ""
-        session_name = (coord_yaml_doc.get("session") or "").strip() \
-            if coord_yaml_doc else ""
-        pane = (located[0] if located else "").strip()
-        bootstrap_file = _driven_bootstrap_path(coord, owner.lower())
-        bf = (bootstrap_file if bootstrap_file and
-              Path(bootstrap_file).is_file() else None)
-        # 0318: driven roles run no persistent agent — the pane is
-        # idle bash between turns. On the FIRST event after launch
-        # (or after a killed pane) there's no session_id yet, so we
-        # force a FRESH session (``claude -p`` without --resume);
-        # claude mints the session-id, which the agent records to the
-        # registry for subsequent --resume turns. Pre-0318 a missing
-        # session_id fell back to a wake — useless for a driven role
-        # whose pane has no running agent to wake.
-        ok, diag = _spawn_driven_turn(
-            coord, owner.lower(), session_id, pane, session_name,
-            bf, verbose,
-            reg=reg,  # 0317: turn-count drives session-reset
-            force_fresh=(not session_id),
-        )
-        if verbose:
-            print(
-                f"  0315/0318: driven dispatch for {owner}: {diag}",
-                file=sys.stderr,
-            )
-        return ok
-
-    # 0321 (0311 Phase 3b): driven codex roles run through the codex
-    # app-server (0320), not PTY keystrokes — symmetric to the claude
-    # ``-p`` driver above. iter-3 (PLANNER transport decision):
-    # spawn a fresh ``codex app-server`` over STDIO per turn —
-    # initialize → thread/start|resume → turn/start → turn/completed —
-    # symmetric to claude's per-turn ``-p`` spawn (no persistent socket;
-    # 0320's --listen WS unit is now vestigial to the driver). Same 0318
-    # migration gate (lifecycle + window mode == driven) so unmigrated
-    # codex roles keep the SIGINT wake.
-    if lifecycle == "driven" and tool == "codex" \
-            and window_mode == "driven":
-        reg = read_registry(coord / REGISTRY_DIR, owner.lower())
-        bootstrap_file = _driven_bootstrap_path(coord, owner.lower())
-        base_instructions = None
-        try:
-            bp = Path(bootstrap_file)
-            if bp.is_file():
-                base_instructions = bp.read_text(encoding="utf-8")
-        except OSError:
-            base_instructions = None
-        ok, diag = _spawn_driven_codex_turn(
-            coord, owner.lower(), base_instructions,
-            str(coord.parent), verbose, reg=reg,
-        )
-        if verbose:
-            print(
-                f"  0321: codex dispatch for {owner}: {diag}",
-                file=sys.stderr,
-            )
-        return ok
+    # 0315/0318/0321 driven dispatch (claude -p / codex app-server),
+    # gated on lifecycle == driven AND window mode == driven. Extracted
+    # to _maybe_drive_driven_role (0347) so the inbox-scan path shares
+    # it. Returns None for non-driven roles → fall through to the legacy
+    # wake mechanism below.
+    driven = _maybe_drive_driven_role(
+        coord, canon_dir, coord_yaml_doc, located, owner, verbose,
+        trigger=f" for {queue}/{filename}")
+    if driven is not None:
+        return driven
 
     mechanism = _wake_mechanism_for_tool(tool)
     if mechanism == "sigint_deepest_descendant":
@@ -2069,6 +2077,17 @@ def coordd(project_dir: Path | None, project_name: str | None,
                 coord_yaml_doc = _read_coord_yaml(project_dir)
                 located = _window_and_tool_for_role(coord_yaml_doc, role)
                 tool = (located[1] if located else "").lower()
+                # 0347: a driven role woken by an inbox event must be
+                # RE-DRIVEN (claude -p / codex app-server), not poked via
+                # sigint/press_enter against an idle bash pane — that's
+                # why a killed driven worker never came back. The driven
+                # turn reads the just-delivered inbox file at tick start;
+                # leave the file in place for it to consume + ack.
+                driven = _maybe_drive_driven_role(
+                    coord, canon_dir, coord_yaml_doc, located, role,
+                    verbose, trigger=f" (inbox {Path(path).name})")
+                if driven is not None:
+                    continue
                 mechanism = _wake_mechanism_for_tool(tool)
                 if mechanism == "sigint_deepest_descendant":
                     sigint_sleeping_descendant(coord, role, verbose)
