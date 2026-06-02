@@ -38,3 +38,33 @@ coverage.xml
 
 # 0185: per-task worktrees
 .worktrees/
+
+# venvs (fleet coordination runtime — never editable/tracked)
+.venv-coord/
+
+# 0354: setup-generated / dogfood-runtime artifacts at repo root.
+# `greatminds setup` deploys these from src/greatminds/data/** into the
+# project root so the live fleet can read them; they are byte-identical
+# copies of canon (do NOT commit duplicates). Anchored with a leading
+# `/` so the canonical sources under src/greatminds/data/** stay tracked.
+/coord.yaml
+/schema.yaml
+/command_START.yaml
+/coordination/
+# Per-role docs copied from src/greatminds/data/roles/*.md
+/ARCHITECT-PLANNER.md
+/ARCHITECT-REVIEWER.md
+/BOT-DEVELOPER.md
+/BOT-USER.md
+/DEVELOPER.md
+/EXPLORER.md
+/MAINTAINER.md
+/READER.md
+/STAND-KEEPER.md
+/TECHNICAL-WRITER.md
+/TESTER.md
+/UI-DEVELOPER.md
+/USER.md
+# Operator bringup notes / restart script for THIS dogfood host (local only)
+/mastermind_setup.md
+/restart_fleet.sh

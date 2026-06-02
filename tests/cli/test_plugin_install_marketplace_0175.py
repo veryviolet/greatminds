@@ -97,14 +97,18 @@ def fake_claude_cli(monkeypatch):
 def test_install_claude_plugins_invokes_per_plugin(fake_claude_cli) -> None:
     """0175: ``claude plugin install <name>@claude-plugins-official``
     is called once per curated plugin for a role."""
-    installed, skipped, failed = setup_mod._install_claude_plugins_for_role(
-        "DEVELOPER", ["postman", "sentry"],
+    inst_fresh, pres_prior, pres_dedupe, failed, failed_names = (
+        setup_mod._install_claude_plugins_for_role(
+            "DEVELOPER", ["postman", "sentry"],
+        )
     )
-    assert installed == 2
-    assert skipped == 0
+    assert inst_fresh == 2
+    assert pres_prior == 0
+    assert pres_dedupe == 0
     assert failed == 0
+    assert failed_names == []
     install_calls = [c for c in fake_claude_cli
-                     if c[:3] == ["claude", "plugin", "install"]]
+                     if c[1:3] == ["plugin", "install"]]
     names = [c[3] for c in install_calls]
     assert names == [
         "postman@claude-plugins-official",
@@ -114,26 +118,31 @@ def test_install_claude_plugins_invokes_per_plugin(fake_claude_cli) -> None:
 
 def test_install_claude_plugins_skips_already_installed(monkeypatch) -> None:
     """0175 idempotency: a plugin already present in
-    ``claude plugin list`` output is skipped (no install call)."""
+    ``claude plugin list`` output is skipped (no install call). Post-
+    0203-iter-2 it now classifies as ``preserved-prior`` (pre-
+    campaign)."""
     calls: list[list[str]] = []
 
     def fake_run(cmd, *_a, **_kw):
         calls.append(list(cmd))
-        if cmd[:3] == ["claude", "plugin", "list"]:
+        if cmd[1:3] == ["plugin", "list"]:
             return subprocess.CompletedProcess(
                 list(cmd), 0, "postman\nplaywright\n", "",
             )
         return subprocess.CompletedProcess(list(cmd), 0, "", "")
     monkeypatch.setattr(setup_mod.subprocess, "run", fake_run)
 
-    installed, skipped, failed = setup_mod._install_claude_plugins_for_role(
-        "TESTER", ["postman", "sentry"],
+    inst_fresh, pres_prior, pres_dedupe, failed, _ = (
+        setup_mod._install_claude_plugins_for_role(
+            "TESTER", ["postman", "sentry"],
+        )
     )
-    assert installed == 1  # sentry installed
-    assert skipped == 1    # postman already there
+    assert inst_fresh == 1     # sentry installed
+    assert pres_prior == 1     # postman already there
+    assert pres_dedupe == 0
     assert failed == 0
     install_calls = [c for c in calls
-                     if c[:3] == ["claude", "plugin", "install"]]
+                     if c[1:3] == ["plugin", "install"]]
     assert len(install_calls) == 1
     assert install_calls[0][3] == "sentry@claude-plugins-official"
 
@@ -144,49 +153,55 @@ def test_install_claude_plugins_continues_after_per_plugin_failure(monkeypatch) 
     etc.), the loop continues to ``sentry`` and reports the failure
     count."""
     def fake_run(cmd, *_a, **_kw):
-        if cmd[:3] == ["claude", "plugin", "list"]:
+        if cmd[1:3] == ["plugin", "list"]:
             return subprocess.CompletedProcess(list(cmd), 0, "", "")
-        if cmd[:3] == ["claude", "plugin", "install"] and "postman" in cmd[3]:
+        if cmd[1:3] == ["plugin", "install"] and "postman" in cmd[3]:
             return subprocess.CompletedProcess(
                 list(cmd), 1, "", "marketplace renamed plugin",
             )
         return subprocess.CompletedProcess(list(cmd), 0, "", "")
     monkeypatch.setattr(setup_mod.subprocess, "run", fake_run)
 
-    installed, skipped, failed = setup_mod._install_claude_plugins_for_role(
-        "DEVELOPER", ["postman", "sentry"],
+    inst_fresh, pres_prior, pres_dedupe, failed, failed_names = (
+        setup_mod._install_claude_plugins_for_role(
+            "DEVELOPER", ["postman", "sentry"],
+        )
     )
-    assert installed == 1
-    assert skipped == 0
+    assert inst_fresh == 1
+    assert pres_prior == 0
+    assert pres_dedupe == 0
     assert failed == 1
+    assert failed_names == ["postman"]
 
 
 def test_install_claude_plugins_empty_list_is_noop(fake_claude_cli) -> None:
     """A role with empty plugin list (READER, MAINTAINER per the
     curated table) does NOT call claude at all — not even the
     ``plugin list`` probe."""
-    installed, skipped, failed = setup_mod._install_claude_plugins_for_role(
-        "READER", [],
+    inst_fresh, pres_prior, pres_dedupe, failed, failed_names = (
+        setup_mod._install_claude_plugins_for_role("READER", [])
     )
-    assert (installed, skipped, failed) == (0, 0, 0)
+    assert (inst_fresh, pres_prior, pres_dedupe, failed) == (0, 0, 0, 0)
+    assert failed_names == []
     assert fake_claude_cli == []
 
 
 def test_install_claude_plugins_handles_missing_claude_cli(monkeypatch) -> None:
-    """Defensive: ``claude`` binary not on PATH → OSError. The probe
-    catches and falls through to fresh installs (which then also fail,
-    but the function returns a sane count instead of crashing setup)."""
-    def fake_run(cmd, *_a, **_kw):
-        raise FileNotFoundError("claude: command not found")
-    monkeypatch.setattr(setup_mod.subprocess, "run", fake_run)
-
-    installed, skipped, failed = setup_mod._install_claude_plugins_for_role(
-        "DEVELOPER", ["postman"],
+    """0203: ``claude`` binary not on PATH and not in the fallback
+    candidate locations → resolver returns None → role-install
+    reports all-failed with named plugins, doesn't shell out at all."""
+    monkeypatch.setattr(setup_mod, "_resolve_claude_binary",
+                        lambda: None)
+    inst_fresh, pres_prior, pres_dedupe, failed, failed_names = (
+        setup_mod._install_claude_plugins_for_role(
+            "DEVELOPER", ["postman"],
+        )
     )
-    # Probe failed → treated as 'nothing installed'; install also
-    # raises → failed counter ticks but no crash.
-    assert installed == 0
+    assert inst_fresh == 0
+    assert pres_prior == 0
+    assert pres_dedupe == 0
     assert failed == 1
+    assert failed_names == ["postman"]
 
 
 # ---------- _install_role_plugins_per_host (aggregate) ----------
@@ -208,7 +223,7 @@ def test_install_role_plugins_iterates_all_claude_roles(monkeypatch,
     monkeypatch.setattr(
         setup_mod, "_install_claude_plugins_for_role",
         lambda role, plugins, **kw: (
-            role_calls.append(role) or (len(plugins), 0, 0)
+            role_calls.append(role) or (len(plugins), 0, 0, 0, [])
         ),
     )
 
@@ -235,11 +250,11 @@ def test_install_role_plugins_codex_side_deferred(monkeypatch,
     install_called: list = []
     monkeypatch.setattr(
         setup_mod, "_install_claude_plugins_for_role",
-        lambda *a, **kw: install_called.append(a) or (0, 0, 0),
+        lambda *a, **kw: install_called.append(a) or (0, 0, 0, 0, []),
     )
 
     out = setup_mod._install_role_plugins_per_host(canon, verbose=False)
-    assert out == (0, 0, 0)
+    assert out == (0, 0, 0, 0, [])
     assert install_called == []
 
 
@@ -255,20 +270,24 @@ def test_install_role_plugins_returns_aggregate_counts(monkeypatch,
         },
     })
     counts_by_role = {
-        "DEVELOPER": (1, 0, 0),
-        "TESTER": (1, 1, 1),
+        # (inst_fresh, pres_prior, pres_dedupe, failed, failed_names)
+        "DEVELOPER": (1, 0, 0, 0, []),
+        "TESTER":    (1, 1, 0, 1, ["c"]),
     }
     monkeypatch.setattr(
         setup_mod, "_install_claude_plugins_for_role",
         lambda role, plugins, **kw: counts_by_role[role],
     )
 
-    installed, skipped, failed = setup_mod._install_role_plugins_per_host(
+    (inst_fresh, pres_prior, pres_dedupe, failed,
+     failed_names) = setup_mod._install_role_plugins_per_host(
         canon, verbose=False,
     )
-    assert installed == 2
-    assert skipped == 1
+    assert inst_fresh == 2
+    assert pres_prior == 1
+    assert pres_dedupe == 0
     assert failed == 1
+    assert "c" in failed_names
 
 
 # ---------- regression pin: role-docs no longer carry fabricated bullets ----------
