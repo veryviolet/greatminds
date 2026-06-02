@@ -4,6 +4,95 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.4.2 — 2026-06-02
+
+Patch release: SAFETY + the recovery-chain fixes the on-stand
+validation surfaced after 1.4.1 shipped.
+
+### Fixed
+
+- **0349 SAFETY: EXPLORER host-destructive actions must target the
+  avatar stand only.** EXPLORER had no machine-target boundary, and a
+  recent campaign ran `kill` against local coordd on the dev fleet —
+  host-destructive work hit the local greatminds-dev fleet instead of
+  the avatar stand. The codex profile now spells out: "the stand" =
+  the AVATAR host (deployed `/srv/greatminds-stand`), a DIFFERENT
+  machine from EXPLORER's own process host. Every host-destructive /
+  lifecycle / recovery command (kill, pkill, kill -TERM/-KILL/-SIGINT,
+  systemctl stop/restart/kill, killing coordd / driven-worker /
+  codex-app-server, logout, reboot) MUST run on the avatar via
+  `ssh <STAND_HOST>`. Strictly forbidden against localhost or the
+  local greatminds-dev fleet (greatminds-daemon@greatminds-dev +
+  coordd). "The local host is NOT the stand; never damage it."
+  Unresolvable destructive command → do not run; file a blocker. The
+  0344 stand-anchor is preserved (ssh remains allowed for on-stand
+  operation); the 0331-era no-host blanket is not re-added.
+
+- **0345 watchdog ignores non-role heartbeat files + coordd
+  periodically reaps orphan intents.** On a healthy reactive fleet
+  watchdog flagged `heartbeat.planner` + `heartbeat.review_sessions`
+  as stale, but those names are a tmux WINDOW name and a QUEUE name,
+  not role heartbeats — the per-lifecycle threshold could not resolve
+  them and fell back to the 600s default. Filename resolution now
+  SEGREGATES non-role files (window / queue / unknown stems) into a
+  single info line ("heartbeats: N non-role/legacy file(s) ignored:
+  ..."). Orphan intents also piled up because the reaper existed but
+  nothing ran it automatically; the safe reaping core is extracted
+  into `intent_clean.reap_orphan_intents` and coordd runs it
+  periodically (default 300s), wrapped so it never crashes the loop.
+
+- **0346 coordd systemd unit `Restart=always` so external kills
+  resurrect coordd.** The coordd systemd template unit used
+  `Restart=on-failure`. coordd catches SIGTERM and returns cleanly,
+  so an external `kill -TERM` produced exit 0/SUCCESS and on-failure
+  did NOT restart the killed coordd (`NRestarts=0`, unit went dead).
+  Now `Restart=always` (RestartSec=2) in both the shipped canon unit
+  and the inline fallback body. Systemd resurrects coordd after any
+  external kill / crash; a deliberate `systemctl --user stop` or
+  `greatminds daemon stop` is still honored (systemd never
+  auto-restarts a commanded stop regardless of `Restart=`), so update
+  / restart flows are unaffected.
+
+- **0347 coordd Step-2 inbox-scan drives migrated driven roles via
+  the shared driver.** coordd drove driven roles only from the
+  queue/.stand path; the inbox-scan woke every role via
+  sigint_deepest_descendant / press_enter. A driven role's pane is
+  idle bash between turns, so an inbox wake of a killed driven codex
+  worker sigint'd a dead pane — nothing re-drove or re-registered it
+  (agent status stayed not-registered). Extracted the dispatch
+  decision into `_maybe_drive_driven_role`: lifecycle==driven AND
+  coord.yaml window mode==driven → route through the driver
+  (claude_driver for tool=claude, codex_driver for tool=codex); else
+  None and the caller falls back to the legacy wake. `_route_queue_event`
+  and the Step-2 inbox-scan both use the shared helper. A killed
+  driven codex worker re-registers on the next event via a
+  force-fresh turn.
+
+- **0348 `greatminds restart` skips driven windows + reports them as
+  coordd-managed.** restart's `_relaunch` built the launch command
+  with the coord.yaml window mode verbatim, so a driven role got
+  `greatminds start-agent <ROLE> codex --mode driven`; `--mode` is
+  `Choice(loop|chat)` and errored, restart exited non-zero, the role
+  was left MISSING. launch.py already SKIPS mode==driven windows;
+  restart now mirrors that — `_relaunch` skips driven windows (recovery
+  is the next coordd event; --reset still clears session files), and
+  `_verify` reports driven roles as `driven (coordd-managed)` and
+  excludes them from total/fail (pre-0348 they were flagged MISSING
+  on a healthy driven fleet).
+
+### Operator migration
+
+- Re-seed `coordination/.codex-home/explorer/` so the 0349 + 0344
+  clauses reach the LIVE EXPLORER. `greatminds setup` seeds the
+  per-role codex homes once without overwrite, so MAINTAINER /
+  STAND-KEEPER must refresh `coordination/.codex-home/explorer/` from
+  the corrected shipped profile after the .venv-coord clean-wheel
+  upgrade. Preserve `auth.json` in the per-role home during the
+  refresh.
+- Run `greatminds daemon install` (or `greatminds daemon repair`) +
+  `systemctl --user daemon-reload` so the existing greatminds-daemon
+  unit picks up the 0346 `Restart=always` directive.
+
 ## 1.4.1 — 2026-06-02
 
 Patch release: brings the shipped EXPLORER codex profile in line with
