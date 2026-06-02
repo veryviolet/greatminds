@@ -535,12 +535,19 @@ def stand_reclaim(lease_id: str | None) -> None:
             lease_id=active.get("lease_id"),
             reason=f"reclaimed expired lease (holder {hr} not alive)",
         )
+        # 0343 parity: reclaim must pop the FIFO head just like release,
+        # else a reclaimed stand is freed but a queued lease (e.g. TESTER
+        # waiting behind a dead holder) is never promoted — the stand stays
+        # free-with-pending-queue forever.
+        captured["promoted"] = ss.promote_head_on_free(state, role)
 
     ss.update_stand_state(coord, mutator)
-    click.echo(
-        f"reclaimed expired lease {captured['lease_id']} "
-        f"(holder {captured['holder']} not alive); stand → free"
-    )
+    msg = (f"reclaimed expired lease {captured['lease_id']} "
+           f"(holder {captured['holder']} not alive); stand → free")
+    if captured.get("promoted"):
+        msg += (f"; auto-promoted queued lease "
+                f"{captured['promoted']} → preparing")
+    click.echo(msg)
 
 
 @stand.command(name="down")
