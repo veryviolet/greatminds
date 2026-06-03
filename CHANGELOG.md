@@ -4,6 +4,48 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.5.0 — 2026-06-03
+
+Major canon consolidation + a new interactive role. Live-verified on a
+real avatar fleet (driven turns bootstrap from the static prompt, claim,
+implement, advance the FSM).
+
+### Added
+
+- **LIVE-DEVELOPER** — an interactive, USER-paced role for working a
+  single task live with the USER on a leased stand. PLANNER routes a
+  plan marked `interactive: true` to the new `feature_live` queue;
+  LIVE-DEVELOPER leases a stand, deploys to its own lease during the
+  session, works live, and on USER approval hands to `feature_review`
+  as a sprint task (`approved_sprint` review outcome; TESTER skipped —
+  the USER is the live validator). New `staged` launch mode (the pane's
+  start command is pre-typed, the USER starts it). Replaces the old
+  UI-DEVELOPER FAST chat variant; scenario C is now LIVE-DEVELOPER. Ships
+  a `vite-dev` stand-profile example (backend + Vite HMR).
+
+### Changed
+
+- **Single static bootstrap.** An agent's whole instruction surface is
+  now `COORDINATE.md` (philosophy) + `schema.yaml` (machine contract +
+  glossary) + `coordination/PROJECT.md` (project specifics) + its role
+  from `$GREATMINDS_ROLE`. The system prompt is one role-independent
+  `coordination/bootstrap.md`; the per-role rendered prompt is gone.
+- **schema.yaml is the token source of truth** — a `glossary` section
+  now defines roles / lifecycles / wake_mechanisms / queue_kinds /
+  queues / stand_profiles / stand_probes / intake_disciplines; the rest
+  references tokens. Heartbeat is redefined as coordd's in-flight-turn
+  hang detector (not a watchdog liveness scan).
+
+### Removed
+
+- The prompt-generation layer: `render-role` + `role contract` CLIs,
+  `command_START.yaml`, and all `roles/*.md`.
+- The unused **bot** stream (BOT-USER / BOT-DEVELOPER roles, `bot_*`
+  queues), the dead `stand_enums` block + `task new --request-type` /
+  `--profile` plumbing, the stalled-agent sweep + its config, and the
+  vestigial stale-kick constants/log in coordd.
+- All numbered task-id and past-version references from the canon docs.
+
 ## 1.4.2 — 2026-06-02
 
 Patch release: SAFETY + the recovery-chain fixes the on-stand
