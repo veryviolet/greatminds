@@ -1,8 +1,8 @@
 """greatminds setup — bootstrap a project to use the coordination protocol.
 
-Creates the runtime queue tree, copies the schema / command_START /
-role docs from the packaged ``greatminds.data`` directory, and seeds
-the inbox + plugin-overlay layout.
+Creates the runtime queue tree, copies the schema / COORDINATE.md and
+seeds the static bootstrap.md from the packaged ``greatminds.data``
+directory, plus the inbox + plugin-overlay layout.
 
 After this command, the project has everything it needs to run the
 fleet. Next steps:
@@ -1168,9 +1168,9 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     header(f"greatminds setup: bootstrapping {project_dir}")
     info(f"  canon source: {canon}")
 
-    # project-root config (schema, command_START, role docs — canon-data,
-    # kept locally so humans can `cat <project>/DEVELOPER.md` without
-    # importing the package).
+    # project-root config (schema.yaml, COORDINATE.md — canon-data,
+    # kept locally so humans + agents can read it without importing the
+    # package).
     header("\nproject-root config:")
 
     # coord.yaml generation (init-style: never overwrite a user-edited file).

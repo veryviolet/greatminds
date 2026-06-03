@@ -12,7 +12,7 @@ Resolution rules (in order, first match wins):
     1. ``$GREATMINDS_PROJECT_DIR / "coordination"`` if that directory exists.
     2. Walk up from ``start`` (or ``Path.cwd()``) looking for ``coordination/``.
 
-- **canon** (package data — schema, command_START, role docs, plugins, mcp,
+- **canon** (package data — schema, bootstrap, COORDINATE, plugins, mcp,
   templates):
     1. ``$GREATMINDS_CANON_DIR`` if set and contains ``schema.yaml``.
     2. ``importlib.resources.files('greatminds.data')`` — wheel-shipped data.
@@ -61,8 +61,9 @@ def find_coord_dir(start: Path | None = None, *, strict: bool = True) -> Path:
 
 
 def find_canon_dir() -> Path:
-    """Locate the canon data directory (``schema.yaml``, ``command_START.yaml``,
-    ``roles/``, ``plugins/``, ``mcp/``, ``codex/profiles/``, ``templates/``).
+    """Locate the canon data directory (``schema.yaml``, ``bootstrap.md``,
+    ``COORDINATE.md``, ``plugins/``, ``mcp/``, ``codex/profiles/``,
+    ``templates/``).
 
     Resolution order:
       1. ``$GREATMINDS_CANON_DIR`` — explicit override (sandbox runs, dev clones).

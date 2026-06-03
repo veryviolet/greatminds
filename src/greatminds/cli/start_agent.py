@@ -9,7 +9,7 @@ Usage::
     greatminds-start-agent <ROLE> <TOOL> [--mode loop|chat] [extra tool args...]
 
 ROLE
-    Role key from ``command_START.yaml`` (DEVELOPER, ARCHITECT-PLANNER,
+    Role key from ``schema.yaml > roles`` (DEVELOPER, ARCHITECT-PLANNER,
     UI-DEVELOPER, EXPLORER, TESTER, …).
 
 TOOL
@@ -26,14 +26,13 @@ What it does:
    refuse to start if another agent is alive (unless ``GREATMINDS_FORCE=1``);
    reuse the persistent session UUID for ``--resume`` semantics;
    rotate the UUID when ``GREATMINDS_FRESH=1``.
-5. Render the bootstrap prompt via
-   ``python -m greatminds.cli.render_role``. On resume, replace it with
-   a short "continue your tick" nudge so the tool doesn't re-ingest the
-   giant role spec.
-6. Strip leading ``/loop`` for chat mode.
-7. Set the terminal title (OSC 0) unless
+5. Use the single static system prompt ``coordination/bootstrap.md``
+   (seeded from canon by setup) as the prompt; the agent reads its own
+   contract from ``schema.roles.<GREATMINDS_ROLE>``. On resume, replace
+   it with a short "continue your tick" nudge.
+6. Set the terminal title (OSC 0) unless
    ``GREATMINDS_START_AGENT_NOTITLE=1``.
-8. Per-tool branching:
+7. Per-tool branching:
 
    ``claude``
        Layered ``--plugin-dir`` (canon coordination-protocol → canon
@@ -631,8 +630,7 @@ def start_agent(role: str, tool: str, mode: str,
     # console-script binary: the 1.0.0 umbrella migration consolidated the
     # console scripts down to a single ``greatminds`` entry-point, so the
     # historical ``greatminds-pty-launch`` binary doesn't exist on PATH.
-    # Same pattern is used for render-role above. Set
-    # GREATMINDS_START_AGENT_NOPTY=1 to opt out (loses coordd keystroke
+    # Set GREATMINDS_START_AGENT_NOPTY=1 to opt out (loses coordd keystroke
     # injection — wake messages then sit in inbox until the agent's own
     # ScheduleWakeup brings it back).
     use_pty = os.environ.get("GREATMINDS_START_AGENT_NOPTY", "0") != "1"
