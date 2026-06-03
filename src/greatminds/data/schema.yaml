@@ -28,7 +28,7 @@ glossary:
     TESTER: "Validates implemented features on a deployed stand. Acquires the stand by lease, probes once it is ready, and runs greatminds gate-check before mv to feature_review/."
     READER: "Reads docs as a fresh user; validates clarity and accuracy; routes the result out of feature_docs_review/."
     EXPLORER: "Uses the live system on the stand as a real user (scenario B), whatever the stand's shape. Files bugs as kind:bugfix tasks in feature_inbox/."
-    STAND-KEEPER: "Owns the singleton stand resource (state.yaml-driven, lease-based). Brings the active lease to ready via a deploy profile, or down on failure. Supports profiles full-deploy (scenarios A, B), vite-dev (scenario C — backend + Vite HMR), and smoke-only."
+    STAND-KEEPER: "Owns the singleton stand resource (state.yaml-driven, lease-based). Brings the active lease to ready via a deploy profile (glossary.stand_profiles), or down on failure."
     USER: "Writes user_feedback/ or initiates an ARCHITECT-PLANNER chat. Never creates implementation tasks directly."
     MAINTAINER: "System operator, self-loop watchdog. Handles infrastructure the product pipeline cannot self-heal: agent restart, dead-pid recovery, greatminds CLI + schema.yaml maintenance, cutover orchestration. Receives asks at inbox/maintainer/ from coordd and from product agents when an issue is structural/schema rather than product. Sweeps PROACTIVELY every tick (an empty inbox is NOT 'nothing to do'): reclaims stale stand leases past TTL with a dead/absent holder, restarts dead agents and coordd, and escalates stalled task/queue chains to ARCHITECT-PLANNER. Does NOT claim product queues, triage user_feedback, or write plans."
     BOT-USER: "Bot-stream entry; independent of the product pipeline."
@@ -68,6 +68,8 @@ glossary:
   stand_profiles:
     full-deploy: "Full backend deployment on the target hosts with service health checks; scenarios A and B."
     vite-dev: "Backend deployed plus a Vite UI dev server with HMR (UI changes reload, no per-change redeploy); scenario C."
+    smoke-only: "Fast reachability + CLI-responds probe — no rsync, no install. Warmup leases and post-deploy liveness checks."
+    liveness-prose: "Prose (md-only, no YAML twin) liveness profile; STAND-KEEPER follows the written checklist via execute_md_profile."
 
 # ---------------------------------------------------------------------------
 # Queues
@@ -400,7 +402,6 @@ roles:
     # No stand queue: SK watches coordination/.stand/state.yaml for
     # lease grants (event-driven via coordd inotify on .stand/).
     claims_from: []
-    profiles: [full-deploy, vite-dev]
     responsibilities:
       - serve_singleton_stand_via_lease
       - deploy_via_profile_executor
@@ -760,18 +761,6 @@ task_kinds:
       - mode              # B (scenario B)
 
 # ---------------------------------------------------------------------------
-# Stand profiles
-#
-# Profiles STAND-KEEPER supports (purpose: glossary.stand_profiles).
-# Project-specific commands/URLs live in the installed PROJECT.md.
-# ---------------------------------------------------------------------------
-stand_profiles:
-  full-deploy:
-    used_by_scenarios: [A, B]
-  vite-dev:
-    used_by_scenarios: [C]
-
-# ---------------------------------------------------------------------------
 # Scenarios
 #
 # Three top-level modes of operation. Each task carries `plan.mode: A|B|C`.
@@ -949,11 +938,11 @@ stand:
         - stand_probe_*: requires holder of active_lease's lease_id
       enforcement_layer: cli
     state_file: .stand/state.yaml       # under coordination/
-    # Profile enum the lease CLI validates ``--profile`` against.
-    # SK's deploy playbook per value lives in PROJECT.md.
-    # ``liveness-prose`` is an md-only profile (no yaml twin) for
-    # exercising ``execute_md_profile`` end-to-end on a real stand.
-    # Canon templates ship in templates/stand-profiles/.
+    # Profile enum the lease CLI validates ``--profile`` against — the
+    # single source of truth for the accepted set. Token definitions
+    # live in glossary.stand_profiles; SK's deploy playbook per value
+    # lives in PROJECT.md; canon presets ship in templates/stand-profiles/
+    # (liveness-prose is md-only, no yaml twin).
     profiles_allowed: [full-deploy, vite-dev, smoke-only, liveness-prose]
 
 tests_block_validation:
