@@ -1370,6 +1370,16 @@ def _route_queue_event(coord: Path, canon_dir: Path,
     if driven is not None:
         return driven
 
+    # A staged (USER-started) role — e.g. LIVE-DEVELOPER — is never
+    # auto-woken by coordd: its pane holds a pre-typed start command
+    # until the USER starts the session, and sending keys would corrupt
+    # it. Deliver-only; the USER claims feature_live when they start.
+    if _window_mode_for_role(coord_yaml_doc, owner) == "staged":
+        if verbose:
+            print(f"  staged role {owner}: deliver-only (USER-started), "
+                  f"no event wake for {queue}/{filename}", file=sys.stderr)
+        return False
+
     mechanism = _wake_mechanism_for_tool(
         tool, _lifecycle_for_role(canon_dir, owner))
     if mechanism == "sigint_deepest_descendant":

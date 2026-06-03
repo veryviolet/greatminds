@@ -24,7 +24,8 @@ glossary:
     ARCHITECT-PLANNER: "Intake triage, planning (writes the plan block, sets stand_required), and per-scope routing from feature_plan to feature_dev / feature_ui_dev / feature_docs. Interactive chat partner for the USER. Writes review_sessions but does not claim from it — EXPLORER owns review-session iteration."
     ARCHITECT-REVIEWER: "Final review with stand-evidence verification (gate_check result in the tests block), commit, and push if policy allows. Owns feature_blocked wake-up: runs greatminds wake-check at the start of each tick."
     DEVELOPER: "Backend / product-code implementation. Claims from feature_dev/ (placed there by ARCHITECT-PLANNER routing scope:backend tasks)."
-    UI-DEVELOPER: "UI implementation. Pipeline mode claims from feature_ui_dev/ (placed there by ARCHITECT-PLANNER routing scope:ui tasks), writes the implementation block, hands off to feature_test/. A FAST chat variant (scenario C, Vite HMR) does not claim from the queue."
+    UI-DEVELOPER: "UI implementation. Claims from feature_ui_dev/ (placed there by ARCHITECT-PLANNER routing scope:ui tasks), writes the implementation block, hands off to feature_test/."
+    LIVE-DEVELOPER: "Interactive, USER-paced developer for a single task on a leased stand (scenario C and ad-hoc live work). Claims from feature_live/, holds a stand lease and deploys to it during the session, chats live with the USER, and on USER approval hands to feature_review/ as a sprint task (REVIEWER no-regression review, no TESTER). Replaces the old UI-DEVELOPER FAST chat variant."
     TECHNICAL-WRITER: "Documentation implementation. Claims from feature_docs/ (placed there by ARCHITECT-PLANNER routing scope:docs tasks); hands off to feature_docs_review/."
     TESTER: "Validates implemented features on a deployed stand. Acquires the stand by lease, probes once it is ready, and runs greatminds gate-check before mv to feature_review/."
     READER: "Reads docs as a fresh user; validates clarity and accuracy; routes the result out of feature_docs_review/."
@@ -53,6 +54,7 @@ glossary:
     feature_docs: "Documentation implementation."
     feature_test: "Implemented code ready for TESTER validation on a deployed stand."
     feature_docs_review: "Docs ready for READER review."
+    feature_live: "Interactive single-task work for LIVE-DEVELOPER (routed by PLANNER when plan.interactive). The role leases a stand, works live with the USER, and hands to feature_review as a sprint task on USER approval."
     feature_review: "Final review; ARCHITECT-REVIEWER approves or hands back."
     verified: "Approved and committed product work."
     archive: "Duplicate, abandoned, superseded, or triaged-away product work."
@@ -135,9 +137,13 @@ queues:
     owner: READER
     writers: [TECHNICAL-WRITER, READER]
     kind: active
+  feature_live:
+    owner: LIVE-DEVELOPER
+    writers: [LIVE-DEVELOPER, ARCHITECT-PLANNER]
+    kind: active
   feature_review:
     owner: ARCHITECT-REVIEWER
-    writers: [TESTER, READER, ARCHITECT-REVIEWER]
+    writers: [TESTER, READER, LIVE-DEVELOPER, ARCHITECT-REVIEWER]
     kind: active
   verified:
     owner: ARCHITECT-REVIEWER
@@ -302,6 +308,34 @@ roles:
         - run_ui_test_suite
         - append_implementation_block
         - mv_to_feature_test
+  LIVE-DEVELOPER:
+    category: product
+    # Interactive, USER-paced: works a single task live with the USER on
+    # a leased stand. As the lease HOLDER it may deploy to its own stand
+    # during the session (deploy_to_own_leased_stand_during_session) —
+    # the only relaxation of STAND-KEEPER's deploy exclusivity, scoped to
+    # an active interactive lease. On USER "ok" it hands to feature_review
+    # as a sprint task (REVIEWER does a no-regression review, outcome
+    # approved_sprint; TESTER is skipped — the USER was the live validator).
+    lifecycle: interactive
+    claims_from: [feature_live]
+    responsibilities:
+      - work_a_single_task_live_with_user_on_leased_stand
+      - deploy_to_own_leased_stand_during_session
+      - hand_to_review_as_sprint_on_user_ok
+    forbidden_actions:
+      - claim_outside_feature_live
+      - commit_to_main_directly
+      - skip_sprint_review
+    event_triggers:
+      on_feature_live_claim:
+        - create_worktree
+        - acquire_lease_via_stand_lease
+        - deploy_to_own_leased_stand_during_session
+        - interactive_chat_with_user
+        - on_user_ok_append_implementation_block
+        - release_lease
+        - mv_to_feature_review
   TECHNICAL-WRITER:
     category: product
     lifecycle: driven
@@ -598,6 +632,12 @@ transitions:
     to: feature_docs_review
     by: ARCHITECT-PLANNER
     requires: [plan_block, scope_docs, plan.audit_only]
+  # Interactive single-task work: a plan marked plan.interactive: true is
+  # routed to LIVE-DEVELOPER's queue regardless of scope (backend or ui).
+  - from: feature_plan
+    to: feature_live
+    by: ARCHITECT-PLANNER
+    requires: [plan_block, plan.interactive]
   - from: feature_dev
     to: feature_test
     by: DEVELOPER
@@ -609,6 +649,13 @@ transitions:
   - from: feature_docs
     to: feature_docs_review
     by: TECHNICAL-WRITER
+    requires: [implementation_block]
+  # LIVE-DEVELOPER hands the USER-approved sprint task to review (no
+  # TESTER step). The verified gate accepts review outcome approved_sprint
+  # and the sprint review satisfies gate_check_pass_if_stand_required.
+  - from: feature_live
+    to: feature_review
+    by: LIVE-DEVELOPER
     requires: [implementation_block]
   - from: feature_test
     to: feature_review
@@ -769,7 +816,7 @@ scenarios:
     stand_profile: full-deploy
   C:
     label: ui_rapid_iteration
-    active_roles: [UI-DEVELOPER, STAND-KEEPER]
+    active_roles: [LIVE-DEVELOPER, STAND-KEEPER]
     stand_profile: vite-dev
 
 # ---------------------------------------------------------------------------
@@ -1045,7 +1092,7 @@ block_kinds:
   plan:
     authored_by: [ARCHITECT-PLANNER]
   implementation:
-    authored_by: [DEVELOPER, UI-DEVELOPER, TECHNICAL-WRITER]
+    authored_by: [DEVELOPER, UI-DEVELOPER, TECHNICAL-WRITER, LIVE-DEVELOPER]
   tests:
     authored_by: [TESTER]
     allowed_test_results: [pass, fail, partial]
@@ -1055,7 +1102,10 @@ block_kinds:
     allowed_outcomes: [pass, fail, partial]
   review:
     authored_by: [ARCHITECT-REVIEWER]
-    allowed_outcomes: [approved, changes_requested]
+    # approved_sprint: the light no-regression approval for a LIVE-DEVELOPER
+    # sprint task (USER already validated it live; REVIEWER only checks it
+    # broke nothing external). Treated as an approve → verified.
+    allowed_outcomes: [approved, approved_sprint, changes_requested]
   stand_result:
     authored_by: [STAND-KEEPER]
     allowed_results: [ok, partial, fail]
@@ -1078,6 +1128,7 @@ queue_accepts_blocks:
   feature_dev:         [implementation, blocked]
   feature_ui_dev:      [implementation, blocked]
   feature_docs:        [implementation, blocked]
+  feature_live:        [implementation, blocked]
   feature_test:        [tests, blocked]
   feature_docs_review: [reader_review, blocked]
   feature_review:      [review, blocked]

@@ -82,13 +82,13 @@ def test_liveness_prose_has_frontmatter_with_prereq_flag() -> None:
 def test_setup_seeds_liveness_prose(tmp_path: Path) -> None:
     """``_seed_stand_profiles`` must copy the new md template
     into the project's ``coordination/stand-profiles/`` on each
-    fresh setup. Counts: 5 files now (full-deploy.yaml/md +
-    smoke-only.yaml/md + liveness-prose.md)."""
+    fresh setup. Counts: 6 files now (full-deploy.yaml/md +
+    smoke-only.yaml/md + liveness-prose.md + vite-dev.yaml)."""
     coord = tmp_path / "proj" / "coordination"
     coord.mkdir(parents=True)
     copied, skipped = setup_mod._seed_stand_profiles(
         coord, find_canon_dir())
-    assert copied == 5
+    assert copied == 6
     assert (coord / "stand-profiles" / "liveness-prose.md").is_file()
 
 

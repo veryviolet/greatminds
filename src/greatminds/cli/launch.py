@@ -239,6 +239,11 @@ def _emit_tmux(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
         # driven dispatch (force-fresh session on the first turn).
         if tool == "bash" or not role or mode == "driven":
             launch_cmd = ""
+        elif mode == "staged":
+            # Interactive, USER-started role (LIVE-DEVELOPER): pre-type the
+            # chat-mode start-agent command but do NOT submit it (below) —
+            # the USER starts/stops the session.
+            launch_cmd = _launch_command(launcher, role, tool, "chat")
         else:
             launch_cmd = _launch_command(launcher, role, tool, mode)
 
@@ -274,8 +279,13 @@ def _emit_tmux(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
         # a dead agent in an existing pane.
         if launch_cmd:
             _tmux("send-keys", "-t", f"{session}:{name}", "C-u")
-            _tmux("send-keys", "-t", f"{session}:{name}",
-                  launch_cmd, "Enter")
+            if mode == "staged":
+                # Pre-type only — no Enter. The command sits in the pane
+                # ready; the USER presses Enter to start the live session.
+                _tmux("send-keys", "-t", f"{session}:{name}", launch_cmd)
+            else:
+                _tmux("send-keys", "-t", f"{session}:{name}",
+                      launch_cmd, "Enter")
 
     _tmux("select-window", "-t", f"{session}:0")
 

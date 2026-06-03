@@ -777,6 +777,13 @@ def is_audit_only(data: dict[str, Any]) -> bool:
     return bool(p and p.get("audit_only") is True)
 
 
+def is_interactive_task(data: dict[str, Any]) -> bool:
+    """LIVE-DEVELOPER routing marker: the latest plan sets
+    ``interactive: true`` (USER asked to work the task live)."""
+    p = latest_plan(data)
+    return bool(p and p.get("interactive") is True)
+
+
 def require_target_readiness(data: dict[str, Any],
                              from_q: str, to_q: str) -> None:
     """Some transitions require the latest block to set a ready_for_* flag."""
@@ -1018,6 +1025,14 @@ def _check_gate_for_stand_required(data: dict[str, Any],
         return None  # No plan → other validators catch this case.
     if plan.get("stand_required") is not True:
         return None  # Gate doesn't apply.
+    # Sprint carve-out: a LIVE-DEVELOPER task is validated live by the
+    # USER and approved by REVIEWER's no-regression review (outcome
+    # approved_sprint). That review IS the gate — there is no TESTER
+    # gate-check evidence to evaluate, so the standard gate doesn't apply.
+    reviews = [b for b in (data.get("blocks") or [])
+               if isinstance(b, dict) and b.get("kind") == "review"]
+    if reviews and reviews[-1].get("outcome") == "approved_sprint":
+        return None
     result = _evaluate_gate_check(data)
     if result == "pass":
         return None
@@ -1311,14 +1326,16 @@ def _check_review_block_approved(data: dict[str, Any],
             "outcome=approved ...` before mv."
         )
     outcome = reviews[-1].get("outcome")
-    if outcome == "approved":
+    # approved_sprint: LIVE-DEVELOPER sprint task — REVIEWER's
+    # no-regression approval (USER validated it live); also verifies.
+    if outcome in ("approved", "approved_sprint"):
         return None
     return (
         f"review_block_approved: latest review block has "
-        f"outcome={outcome!r}, expected 'approved'. Either append a "
-        f"fresh review block with outcome=approved (post-fix iteration), "
-        f"or route the task back to the appropriate per-scope queue "
-        f"with outcome=changes_requested."
+        f"outcome={outcome!r}, expected 'approved' or 'approved_sprint'. "
+        f"Either append a fresh review block with outcome=approved "
+        f"(post-fix iteration), or route the task back to the appropriate "
+        f"per-scope queue with outcome=changes_requested."
     )
 
 
@@ -1393,6 +1410,20 @@ def _check_feature_blocked_withdrawn(data: dict[str, Any],
 # evidence lives on the product task's tests block (0246).
 
 
+def _check_plan_interactive(data: dict[str, Any],
+                            from_q: str, to_q: str) -> str | None:
+    """feature_plan → feature_live requires the latest plan block to set
+    ``interactive: true`` (the LIVE-DEVELOPER routing marker)."""
+    if is_interactive_task(data):
+        return None
+    return (
+        "plan.interactive: feature_plan → feature_live requires the latest "
+        "plan block to set interactive: true. Append `greatminds task "
+        "append-block plan --id <X> --field interactive=true ...`, or route "
+        "to a per-scope queue (feature_dev / feature_ui_dev / feature_docs)."
+    )
+
+
 # ---------------------------------------------------------------------------
 SCHEMA_REQUIRES_VALIDATORS: dict[str, "callable"] = {
     # Empty pre-condition is always satisfied.
@@ -1417,6 +1448,9 @@ SCHEMA_REQUIRES_VALIDATORS: dict[str, "callable"] = {
     # 0225 doc: plan.audit_only enforced by validate_block's plan
     # branch on the plan block. Documentary at mv level.
     "plan.audit_only": _noop_existing,
+    # feature_plan → feature_live: real gate on the latest plan's
+    # interactive marker (the LIVE-DEVELOPER routing path).
+    "plan.interactive": _check_plan_interactive,
     # 0225 doc: implementation_block / tests_block names appear in
     # ``feature_plan → feature_dev`` and ``feature_dev → feature_test``
     # requires but the named block doesn't exist yet at mv time (it

@@ -22,6 +22,8 @@ CANON_NAMES = (
     "smoke-only.yaml", "smoke-only.md",
     # 0295/0296: md-only profile, no yaml twin — exercises execute_md_profile.
     "liveness-prose.md",
+    # vite-dev: scenario C (LIVE-DEVELOPER rapid UI iteration / HMR).
+    "vite-dev.yaml",
 )
 
 
@@ -111,11 +113,11 @@ def _coord(tmp_path: Path) -> Path:
 
 def test_seed_stand_profiles_copies_all_four(tmp_path: Path) -> None:
     """First-time call must copy every canon preset; returned counts
-    match (copied=4, skipped=0)."""
+    match (copied=6, skipped=0)."""
     coord = _coord(tmp_path)
     copied, skipped = setup_mod._seed_stand_profiles(
         coord, find_canon_dir())
-    assert (copied, skipped) == (5, 0)
+    assert (copied, skipped) == (6, 0)
     landing = coord / "stand-profiles"
     assert landing.is_dir()
     for name in CANON_NAMES:
@@ -127,7 +129,7 @@ def test_seed_stand_profiles_copies_all_four(tmp_path: Path) -> None:
 
 def test_seed_stand_profiles_is_idempotent(tmp_path: Path) -> None:
     """Re-running setup must NOT overwrite operator-edited copies.
-    Second call reports skipped=4, copied=0; content of the
+    Second call reports skipped=6, copied=0; content of the
     operator-edited file survives intact."""
     coord = _coord(tmp_path)
     setup_mod._seed_stand_profiles(coord, find_canon_dir())
@@ -137,7 +139,7 @@ def test_seed_stand_profiles_is_idempotent(tmp_path: Path) -> None:
 
     copied, skipped = setup_mod._seed_stand_profiles(
         coord, find_canon_dir())
-    assert (copied, skipped) == (0, 5)
+    assert (copied, skipped) == (0, 6)
     assert target.read_text(encoding="utf-8") == operator_edit, (
         "0281: setup must NOT overwrite operator-edited preset files"
     )

@@ -1,0 +1,75 @@
+# vite-dev.yaml — STAND-KEEPER reference playbook for scenario C
+# (LIVE-DEVELOPER rapid UI iteration). Brings the backend up once, then
+# leaves a Vite dev server running with HMR so the lease HOLDER
+# (LIVE-DEVELOPER) can edit UI in its worktree and see changes reload
+# live — no per-edit redeploy. The dev server stays up across the whole
+# interactive session; only the backend is (re)deployed.
+#
+# Substitution variables (lease metadata + PROJECT.env):
+#   - {{ host }} / {{ user }}  — target host + SSH user (inventory line)
+#   - {{ deploy_path }}        — remote root, e.g. /srv/greatminds
+#   - {{ worktree }}           — local worktree (the UI source Vite serves)
+#   - {{ vite_port }}          — Vite dev-server port (default 5173)
+#   - {{ ui_dir }}             — UI subdir within the worktree (default ui)
+#   - {{ lease_id }} / {{ task_id }} — bookkeeping
+#
+# `prerequisite`-tagged tasks are the subset a warmup lease
+# (deploy_prerequisites_only=True) runs.
+---
+- name: greatminds vite-dev stand
+  hosts: stand
+  gather_facts: false
+  become: false
+  vars:
+    deploy_path: "{{ deploy_path | default('/srv/greatminds') }}"
+    vite_port: "{{ vite_port | default('5173') }}"
+    ui_dir: "{{ ui_dir | default('ui') }}"
+
+  tasks:
+    - name: ensure deploy_path exists
+      ansible.builtin.file:
+        path: "{{ deploy_path }}"
+        state: directory
+        mode: "0755"
+      tags: [prerequisite]
+
+    - name: sync worktree to deploy_path (backend + UI source)
+      ansible.builtin.command:
+        cmd: >
+          rsync -aP
+          --exclude=.venv*
+          --exclude=.worktrees
+          --exclude=__pycache__
+          --exclude=node_modules
+          {{ worktree }}/
+          {{ ansible_user | default('') }}@{{ inventory_hostname }}:{{ deploy_path }}/
+      delegate_to: localhost
+      changed_when: true
+      tags: [prerequisite]
+
+    - name: install UI dependencies (idempotent)
+      ansible.builtin.command:
+        cmd: npm install
+        chdir: "{{ deploy_path }}/{{ ui_dir }}"
+      changed_when: true
+
+    - name: start Vite dev server with HMR (background; stays up across the session)
+      # The lease HOLDER (LIVE-DEVELOPER) edits UI in its worktree and
+      # Vite's HMR reloads the change live — no redeploy per edit.
+      # Idempotent: skip if a dev server is already answering on vite_port.
+      ansible.builtin.shell: >
+        curl -fsS "http://localhost:{{ vite_port }}/" >/dev/null 2>&1 ||
+        nohup npm run dev -- --host --port {{ vite_port }}
+        >"/tmp/vite-{{ lease_id | default('dev') }}.log" 2>&1 &
+      args:
+        chdir: "{{ deploy_path }}/{{ ui_dir }}"
+      changed_when: true
+
+    - name: readiness — Vite dev server answers (GET only)
+      ansible.builtin.command:
+        cmd: curl -fsS "http://localhost:{{ vite_port }}/"
+      register: vite_ready
+      retries: 5
+      delay: 2
+      until: vite_ready.rc == 0
+      changed_when: false

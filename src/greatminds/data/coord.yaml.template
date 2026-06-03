@@ -34,6 +34,13 @@ windows:
     # Placeholder pane. A later change has the daemon render a live
     # task-status table here; for now it is a plain project shell.
     mode: dashboard
+  - name: live
+    role: LIVE-DEVELOPER
+    tool: claude
+    # Interactive, USER-paced. mode:staged means launch creates the pane
+    # and PRE-TYPES the start-agent command but does NOT submit it — the
+    # USER starts/stops the live session themselves when they want one.
+    mode: staged
   # --- driven roles (no pane; coordd drives each turn as a subprocess) ---
   - name: reviewer
     role: ARCHITECT-REVIEWER
