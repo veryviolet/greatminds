@@ -119,8 +119,21 @@ def test_reclaim_role_gated(tmp_path, monkeypatch):
     res = _run("DEVELOPER", ["reclaim"])
     assert res.exit_code != 0
     out = (res.output or "") + str(res.exception or "")
-    assert "STAND-KEEPER or ARCHITECT-PLANNER" in out
+    assert "MAINTAINER" in out and "reclaim" in out
     assert _state(coord)["active_lease"] is not None
+
+
+def test_reclaim_allowed_for_maintainer(tmp_path, monkeypatch):
+    """MAINTAINER's contract carries the stale-lease reclaim recovery
+    duty, so the CLI gate must allow it (reconciles the canon↔code
+    mismatch found in the 1.5.0 live fleet run)."""
+    proj, coord = _project(tmp_path, monkeypatch, granted_delta=-20000,
+                           holder_pid=None)  # expired + absent holder
+    res = _run("MAINTAINER", ["reclaim"])
+    assert res.exit_code == 0, res.output
+    st = _state(coord)
+    assert st["state"] == "free"
+    assert st["active_lease"] is None
 
 
 def test_reclaim_no_active_lease_errors(tmp_path, monkeypatch):

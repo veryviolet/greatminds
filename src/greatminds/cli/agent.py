@@ -142,29 +142,26 @@ def agent() -> None:
 
 @agent.command(name="status",
                help="report pid/alive/session/venv/heartbeat/input_sock "
-                    "for a role (or every registered role).")
-@click.argument("role", required=False)
+                    "for one or more roles (or every registered role).")
+@click.argument("roles", nargs=-1)
 @click.option("--json", "as_json", is_flag=True, default=False,
               help="emit a machine-readable JSON array (cat replacement).")
-def agent_status(role: str | None, as_json: bool) -> None:
+def agent_status(roles: tuple[str, ...], as_json: bool) -> None:
     coord = find_coord_dir()
-    if role:
-        roles = [role.lower()]
-        reg_dir = coord / REGISTRY_DIR
-        if not (reg_dir / f"{role.lower()}.json").is_file():
-            # Still emit a stable (not-registered) record rather than
-            # erroring — the operator asked a specific role's state.
-            pass
+    if roles:
+        # Explicit roles (one or many) — emit a stable record per role
+        # even if not registered, since the operator named it.
+        role_list = [r.lower() for r in roles]
     else:
-        roles = _registered_roles(coord)
-        if not roles:
+        role_list = _registered_roles(coord)
+        if not role_list:
             if as_json:
                 click.echo("[]")
             else:
                 click.echo("(no registered agents)")
             return
 
-    records = [collect_agent_status(coord, r) for r in roles]
+    records = [collect_agent_status(coord, r) for r in role_list]
     if as_json:
         click.echo(json.dumps(records, indent=2))
     else:

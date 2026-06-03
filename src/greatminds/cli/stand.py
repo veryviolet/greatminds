@@ -486,16 +486,18 @@ def stand_reclaim(lease_id: str | None) -> None:
     A stale lease (a crashed holder past its ttl_seconds) otherwise
     permanently locks the singleton — ``release`` is holder-only and
     there was no reaper. ``reclaim`` is restricted to STAND-KEEPER /
-    ARCHITECT-PLANNER (the stand owners) and refuses to clobber a live,
-    in-TTL lease OR a lease whose holder pid is still alive: it only
-    frees a lease that is BOTH past its TTL AND held by a dead/absent
-    agent.
+    ARCHITECT-PLANNER (the stand owners) and MAINTAINER (whose contract
+    carries reclaim_stale_stand_lease_past_ttl_with_dead_holder as a
+    recovery duty); it refuses to clobber a live, in-TTL lease OR a lease
+    whose holder pid is still alive: it only frees a lease that is BOTH
+    past its TTL AND held by a dead/absent agent.
     """
     from greatminds.cli import stand_state as ss
     role = _holder_role()
-    if role.upper() not in ("STAND-KEEPER", "ARCHITECT-PLANNER"):
+    if role.upper() not in ("STAND-KEEPER", "ARCHITECT-PLANNER", "MAINTAINER"):
         raise GreatMindsError(
-            "only STAND-KEEPER or ARCHITECT-PLANNER may reclaim a lease",
+            "only STAND-KEEPER, ARCHITECT-PLANNER or MAINTAINER may "
+            "reclaim a lease",
             exit_code=3,
         )
     coord = find_coord_dir()

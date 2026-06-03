@@ -143,6 +143,23 @@ def test_cli_status_single_role(tmp_path, monkeypatch):
     assert "TESTER" not in res.output
 
 
+def test_cli_status_multiple_roles(tmp_path, monkeypatch):
+    """1.5.1: `agent status` accepts several roles at once (a fresh
+    PLANNER hit the old single-role-only limit asking
+    `agent status STAND-KEEPER MAINTAINER TESTER`)."""
+    coord = _coord(tmp_path)
+    _write_reg(coord, "developer", pid=os.getpid(), session_id="d1")
+    _write_reg(coord, "maintainer", pid=os.getpid(), session_id="m1")
+    monkeypatch.chdir(coord.parent)
+    res = _run(["agent", "status", "DEVELOPER", "MAINTAINER", "TESTER"],
+               coord.parent)
+    assert res.exit_code == 0, res.output
+    assert "DEVELOPER" in res.output
+    assert "MAINTAINER" in res.output
+    # TESTER named but not registered → still a stable (not registered) record.
+    assert "TESTER" in res.output
+
+
 def test_cli_status_json(tmp_path, monkeypatch):
     coord = _coord(tmp_path)
     _write_reg(coord, "developer", pid=os.getpid(), session_id="d1",

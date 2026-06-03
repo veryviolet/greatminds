@@ -4,6 +4,25 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.5.1 — 2026-06-03
+
+Patch: two issues surfaced operating the 1.5.0 fleet live.
+
+### Fixed
+
+- **`greatminds agent status` accepts multiple roles.** It was
+  single-role-only; a freshly-restarted PLANNER ran
+  `agent status STAND-KEEPER MAINTAINER TESTER` and got an
+  "unexpected extra arguments" error. The command now takes any number
+  of role args (and still defaults to every registered role).
+- **MAINTAINER may now `stand reclaim`.** `schema.roles.MAINTAINER`
+  carries `reclaim_stale_stand_lease_past_ttl_with_dead_holder` as a
+  recovery duty, but the `stand reclaim` CLI gate allowed only
+  STAND-KEEPER / ARCHITECT-PLANNER — so MAINTAINER could not actually
+  close stale-lease recovery asks. Added MAINTAINER to the gate
+  (the safety guards are unchanged: only an expired lease with a
+  dead/absent holder is freed).
+
 ## 1.5.0 — 2026-06-03
 
 Major canon consolidation + a new interactive role. Live-verified on a
