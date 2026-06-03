@@ -127,10 +127,7 @@ def test_create_task_library_rejects_stand_stream(tmp_path: Path) -> None:
     os.environ["GREATMINDS_PROJECT_DIR"] = str(proj)
     try:
         with pytest.raises(GreatMindsError) as excinfo:
-            task_mod.create_task(
-                stream="stand", title="probe",
-                request_type="deploy", profile="full-deploy",
-            )
+            task_mod.create_task(stream="stand", title="probe")
         assert "stand" in str(excinfo.value).lower()
     finally:
         os.environ.pop("GREATMINDS_PROJECT_DIR", None)

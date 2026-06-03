@@ -9,7 +9,7 @@ block_kind required code changes on top of schema changes.
 
 0174 moves the DATA into ``schema.yaml`` under new sections
 (``streams:``, ``block_kinds:``, ``queue_accepts_blocks:``,
-``product_enums:``, ``stand_enums:``, ``assignee_role_by_scope:``).
+``product_enums:``, ``assignee_role_by_scope:``).
 ``cli/task.py`` loads them at module-import. Validator FUNCTIONS
 stay in code (registered by name in transitions[*].requires lists).
 """
@@ -108,16 +108,6 @@ def test_schema_has_product_enums() -> None:
     assert "A" in pe["modes"] and "B" in pe["modes"]
 
 
-def test_schema_has_stand_enums() -> None:
-    doc = _load_schema()
-    se = doc.get("stand_enums")
-    assert se is not None
-    for key in ("request_types", "profiles", "results", "statuses"):
-        assert se.get(key), f"0174: stand_enums.{key} missing"
-    assert "full-deploy" in se["profiles"]
-    assert "READY" in se["statuses"]
-
-
 def test_block_kinds_tests_carries_result_enums() -> None:
     """0174 contract: per-block-kind enums live with the block_kind
     entry (not as flat module constants). Validators read them from
@@ -184,12 +174,6 @@ def test_task_module_enums_match_schema() -> None:
     assert task_mod.PRIORITIES == set(pe["priorities"])
     assert task_mod.PLAN_KINDS == set(pe["plan_kinds"])
     assert task_mod.MODES == set(pe["modes"])
-
-    se = doc["stand_enums"]
-    assert task_mod.STAND_REQUEST_TYPES == set(se["request_types"])
-    assert task_mod.STAND_PROFILES == set(se["profiles"])
-    assert task_mod.STAND_RESULTS == set(se["results"])
-    assert task_mod.STAND_STATUSES == set(se["statuses"])
 
 
 def test_task_module_test_review_enums_match_schema() -> None:

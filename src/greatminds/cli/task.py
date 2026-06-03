@@ -141,7 +141,6 @@ def _load_fsm_tables_from_schema() -> dict[str, Any]:
     queue_accepts_data = doc.get("queue_accepts_blocks") or {}
     assignee_data = doc.get("assignee_role_by_scope") or {}
     product_enums = doc.get("product_enums") or {}
-    stand_enums = doc.get("stand_enums") or {}
 
     if not streams_data or not block_kinds_data or not queue_accepts_data:
         raise GreatMindsError(
@@ -169,10 +168,6 @@ def _load_fsm_tables_from_schema() -> dict[str, Any]:
     out["PRIORITIES"] = set(product_enums.get("priorities") or [])
     out["PLAN_KINDS"] = set(product_enums.get("plan_kinds") or [])
     out["MODES"] = set(product_enums.get("modes") or [])
-    out["STAND_REQUEST_TYPES"] = set(stand_enums.get("request_types") or [])
-    out["STAND_PROFILES"] = set(stand_enums.get("profiles") or [])
-    out["STAND_RESULTS"] = set(stand_enums.get("results") or [])
-    out["STAND_STATUSES"] = set(stand_enums.get("statuses") or [])
 
     tests_meta = block_kinds_data.get("tests") or {}
     out["TEST_RESULTS"] = set(tests_meta.get("allowed_test_results") or [])
@@ -196,10 +191,6 @@ PRODUCT_SCOPES:      set[str] = _FSM["PRODUCT_SCOPES"]
 PRIORITIES:          set[str] = _FSM["PRIORITIES"]
 PLAN_KINDS:          set[str] = _FSM["PLAN_KINDS"]
 MODES:               set[str] = _FSM["MODES"]
-STAND_REQUEST_TYPES: set[str] = _FSM["STAND_REQUEST_TYPES"]
-STAND_PROFILES:      set[str] = _FSM["STAND_PROFILES"]
-STAND_RESULTS:       set[str] = _FSM["STAND_RESULTS"]
-STAND_STATUSES:      set[str] = _FSM["STAND_STATUSES"]
 TEST_RESULTS:        set[str] = _FSM["TEST_RESULTS"]
 GATE_CHECK_RESULTS:  set[str] = _FSM["GATE_CHECK_RESULTS"]
 REVIEW_OUTCOMES:     set[str] = _FSM["REVIEW_OUTCOMES"]
@@ -1894,8 +1885,6 @@ def create_task(
     priority: str | None = None,
     kind: str | None = None,
     scope: str | None = None,
-    request_type: str | None = None,
-    profile: str | None = None,
     hosts: list[str] | None = None,
     evidence_for: list[str] | None = None,
     mode: str | None = None,
@@ -2465,9 +2454,6 @@ def _split_multivalue(ctx, param, value):
               help="product: " + "|".join(sorted(PRODUCT_KINDS)))
 @click.option("--scope", default=None,
               help="product: " + "|".join(sorted(PRODUCT_SCOPES)))
-@click.option("--request-type", "request_type", default=None,
-              type=click.Choice(sorted(STAND_REQUEST_TYPES)))
-@click.option("--profile", default=None, type=click.Choice(sorted(STAND_PROFILES)))
 @click.option("--hosts", multiple=True, callback=_split_multivalue,
               help="list of hosts; repeat the flag or comma-separate values")
 @click.option("--evidence-for", "evidence_for", multiple=True,
@@ -2483,7 +2469,7 @@ def _split_multivalue(ctx, param, value):
 @click.option("--seq", default=None, help="override numeric id prefix")
 @click.option("--reason", default=None, help="journal reason")
 def task_new(stream, title, reporter, priority, kind, scope,
-             request_type, profile, hosts, evidence_for,
+             hosts, evidence_for,
              mode, target_functionality, scenarios,
              description, in_queue, seq, reason) -> None:
     target_path = create_task(
@@ -2493,8 +2479,6 @@ def task_new(stream, title, reporter, priority, kind, scope,
         priority=priority,
         kind=kind,
         scope=scope,
-        request_type=request_type,
-        profile=profile,
         hosts=hosts,
         evidence_for=evidence_for,
         mode=mode,
