@@ -1268,17 +1268,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#greatminds-render-role" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        render-role
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#greatminds-report-upstream" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2179,17 +2168,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#greatminds-render-role" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        render-role
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#greatminds-report-upstream" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2650,8 +2628,8 @@ detection (useful when no marker files describe the env).</p>
 </code></pre></div>
 <h3 id="greatminds-lint-tokens">greatminds lint-tokens<a class="headerlink" href="#greatminds-lint-tokens" title="Permanent link">&para;</a></h3>
 <p>Lint <TOKEN> usage across the canon coordination files.</p>
-<p>Scans <code>command_START.yaml</code>, <code>COORDINATE.md</code>, role docs (<code>*.md</code>)
-and <code>templates/</code> for <code>&lt;TOKEN&gt;</code> patterns. Compares with the token
+<p>Scans <code>COORDINATE.md</code>, root <code>*.md</code>, <code>templates/</code>, plugin skills
+and mcp configs for <code>&lt;TOKEN&gt;</code> patterns. Compares with the token
 catalog in <code>PROJECT_VARIABLES.md</code>.</p>
 <p>Exits non-zero if unknown tokens are found. Unused catalog tokens are
 warned about but do not fail.</p>
@@ -2792,25 +2770,6 @@ coordd knows where to push.</p>
 </code></pre></div>
 <p><strong>Options:</strong></p>
 <div class="highlight"><pre><span></span><code>  -h, --help  Show this message and exit.
-</code></pre></div>
-<h3 id="greatminds-render-role">greatminds render-role<a class="headerlink" href="#greatminds-render-role" title="Permanent link">&para;</a></h3>
-<p>Render a role's bootstrap command with project tokens substituted.</p>
-<p><code>ROLE</code> is one of the keys under <code>roles:</code> in <code>command_START.yaml</code>
-(e.g. <code>DEVELOPER</code>, <code>ARCHITECT-PLANNER</code>, <code>UI-DEVELOPER-FAST</code>).</p>
-<p><code>--project-dir</code> points at an installed project containing
-<code>coordination/PROJECT.md</code> (default: current working directory).
-<code>--canon-dir</code> defaults to the packaged <code>greatminds.data</code> shipped
-with this wheel; pass to override (test fixtures, dev clones).</p>
-<p>Prints the rendered bootstrap text to stdout; warnings about unresolved
-tokens go to stderr.</p>
-<p><strong>Usage:</strong></p>
-<div class="highlight"><pre><span></span><code>greatminds render-role [OPTIONS] ROLE
-</code></pre></div>
-<p><strong>Options:</strong></p>
-<div class="highlight"><pre><span></span><code>  --project-dir DIRECTORY  project root containing coordination/PROJECT.md
-                           (default: cwd)
-  --canon-dir DIRECTORY    canon data dir (default: packaged greatminds.data)
-  -h, --help               Show this message and exit.
 </code></pre></div>
 <h3 id="greatminds-report-upstream">greatminds report-upstream<a class="headerlink" href="#greatminds-report-upstream" title="Permanent link">&para;</a></h3>
 <p>greatminds report-upstream — file a bug against the upstream greatminds repo.</p>
