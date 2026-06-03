@@ -58,21 +58,6 @@ WAKE_ENTER = "\r\n"
 WAKE_GAP_SECONDS = 0.35
 REGISTRY_DIR = ".agent_registry"
 
-# Stale-heartbeat kick: nudge an agent whose heartbeat has gone cold
-# (transient API errors / rate-limits stalled its self-wake), provided
-# it actually has pending work and we haven't already kicked it recently.
-# Stale-kick is OFF by default. Agent prompts now carry adaptive
-# backoff (self-wake), and real work arrives via inbox-file push, so
-# the heartbeat kick is redundant in normal operation — and it was
-# actively harmful: it nudged idle agents minute-after-minute when
-# nothing was happening, and injected "continue your tick" into the middle
-# of a human's interactive chat with ARCHITECT-PLANNER. Opt in only if
-# you specifically need the rate-limit-stuck recovery: COORDD_STALE_KICK=1.
-STALE_KICK_ENABLED = os.environ.get("COORDD_STALE_KICK", "0") == "1"
-STALE_CHECK_INTERVAL_SEC = float(os.environ.get("COORDD_STALE_CHECK_INTERVAL_SEC", "60"))
-STALE_KICK_SEC           = float(os.environ.get("COORDD_STALE_KICK_SEC",           "900"))
-KICK_MIN_INTERVAL_SEC    = float(os.environ.get("COORDD_KICK_MIN_INTERVAL_SEC",    "600"))
-
 # In-flight-turn hang detection. A driven turn runs as a coordd
 # subprocess holding the role's run-lock for the turn's duration. If the
 # lock has been held longer than the hang threshold AND the role's
@@ -146,17 +131,14 @@ def write_hang_report(coord: Path, role_lower: str, lock_age: float,
 PUSH_FRESH_GUARD_SEC     = float(os.environ.get("COORDD_PUSH_FRESH_GUARD_SEC",      "60"))
 # Chat-driven roles are paced by a human, not by ticks. coordd must
 # NEVER inject keystrokes ("check inbox and continue your tick") into their
-# pty — that corrupts the live conversation. This applies to BOTH the
-# stale-kick AND the inbox-file push: the inbox message is still written
-# to disk and the chat agent reads it in its own flow; coordd just does
-# not type into it. (A loop-mode agent still gets the keystroke push —
+# pty — that corrupts the live conversation. The inbox message is still
+# written to disk and the chat agent reads it in its own flow; coordd just
+# does not type into it. (A loop-mode agent still gets the keystroke push —
 # that is how it wakes from sleep.) Especially important because a
 # role's own task moves generate wake-to-self files via
 # notify_from_journal; without this, PLANNER nudges itself repeatedly
-# on every bin/task new/mv it performs.
+# on every task new/mv it performs.
 NO_KEYSTROKE_INJECT_ROLES = {"architect-planner", "maintainer", "user"}
-# Backward-compat alias (older code/tests referenced this name).
-NO_STALE_KICK_ROLES = NO_KEYSTROKE_INJECT_ROLES
 
 # Dead-pid report (H1/H8): coordd watches the agent registry and, when
 # it observes a role whose pid is no longer alive, files an `ask`
@@ -1930,15 +1912,6 @@ def coordd(project_dir: Path | None, project_name: str | None,
     # restart, which is fine.
     canon_dir = find_canon_dir()
     schema_roles = load_schema_roles(canon_dir)
-    if verbose:
-        print(
-            f"coordd: stale-kick enabled "
-            f"(check every {STALE_CHECK_INTERVAL_SEC:.0f}s, "
-            f"threshold {STALE_KICK_SEC:.0f}s, "
-            f"min interval per role {KICK_MIN_INTERVAL_SEC:.0f}s, "
-            f"schema roles: {len(schema_roles)})",
-            file=sys.stderr,
-        )
 
     # In-flight-turn hang detection (replaces the old stale-kick /
     # stalled-sweep heartbeat-cold nudges, which were a loop-mode
