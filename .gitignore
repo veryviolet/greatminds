@@ -48,7 +48,9 @@ coverage.xml
 # copies of canon (do NOT commit duplicates). Anchored with a leading
 # `/` so the canonical sources under src/greatminds/data/** stay tracked.
 /coord.yaml
+/coord.yaml.*.bak
 /schema.yaml
+/COORDINATE.md
 /command_START.yaml
 /coordination/
 # Per-role docs copied from src/greatminds/data/roles/*.md
