@@ -601,8 +601,8 @@ def test_bootstrap_soft_preserves_session_files_for_alive_agent(env, monkeypatch
     # Stub the soft-inject helper so the test doesn't shell out to
     # `greatminds render-role` or tmux paste-buffer.
     monkeypatch.setattr(
-        restart_mod, "_soft_inject_render_role",
-        lambda session, name, role: (True, "stubbed render-role inject"),
+        restart_mod, "_soft_inject_bootstrap",
+        lambda session, name, role, coord_dir: (True, "stubbed bootstrap inject"),
     )
 
     _run_bootstrap(env)
@@ -634,7 +634,7 @@ def test_bootstrap_soft_does_not_sigterm_alive_agent(env, monkeypatch):
         env.alive.discard(pid)
     monkeypatch.setattr(restart_mod.os, "kill", recording_kill)
     monkeypatch.setattr(
-        restart_mod, "_soft_inject_render_role",
+        restart_mod, "_soft_inject_bootstrap",
         lambda *_a, **_kw: (True, "stubbed"),
     )
 
@@ -647,7 +647,7 @@ def test_bootstrap_soft_does_not_sigterm_alive_agent(env, monkeypatch):
 
 
 def test_bootstrap_soft_calls_render_role_inject_for_alive_agent(env, monkeypatch):
-    """0147 contract: --bootstrap drives _soft_inject_render_role for
+    """0147 contract: --bootstrap drives _soft_inject_bootstrap for
     every alive role. This is the canon-refresh mechanism — pin the
     invocation so it can't silently no-op in a future refactor."""
     _write_coord_yaml(
@@ -664,10 +664,10 @@ def test_bootstrap_soft_calls_render_role_inject_for_alive_agent(env, monkeypatc
 
     inject_calls: list[tuple[str, str, str]] = []
 
-    def recording_inject(session: str, name: str, role: str):
+    def recording_inject(session: str, name: str, role: str, coord_dir):
         inject_calls.append((session, name, role))
         return True, "stubbed"
-    monkeypatch.setattr(restart_mod, "_soft_inject_render_role",
+    monkeypatch.setattr(restart_mod, "_soft_inject_bootstrap",
                         recording_inject)
 
     _run_bootstrap(env)
@@ -689,14 +689,14 @@ def test_bootstrap_soft_skips_inject_for_dead_pid(env, monkeypatch):
 
     inject_calls: list = []
     monkeypatch.setattr(
-        restart_mod, "_soft_inject_render_role",
+        restart_mod, "_soft_inject_bootstrap",
         lambda *a, **kw: (inject_calls.append(a) or (True, "stubbed")),
     )
 
     _run_bootstrap(env)
 
     assert inject_calls == [], (
-        "--bootstrap must NOT call _soft_inject_render_role for dead pids"
+        "--bootstrap must NOT call _soft_inject_bootstrap for dead pids"
     )
 
 
@@ -868,60 +868,54 @@ def test_reset_help_mentions_destructive_and_session_drop(env):
     assert "destructive" in out or "fresh" in out
 
 
-# ---------- _soft_inject_render_role helper ----------
+# ---------- _soft_inject_bootstrap helper ----------
 
 
-def test_soft_inject_loads_buffer_pastes_and_submits(monkeypatch):
-    """Pin the soft-inject mechanism: calls greatminds render-role
-    <ROLE>, loads stdout into a tmux buffer, paste-buffer -p, then
-    send-keys Enter. The -p (bracketed paste) flag is load-bearing —
-    without it multi-line render-role text would submit fragments
-    on every newline."""
+def test_soft_inject_loads_buffer_pastes_and_submits(tmp_path, monkeypatch):
+    """Pin the soft-inject mechanism: reads the static
+    coordination/bootstrap.md, loads it into a tmux buffer,
+    paste-buffer -p, then send-keys Enter. The -p (bracketed paste)
+    flag is load-bearing — without it the multi-line prompt would
+    submit fragments on every newline."""
     import subprocess as _sub
+
+    coord = tmp_path / "coordination"
+    coord.mkdir()
+    (coord / "bootstrap.md").write_text(
+        "BOOTSTRAP LINE 1\nBOOTSTRAP LINE 2\n", encoding="utf-8")
 
     calls: list[list[str]] = []
 
     def fake_run(cmd, *args, **kwargs):
         calls.append(list(cmd))
-        if cmd[:2] == ["greatminds", "render-role"]:
-            return _sub.CompletedProcess(
-                list(cmd), 0,
-                "ROLE PROMPT LINE 1\nROLE PROMPT LINE 2\n",
-                "",
-            )
         return _sub.CompletedProcess(list(cmd), 0, "", "")
 
     monkeypatch.setattr(restart_mod.subprocess, "run", fake_run)
-    ok, diag = restart_mod._soft_inject_render_role(
-        "test-session", "dev", "DEVELOPER",
+    ok, diag = restart_mod._soft_inject_bootstrap(
+        "test-session", "dev", "DEVELOPER", coord,
     )
     assert ok, diag
-    # Three calls in order: render-role, load-buffer, paste-buffer -p, send-keys Enter.
-    assert calls[0][:2] == ["greatminds", "render-role"]
-    assert calls[0][2] == "DEVELOPER"
-    assert calls[1][:2] == ["tmux", "load-buffer"]
+    # No render-role shell-out — the prompt comes from bootstrap.md.
+    assert not any(c[:2] == ["greatminds", "render-role"] for c in calls)
+    assert calls[0][:2] == ["tmux", "load-buffer"]
     paste_call = [c for c in calls if c[:2] == ["tmux", "paste-buffer"]][0]
-    assert "-p" in paste_call, "bracketed paste -p flag required (0147)"
+    assert "-p" in paste_call, "bracketed paste -p flag required"
     assert "test-session:dev" in paste_call
     submit = [c for c in calls if c[:2] == ["tmux", "send-keys"]][0]
     assert submit[-1] == "Enter"
 
 
-def test_soft_inject_returns_false_when_render_role_fails(monkeypatch):
-    """render-role failure (unknown role, missing canon) must be
-    non-fatal — caller logs the diag and continues. Don't crash
-    --bootstrap because one role's canon broke."""
+def test_soft_inject_returns_false_when_bootstrap_missing(tmp_path, monkeypatch):
+    """A missing coordination/bootstrap.md must be non-fatal — caller
+    logs the diag and continues. Don't crash --bootstrap on it."""
     import subprocess as _sub
-
-    def fake_run(cmd, *args, **kwargs):
-        if cmd[:2] == ["greatminds", "render-role"]:
-            return _sub.CompletedProcess(list(cmd), 2, "",
-                                         "role NOPE not found")
-        return _sub.CompletedProcess(list(cmd), 0, "", "")
-
-    monkeypatch.setattr(restart_mod.subprocess, "run", fake_run)
-    ok, diag = restart_mod._soft_inject_render_role(
-        "test-session", "dev", "NOPE",
+    monkeypatch.setattr(
+        restart_mod.subprocess, "run",
+        lambda *a, **k: _sub.CompletedProcess([], 0, "", ""))
+    coord = tmp_path / "coordination"
+    coord.mkdir()  # no bootstrap.md inside
+    ok, diag = restart_mod._soft_inject_bootstrap(
+        "test-session", "dev", "DEVELOPER", coord,
     )
     assert ok is False
-    assert "render-role NOPE failed" in diag
+    assert "bootstrap.md unreadable" in diag

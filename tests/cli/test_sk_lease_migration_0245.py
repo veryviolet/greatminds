@@ -18,7 +18,6 @@ from pathlib import Path
 import pytest
 
 from greatminds.cli import coordd as coordd_mod
-from greatminds.core.paths import find_canon_dir
 
 
 # ---------- coordd inotify includes .stand ----------
@@ -43,49 +42,8 @@ def test_inotify_watcher_registers_stand_when_dir_exists(
     assert ".stand" in set(w._wd_to_queue.values())
 
 
-# ---------- role-doc pins (0244 → 0245 migration) ----------
-
-
-def test_stand_keeper_doc_references_lease_api() -> None:
-    """0245 prose pin: STAND-KEEPER.md cites the new
-    `greatminds stand ready/down/up` workflow."""
-    text = (find_canon_dir() / "roles" / "STAND-KEEPER.md").read_text(
-        encoding="utf-8",
-    )
-    assert "greatminds stand ready" in text
-    assert "greatminds stand down" in text
-    assert "greatminds stand up" in text
-    assert "deprecated" in text.lower() or "post-0245" in text.lower()
-
-
-def test_tester_doc_references_lease_workflow() -> None:
-    """TESTER.md cites the new lease/release path + holder
-    information asymmetry."""
-    text = (find_canon_dir() / "roles" / "TESTER.md").read_text(
-        encoding="utf-8",
-    )
-    assert "greatminds stand lease" in text
-    assert "greatminds stand release" in text
-    # Information-asymmetry mention (no prose channel).
-    assert "information asymmetry" in text.lower() or \
-           "rubber-stamp" in text.lower()
-
-
-def test_explorer_doc_references_lease_workflow() -> None:
-    """EXPLORER.md walks scenarios using lease/release for
-    review-session stand state."""
-    text = (find_canon_dir() / "roles" / "EXPLORER.md").read_text(
-        encoding="utf-8",
-    )
-    assert "greatminds stand lease" in text
-    assert "greatminds stand release" in text
-
-
-def test_no_prose_channel_in_lease_request_documented() -> None:
-    """Cross-doc: TESTER doc explicitly warns against putting
-    acceptance / probe steps in lease requests (PLANNER §7
-    amendment)."""
-    text = (find_canon_dir() / "roles" / "TESTER.md").read_text(
-        encoding="utf-8",
-    )
-    assert "structured only" in text.lower() or "no prose" in text.lower()
+# Role-doc lease-API prose pins removed: the per-role prose docs are
+# gone (system prompt is the static bootstrap.md). The lease/release
+# workflow + information-asymmetry are pinned in schema (event_triggers
+# / forbidden_actions, test_schema_role_contracts_0288) and the stand
+# resource model (schema.stand).

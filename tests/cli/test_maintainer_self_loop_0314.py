@@ -19,71 +19,12 @@ import yaml
 from greatminds.core.paths import find_canon_dir
 
 
-def _command_start() -> dict:
-    return yaml.safe_load(
-        (find_canon_dir() / "command_START.yaml").read_text(
-            encoding="utf-8")
-    ) or {}
-
-
-def _maintainer_entry() -> dict:
-    roles = (_command_start().get("roles") or {})
-    return roles.get("MAINTAINER") or {}
-
-
-# ---------- command_START launch mode ----------
-
-
-def test_maintainer_launch_is_loop() -> None:
-    """0314: MAINTAINER's bootstrap ``launch`` flips chat → /loop."""
-    entry = _maintainer_entry()
-    assert entry.get("launch") == "/loop", (
-        f"0314: MAINTAINER launch must be '/loop' (got "
-        f"{entry.get('launch')!r})"
-    )
-
-
-def test_maintainer_body_describes_health_check_tick() -> None:
-    """The bootstrap body must instruct the periodic health-check
-    tick: inbox drain + safe auto-fix + escalation."""
-    body = _maintainer_entry().get("body") or ""
-    low = body.lower()
-    assert "health-check" in low or "health check" in low
-    assert "self-loop" in low
-    # Safe auto-fix instructions.
-    assert "greatminds restart" in body
-    assert "daemon restart" in body or "daemon repair" in body
-    # Escalation to PLANNER for FSM stalls.
-    assert "ARCHITECT-PLANNER" in body
-
-
-def test_maintainer_body_is_non_user_facing() -> None:
-    """0314: bootstrap must declare MAINTAINER non-user-facing —
-    USER reaches it through PLANNER."""
-    body = _maintainer_entry().get("body") or ""
-    assert "non-user-facing" in body.lower() \
-        or "NON-USER-FACING" in body
-    assert "ARCHITECT-PLANNER" in body
-
-
-def test_maintainer_body_forbids_self_fixing_fsm() -> None:
-    """Phase 1b contract: MAINTAINER does NOT fix queue/FSM stalls
-    itself — it escalates to PLANNER."""
-    body = _maintainer_entry().get("body") or ""
-    low = body.lower()
-    assert "escalate" in low
-    # Don't-fix-FSM-yourself instruction present.
-    assert ("do not fix" in low and ("fsm" in low or "queue" in low)) \
-        or "escalate to planner" in low
-
-
-def test_maintainer_body_mentions_configurable_interval() -> None:
-    """Tick cadence is configurable, default 1h, with the
-    claude/codex self-wake split documented."""
-    body = _maintainer_entry().get("body") or ""
-    low = body.lower()
-    assert "1h" in low or "default 1h" in low or "cadence" in low
-    assert "schedulewakeup" in low or "self-wake" in low
+# MAINTAINER's bootstrap launch mode + tick-body instructions moved
+# out of command_START (the system prompt is now the static
+# bootstrap.md; the self-loop behaviour is glossary.lifecycles.self-loop
+# + schema.roles.MAINTAINER.event_triggers.on_self_loop_tick). Canon
+# self-loop truth is pinned below (coord.yaml template mode + schema
+# lifecycle).
 
 
 # ---------- coord.yaml template ----------
@@ -106,35 +47,6 @@ def test_coord_template_maintainer_mode_is_loop() -> None:
     assert maint.get("mode") == "loop", (
         f"0314: maintainer window mode must be 'loop' (got "
         f"{maint.get('mode')!r})"
-    )
-
-
-# ---------- role doc ----------
-
-
-def test_maintainer_md_declares_self_loop() -> None:
-    """MAINTAINER.md must frame the role as a self-loop watchdog,
-    not chat-mode."""
-    text = (find_canon_dir() / "roles" / "MAINTAINER.md").read_text(
-        encoding="utf-8")
-    assert "self-loop" in text.lower()
-    assert "watchdog" in text.lower()
-
-
-def test_maintainer_md_says_non_user_facing() -> None:
-    text = (find_canon_dir() / "roles" / "MAINTAINER.md").read_text(
-        encoding="utf-8")
-    assert "non-user-facing" in text.lower()
-    assert "ARCHITECT-PLANNER" in text
-
-
-def test_maintainer_md_no_longer_claims_chat_mode() -> None:
-    """Negative pin: the old 'MAINTAINER is chat-mode, not /loop'
-    line must be gone (it contradicted the 0314 self-loop model)."""
-    text = (find_canon_dir() / "roles" / "MAINTAINER.md").read_text(
-        encoding="utf-8")
-    assert "chat-mode**, not /loop" not in text, (
-        "0314: stale 'chat-mode, not /loop' framing must be removed"
     )
 
 

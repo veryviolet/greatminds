@@ -259,16 +259,7 @@ def test_stand_ready_accepts_when_marker_present(tmp_path: Path,
     assert state["state"] == "ready"
 
 
-# ---------- canon doc requires the mandatory step ----------
-
-
-def test_stand_keeper_doc_mentions_dispatch_profile_mandatory() -> None:
-    """STAND-KEEPER.md must call out the mandatory executor
-    invocation so the SK chat agent reads it as the FIRST step on
-    every lease-preparing tick."""
-    from greatminds.core.paths import find_canon_dir
-    text = (find_canon_dir() / "roles" / "STAND-KEEPER.md") \
-        .read_text(encoding="utf-8")
-    assert "dispatch_profile" in text or "execute_yaml_profile" in text
-    assert "mandatory" in text.lower()
-    assert "deploy marker" in text or "deploy-<lease_id>" in text
+# The "dispatch_profile before stand ready" rule is pinned in schema
+# (roles.STAND-KEEPER.event_triggers.on_lease_preparing) and ENFORCED by
+# the deploy-marker gate exercised by the tests above; the per-role
+# prose doc that restated it is gone (system prompt = static bootstrap).

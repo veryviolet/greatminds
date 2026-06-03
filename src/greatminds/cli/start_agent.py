@@ -125,50 +125,6 @@ def load_env_file(path: Path) -> None:
         os.environ[key] = val
 
 
-def render_prompt(role: str, project_dir: Path) -> str:
-    """Run ``greatminds-render-role`` in a child process and return its stdout."""
-    proc = subprocess.run(
-        [
-            sys.executable, "-m", "greatminds.cli.render_role",
-            role, "--project-dir", str(project_dir),
-        ],
-        capture_output=True, text=True,
-    )
-    if proc.returncode != 0:
-        sys.stderr.write(proc.stderr)
-        raise GreatMindsError(f"render-role failed for role {role}", exit_code=2)
-    return proc.stdout.rstrip()
-
-
-def bootstrap_path(coord: Path, role: str) -> Path:
-    """0316 (0311 Phase 2b): path to a role's rendered bootstrap
-    (system-prompt) file: ``<coord>/.bootstrap/<role-lower>.md``.
-
-    The driven driver (0315) passes this to claude's
-    ``--append-system-prompt-file`` so the role contract rides the
-    system prompt on every fresh ``-p`` turn — independent of the
-    --resume history. Single source of the path so coordd + setup +
-    launch agree."""
-    return coord / ".bootstrap" / f"{role.lower()}.md"
-
-
-def write_role_bootstrap(coord: Path, project_dir: Path,
-                         role: str) -> Path:
-    """0316: render the role contract via render-role and write it to
-    the bootstrap file. Returns the path. Called at setup / launch so
-    a fresh ``.bootstrap/<role>.md`` exists for the driven driver to
-    reference.
-
-    Best-effort caller contract: render failures raise GreatMindsError
-    (the bootstrap is load-bearing for driven roles); callers that
-    want graceful degradation wrap in try/except."""
-    rendered = render_prompt(role, project_dir)
-    target = bootstrap_path(coord, role)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(rendered + "\n", encoding="utf-8")
-    return target
-
-
 def set_terminal_title(role: str) -> None:
     """Set the OSC 0 terminal title to ``role``; safe no-op if no tty."""
     try:
@@ -651,12 +607,20 @@ def start_agent(role: str, tool: str, mode: str,
         }
         registry_file.write_text(json.dumps(registry_payload), encoding="utf-8")
 
-    # Render the bootstrap prompt — on resume, replace with a short nudge.
-    prompt = render_prompt(role, project_dir)
+    # The system prompt is the single static coordination/bootstrap.md
+    # (seeded from canon by setup); the agent reads its own contract from
+    # schema.roles.<GREATMINDS_ROLE> (exported above). On resume, replace
+    # with a short nudge — the contract is already in session history.
+    bootstrap_md = project_dir / "coordination" / "bootstrap.md"
+    if bootstrap_md.is_file():
+        prompt = bootstrap_md.read_text(encoding="utf-8").rstrip()
+    else:
+        prompt = (f"You are {role}, a greatminds agent. Read schema.yaml "
+                  f"(roles.{role}), COORDINATE.md, coordination/PROJECT.md; "
+                  f"follow your lifecycle; coordination/ access via the "
+                  f"greatminds CLI only. Act on your tick.")
     if not session_new:
         prompt = f"continue your tick as {role} — you already know the contract"
-    if mode == "chat" and prompt.startswith("/loop "):
-        prompt = prompt[len("/loop "):]
 
     # Terminal title.
     if not dry_run and os.environ.get("GREATMINDS_START_AGENT_NOTITLE", "0") != "1":

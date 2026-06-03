@@ -10,10 +10,11 @@ When `schema.yaml` and this prose disagree, `schema.yaml` is authoritative
 for mechanics, and the prose is authoritative for the spirit of the
 invariants. Fix whichever is wrong, do not paper over the conflict.
 
-Project-specific values appear as `<TOKEN>` placeholders; their values live
-in the installed `coordination/PROJECT.md`. Use `greatminds render-role <ROLE>` to
-get a token-substituted bootstrap prompt; the script reads this canon plus
-the local `PROJECT.md`.
+Project-specific values live in the installed `coordination/PROJECT.md`
+(canon refers to them as `${...}` variables). Each agent's system prompt is
+the single static `coordination/bootstrap.md`; it reads this canon
+(`schema.yaml` + `COORDINATE.md`) plus `PROJECT.md` at the start of every
+tick.
 
 Every installed agent reads `COORDINATE.md`, `schema.yaml`, its own role
 `.md`, and `coordination/PROJECT.md` before acting.
@@ -562,15 +563,13 @@ No `git add .`; the committer stages exact paths only.
 
 ## 15. Bootstrap
 
-Render and run a role's bootstrap prompt with `greatminds render-role`:
-
-```bash
-<PROJECT_ROOT>/greatminds render-role <ROLE> [--project-dir <dir>]
-```
-
-The output substitutes tokens from `coordination/PROJECT.md`. Either pipe
-into your agent runner or copy the text. The complete role list lives in
-`command_START.yaml`.
+Every agent's system prompt is the single static `coordination/bootstrap.md`
+(seeded from canon by `greatminds setup`). It is role-independent: the agent
+learns its role from `$GREATMINDS_ROLE` and reads its own contract from
+`schema.yaml > roles.<GREATMINDS_ROLE>`, plus `COORDINATE.md` and
+`coordination/PROJECT.md`. coordd injects it as the system prompt for driven
+turns; `greatminds start-agent` uses it for paned roles. The role list is
+`schema.yaml > roles`.
 
 To check the canon for unknown tokens or missing catalog entries:
 
@@ -587,6 +586,17 @@ To audit the live coordination filesystem:
 <PROJECT_ROOT>/greatminds agent status [ROLE]
 <PROJECT_ROOT>/greatminds journal tail
 ```
+
+## 16. Visual event markers
+
+After a coordination action — `greatminds task mv`,
+`greatminds task append-block`, or `greatminds inbox send` — emit the
+matching one-line visual marker as the **LAST line** of your reply, so
+an operator scrolling a pane sees state changes at a glance. The marker templates
+(and their emoji) live in `schema.visual_events` — use them as the
+source of truth; do not inline or invent emoji here, or prose and
+schema drift. The marker comes AFTER any follow-up text, on its own
+final line.
 
 ## Canon skill plugins
 

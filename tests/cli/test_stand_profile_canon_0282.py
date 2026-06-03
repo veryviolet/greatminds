@@ -1,24 +1,13 @@
-"""Phase F canon pins for stand-profile role documentation."""
+"""Phase F canon pins for stand-profile documentation.
+
+The per-role prose pins (STAND-KEEPER profile lookup, TESTER deploy
+exclusion) moved to schema: the profile lookup is schema.stand_profile,
+TESTER's no-deploy is schema.roles.TESTER.forbidden_actions (pinned by
+test_schema_role_contracts_0288). COORDINATE.md §8.1 still carries the
+operator-facing convention.
+"""
 
 from greatminds.core.paths import find_canon_dir
-
-
-def _role_text(name: str) -> str:
-    return (find_canon_dir() / "roles" / name).read_text(encoding="utf-8")
-
-
-def test_canon_mentions_stand_profile_lookup() -> None:
-    text = _role_text("STAND-KEEPER.md")
-    assert "coordination/stand-profiles/" in text
-    assert "load_profile(coord, lease.profile)" in text
-
-
-def test_tester_canon_excludes_deploy_scope() -> None:
-    text = _role_text("TESTER.md")
-    role_scope = text.split("## Bootstrap", maxsplit=1)[0].lower()
-    assert "probe" in role_scope
-    for forbidden in ("rsync", "build wheel", "install"):
-        assert forbidden not in role_scope
 
 
 def test_coordinate_md_has_stand_profiles_section() -> None:

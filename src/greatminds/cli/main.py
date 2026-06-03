@@ -50,7 +50,6 @@ from . import launch as _launch_mod
 from . import coordd as _coordd_mod
 from . import wake_check as _wake_check_mod
 from . import watchdog as _watchdog_mod
-from . import render_role as _render_role_mod
 from . import lint_tokens as _lint_tokens_mod
 from . import migrate_task as _migrate_task_mod
 from . import migrate_stand_history as _migrate_stand_history_mod
@@ -68,7 +67,6 @@ from . import report_upstream as _report_upstream_mod
 from . import daemon as _daemon_mod
 from . import update as _update_mod
 from . import worktree as _worktree_mod
-from . import role_contract as _role_contract_mod
 from . import agent as _agent_mod
 
 cli.add_command(_task_mod.task)
@@ -79,7 +77,6 @@ cli.add_command(_launch_mod.launch)
 cli.add_command(_coordd_mod.coordd)
 cli.add_command(_wake_check_mod.wake_check, name="wake-check")
 cli.add_command(_watchdog_mod.watchdog)
-cli.add_command(_render_role_mod.render_role, name="render-role")
 cli.add_command(_lint_tokens_mod.lint_tokens, name="lint-tokens")
 cli.add_command(_migrate_task_mod.migrate_task, name="migrate-task")
 cli.add_command(_migrate_stand_history_mod.migrate_stand_history,
@@ -98,7 +95,6 @@ cli.add_command(_report_upstream_mod.report_upstream, name="report-upstream")
 cli.add_command(_daemon_mod.daemon)
 cli.add_command(_update_mod.update)
 cli.add_command(_worktree_mod.worktree)
-cli.add_command(_role_contract_mod.role)
 cli.add_command(_agent_mod.agent)
 
 

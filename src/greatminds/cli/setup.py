@@ -257,32 +257,20 @@ def _ensure_project_md(coord: Path, canon: Path, force: bool,
     return status
 
 
-def _seed_role_bootstraps(coord: Path, project_dir: Path) -> int:
-    """0316 (0311 Phase 2b): render each role's contract to
-    ``coordination/.bootstrap/<role>.md`` for the driven driver's
-    ``--append-system-prompt-file``.
-
-    Returns the count successfully written. Best-effort per role: a
-    render-role failure logs a warning and continues (the driven
-    driver gates on file existence and falls back to --resume
-    history). Roles whose render fails simply don't get a bootstrap
-    file this run.
-    """
-    from greatminds.cli.start_agent import write_role_bootstrap
-    written = 0
-    # The canonical role names render-role understands are the
-    # command_START roles; ROLES_LOWER carries the lowercase set.
-    for r in ROLES_LOWER:
-        role_upper = r.upper()
-        try:
-            write_role_bootstrap(coord, project_dir, role_upper)
-            written += 1
-        except Exception as exc:  # noqa: BLE001 — best-effort seed
-            warn(
-                f"  role bootstrap for {role_upper} skipped "
-                f"(render-role failed: {str(exc)[:80]})"
-            )
-    return written
+def _seed_bootstrap(coord: Path, canon: Path) -> bool:
+    """Seed the single static system-prompt ``coordination/bootstrap.md``
+    from canon (``greatminds.data/bootstrap.md``), overwriting on each
+    setup so it tracks canon. Role-independent: every agent reads its own
+    contract from ``schema.roles.<GREATMINDS_ROLE>``. The driven driver
+    and start-agent pass this file to claude's
+    ``--append-system-prompt-file`` / codex ``baseInstructions``."""
+    src = canon / "bootstrap.md"
+    if not src.is_file():
+        return False
+    coord.mkdir(parents=True, exist_ok=True)
+    (coord / "bootstrap.md").write_text(
+        src.read_text(encoding="utf-8"), encoding="utf-8")
+    return True
 
 
 def _seed_stand_profiles(coord: Path, canon: Path) -> tuple[int, int]:
@@ -542,12 +530,6 @@ ROLES_LOWER = [
     "architect-planner", "architect-reviewer", "developer", "ui-developer",
     "technical-writer", "tester", "reader", "explorer", "stand-keeper",
     "user", "maintainer",
-]
-
-ROLE_DOCS = [
-    "ARCHITECT-PLANNER.md", "ARCHITECT-REVIEWER.md", "DEVELOPER.md",
-    "UI-DEVELOPER.md", "TECHNICAL-WRITER.md", "TESTER.md", "READER.md",
-    "EXPLORER.md", "STAND-KEEPER.md", "MAINTAINER.md", "USER.md",
 ]
 
 
@@ -1233,12 +1215,7 @@ def setup(project_dir: Path | None, force: bool, lang: str,
         else:
             warn("  coord.yaml: template missing in canon, skipping generation")
     info(f"  schema.yaml: {_copy_if_missing(canon / 'schema.yaml', project_dir / 'schema.yaml', force=True)}")
-    info(f"  command_START.yaml: {_copy_if_missing(canon / 'command_START.yaml', project_dir / 'command_START.yaml', force=True)}")
     info(f"  COORDINATE.md: {_copy_if_missing(canon / 'COORDINATE.md', project_dir / 'COORDINATE.md', force=True)}")
-    for role_md in ROLE_DOCS:
-        src = canon / "roles" / role_md
-        if src.is_file():
-            _copy_if_missing(src, project_dir / role_md, force=True)
 
     # coordination/ — runtime state
     coord = project_dir / "coordination"
@@ -1361,15 +1338,12 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     sp_copied, sp_skipped = _seed_stand_profiles(coord, canon)
     info(f"  stand-profiles: {sp_copied} copied, {sp_skipped} exist")
 
-    # 0316 (0311 Phase 2b): seed per-role bootstrap (system-prompt)
-    # files under coordination/.bootstrap/<role>.md from render-role.
-    # The driven driver (0315) passes these to claude's
-    # ``--append-system-prompt-file`` so the role contract rides the
-    # system prompt on every fresh ``-p`` turn. Best-effort: a
-    # render-role failure for one role warns but doesn't abort setup
-    # (the agent falls back to --resume history without the file).
-    bs_written = _seed_role_bootstraps(coord, project_dir)
-    info(f"  role bootstraps: {bs_written} written")
+    # Seed the single static system-prompt coordination/bootstrap.md
+    # from canon. The driven driver + start-agent pass it to claude's
+    # ``--append-system-prompt-file`` / codex ``baseInstructions``; each
+    # agent reads its own contract from schema.roles.<GREATMINDS_ROLE>.
+    bs_ok = _seed_bootstrap(coord, canon)
+    info(f"  bootstrap.md: {'written' if bs_ok else 'MISSING in canon'}")
 
     # .claude/settings.local.json — Stop hook + schema's claude_settings
     # permissions.allow rules (0191). Merge-on-existing preserves any

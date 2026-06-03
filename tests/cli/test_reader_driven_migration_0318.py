@@ -53,21 +53,6 @@ def test_coord_template_reader_mode_driven() -> None:
     )
 
 
-def test_command_start_reader_launch_is_driven() -> None:
-    doc = yaml.safe_load(
-        (find_canon_dir() / "command_START.yaml").read_text(
-            encoding="utf-8")
-    ) or {}
-    reader = (doc.get("roles") or {}).get("READER") or {}
-    assert reader.get("launch") == "driven"
-    body = reader.get("body") or ""
-    low = body.lower()
-    assert "driven" in low
-    # No self-pacing /loop framing — the body tells READER not to
-    # self-pace (wording may wrap across lines, so match loosely).
-    assert "self-pace" in low
-
-
 def test_non_driven_roles_stay_non_driven() -> None:
     """Only the paned roles stay non-driven: ARCHITECT-PLANNER
     (interactive chat) and MAINTAINER (self-loop watchdog). Every

@@ -54,13 +54,6 @@ def _coord_template() -> dict:
     ) or {}
 
 
-def _command_start() -> dict:
-    return yaml.safe_load(
-        (find_canon_dir() / "command_START.yaml").read_text(
-            encoding="utf-8")
-    ) or {}
-
-
 # ---------- canon: migrated roles are driven everywhere ----------
 
 
@@ -84,23 +77,6 @@ def test_coord_template_window_mode_driven(role: str) -> None:
     assert win.get("mode") == "driven", (
         f"0319: {role} window mode must be 'driven' (got "
         f"{win.get('mode')!r})"
-    )
-
-
-@pytest.mark.parametrize("role", MIGRATED)
-def test_command_start_launch_is_driven(role: str) -> None:
-    spec = (_command_start().get("roles") or {}).get(role) or {}
-    assert spec.get("launch") == "driven", (
-        f"0319: {role} command_START launch must be 'driven'"
-    )
-    body = spec.get("body") or ""
-    low = body.lower()
-    assert "driven" in low, f"0319: {role} body must mention driven"
-    assert "self-pace" in low, (
-        f"0319: {role} body must tell it not to self-pace"
-    )
-    assert not body.lstrip().startswith("/loop "), (
-        f"0319: driven {role} body must not open with a /loop opener"
     )
 
 
@@ -131,11 +107,6 @@ def test_untouched_roles_not_driven(role: str) -> None:
         assert win.get("mode") != "driven", (
             f"0319: {role} must stay non-driven this phase (got "
             f"{win.get('mode')!r})"
-        )
-    spec = (_command_start().get("roles") or {}).get(role) or {}
-    if spec:
-        assert spec.get("launch") != "driven", (
-            f"0319: {role} command_START launch must not be 'driven'"
         )
 
 

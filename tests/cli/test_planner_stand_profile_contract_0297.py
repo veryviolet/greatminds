@@ -92,33 +92,9 @@ def test_planner_event_triggers_preserve_legacy() -> None:
         assert legacy in triggers
 
 
-# ---------- prose addendum ----------
-
-
-def test_planner_md_has_stand_profile_section() -> None:
-    """ARCHITECT-PLANNER.md must carry a short cross-reference to
-    the schema entries so a chat-mode PLANNER reading the prose at
-    bootstrap sees the pointer."""
-    text = (find_canon_dir() / "roles" / "ARCHITECT-PLANNER.md") \
-        .read_text(encoding="utf-8")
-    assert "stand-profile" in text.lower() or "stand_profile" in text.lower(), (
-        "0297: ARCHITECT-PLANNER.md must reference stand profiles"
-    )
-    # The cross-reference must point to schema, not duplicate prose.
-    assert "schema.roles.ARCHITECT-PLANNER" in text or "schema.yaml" in text
-
-
-def test_planner_md_mentions_profiles_allowed() -> None:
-    """The prose must name ``profiles_allowed`` so an operator who
-    reads the doc knows where to extend when a lease rejects."""
-    text = (find_canon_dir() / "roles" / "ARCHITECT-PLANNER.md") \
-        .read_text(encoding="utf-8")
-    assert "profiles_allowed" in text
-
-
-def test_planner_md_mentions_stand_keeper_notifications() -> None:
-    """The prose must point at the 0291 notification channel —
-    PLANNER discovers stand_down via inbox-info, not by polling."""
-    text = (find_canon_dir() / "roles" / "ARCHITECT-PLANNER.md") \
-        .read_text(encoding="utf-8")
-    assert "stand_keeper.notifications" in text or "notifications" in text
+# PLANNER's stand-profile prose pins moved to schema: the
+# coordinate-stand-profiles responsibility + on_stand_lease_enum_block /
+# on_stand_down_* event_triggers are in schema.roles.ARCHITECT-PLANNER
+# (tested above + by test_schema_role_contracts_0288); profiles_allowed
+# is schema.stand; the notification channel is schema.stand_keeper.
+# The per-role prose doc is gone (system prompt = static bootstrap.md).

@@ -1,7 +1,7 @@
 """Lint <TOKEN> usage across the canon coordination files.
 
-Scans ``command_START.yaml``, ``COORDINATE.md``, role docs (``*.md``)
-and ``templates/`` for ``<TOKEN>`` patterns. Compares with the token
+Scans ``COORDINATE.md``, root ``*.md``, ``templates/``, plugin skills
+and mcp configs for ``<TOKEN>`` patterns. Compares with the token
 catalog in ``PROJECT_VARIABLES.md``.
 
 Exits non-zero if unknown tokens are found. Unused catalog tokens are
@@ -27,7 +27,6 @@ TOKENS_USED_RE = re.compile(
 CATALOG_ROW_RE = re.compile(r"`<([A-Z_][A-Z0-9_]*)>`")
 
 SCAN_GLOBS = [
-    "command_START.yaml",
     "COORDINATE.md",
     "*.md",
     "templates/**/*.md",

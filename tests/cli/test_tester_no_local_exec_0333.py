@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import yaml
 
-from greatminds.cli import role_contract as rc
 from greatminds.core.paths import find_canon_dir
 
 
@@ -32,13 +31,6 @@ def test_tester_forbids_local_tests_and_uv_run() -> None:
         "0333: TESTER must forbid local test runs")
     assert "uv_run_or_active_against_fleet_venv" in forb, (
         "0333: TESTER must forbid uv run/--active against the fleet venv")
-
-
-def test_rendered_tester_contract_shows_no_local_exec() -> None:
-    entry = rc.load_role_contract(find_canon_dir(), "TESTER")
-    text = rc.render_contract("TESTER", entry)
-    assert "run_local_tests" in text
-    assert "uv_run_or_active_against_fleet_venv" in text
 
 
 # ---------- COORDINATE.md §12.5 no longer invites TESTER to test ----------

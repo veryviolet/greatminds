@@ -283,40 +283,32 @@ def _iter_role_windows(windows: list[dict]) -> list[tuple[str, str]]:
     return out
 
 
-def _soft_inject_render_role(
+def _soft_inject_bootstrap(
     session: str,
     window: str,
     role: str,
+    coord_dir: Path,
 ) -> tuple[bool, str]:
-    """0147 ``--bootstrap`` (soft): inject the role's freshly-rendered
-    canon into the live tmux pane and submit with Enter. The agent
-    keeps running; its next reply incorporates the new canon.
-    Session-id files are NOT touched; the agent's pid is NOT killed;
-    claude ``--resume`` / codex resume continuity is preserved.
+    """``--bootstrap`` (soft): paste the static system prompt
+    (``coordination/bootstrap.md``) into the live tmux pane and submit
+    with Enter. The agent keeps running and re-reads canon on its next
+    reply. Session-id files are NOT touched; the agent's pid is NOT
+    killed; claude ``--resume`` / codex resume continuity is preserved.
 
-    Mechanism: shell out to ``greatminds render-role <ROLE>`` to
-    capture the rendered prompt (the same text the agent saw on its
-    original bootstrap), load it into a uniquely-named tmux buffer,
-    and ``paste-buffer -p`` (bracketed paste) into the pane. Then
-    ``send-keys Enter`` submits. Bracketed paste preserves multi-line
-    text as a single paste — without ``-p`` each embedded newline
-    might be interpreted as the agent's submit key, fragmenting the
-    canon across many turns.
+    Mechanism: load the static prompt into a uniquely-named tmux buffer
+    and ``paste-buffer -p`` (bracketed paste) into the pane, then
+    ``send-keys Enter``. Bracketed paste preserves the multi-line text
+    as a single paste so embedded newlines aren't read as submit keys.
 
     Returns ``(ok, diag)``. Soft-inject failures are non-fatal — the
     caller logs and continues to the next role; this is operator
     convenience, not a correctness gate.
     """
-    proc = subprocess.run(
-        ["greatminds", "render-role", role],
-        capture_output=True, text=True,
-    )
-    if proc.returncode != 0 or not proc.stdout.strip():
-        return False, (
-            f"render-role {role} failed: rc={proc.returncode} "
-            f"stderr={proc.stderr.strip()[:120]}"
-        )
-    rendered = proc.stdout.rstrip() + "\n"
+    try:
+        rendered = (coord_dir / "bootstrap.md").read_text(
+            encoding="utf-8").rstrip() + "\n"
+    except OSError as exc:
+        return False, f"bootstrap.md unreadable: {str(exc)[:120]}"
     buf_name = f"gm-bootstrap-{role.lower()}"
     load = subprocess.run(
         ["tmux", "load-buffer", "-b", buf_name, "-"],
@@ -337,7 +329,7 @@ def _soft_inject_render_role(
     )
     if submit.returncode != 0:
         return False, f"tmux send-keys Enter failed: {submit.stderr.strip()[:120]}"
-    return True, f"render-role injected ({len(rendered)} chars) + Enter"
+    return True, f"bootstrap injected ({len(rendered)} chars) + Enter"
 
 
 def _sigterm_alive(pid: int) -> None:
@@ -427,8 +419,8 @@ def _restart_dead_agents(
                 # preserved across this operation. The role with this
                 # branch does NOT need_start (the agent is already
                 # running; we just nudged it).
-                ok, diag = _soft_inject_render_role(session, name,
-                                                   role_lc.upper())
+                ok, diag = _soft_inject_bootstrap(session, name,
+                                                  role_lc.upper(), coord_dir)
                 if ok:
                     _log(f"    {name} ({role_lc}): pid={pid} alive — "
                          f"--bootstrap (soft): {diag}")
@@ -636,9 +628,9 @@ def _verify(
     "--bootstrap",
     is_flag=True,
     default=False,
-    help=("soft canon refresh for alive agents (0147). Renders the "
-          "role canon via `greatminds render-role` and pastes it into "
-          "the live tmux pane via bracketed paste, then submits with "
+    help=("soft canon refresh for alive agents. Pastes the static "
+          "`coordination/bootstrap.md` into the live tmux pane via "
+          "bracketed paste, then submits with "
           "Enter. The agent keeps running — session-id files are NOT "
           "touched, pid is NOT killed, claude --resume / codex resume "
           "continuity is preserved. This is the canonical post-PyPI-"

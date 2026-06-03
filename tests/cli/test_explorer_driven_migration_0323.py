@@ -39,13 +39,6 @@ def _coord_template() -> dict:
     ) or {}
 
 
-def _command_start() -> dict:
-    return yaml.safe_load(
-        (find_canon_dir() / "command_START.yaml").read_text(
-            encoding="utf-8")
-    ) or {}
-
-
 # ---------- canon: EXPLORER is driven everywhere ----------
 
 
@@ -64,18 +57,6 @@ def test_coord_template_explorer_mode_driven() -> None:
     assert win.get("mode") == "driven", (
         f"0323: explorer window mode must be 'driven' (got "
         f"{win.get('mode')!r})"
-    )
-
-
-def test_command_start_explorer_launch_is_driven() -> None:
-    spec = (_command_start().get("roles") or {}).get("EXPLORER") or {}
-    assert spec.get("launch") == "driven"
-    body = spec.get("body") or ""
-    low = body.lower()
-    assert "driven" in low
-    assert "self-pace" in low
-    assert not body.lstrip().startswith("/loop "), (
-        "0323: driven EXPLORER body must not open with a /loop opener"
     )
 
 

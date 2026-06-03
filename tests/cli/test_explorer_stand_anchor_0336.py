@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import yaml
 
-from greatminds.cli import role_contract as rc
 from greatminds.core.paths import find_canon_dir
 
 
@@ -21,11 +20,6 @@ def _schema_explorer() -> dict:
         (find_canon_dir() / "schema.yaml").read_text(encoding="utf-8")
     ) or {}
     return doc["roles"]["EXPLORER"]
-
-
-def _explorer_md() -> str:
-    return (find_canon_dir() / "roles" / "EXPLORER.md").read_text(
-        encoding="utf-8")
 
 
 # ---------- 0331 inversion is gone ----------
@@ -64,32 +58,3 @@ def test_schema_explorer_forbids_off_stand_validation() -> None:
     assert "ssh_into_stand_hosts" not in forb
 
 
-def test_rendered_contract_shows_stand_anchor_not_blackbox() -> None:
-    entry = rc.load_role_contract(find_canon_dir(), "EXPLORER")
-    text = rc.render_contract("EXPLORER", entry)
-    assert "operate_on_the_stand_as_real_user_whatever_its_shape" in text
-    assert "validate_off_stand_or_local_substitutes" in text
-    assert "black_box" not in text
-    assert "ssh_into_stand_hosts" not in text
-
-
-# ---------- EXPLORER.md prose: stand-anchor + product-shape-agnostic ----------
-
-
-def test_explorer_md_states_firm_stand_anchor() -> None:
-    md = _explorer_md()
-    assert "ON THE STAND" in md
-    assert "STRICTLY FORBIDDEN" in md
-    # off-stand / local substitutes explicitly forbidden
-    low = md.lower()
-    assert "off-stand" in low or "not the stand" in low
-    assert "local substitutes" in low
-
-
-def test_explorer_md_access_method_is_shape_agnostic() -> None:
-    """Access method must NOT be web-only — SSH / host / deployed-where
-    alternatives are named alongside HTTP."""
-    low = _explorer_md().lower()
-    assert "ssh" in low, "0336: SSH access path must be named (not web-only)"
-    # the old web-only THE-method line is gone
-    assert "opens the ui in a browser /" not in low

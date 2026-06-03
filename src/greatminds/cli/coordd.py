@@ -531,12 +531,16 @@ def _lifecycle_for_role(canon_dir: Path, role: str) -> str | None:
 
 
 def _driven_bootstrap_path(coord: Path, role_lower: str) -> str:
-    """0315/0316: path to the role's rendered bootstrap (system-
-    prompt) file. 0316 generates it at setup/launch via render-role;
-    0315's driver passes it to ``--append-system-prompt-file`` when
-    it exists. Returns the path string regardless of existence —
-    the caller gates on ``Path(...).is_file()``."""
-    return str(coord / ".bootstrap" / f"{role_lower}.md")
+    """Path to the single static system-prompt file
+    ``coordination/bootstrap.md`` (seeded from canon by ``setup``).
+
+    Role-independent: the prompt is the same for every role, which reads
+    its own contract from ``schema.roles.<GREATMINDS_ROLE>`` (coordd sets
+    GREATMINDS_ROLE in the turn's env). Passed to claude's
+    ``--append-system-prompt-file`` / used as codex ``baseInstructions``
+    when it exists; the caller gates on ``Path(...).is_file()``. The
+    ``role_lower`` arg is retained for call-site symmetry."""
+    return str(coord / "bootstrap.md")
 
 
 def _driven_run_lock_path(coord: Path, role_lower: str) -> Path:
@@ -753,6 +757,11 @@ def _spawn_driven_turn(
             proc = subprocess.run(
                 run_argv, cwd=str(coord.parent),
                 capture_output=True, text=True,
+                # coordd has no role of its own; export the driven role
+                # so the agent's greatminds CLI resolves caller_role and
+                # the static bootstrap's $GREATMINDS_ROLE is set (mirrors
+                # the codex driver's _codex_appserver_env).
+                env={**os.environ, "GREATMINDS_ROLE": role_lower.upper()},
             )
             try:
                 _turn_log_path(coord, role_lower).write_text(

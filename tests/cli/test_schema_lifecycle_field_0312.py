@@ -10,9 +10,7 @@ f(lifecycle, tool); 1a is the declaration only.
 from __future__ import annotations
 
 import yaml
-from click.testing import CliRunner
 
-from greatminds.cli import role_contract as rc_mod
 from greatminds.core.paths import find_canon_dir
 
 
@@ -100,22 +98,3 @@ def test_launch_modes_removed_from_roles() -> None:
         assert "launch_modes" not in entry, (
             f"role {name!r} still carries the removed launch_modes field"
         )
-
-
-# ---------- role contract CLI surfaces lifecycle ----------
-
-
-def test_role_contract_cli_shows_lifecycle() -> None:
-    """``greatminds role contract <ROLE>`` must render the
-    Lifecycle line so agents read it at tick start."""
-    result = CliRunner().invoke(
-        rc_mod.role, ["contract", "MAINTAINER"])
-    assert result.exit_code == 0, result.output
-    assert "Lifecycle: self-loop" in result.output
-
-
-def test_role_contract_cli_shows_driven_for_developer() -> None:
-    result = CliRunner().invoke(
-        rc_mod.role, ["contract", "DEVELOPER"])
-    assert result.exit_code == 0
-    assert "Lifecycle: driven" in result.output

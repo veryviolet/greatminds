@@ -1,8 +1,9 @@
 # Coordination pipeline schema
 #
 # Machine-readable source of truth for queues, roles, transitions, and stand
-# profiles. Read by bin/ scripts (render-role, gate_check, wake_check, watchdog,
-# lint-tokens) and by humans cross-referencing COORDINATE.md prose.
+# profiles. Read by the greatminds CLI (gate-check, wake-check, watchdog,
+# lint-tokens), by each agent at tick start, and by humans cross-referencing
+# COORDINATE.md prose.
 #
 # Invariants in COORDINATE.md must match what's encoded here. If they drift,
 # the schema is normative — fix the prose, not the schema.
@@ -779,8 +780,8 @@ scenarios:
 # on coordination/ is forbidden. Why: a raw relative coordination/ path
 # breaks from a per-task worktree cwd (the worktree has no
 # coordination/); the CLI resolves the project root regardless of cwd;
-# and a direct task-yaml edit bypasses FSM validation. role_contract
-# renders this for every role (machine-readable, no prose).
+# and a direct task-yaml edit bypasses FSM validation. Every agent
+# reads this rule from canon at tick start (machine-readable, no prose).
 # ---------------------------------------------------------------------------
 coordination_access:
   cli_only: true

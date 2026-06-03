@@ -44,7 +44,7 @@ Each tick:
 4. `greatminds inbox ack <file>` after handling each message.
 
 Beyond the tick: you maintain the greatminds package, schema.yaml,
-command_START.yaml, COORDINATE.md, and orchestrate cutovers.
+COORDINATE.md, bootstrap.md, and orchestrate cutovers.
 
 Mutation paths: `greatminds task` / `greatminds inbox` / `greatminds stand`
 only. No bare mv/Edit/Write on coordination/ files.

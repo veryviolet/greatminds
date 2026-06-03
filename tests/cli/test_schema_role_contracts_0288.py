@@ -12,15 +12,9 @@ CLI is what 0288 lands.
 """
 from __future__ import annotations
 
-import subprocess
-import sys
-
 import pytest
 import yaml
-from click.testing import CliRunner
 
-from greatminds.cli import role_contract as rc_mod
-from greatminds.core.errors import GreatMindsError
 from greatminds.core.paths import find_canon_dir
 
 
@@ -165,81 +159,3 @@ def test_reviewer_event_triggers_gate_check() -> None:
     entry = _schema_roles()["ARCHITECT-REVIEWER"]
     steps = entry["event_triggers"]["on_feature_review_claim"]
     assert "run_gate_check" in steps
-
-
-# ---------- CLI render ----------
-
-
-def test_role_contract_cli_renders_tester(tmp_path) -> None:
-    """``greatminds role contract TESTER`` outputs the structured
-    summary with all four sections + the event_triggers detail."""
-    runner = CliRunner()
-    result = runner.invoke(
-        rc_mod.role,
-        ["contract", "TESTER"],
-    )
-    assert result.exit_code == 0, result.output
-    out = result.output
-    assert "ROLE: TESTER" in out
-    assert "Responsibilities:" in out
-    assert "Forbidden actions:" in out
-    assert "Event triggers:" in out
-    assert "on_feature_test_claim:" in out
-    # Step numbering: "1." prefix proves the ordered render.
-    assert "  1. acquire_lease_via_stand_lease" in out \
-        or "    1. acquire_lease_via_stand_lease" in out
-
-
-def test_role_contract_cli_rejects_unknown_role() -> None:
-    runner = CliRunner()
-    result = runner.invoke(
-        rc_mod.role,
-        ["contract", "GHOST-ROLE"],
-    )
-    assert result.exit_code != 0
-    msg = result.output + (str(result.exception)
-                            if result.exception else "")
-    assert "GHOST-ROLE" in msg
-    assert "Available" in msg
-
-
-def test_role_list_cli_returns_all_roles() -> None:
-    """``greatminds role list`` returns every declared role, one
-    per line."""
-    runner = CliRunner()
-    result = runner.invoke(rc_mod.role, ["list"])
-    assert result.exit_code == 0
-    lines = set(result.output.strip().splitlines())
-    for name in ALL_ROLES:
-        assert name in lines
-
-
-# ---------- load_role_contract library API ----------
-
-
-def test_load_role_contract_returns_full_entry(tmp_path) -> None:
-    entry = rc_mod.load_role_contract(find_canon_dir(), "TESTER")
-    assert "responsibilities" in entry
-    assert "forbidden_actions" in entry
-    assert "event_triggers" in entry
-
-
-def test_load_role_contract_raises_on_unknown(tmp_path) -> None:
-    with pytest.raises(GreatMindsError) as exc:
-        rc_mod.load_role_contract(find_canon_dir(), "NONEXISTENT")
-    assert "NONEXISTENT" in str(exc.value)
-
-
-# ---------- main CLI integration ----------
-
-
-def test_main_cli_registers_role_group() -> None:
-    """``greatminds role contract TESTER`` works through the main
-    CLI dispatch (not just the standalone group)."""
-    proc = subprocess.run(
-        [sys.executable, "-m", "greatminds.cli.main",
-         "role", "contract", "TESTER"],
-        capture_output=True, text=True, timeout=10,
-    )
-    assert proc.returncode == 0, proc.stderr
-    assert "ROLE: TESTER" in proc.stdout

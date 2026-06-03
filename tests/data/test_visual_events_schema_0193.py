@@ -114,86 +114,49 @@ def test_templates_use_markdown_bold_verb() -> None:
         )
 
 
-# ---------- command_START.yaml common: prose ----------
+# ---------- COORDINATE.md §16: WHEN-to-emit prose ----------
+#
+# The agent-facing WHEN-to-emit convention moved from command_START's
+# common block to COORDINATE.md §16 (the system prompt is now the static
+# bootstrap.md). The marker TEMPLATES stay in schema.visual_events.
 
 
-def test_command_start_carries_visual_marker_paragraph() -> None:
-    """0193 prose pin: command_START.yaml's common: block contains
-    the «Visual event markers» paragraph that tells agents WHEN to
-    emit (the rule isn't machine-encodable for a prompt-driven
-    agent)."""
-    doc = yaml.safe_load(
-        (find_canon_dir() / "command_START.yaml").read_text(
-            encoding="utf-8"
-        )
-    ) or {}
-    common = doc.get("common") or ""
-    assert "Visual event markers" in common, (
-        "0193: command_START.yaml common: missing the «Visual event "
-        "markers» paragraph"
-    )
+def _marker_para() -> str:
+    text = (find_canon_dir() / "COORDINATE.md").read_text(encoding="utf-8")
+    idx = text.find("Visual event markers")
+    assert idx >= 0, (
+        "COORDINATE.md missing the «Visual event markers» section")
+    return text[idx:idx + 800]
+
+
+def test_coordinate_carries_visual_marker_paragraph() -> None:
+    assert "Visual event markers" in _marker_para()
 
 
 def test_prose_references_schema_not_inlined_templates() -> None:
-    """0193 design pin: the prose paragraph points agents at
-    ``schema.visual_events`` rather than inlining template strings.
-    If templates were duplicated in prose, schema + prose would
-    drift on every future change."""
-    doc = yaml.safe_load(
-        (find_canon_dir() / "command_START.yaml").read_text(
-            encoding="utf-8"
-        )
-    ) or {}
-    common = doc.get("common") or ""
-    # Locate the marker paragraph.
-    idx = common.find("Visual event markers")
-    assert idx >= 0
-    # Extract the next ~600 chars as the paragraph window.
-    para = common[idx:idx + 700]
+    """The paragraph points at ``schema.visual_events`` rather than
+    inlining template strings (else schema + prose drift)."""
+    para = _marker_para()
     assert "schema.visual_events" in para, (
-        "0193: prose must reference schema.visual_events as the "
-        "source of truth (not duplicate templates inline)"
-    )
-    # No literal emoji in the prose — those live in schema.
+        "prose must reference schema.visual_events as the source of truth")
     for emoji in ("🔵", "🟢", "🟩", "🔴", "🟣"):
         assert emoji not in para, (
-            f"0193: prose paragraph leaks emoji {emoji!r} — must live "
-            f"in schema only to avoid drift"
-        )
+            f"prose paragraph leaks emoji {emoji!r} — must live in schema")
 
 
 def test_prose_lists_three_trigger_verbs() -> None:
-    """0193: the WHEN-to-emit instruction names the three CLI verbs
-    operators expect a marker after (task mv, task append-block,
-    inbox send)."""
-    doc = yaml.safe_load(
-        (find_canon_dir() / "command_START.yaml").read_text(
-            encoding="utf-8"
-        )
-    ) or {}
-    common = doc["common"]
-    idx = common.find("Visual event markers")
-    para = common[idx:idx + 700]
+    """The WHEN-to-emit instruction names the three CLI verbs a marker
+    follows (task mv, task append-block, inbox send)."""
+    para = _marker_para()
     for verb in ("greatminds task mv", "greatminds task append-block",
                  "greatminds inbox send"):
-        assert verb in para, (
-            f"0193: prose paragraph missing trigger verb {verb!r}"
-        )
+        assert verb in para, f"prose paragraph missing trigger verb {verb!r}"
 
 
 def test_prose_says_marker_is_last_line() -> None:
-    """0193 contract: marker is the LAST sentence of the reply
-    (otherwise operators scrolling have to find it amid follow-up
-    text). Plan §prose §last sentence."""
-    doc = yaml.safe_load(
-        (find_canon_dir() / "command_START.yaml").read_text(
-            encoding="utf-8"
-        )
-    ) or {}
-    common = doc["common"]
-    idx = common.find("Visual event markers")
-    para = common[idx:idx + 700]
-    assert "AFTER this line" in para or "last sentence" in para, (
-        "0193: prose paragraph must state that the marker is the "
-        "LAST line of the action's reply"
-    )
+    """The marker is the LAST line of the reply (operators scrolling a
+    pane should find it without hunting through follow-up text)."""
+    para = _marker_para()
+    assert "LAST line" in para or "last sentence" in para or \
+        "AFTER any follow-up" in para, (
+        "prose must state the marker is the LAST line of the reply")
