@@ -4,10 +4,9 @@ MAINTAINER pattern.
 
 Pre-0304 only MAINTAINER had this explicit block; DEVELOPER /
 STAND-KEEPER / TESTER / READER / TECHNICAL-WRITER / EXPLORER /
-UI-DEVELOPER / BOT-DEVELOPER lacked it. Fresh-install agents
-could (and did, per upstream issue #4) act without re-reading
-COORDINATE.md or schema. 0304 puts the canon-read step in their
-faces.
+UI-DEVELOPER lacked it. Fresh-install agents could (and did, per
+upstream issue #4) act without re-reading COORDINATE.md or schema.
+0304 puts the canon-read step in their faces.
 """
 from __future__ import annotations
 
@@ -15,7 +14,7 @@ from greatminds.core.paths import find_canon_dir
 
 
 # Roles that 0304 extends. MAINTAINER's existing format is the
-# reference; the new blocks mirror it for these 8 roles.
+# reference; the new blocks mirror it for these roles.
 ROLES = (
     "DEVELOPER",
     "UI-DEVELOPER",
@@ -24,7 +23,6 @@ ROLES = (
     "TECHNICAL-WRITER",
     "STAND-KEEPER",
     "EXPLORER",
-    "BOT-DEVELOPER",
 )
 
 

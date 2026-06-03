@@ -34,7 +34,7 @@ SCAN_GLOBS = [
     "plugins/**/SKILL.md",
     "mcp/*.json",
 ]
-EXCLUDE_NAMES = {"PROJECT_VARIABLES.md", "INSTALL.md", "README.md", "BOT_STREAM_DIVERGENCE.md"}
+EXCLUDE_NAMES = {"PROJECT_VARIABLES.md", "INSTALL.md", "README.md"}
 
 # Tokens that look like <TOKEN> but are documentation placeholders for
 # the task-id syntax inside paths, not real project variables.

@@ -31,12 +31,10 @@ glossary:
     STAND-KEEPER: "Owns the singleton stand resource (state.yaml-driven, lease-based). Brings the active lease to ready via a deploy profile (glossary.stand_profiles), or down on failure."
     USER: "Writes user_feedback/ or initiates an ARCHITECT-PLANNER chat. Never creates implementation tasks directly."
     MAINTAINER: "System operator, self-loop watchdog. Handles infrastructure the product pipeline cannot self-heal: agent restart, dead-pid recovery, greatminds CLI + schema.yaml maintenance, cutover orchestration. Receives asks at inbox/maintainer/ from coordd and from product agents when an issue is structural/schema rather than product. Sweeps PROACTIVELY every tick (an empty inbox is NOT 'nothing to do'): reclaims stale stand leases past TTL with a dead/absent holder, restarts dead agents and coordd, and escalates stalled task/queue chains to ARCHITECT-PLANNER. Does NOT claim product queues, triage user_feedback, or write plans."
-    BOT-USER: "Bot-stream entry; independent of the product pipeline."
-    BOT-DEVELOPER: "Bot-stream implementer; independent of the product pipeline."
   lifecycles:
-    interactive: "Human-paced chat in a tmux pane; the USER drives each turn. coordd never runs its turns."
-    self-loop: "Runs its own loop in a tmux pane, waking itself on a timer; coordd may nudge it (tmux_send_keys) but never runs its turns."
-    driven: "No tmux pane; coordd runs each turn as a managed subprocess (claude -p / codex app-server) on queue / inbox / .stand events, holding the per-role run-lock for the full turn."
+    interactive: "Human-paced chat in a tmux pane; the USER drives each turn. coordd never runs its turns. The agent waits for USER input between turns — it does not self-schedule."
+    self-loop: "Runs its own loop in a tmux pane. After each tick it MUST re-arm its next wake (sleep / ScheduleWakeup) so it ticks again. coordd may nudge it (tmux_send_keys) but never runs its turns."
+    driven: "No tmux pane; coordd runs each turn as a managed subprocess (claude -p / codex app-server) on queue / inbox / .stand events, holding the per-role run-lock for the full turn. The turn MUST return promptly — NEVER sleep / ScheduleWakeup / loop, or the run-lock never releases and the hang detector flags the turn."
   wake_mechanisms:
     tmux_send_keys: "Wake by typing WAKE_TEXT then Enter into the role's tmux pane. The only safe mechanism for interactive / self-loop roles (SIGINT to a live TUI is Ctrl-C → quit); also claude's default."
     sigint_deepest_descendant: "Wake a loop agent blocked on a bash sleep by sending SIGINT to its deepest descendant (the sleep). Safe only when that descendant is not a live TUI — never for interactive / self-loop."
@@ -60,16 +58,29 @@ glossary:
     user_feedback: "Product feedback awaiting PLANNER triage."
     review_sessions: "Scenario-B review sessions; EXPLORER iterates live-stand exploration and files bugs to feature_inbox."
     .stand: "Singleton stand resource state.yaml + lease bookkeeping; coordd watches it to wake STAND-KEEPER on lease lifecycle events."
-    bot_inbox: "Bot behaviour issue awaiting fix."
-    bot_wip: "Bot issue in progress."
-    bot_done: "Bot fix ready for retest."
-    bot_verified: "Bot issue verified."
-    bot_archive: "Archived bot issue."
   stand_profiles:
     full-deploy: "Full backend deployment on the target hosts with service health checks; scenarios A and B."
     vite-dev: "Backend deployed plus a Vite UI dev server with HMR (UI changes reload, no per-change redeploy); scenario C."
     smoke-only: "Fast reachability + CLI-responds probe — no rsync, no install. Warmup leases and post-deploy liveness checks."
     liveness-prose: "Prose (md-only, no YAML twin) liveness profile; STAND-KEEPER follows the written checklist via execute_md_profile."
+  stand_probes:
+    # STAND-KEEPER readiness checks (allowed) — GET / observe only.
+    docker_ps: "Container liveness via docker ps / docker compose ps."
+    http_health_get_200: "GET the health endpoint and require HTTP 200 — the one allowed status check."
+    ssh_reachable: "SSH reachability of the stand host plus a remote docker ps."
+    gpu_check: "GPU availability via nvidia-smi, when the profile requests it."
+    endpoint_presence: "Presence of an endpoint / bundle / bootstrap artifact — existence only, never exercising it."
+    get_only_route_status: "GET-only HTTP status on routes (e.g. 200 on SPA paths); no POST, no body validation."
+    # Forbidden for STAND-KEEPER — TESTER / EXPLORER territory.
+    any_post: "ANY POST to the product API — zero exceptions (auth, bootstrap, login, business endpoints all included). SK is GET / observe only."
+    response_body_validation: "Checking response body shape / fields / counts / status beyond the one allowed health 200."
+    acceptance_criteria: "Running acceptance / regression criteria (layer-1 pass, AC checks, dedup re-POST, error paths)."
+    followup_bug_filing: "Filing follow-up bugs / product gaps from SK's own checks — triage is ARCHITECT-PLANNER's (note observations only)."
+    e2e_browser_flow: "Full end-to-end browser / Playwright product flows."
+    regression_scenario: "Regression scenarios that EXPLORER would run."
+    gate_check: "greatminds gate-check — TESTER-only; reads TESTER's tests-block lease evidence."
+  intake_disciplines:
+    propose_then_file: "Present design / options / scope in chat first; WAIT for an explicit USER approval marker (ok / да / file / go / делай, or a chosen option) before any FSM mutation (task new / plan / mv). Read-only ops (inbox list, queue inspection, gate-check) need no approval. Exception: a standing USER instruction that explicitly authorizes auto-filing within a scope."
 
 # ---------------------------------------------------------------------------
 # Queues
@@ -152,26 +163,6 @@ queues:
     owner: STAND-KEEPER
     writers: [STAND-KEEPER, TESTER, ARCHITECT-PLANNER, MAINTAINER]
     kind: state
-  bot_inbox:
-    owner: BOT-DEVELOPER
-    writers: [BOT-USER]
-    kind: active
-  bot_wip:
-    owner: BOT-DEVELOPER
-    writers: [BOT-DEVELOPER]
-    kind: active
-  bot_done:
-    owner: BOT-USER
-    writers: [BOT-DEVELOPER]
-    kind: active
-  bot_verified:
-    owner: BOT-USER
-    writers: [BOT-USER]
-    kind: terminal
-  bot_archive:
-    owner: BOT-USER
-    writers: [BOT-USER, BOT-DEVELOPER]
-    kind: terminal
 
 # ---------------------------------------------------------------------------
 # Roles
@@ -202,6 +193,8 @@ roles:
     # `tool`; launch mechanics = f(lifecycle, tool)).
     lifecycle: interactive
     claims_from: [user_feedback, feature_inbox, feature_plan]
+    # USER-interaction discipline (def: glossary.intake_disciplines).
+    intake_discipline: propose_then_file
     responsibilities:
       - triage_user_feedback
       - write_plan_blocks
@@ -369,6 +362,9 @@ roles:
         - append_reader_review_block
         - mv_to_feature_review_on_pass
         - mv_back_to_feature_docs_on_fail_or_partial
+        # Audit-only tasks have no WRITER plan to bounce back to —
+        # always route them to feature_review, never to feature_docs.
+        - route_audit_only_to_feature_review_never_feature_docs
   EXPLORER:
     category: product
     lifecycle: driven
@@ -411,6 +407,25 @@ roles:
       - mv_to_feature_review
       - claim_product_queues
       - mark_ready_without_executor_run
+    # Readiness probing is GET / observe ONLY — infra liveness, never
+    # product acceptance. The token classes below are the canon
+    # boundary (defs: glossary.stand_probes); concrete endpoints /
+    # bundles / route names are project-shaped and live in PROJECT.md.
+    allowed_readiness_checks:
+      - docker_ps
+      - http_health_get_200
+      - ssh_reachable
+      - gpu_check
+      - endpoint_presence
+      - get_only_route_status
+    forbidden_probes:
+      - any_post
+      - response_body_validation
+      - acceptance_criteria
+      - followup_bug_filing
+      - e2e_browser_flow
+      - regression_scenario
+      - gate_check
     event_triggers:
       on_lease_preparing:
         - load_profile_via_load_profile
@@ -465,31 +480,6 @@ roles:
         - reclaim_stale_stand_lease_past_ttl_with_dead_holder
         - restart_dead_agents_and_coordd_via_greatminds_restart
         - escalate_stalled_or_stuck_chains_to_planner_via_inbox
-  BOT-USER:
-    category: bot
-    lifecycle: driven
-    claims_from: [bot_done, bot_verified]
-    responsibilities:
-      - verify_bot_output
-    forbidden_actions:
-      - claim_product_queues
-    event_triggers:
-      on_bot_done_claim:
-        - verify_bot_change
-        - mv_to_bot_verified_or_back_to_bot_wip
-  BOT-DEVELOPER:
-    category: bot
-    lifecycle: driven
-    claims_from: [bot_inbox]
-    responsibilities:
-      - implement_bot_change
-    forbidden_actions:
-      - claim_product_queues
-    event_triggers:
-      on_bot_inbox_claim:
-        - implement_bot_change_in_worktree
-        - mv_to_bot_wip
-        - mv_to_bot_done_on_complete
 
 # ---------------------------------------------------------------------------
 # Transitions

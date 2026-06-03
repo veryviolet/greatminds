@@ -535,7 +535,6 @@ Default:
   review blocks); the FSM owns those via per-role queues.
 - Implementers, TESTER, READER, USER, EXPLORER, and STAND-KEEPER do not
   commit.
-- BOT-DEVELOPER follows `<BOT_COMMIT_POLICY>`.
 
 Allowed to everyone for inspection: `git status`, `git diff`, `git show`,
 `git log`.

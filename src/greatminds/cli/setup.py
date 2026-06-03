@@ -536,23 +536,18 @@ QUEUES = [
     "feature_docs", "feature_test", "feature_docs_review",
     "feature_review", "feature_blocked", "verified", "archive",
     "user_feedback", "review_sessions",
-    # 0247 (1.3.0): stand_requests, stand_wip, stand_done REMOVED.
-    # Lease-based singleton stand resource (.stand/state.yaml)
-    # replaces them.
-    "bot_inbox", "bot_wip", "bot_done", "bot_verified", "bot_archive",
 ]
 
 ROLES_LOWER = [
     "architect-planner", "architect-reviewer", "developer", "ui-developer",
     "technical-writer", "tester", "reader", "explorer", "stand-keeper",
-    "user", "maintainer", "bot-user", "bot-developer",
+    "user", "maintainer",
 ]
 
 ROLE_DOCS = [
     "ARCHITECT-PLANNER.md", "ARCHITECT-REVIEWER.md", "DEVELOPER.md",
     "UI-DEVELOPER.md", "TECHNICAL-WRITER.md", "TESTER.md", "READER.md",
     "EXPLORER.md", "STAND-KEEPER.md", "MAINTAINER.md", "USER.md",
-    "BOT-USER.md", "BOT-DEVELOPER.md",
 ]
 
 

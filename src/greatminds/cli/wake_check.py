@@ -237,7 +237,7 @@ def wake_check(project_dir: Path | None, canon_dir: Path | None, quiet: bool) ->
             if isinstance(meta, dict) and meta.get("kind") == "terminal":
                 terminal_queues.add(q)
     if not terminal_queues:
-        terminal_queues = {"verified", "archive", "stand_done", "bot_verified", "bot_archive"}
+        terminal_queues = {"verified", "archive"}
 
     ready: list[tuple[str, str]] = []
     not_ready: list[tuple[str, list[str]]] = []

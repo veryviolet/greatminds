@@ -24,8 +24,7 @@ from greatminds.core.errors import GreatMindsError
 from greatminds.core.paths import find_canon_dir
 
 
-# Roles 0288 declares contracts for. Excludes USER (entry; no
-# actions) and bot pair (carry minimal contracts).
+# Roles 0288 declares contracts for. Excludes USER (entry; no actions).
 PRODUCT_ROLES = (
     "ARCHITECT-PLANNER",
     "ARCHITECT-REVIEWER",
@@ -39,7 +38,7 @@ PRODUCT_ROLES = (
     "MAINTAINER",
 )
 
-ALL_ROLES = PRODUCT_ROLES + ("USER", "BOT-USER", "BOT-DEVELOPER")
+ALL_ROLES = PRODUCT_ROLES + ("USER",)
 
 
 def _schema_roles() -> dict:
@@ -62,8 +61,8 @@ def test_all_roles_present_in_schema() -> None:
 @pytest.mark.parametrize("role", ALL_ROLES)
 def test_role_has_responsibilities_list(role: str) -> None:
     """Every role must declare ``responsibilities`` as a non-empty
-    list (USER + bot pair included — even entry/marginal roles
-    benefit from a one-liner duty statement)."""
+    list (USER included — even entry/marginal roles benefit from a
+    one-liner duty statement)."""
     entry = _schema_roles()[role]
     resp = entry.get("responsibilities")
     assert isinstance(resp, list) and resp, (

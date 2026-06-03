@@ -118,7 +118,7 @@ ACTIVE_QUEUES = (
     "stand_requests", "stand_wip",
 )
 
-TERMINAL_QUEUES = ("verified", "archive", "stand_done", "bot_archive", "bot_verified")
+TERMINAL_QUEUES = ("verified", "archive", "stand_done")
 
 
 def die(msg: str, code: int = 1) -> None:
