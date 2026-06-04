@@ -129,7 +129,7 @@ Stand resource:
 
 ```
 coordination/.stand/state.yaml
-greatminds stand lease -> STAND-KEEPER ready/down/up -> holder release
+greatminds stand lease -> coordd auto-deploys (ready/down) -> holder release
 ```
 
 The legacy `stand_requests/ -> stand_wip/ -> stand_done/` queue path is not
@@ -277,7 +277,7 @@ wrong-commit evidence, mismatched worktree fingerprints, or
 
 ### 8.1 Stand profiles (`coordination/stand-profiles/`)
 
-When STAND-KEEPER grants a lease, it loads a profile file matching
+When a lease enters preparing, coordd loads a profile file matching
 `lease.profile` (the enum declared in `schema.stand.resource.profiles_allowed`)
 from the canonical directory `coordination/stand-profiles/` and executes
 it as part of the deploy.
@@ -287,7 +287,7 @@ Ownership and usage:
 - Stand profiles live at `coordination/stand-profiles/<name>.{yaml,md}`.
 - USER and DEVELOPER write or update profiles when adding new deploy
   scenarios.
-- STAND-KEEPER uses a profile only when the active lease carries
+- coordd uses a profile only when the active lease carries
   `profile=<name>`, loading it with `load_profile(coord, lease.profile)`.
 - YAML and MD profile files are both supported; the author chooses the
   format that best fits the scenario.
@@ -339,7 +339,7 @@ separate mechanism and does NOT hand-run a manual runbook. The flow:
    `verify_only: true`. PLANNER routes it `feature_plan → feature_test`
    directly (the `plan.verify_only` transition — no implementer step).
    PLANNER never runs ansible or checks the product itself.
-2. **STAND-KEEPER** executes the profile on the lease and does readiness
+2. **coordd** executes the profile on the lease (deterministic ansible) and does readiness
    ONLY — ssh-reachable, `docker`/health GET, gpu, endpoint presence.
    It does not do acceptance.
 3. **TESTER** holds the `feature_test` lease, waits for `ready`, exercises
@@ -351,7 +351,7 @@ separate mechanism and does NOT hand-run a manual runbook. The flow:
 4. Behavioural "use it like a user" verification can instead be an
    **EXPLORER** `review_sessions` lease; bugs found go to `feature_inbox`.
 
-So: deploy/readiness = STAND-KEEPER, behavioural verification = TESTER
+So: deploy/readiness = coordd, behavioural verification = TESTER
 (or EXPLORER), bug intake = `feature_inbox`, planning/routing = PLANNER.
 
 ---
@@ -385,7 +385,7 @@ task bounces back to DEVELOPER / PLANNER. The §8 `gate_check_pass`
 rule still applies; this strict definition is **on top of**
 `gate_check_pass`, not in place of it.
 
-**TESTER vs STAND-KEEPER role boundary.** STAND-KEEPER's readiness
+**TESTER vs coordd-deploy boundary.** coordd's deploy/readiness
 records prove infrastructure only (container UP, version, `/health` 200,
 schema sane). They are NOT test results.
 TESTER's `tests` block on a `scope: backend|ui` task MUST also
@@ -436,7 +436,7 @@ mid-flight (after the `plan` block has been written and the task has
 moved past `feature_plan/`), PLANNER MUST send the change as a
 `kind: info` inbox message to **every role the task will touch in
 subsequent ticks**: DEVELOPER (or the current queue owner),
-TESTER, ARCHITECT-REVIEWER, and STAND-KEEPER if `stand_required`.
+TESTER and ARCHITECT-REVIEWER if `stand_required`.
 
 The message MUST explicitly name what changed and what each recipient
 must do differently — e.g. "TESTER: cite lease <NEW> not
@@ -457,7 +457,7 @@ prompted the change (asked, escalated, or PLANNER acted proactively).
 that do NOT need a task move. Use it for:
 
 - a question from DEVELOPER to ARCHITECT-PLANNER mid-implementation,
-- coordination signals from STAND-KEEPER ("stand is back up"),
+- coordination signals from coordd ("stand is back up"),
 - EXPLORER asking ARCHITECT-PLANNER to refresh `stand_target`.
 
 Each message is a markdown file with front-matter:
@@ -529,7 +529,7 @@ CLI resolves the path from schema policy.
 
 TESTER does **not** edit or execute in the worktree. TESTER's only
 execution surface is SSH probes against the **deployed stand** (after
-STAND-KEEPER rsyncs the worktree to the stand); evidence comes from the
+the deploy playbook rsyncs the worktree to the stand); evidence comes from the
 stand, not a local run.
 
 `uv run` / `uv run --active` is **forbidden for every role anywhere in
@@ -559,7 +559,7 @@ Lifecycle:
 - `greatminds task mv ... archive` removes the task worktree.
 
 There is no file-lock model: operators look in `.worktrees/` for in-flight
-code instead of looking for lock files. STAND-KEEPER rsyncs the worktree
+code instead of looking for lock files. The deploy playbook rsyncs the worktree
 (not the main project tree) when the active stand lease names the task and
 worktree. Policy lives in `schema.yaml > worktrees:`.
 Before cutting the 1.2.x → 1.3 release, MAINTAINER runs
@@ -577,7 +577,7 @@ Default:
   flows through `ARCHITECT-REVIEWER`. MAINTAINER never commits
   product-task artifacts (plan / implementation / tests / reader /
   review blocks); the FSM owns those via per-role queues.
-- Implementers, TESTER, READER, USER, EXPLORER, and STAND-KEEPER do not
+- Implementers, TESTER, READER, USER, and EXPLORER do not
   commit.
 
 Allowed to everyone for inspection: `git status`, `git diff`, `git show`,
@@ -653,7 +653,6 @@ loaded only for the matching `GREATMINDS_ROLE`; the shared
 | `coordination-protocol` | all roles | fsm-mechanics, plan-block-protocol, impl-block-craft, iteration-and-blocking, stand-protocol, inbox-and-escalation |
 | `role-architect-planner` | ARCHITECT-PLANNER | adr-template, trade-off-framework, task-decomposition |
 | `role-tester` | TESTER | probe-craft, api-and-db-probes, ui-visual-verification |
-| `role-stand-keeper` | STAND-KEEPER | stand-bring-up, fresh-db-volume-wipes, fault-isolation-on-stand |
 | `role-reader` | READER | fresh-user-perspective, reality-vs-docs-audit, reader-review-block-craft, audit-path-vs-post-write-path |
 | `role-architect-reviewer` | ARCHITECT-REVIEWER | evidence-chain-verification, architectural-review, review-block-craft, commit-and-push-protocol, wake-and-unblock |
 | `role-explorer` | EXPLORER | exploratory-probing, bug-as-mini-task, re-verify-loop |

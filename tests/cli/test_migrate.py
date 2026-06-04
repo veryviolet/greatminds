@@ -117,3 +117,29 @@ def test_canonical_windows_from_template():
     assert "ARCHITECT-PLANNER" in roles
     assert "driven" in modes                              # workers driven
     assert any(w.get("name") == "dashboard" for w in wins)
+
+
+# ---------- 1.6.0: strip retired-role (STAND-KEEPER) windows ----------
+
+
+def test_strip_retired_role_windows_removes_stand_keeper(tmp_path: Path):
+    (tmp_path / "coord.yaml").write_text(yaml.safe_dump({
+        "session": "x", "windows": [
+            {"name": "planner", "role": "ARCHITECT-PLANNER", "mode": "chat"},
+            {"name": "stand", "role": "STAND-KEEPER", "mode": "driven"},
+            {"name": "dev", "role": "DEVELOPER", "mode": "driven"}]}),
+        encoding="utf-8")
+    removed = mg.strip_retired_role_windows(tmp_path)
+    assert removed == ["STAND-KEEPER"]
+    roles = [w["role"] for w in
+             yaml.safe_load((tmp_path / "coord.yaml").read_text())["windows"]]
+    assert "STAND-KEEPER" not in roles
+    assert "ARCHITECT-PLANNER" in roles and "DEVELOPER" in roles
+
+
+def test_strip_retired_role_windows_noop_when_absent(tmp_path: Path):
+    (tmp_path / "coord.yaml").write_text(yaml.safe_dump({
+        "session": "x", "windows": [
+            {"name": "dev", "role": "DEVELOPER", "mode": "driven"}]}),
+        encoding="utf-8")
+    assert mg.strip_retired_role_windows(tmp_path) == []

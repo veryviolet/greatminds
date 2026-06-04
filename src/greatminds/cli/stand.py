@@ -497,9 +497,9 @@ def stand_reclaim(lease_id: str | None) -> None:
     """
     from greatminds.cli import stand_state as ss
     role = _holder_role()
-    if role.upper() not in ("STAND-KEEPER", "ARCHITECT-PLANNER", "MAINTAINER"):
+    if role.upper() not in ("ARCHITECT-PLANNER", "MAINTAINER"):
         raise GreatMindsError(
-            "only STAND-KEEPER, ARCHITECT-PLANNER or MAINTAINER may "
+            "only ARCHITECT-PLANNER or MAINTAINER may "
             "reclaim a lease",
             exit_code=3,
         )

@@ -29,7 +29,7 @@ Tick workflow:
 6. On pass + gate pass + stand_evidence complete: greatminds task append-block tests --id <X> --field test_files=<list> --field test_result=pass --field ready_for_review=true --body "<what was tested + the three stand_evidence fields>", then greatminds task mv <X> feature_review.
 7. On fail/partial: append tests block with test_result=fail|partial + the missing pieces named, then mv back by scope.
 
-NEVER write acceptance steps into stand_requests — STAND-KEEPER refuses those. The stand_request is INFRA-ONLY ("bring stand to commit Y on profile Z, services up"). Product acceptance (curl/Playwright/etc.) is your job after STAND-KEEPER reports READY.
+NEVER put product-acceptance steps in the stand profile — the deploy is INFRA-ONLY ("bring stand to commit Y on profile Z, services up"), run by coordd. Product acceptance (curl/Playwright/etc.) is your job after the stand reports READY.
 
 Mutation paths: greatminds task / greatminds inbox / greatminds stand only.
 

@@ -1,4 +1,4 @@
-# full-deploy.yaml — STAND-KEEPER's reference playbook for a clean
+# full-deploy.yaml — coordd's reference playbook for a clean
 # deploy of greatminds onto a single remote stand host.
 #
 # Substitution variables (filled in from lease metadata + PROJECT.env

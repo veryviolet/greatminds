@@ -69,7 +69,7 @@ def _state(coord):
 def test_reclaim_expired_absent_holder_frees_stand(tmp_path, monkeypatch):
     proj, coord = _project(tmp_path, monkeypatch, granted_delta=-20000,
                            holder_pid=None)  # no registry → absent
-    res = _run("STAND-KEEPER", ["reclaim"])
+    res = _run("MAINTAINER", ["reclaim"])
     assert res.exit_code == 0, res.output
     st = _state(coord)
     assert st["state"] == "free"
@@ -92,7 +92,7 @@ def test_reclaim_refuses_in_ttl_lease(tmp_path, monkeypatch):
     # granted recently, ttl large ⇒ NOT expired
     proj, coord = _project(tmp_path, monkeypatch, granted_delta=-60,
                            ttl=14400, holder_pid=None)
-    res = _run("STAND-KEEPER", ["reclaim"])
+    res = _run("MAINTAINER", ["reclaim"])
     assert res.exit_code != 0
     out = (res.output or "") + str(res.exception or "")
     assert "within its TTL" in out
@@ -104,7 +104,7 @@ def test_reclaim_refuses_when_holder_alive(tmp_path, monkeypatch):
     # expired BUT holder pid is THIS process → alive
     proj, coord = _project(tmp_path, monkeypatch, granted_delta=-20000,
                            holder_pid=os.getpid())
-    res = _run("STAND-KEEPER", ["reclaim"])
+    res = _run("MAINTAINER", ["reclaim"])
     assert res.exit_code != 0
     out = (res.output or "") + str(res.exception or "")
     assert "still alive" in out
@@ -141,7 +141,7 @@ def test_reclaim_no_active_lease_errors(tmp_path, monkeypatch):
     (proj / "coordination" / "stand_requests").mkdir(parents=True)
     (proj / "coordination" / ".stand").mkdir()
     monkeypatch.chdir(proj)
-    res = _run("STAND-KEEPER", ["reclaim"])
+    res = _run("MAINTAINER", ["reclaim"])
     assert res.exit_code != 0
     out = (res.output or "") + str(res.exception or "")
     assert "no active lease" in out
@@ -149,7 +149,7 @@ def test_reclaim_no_active_lease_errors(tmp_path, monkeypatch):
 
 def test_reclaim_wrong_lease_id_errors(tmp_path, monkeypatch):
     proj, coord = _project(tmp_path, monkeypatch, granted_delta=-20000)
-    res = _run("STAND-KEEPER", ["reclaim", "--lease-id", "nope"])
+    res = _run("MAINTAINER", ["reclaim", "--lease-id", "nope"])
     assert res.exit_code != 0
     out = (res.output or "") + str(res.exception or "")
     assert "not the active lease" in out

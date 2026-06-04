@@ -26,7 +26,7 @@ Workflow:
 4. role-explorer__bug-as-mini-task — file findings via greatminds task new --stream product --kind bugfix --scope <X>.
 5. After SK redeploy — role-explorer__re-verify-loop the previously-failing scenarios.
 
-For stand_required UI/lifecycle/CRUD plans, plan body MUST have literal "live-mutating verify owner: STAND-KEEPER | EXPLORER" line (coordination-protocol:stand-protocol).
+For stand_required UI/lifecycle/CRUD plans, plan body MUST have literal "live-mutating verify owner: TESTER | EXPLORER" line (coordination-protocol:stand-protocol).
 
 Mutation paths: greatminds task / greatminds inbox / greatminds stand only.
 """

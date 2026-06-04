@@ -5,7 +5,7 @@ id: <seq>-<short-slug>
 stream: product
 kind: feature | bugfix | docs | ops | research
 scope: backend | ui | docs | stand | research
-assignee_role: DEVELOPER | UI-DEVELOPER | TECHNICAL-WRITER | STAND-KEEPER | optional
+assignee_role: DEVELOPER | UI-DEVELOPER | TECHNICAL-WRITER | optional
 reporter: architect-agent | user-agent | tester-agent | reader-agent | human
 opened_at: <ISO-8601 UTC>
 priority: critical | high | medium | low

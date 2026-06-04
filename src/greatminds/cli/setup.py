@@ -534,7 +534,7 @@ QUEUES = [
 
 ROLES_LOWER = [
     "architect-planner", "architect-reviewer", "developer", "ui-developer",
-    "technical-writer", "tester", "reader", "explorer", "stand-keeper",
+    "technical-writer", "tester", "reader", "explorer",
     "user", "maintainer",
 ]
 

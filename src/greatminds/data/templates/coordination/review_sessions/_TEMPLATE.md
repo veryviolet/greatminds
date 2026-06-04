@@ -29,7 +29,7 @@ status: open | concluded
 What this review session is investigating and why.
 
 ## Stand readiness
-- Required stand_done/<id> reference once STAND-KEEPER confirms.
+- Required stand-ready reference once coordd reports the stand ready.
 - `stand.status` snapshot at session open.
 
 ## Scenarios

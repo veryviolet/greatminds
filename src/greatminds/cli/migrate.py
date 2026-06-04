@@ -105,6 +105,45 @@ def migrate_coord_yaml(project_dir: Path) -> tuple[str, str]:
     return ("migrated", detail)
 
 
+# Roles removed in a newer version — their coord.yaml windows must be
+# stripped on migration, even from an already-driven coord.yaml (which
+# migrate_coord_yaml leaves untouched). 1.6.0 retired STAND-KEEPER (coordd
+# now deploys the stand itself).
+RETIRED_ROLES = {"STAND-KEEPER"}
+
+
+def strip_retired_role_windows(project_dir: Path) -> list[str]:
+    """Remove coord.yaml windows whose role was retired (e.g.
+    STAND-KEEPER in 1.6.0). Runs on ANY coord.yaml — including the
+    already-driven fleets that ``migrate_coord_yaml`` skips — so an
+    ``update`` of an existing 1.5.x fleet drops the stand-keeper pane
+    instead of launching an agent for a role the schema no longer has.
+    Returns the list of removed role names."""
+    coord_yaml = project_dir / "coord.yaml"
+    if not coord_yaml.is_file():
+        return []
+    try:
+        doc = yaml.safe_load(coord_yaml.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return []
+    windows = doc.get("windows") or []
+    kept, removed = [], []
+    for w in windows:
+        role = (w.get("role") or "").strip().upper() if isinstance(w, dict) \
+            else ""
+        if role in RETIRED_ROLES:
+            removed.append(role)
+        else:
+            kept.append(w)
+    if not removed:
+        return []
+    doc["windows"] = kept
+    coord_yaml.write_text(
+        yaml.safe_dump(doc, sort_keys=False, allow_unicode=True),
+        encoding="utf-8")
+    return removed
+
+
 def remove_legacy_artifacts(project_dir: Path) -> list[str]:
     """Remove files/queues deleted in newer versions. Returns removed paths.
 
@@ -158,6 +197,12 @@ def run_migration(project_dir: Path, run_setup: bool = True) -> None:
     status, detail = migrate_coord_yaml(project_dir)
     {"migrated": ok, "already-current": info, "no-file": info,
      "error": err}.get(status, info)(f"    {status}: {detail}")
+
+    # 1.6.0: drop windows for retired roles (STAND-KEEPER) even from an
+    # already-driven coord.yaml — the deploy moved into coordd.
+    retired = strip_retired_role_windows(project_dir)
+    if retired:
+        ok(f"    ✓ removed retired-role window(s): {', '.join(retired)}")
 
     info("==> removing legacy artifacts (deleted in newer versions)...")
     removed = remove_legacy_artifacts(project_dir)

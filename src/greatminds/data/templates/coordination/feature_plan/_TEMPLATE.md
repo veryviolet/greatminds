@@ -13,7 +13,7 @@ plan:
   written_by: architect-planner-agent
   written_at: <ISO-8601 UTC>
   base_commit: <short sha at plan time>
-  assignee_role: DEVELOPER | UI-DEVELOPER | TECHNICAL-WRITER | STAND-KEEPER
+  assignee_role: DEVELOPER | UI-DEVELOPER | TECHNICAL-WRITER
   plan_kind: full | bugfix
   mode: A | B | C
   stand_required: true | false

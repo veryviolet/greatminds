@@ -1,4 +1,4 @@
-# vite-dev.yaml — STAND-KEEPER reference playbook for scenario C
+# vite-dev.yaml — coordd reference playbook for scenario C
 # (LIVE-DEVELOPER rapid UI iteration). Brings the backend up once, then
 # leaves a Vite dev server running with HMR so the lease HOLDER
 # (LIVE-DEVELOPER) can edit UI in its worktree and see changes reload
