@@ -1408,6 +1408,40 @@
 <p>All notable changes to <strong>greatminds</strong> are documented here. Format follows
 <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a> loosely; versions
 follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
+<h2 id="157-2026-06-04">1.5.7 — 2026-06-04<a class="headerlink" href="#157-2026-06-04" title="Permanent link">&para;</a></h2>
+<p>Canon: insist on full-contract reading, add a no-code stand-verification
+FSM path, and a read-only PROJECT.md surface.</p>
+<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><code>plan.verify_only</code> → <code>feature_plan → feature_test</code>.</strong> A no-code
+  stand/playbook task (e.g. "deploy the full stand by profile X",
+  "verify this playbook") had no clean FSM path — <code>feature_test</code> was
+  reachable only from an implementer queue with an <code>implementation</code>
+  block. PLANNER now routes a <code>verify_only</code> plan straight to TESTER, who
+  leases a stand, runs the profile/probe, and records stand evidence
+  (mirrors the READER <code>audit_only</code> path). "Deploy the stand" and "test
+  the stand" are the SAME path differing only in verification depth
+  (readiness-only vs functional probes) — documented in COORDINATE §8.2.
+  There is deliberately NO task-less stand deploy: every lease serves an
+  auditable task, which is what anchors the tested/verified gate.</li>
+<li><strong><code>greatminds project show</code></strong> — read-only print of
+  <code>coordination/PROJECT.md</code>. Closes a protocol gap: the contract requires
+  agents to read PROJECT.md, but it lives under <code>coordination/</code> and the
+  mutations-via-CLI rule left no sanctioned CLI to obtain it.</li>
+</ul>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>bootstrap.md now insists on reading the contract IN FULL.</strong> The old
+  wording ("YOUR contract is <code>roles.&lt;ROLE&gt;</code>") let agents — codex
+  especially — skim to their role section and stop, then propose moves
+  the FSM forbids. It now requires reading the whole <code>schema.yaml</code> every
+  tick (glossary, the full queue graph, and the exact transitions of the
+  path the task is on); the role block is necessary but not sufficient.</li>
+<li><strong>The "CLI-only" rule is scoped to MUTATIONS.</strong> Reading the canon docs
+  (<code>schema.yaml</code>, <code>COORDINATE.md</code>, <code>bootstrap.md</code>, <code>coordination/PROJECT.md</code>)
+  directly is now explicitly allowed — they are docs, not FSM state.
+  Only mutations + queue/inbox/task ops go through the CLI.</li>
+</ul>
 <h2 id="156-2026-06-04">1.5.6 — 2026-06-04<a class="headerlink" href="#156-2026-06-04" title="Permanent link">&para;</a></h2>
 <p>Fix: MAINTAINER tick cadence + runtime files leaking into git.</p>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
@@ -1445,7 +1479,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
 </ul>
 <h2 id="154-2026-06-04">1.5.4 — 2026-06-04<a class="headerlink" href="#154-2026-06-04" title="Permanent link">&para;</a></h2>
 <p>Feature: a live fleet status dashboard + tmux status-line config on launch.</p>
-<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>greatminds dashboard</code></strong> — a read-only, non-scrolling console table
   of the fleet at a glance: per-agent activity (alive/idle/working/
@@ -1531,7 +1565,7 @@ could never be archived.</p>
 <p>Major canon consolidation + a new interactive role. Live-verified on a
 real avatar fleet (driven turns bootstrap from the static prompt, claim,
 implement, advance the FSM).</p>
-<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
+<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>LIVE-DEVELOPER</strong> — an interactive, USER-paced role for working a
   single task live with the USER on a leased stand. PLANNER routes a
@@ -1544,7 +1578,7 @@ implement, advance the FSM).</p>
   UI-DEVELOPER FAST chat variant; scenario C is now LIVE-DEVELOPER. Ships
   a <code>vite-dev</code> stand-profile example (backend + Vite HMR).</li>
 </ul>
-<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Single static bootstrap.</strong> An agent's whole instruction surface is
   now <code>COORDINATE.md</code> (philosophy) + <code>schema.yaml</code> (machine contract +
@@ -1701,7 +1735,7 @@ coordd .stand watch-up-front + STAND-KEEPER auto-wake, an expired-lease
 reclaim + queue-head auto-promote, the canon TESTER-local-exec ban, the
 EXPLORER stand-only contract restore, and a full reactive-fleet
 documentation refresh.</p>
-<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
+<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0337 CLI-only coordination access rule reaches the render-role
@@ -1747,7 +1781,7 @@ documentation refresh.</p>
   singleton lock.</p>
 </li>
 </ul>
-<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
+<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0326 unify <code>greatminds task</code> subcommand id intake (DOD2).</strong>
@@ -1870,7 +1904,7 @@ self-loop watchdog with auto_mode-allowed recovery commands; all
 claude + codex workers are coordd-driven (one turn per event over
 <code>claude -p</code>/<code>--resume</code> or a fresh <code>codex app-server</code> stdio); canon
 prose + public mkdocs site mirror the model.</p>
-<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">&para;</a></h3>
+<h3 id="added_4">Added<a class="headerlink" href="#added_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0312 schema role contracts gain per-role lifecycle field (Phase 1a).</strong>
@@ -1969,7 +2003,7 @@ prose + public mkdocs site mirror the model.</p>
   workers run driven; ARCHITECT-REVIEWER stays non-driven for now.</p>
 </li>
 </ul>
-<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
+<h3 id="changed_3">Changed<a class="headerlink" href="#changed_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0325 canon docs for the reactive-fleet lifecycle model (Phase 4).</strong>
   <code>COORDINATE.md</code> §2.1 (new) carries the lifecycle vocabulary + the
@@ -1998,7 +2032,7 @@ worktree-isolation enforcement at the CLI, uniform session-start
 canon-read across role canons, SK heartbeat refresh during long
 ansible runs, daemon install systemd enablement + repair subcommand,
 and the launch/restart wrapper-loop removal.</p>
-<h3 id="added_4">Added<a class="headerlink" href="#added_4" title="Permanent link">&para;</a></h3>
+<h3 id="added_5">Added<a class="headerlink" href="#added_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0303 task append-block enforces cwd under per-task worktree.</strong>
@@ -2126,7 +2160,7 @@ upgrade promptly.</p>
 mechanism so fresh-install PLANNER agents pick up the workflow at
 tick start without an operator ping. Closes the role-contract gap
 left after the 0276 stand-profile umbrella shipped.</p>
-<h3 id="added_5">Added<a class="headerlink" href="#added_5" title="Permanent link">&para;</a></h3>
+<h3 id="added_6">Added<a class="headerlink" href="#added_6" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0297 PLANNER role contract gains stand-profile coordination.</strong>
   <code>schema.roles.ARCHITECT-PLANNER</code> now declares
@@ -2142,7 +2176,7 @@ left after the 0276 stand-profile umbrella shipped.</p>
 <h2 id="137-2026-05-27">1.3.7 — 2026-05-27<a class="headerlink" href="#137-2026-05-27" title="Permanent link">&para;</a></h2>
 <p>Closes the 0276 stand-profile umbrella DoD with the MD-cycle live-green
 on real avatar.</p>
-<h3 id="added_6">Added<a class="headerlink" href="#added_6" title="Permanent link">&para;</a></h3>
+<h3 id="added_7">Added<a class="headerlink" href="#added_7" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0295 liveness-prose MD-only canon template (Phase I of 0276).</strong>
   New <code>data/templates/stand-profiles/liveness-prose.md</code> with no YAML
@@ -2159,7 +2193,7 @@ on real avatar.</p>
 plus a chain of canon-playbook robustness fixes empirically proven on
 real avatar deploys, and pushes the schema enum so md-only profiles can
 be leased.</p>
-<h3 id="added_7">Added<a class="headerlink" href="#added_7" title="Permanent link">&para;</a></h3>
+<h3 id="added_8">Added<a class="headerlink" href="#added_8" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0284 end-to-end stand-profile cycle tests + collection-free rsync
@@ -2210,7 +2244,7 @@ be leased.</p>
 workflow from <code>schema.yaml</code> at tick start, and plugs the orphan
 <code>active_lease</code> leak that produced <code>state=down + active_lease={...}</code>
 contradictions across the stand transitions.</p>
-<h3 id="added_8">Added<a class="headerlink" href="#added_8" title="Permanent link">&para;</a></h3>
+<h3 id="added_9">Added<a class="headerlink" href="#added_9" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0288 schema-driven role contracts for all 13 roles + CLI.</strong>
   <code>schema.roles.&lt;ROLE&gt;</code> now carries <code>responsibilities</code>,
@@ -2255,7 +2289,7 @@ dispatch contract is actually enforced.</p>
 <h2 id="133-2026-05-27">1.3.3 — 2026-05-27<a class="headerlink" href="#133-2026-05-27" title="Permanent link">&para;</a></h2>
 <p>Stand-profile mechanism (0276 umbrella, Phases A-G) plus a deploy-safety
 fix that unblocks Phase H avatar verification.</p>
-<h3 id="added_9">Added<a class="headerlink" href="#added_9" title="Permanent link">&para;</a></h3>
+<h3 id="added_10">Added<a class="headerlink" href="#added_10" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0277 stand_profile schema section + canon convention (Phase A).</strong>
@@ -2458,7 +2492,7 @@ files may stay as historical evidence.</p>
   is gone. Pre-1.3.0 tasks without a <code>lease_id</code> on their tests block
   return <code>missing</code>; refile via the lease API to verify.</li>
 </ul>
-<h3 id="added_10">Added<a class="headerlink" href="#added_10" title="Permanent link">&para;</a></h3>
+<h3 id="added_11">Added<a class="headerlink" href="#added_11" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Lease-based stand CLI:</strong></li>
 <li><code>greatminds stand lease --task &lt;id&gt; --worktree &lt;path&gt; --profile
@@ -2576,7 +2610,7 @@ umbrella-console-script migration. No new features.</p>
   library API; the click handlers are thin wrappers calling them,
   matching vfl's <code>create_node()</code> / <code>create_project()</code> pattern.</li>
 </ul>
-<h3 id="added_11">Added<a class="headerlink" href="#added_11" title="Permanent link">&para;</a></h3>
+<h3 id="added_12">Added<a class="headerlink" href="#added_12" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>tests/test_task_field_coercion.py</code> — pytest regression suite
   covering all three 1.1.0 bugs (20 tests, all passing). Tests:
@@ -2609,7 +2643,7 @@ internal artefacts (task files, journal, code) English.</p>
   Russian to English. Pre-1.1.0 versions on PyPI (0.1.0, 0.1.1, 1.0.0)
   shipped Russian-only canon by mistake — yank them in favour of 1.1.0+.</li>
 </ul>
-<h3 id="added_12">Added<a class="headerlink" href="#added_12" title="Permanent link">&para;</a></h3>
+<h3 id="added_13">Added<a class="headerlink" href="#added_13" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>greatminds setup --lang &lt;code&gt;</code> flag — records the agent
   user-facing language in <code>PROJECT.md</code> as <code>&lt;GREATMINDS_LANG&gt;</code>. Any
@@ -2640,7 +2674,7 @@ are consolidated into a single <code>greatminds</code> umbrella with subcommands
 <li><code>coord-init</code>, <code>coord-launch</code>, <code>coord-tmux</code> modules removed; their
   functionality is in <code>greatminds setup</code> and <code>greatminds launch</code>.</li>
 </ul>
-<h3 id="added_13">Added<a class="headerlink" href="#added_13" title="Permanent link">&para;</a></h3>
+<h3 id="added_14">Added<a class="headerlink" href="#added_14" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>greatminds.core.env</code> — adaptive Python-env detector covering 8
   scenarios: pixi, uv, poetry, conda, plain venv, external-venv
@@ -2681,7 +2715,7 @@ permissions enforced.</p>
 </ul>
 <h2 id="010-2026-05-20">0.1.0 — 2026-05-20<a class="headerlink" href="#010-2026-05-20" title="Permanent link">&para;</a></h2>
 <p>First public release.</p>
-<h3 id="added_14">Added<a class="headerlink" href="#added_14" title="Permanent link">&para;</a></h3>
+<h3 id="added_15">Added<a class="headerlink" href="#added_15" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Python package <code>greatminds</code> with 19 console entry-points covering the
   full R8 pipeline:</li>
