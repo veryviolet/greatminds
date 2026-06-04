@@ -311,14 +311,46 @@ def test_registry_missing_sends_enter(env):
     assert "test-session:ops" not in targets
 
 
-def test_pid_dead_sends_enter_and_unlinks_stale_registry(env):
+def test_pid_dead_clears_volatile_but_preserves_session_id(env):
     _write_coord_yaml(env.project_dir)
-    # Dead pid (NOT in env.alive) → registry should be removed and Enter sent.
+    # Dead pid (NOT in env.alive) + a recorded session_id (driven-claude
+    # stores its session UUID in the .json). Default restart must clear the
+    # stale pid/input_sock but PRESERVE session_id — destroying a session
+    # is reserved for --reset, never a side effect of a plain restart.
     reg = _write_registry(env.project_dir, "developer", pid=9999, with_sock=True)
+    import json as _json
+    data = _json.loads(reg.read_text())
+    data["session_id"] = "sess-keep-me"
+    reg.write_text(_json.dumps(data))
+
     _run(env)
-    assert not reg.is_file(), "stale registry must be unlinked"
+
+    assert reg.is_file(), "registry kept (only volatile fields cleared)"
+    after = _json.loads(reg.read_text())
+    assert after.get("session_id") == "sess-keep-me", (
+        "default restart must PRESERVE session_id (no flagless session kill)")
+    assert "pid" not in after and "input_sock" not in after, (
+        "volatile pid/input_sock must be cleared for the dead agent")
     targets = {c[c.index("-t") + 1] for c in env.sub.find("send-keys") if "-t" in c}
     assert "test-session:dev" in targets
+
+
+def test_default_restart_preserves_sidecar_session_files_dead_pid(env):
+    """Default restart (NO --reset) must preserve the claude/codex
+    session-id sidecar files for a dead agent — session destruction is
+    reserved for the explicit --reset flag."""
+    _write_coord_yaml(env.project_dir)
+    _write_registry(env.project_dir, "developer", pid=9999, with_sock=True)
+    reg_dir = env.project_dir / "coordination" / ".agent_registry"
+    (reg_dir / "developer.session-id").write_text("claude-sid", encoding="utf-8")
+    (reg_dir / "developer.codex-session-id").write_text("codex-sid", encoding="utf-8")
+
+    _run(env)
+
+    assert (reg_dir / "developer.session-id").is_file(), \
+        "default restart must NOT drop claude session-id (dead pid)"
+    assert (reg_dir / "developer.codex-session-id").is_file(), \
+        "default restart must NOT drop codex session-id (dead pid)"
 
 
 def test_pid_alive_does_not_send_enter_for_that_window(env):

@@ -4,6 +4,25 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.5.12 — 2026-06-04
+
+Fix: a plain restart silently destroyed driven-agent sessions.
+
+### Fixed
+
+- **Default `greatminds restart` preserves session continuity.** For a
+  dead agent it did `reg_path.unlink()` on `<role>.json` — but the
+  driven-claude session UUID is stored IN that .json (coordd writes
+  `reg["session_id"]`), and a driven role's pid is dead between turns, so
+  every default restart wiped its session and force-freshed it on the
+  next turn. Session DESTRUCTION must be reserved for the explicit
+  `--reset` flag, never a side effect of a plain restart (or of
+  `greatminds update`, which restarts on every run since 1.5.10). The
+  dead-agent path now clears only the volatile `pid` / `input_sock` and
+  PRESERVES `session_id` (and the claude/codex session-id sidecar files,
+  which it never touched); `--reset` remains the only path that drops a
+  session.
+
 ## 1.5.11 — 2026-06-04
 
 ### Added

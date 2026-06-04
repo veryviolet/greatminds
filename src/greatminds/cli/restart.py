@@ -350,6 +350,30 @@ def _sigterm_alive(pid: int) -> None:
     time.sleep(1.0)
 
 
+def _clear_volatile_registry(reg_path: Path) -> None:
+    """Default-restart cleanup of a DEAD agent's registry: drop only the
+    volatile ``pid`` + ``input_sock`` (stale once the agent is gone) and
+    PRESERVE ``session_id`` + turn count, so the relaunch / next coordd
+    turn resumes the prior session.
+
+    Session DESTRUCTION (clearing session_id) is reserved for the explicit
+    ``--reset`` path — it must NEVER be a side effect of a plain restart.
+    If the registry is unreadable, leave it untouched (a stale dead pid is
+    harmless — start_agent refuses only on a LIVE pid)."""
+    try:
+        data = json.loads(reg_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    if not isinstance(data, dict):
+        return
+    data.pop("pid", None)
+    data.pop("input_sock", None)
+    try:
+        reg_path.write_text(json.dumps(data), encoding="utf-8")
+    except OSError:
+        pass
+
+
 def _clear_session_files_for_bootstrap(
     registry_dir: Path,
     role_lc: str,
@@ -405,10 +429,15 @@ def _restart_dead_agents(
             except (TypeError, ValueError):
                 pid = 0
             if not _pid_alive(pid):
-                try:
-                    reg_path.unlink()
-                except OSError:
-                    pass
+                # Dead agent: clear ONLY the volatile pid/input_sock so a
+                # relaunch re-registers cleanly — but PRESERVE session_id
+                # (driven-claude stores its session UUID here in the .json;
+                # coordd resumes it next turn). Pre-fix this did
+                # reg_path.unlink(), which nuked session_id and force-
+                # freshed the agent on every default restart — destroying
+                # sessions with NO explicit flag. Session DESTRUCTION is
+                # reserved for --reset (_clear_session_files_for_bootstrap).
+                _clear_volatile_registry(reg_path)
                 needs_start = True
             elif bootstrap:
                 # 0147 ``--bootstrap`` (soft): the alive agent is NOT
