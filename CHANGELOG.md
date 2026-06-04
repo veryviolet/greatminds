@@ -4,6 +4,18 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.5.11 — 2026-06-04
+
+### Added
+
+- **`greatminds task list <queue> --json`.** `task list` only printed
+  filenames; an agent inspecting a queue (a codex PLANNER hit this) has
+  no raw access to `coordination/`, so it guessed a `--json` flag and
+  errored. Added it — emits a JSON array of `{id, title, queue, file}`
+  per task (malformed files degrade to the filename stem, never crash
+  the listing). Plain output is unchanged (filenames only). Mirrors
+  `agent status --json`.
+
 ## 1.5.10 — 2026-06-04
 
 Fix: `update` skipped the migration when the package was already current.

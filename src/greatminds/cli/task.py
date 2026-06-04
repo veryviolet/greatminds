@@ -2653,7 +2653,9 @@ def task_show(task_id) -> None:
 
 @task.command(name="list")
 @click.argument("queue")
-def task_list(queue) -> None:
+@click.option("--json", "as_json", is_flag=True, default=False,
+              help="emit a machine-readable JSON array (id/title/queue/file).")
+def task_list(queue, as_json) -> None:
     coord = find_coord_dir()
     # Heartbeat on read-only list — refreshes the running role's liveness
     # check during long idle stretches. Best-effort; never blocks output.
@@ -2664,11 +2666,30 @@ def task_list(queue) -> None:
     qdir = coord / queue
     if not qdir.is_dir():
         raise GreatMindsError(f"queue {queue} not found")
-    for f in sorted(qdir.iterdir()):
-        if f.suffix not in (".yaml", ".md"):
-            continue
-        if f.name in ("_TEMPLATE.md", "_TEMPLATE.yaml"):
-            continue
+    files = [f for f in sorted(qdir.iterdir())
+             if f.suffix in (".yaml", ".md")
+             and f.name not in ("_TEMPLATE.md", "_TEMPLATE.yaml")]
+    if as_json:
+        # Machine-readable listing — the sanctioned way for agents to
+        # inspect a queue without raw access to coordination/. Each
+        # record: id, title, queue, file. Malformed files degrade to the
+        # filename stem with an empty title (never crash the listing).
+        records = []
+        for f in files:
+            data: dict = {}
+            try:
+                data = load_task(f)
+            except GreatMindsError:
+                data = {}
+            records.append({
+                "id": (data.get("id") or f.stem),
+                "title": (data.get("title") or "").strip(),
+                "queue": queue,
+                "file": f.name,
+            })
+        click.echo(json.dumps(records, indent=2))
+        return
+    for f in files:
         click.echo(f.name)
 
 
