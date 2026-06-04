@@ -267,6 +267,60 @@ def test_wake_codex_returns_ship_blocking_when_no_key_advances_heartbeat(
 
 
 # ---------------------------------------------------------------------------
+# SIGINT interrupt is for a `bash sleep` ONLY — never a live engine.
+#
+# Regression: press_enter's wake interrupt SIGINTs the deepest descendant
+# to break a blocking `bash sleep` so a queued Enter gets read. For an
+# interactive codex TUI the deepest descendant is the LIVE codex engine
+# (codex is multi-process: node → engine), so an unguarded SIGINT is
+# Ctrl-C → codex QUITS to the shell and the WAKE_TEXT lands in bash. The
+# guard: only SIGINT when the leaf's comm is literally "sleep".
+# ---------------------------------------------------------------------------
+
+
+def test_wake_does_not_sigint_live_codex_engine_descendant(
+    coord_dir, tmux, monkeypatch,
+):
+    """The bug the USER hit repeatedly: waking a codex TUI SIGINT'd its
+    engine and dropped the pane to bash. A non-sleep deepest descendant
+    must NOT be signalled."""
+    _write_registry(coord_dir, "architect-planner", pid=1000, tool="codex")
+    _write_heartbeat(coord_dir, "architect-planner", mtime=1000.0)
+    monkeypatch.setattr(se, "_poll_heartbeat_advance", lambda *a, **kw: True)
+    # codex engine is a descendant (leaf != agent pid) whose comm is NOT sleep.
+    monkeypatch.setattr(se, "_deepest_descendant", lambda pid: 2000)
+    monkeypatch.setattr(se, "_process_comm", lambda pid: "codex")
+    sigints: list[int] = []
+    monkeypatch.setattr(se, "_send_sigint", lambda pid: sigints.append(pid) or True)
+
+    ok, diag = se.press_enter(
+        coord_dir, "s", "planner", "architect-planner", "codex", mode="wake",
+    )
+    assert ok, diag
+    assert sigints == [], f"SIGINT must NOT be sent to a live engine; got {sigints}"
+    assert "no SIGINT" in diag and "codex" in diag
+
+
+def test_wake_sigints_real_sleep_descendant(coord_dir, tmux, monkeypatch):
+    """The legitimate case: a loop agent blocked on `bash sleep N`. The
+    leaf's comm IS sleep → SIGINT fires to break the syscall."""
+    _write_registry(coord_dir, "developer", pid=1000, tool="claude")
+    _write_heartbeat(coord_dir, "developer", mtime=1000.0)
+    monkeypatch.setattr(se, "_poll_heartbeat_advance", lambda *a, **kw: True)
+    monkeypatch.setattr(se, "_deepest_descendant", lambda pid: 2000)
+    monkeypatch.setattr(se, "_process_comm", lambda pid: "sleep")
+    sigints: list[int] = []
+    monkeypatch.setattr(se, "_send_sigint", lambda pid: sigints.append(pid) or True)
+
+    ok, diag = se.press_enter(
+        coord_dir, "s", "dev", "developer", "claude", mode="wake",
+    )
+    assert ok, diag
+    assert sigints == [2000], f"SIGINT must break a real sleep; got {sigints}"
+    assert "SIGINT pid=2000" in diag
+
+
+# ---------------------------------------------------------------------------
 # mode="bare-enter" — pane-diff verify (launcher/dialog case)
 # ---------------------------------------------------------------------------
 

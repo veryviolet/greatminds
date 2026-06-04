@@ -1676,6 +1676,7 @@ def sigint_sleeping_descendant(coord: Path, role: str,
     from greatminds.cli._send_enter import (
         _deepest_descendant,
         _pid_alive,
+        _process_comm,
         _send_sigint,
     )
 
@@ -1693,6 +1694,21 @@ def sigint_sleeping_descendant(coord: Path, role: str,
     if leaf is None or leaf == pid_int:
         # No sleep descendant → agent isn't asleep on a tool subprocess.
         # SIGINTing the agent itself would be hostile; skip.
+        return False
+    # Only interrupt an ACTUAL ``bash sleep`` backoff timer. The
+    # ``leaf != pid_int`` guard alone is NOT enough: a multi-process
+    # interactive TUI (codex: node → engine → threads; cursor likewise)
+    # has a live ENGINE as its deepest descendant, so this branch is
+    # reached and SIGINT would QUIT the agent. Gate strictly on the leaf
+    # being a real ``sleep`` (mirrors press_enter's guard).
+    leaf_comm = _process_comm(leaf)
+    if leaf_comm != "sleep":
+        if verbose:
+            print(
+                f"  event-wake: role={role} skip SIGINT — leaf pid={leaf} "
+                f"comm={leaf_comm!r} is a live engine, not a sleep",
+                file=sys.stderr,
+            )
         return False
     ok = _send_sigint(leaf)
     if ok and verbose:

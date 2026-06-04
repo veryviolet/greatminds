@@ -367,11 +367,30 @@ def press_enter(
         leaf = _deepest_descendant(pid_int)
         if leaf is not None and leaf != pid_int:
             leaf_comm = _process_comm(leaf)
-            if _send_sigint(leaf):
+            # CRITICAL: only SIGINT an ACTUAL ``bash sleep`` backoff timer.
+            # The whole point of this interrupt (see docstring above) is to
+            # break a blocking ``sleep`` syscall so a queued Enter gets read.
+            # But the deepest descendant of an INTERACTIVE TUI is the live
+            # engine, NOT a sleep: codex is multi-process (node → codex
+            # engine → threads) so ``leaf != pid_int`` is TRUE and the leaf
+            # is the codex engine; SIGINT there is Ctrl-C → codex QUITS to
+            # the shell, and the WAKE_TEXT we send next lands in bash
+            # (`-bash: continue: ...`). ``leaf_comm`` was computed here from
+            # the first commit but only ever used in the diag string — never
+            # gated on. That gap killed codex/cursor TUIs on every wake.
+            # Gate strictly on comm == "sleep": a real sleep is safe to
+            # interrupt; anything else (codex/node/claude/cursor engine) is
+            # a live process we must NOT signal — the send-keys Enter below
+            # is the correct (and sufficient) wake for a TUI sitting idle.
+            if leaf_comm == "sleep" and _send_sigint(leaf):
                 interrupt_diag = f" (SIGINT pid={leaf} comm={leaf_comm!r})"
                 # Brief gap so the bash subprocess can collect the signal
                 # and return control to the agent before we deliver Enter.
                 time.sleep(0.05)
+            elif leaf_comm != "sleep":
+                interrupt_diag = (f" (no SIGINT: leaf pid={leaf} "
+                                  f"comm={leaf_comm!r} is a live engine, "
+                                  f"not a sleep)")
 
     hb_baseline = _heartbeat_mtime(coord_dir, role_lower) if mode == "wake" else None
     # Pane baseline: capture in bare-enter mode AND in the wake mode's

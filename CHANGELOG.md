@@ -4,6 +4,29 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.5.3 — 2026-06-04
+
+Patch: waking an idle codex/cursor TUI quit the agent (Ctrl-C to the shell).
+
+### Fixed
+
+- **The event-wake SIGINT no longer kills interactive codex TUIs.** The
+  wake primitive (`_send_enter.press_enter`, and the parallel
+  `coordd.sigint_sleeping_descendant`) SIGINTs the deepest descendant of
+  an agent to break a blocking `bash sleep` backoff timer so a queued
+  Enter gets read. The guard was `leaf != agent_pid` — sufficient for
+  claude (whose deepest descendant IS the agent process, so it was
+  skipped), but WRONG for codex/cursor: those are multi-process (node →
+  engine), so the deepest descendant is the LIVE ENGINE, not a sleep.
+  SIGINT there is Ctrl-C → codex quits to the shell and the next
+  `WAKE_TEXT` ("continue your tick") lands in bash (`-bash: continue:
+  ...`). The leaf's `comm` was computed from the first commit but only
+  ever used in the diagnostic string — never gated on. Both paths now
+  SIGINT only when the leaf is an actual `sleep` process; a live engine
+  is woken by the send-keys Enter alone (idle TUIs read input directly,
+  so no interrupt is needed). The bug bit IDLE agents (stale heartbeat);
+  busy agents were masked by the fresh-heartbeat push guard.
+
 ## 1.5.2 — 2026-06-04
 
 Patch: the documented task-withdraw path was broken — a withdrawn task

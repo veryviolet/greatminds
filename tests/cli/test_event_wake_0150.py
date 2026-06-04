@@ -52,6 +52,10 @@ def test_signals_deepest_descendant_when_agent_is_sleeping(tmp_path: Path, monke
         "greatminds.cli._send_enter._deepest_descendant",
         lambda p: 2000,  # sleep PID, deeper than agent
     )
+    # The leaf must be a REAL sleep for the SIGINT to fire.
+    monkeypatch.setattr(
+        "greatminds.cli._send_enter._process_comm", lambda p: "sleep",
+    )
     sent: list[int] = []
 
     def fake_sigint(pid: int) -> bool:
@@ -63,6 +67,35 @@ def test_signals_deepest_descendant_when_agent_is_sleeping(tmp_path: Path, monke
 
     assert coordd_mod.sigint_sleeping_descendant(coord, "developer") is True
     assert sent == [2000]
+
+
+def test_skips_when_descendant_is_live_engine_not_sleep(tmp_path: Path, monkeypatch) -> None:
+    """Regression (codex-TUI quit bug): a multi-process interactive agent
+    (codex: node → engine) has a LIVE descendant that is NOT a sleep.
+    ``leaf != pid`` alone passes the old guard, but SIGINTing the codex
+    engine is Ctrl-C → the agent quits to the shell. Helper must refuse
+    when the leaf's comm is not 'sleep'."""
+    coord = tmp_path / "coordination"
+    coord.mkdir(parents=True)
+    _seed_registry(tmp_path, "architect-planner", pid=1000)
+
+    monkeypatch.setattr(
+        "greatminds.cli._send_enter._pid_alive", lambda p: True,
+    )
+    monkeypatch.setattr(
+        "greatminds.cli._send_enter._deepest_descendant", lambda p: 2000,
+    )
+    monkeypatch.setattr(
+        "greatminds.cli._send_enter._process_comm", lambda p: "codex",
+    )
+    sent: list[int] = []
+    monkeypatch.setattr(
+        "greatminds.cli._send_enter._send_sigint",
+        lambda p: sent.append(p) or True,
+    )
+
+    assert coordd_mod.sigint_sleeping_descendant(coord, "architect-planner") is False
+    assert sent == [], "must NOT SIGINT a live codex engine descendant"
 
 
 def test_skips_when_no_descendant_chain(tmp_path: Path, monkeypatch) -> None:
