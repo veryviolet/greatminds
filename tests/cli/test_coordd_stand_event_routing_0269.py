@@ -129,49 +129,45 @@ def _project_with_sk_window(tmp_path: Path) -> Path:
     return project
 
 
-def test_route_queue_event_dispatches_to_stand_keeper_on_state_change(
+def test_route_stand_event_runs_coordd_deploy_on_preparing(
     tmp_path: Path, monkeypatch,
 ) -> None:
-    """End-to-end: a ``state.yaml`` write under ``coordination/.stand/``
-    triggers ``press_enter`` for STAND-KEEPER's window. This is the
-    PRIMARY behavior 0269 unblocks — pre-fix the dispatcher dropped
-    the event because the owner-lookup returned None."""
+    """1.6.0: a ``state.yaml`` write under ``coordination/.stand/`` with
+    state=preparing makes COORDD run the deploy engine directly — there
+    is no STAND-KEEPER agent to wake. The retired behavior (press_enter /
+    drive an SK turn) must NOT fire."""
     project = _project_with_sk_window(tmp_path)
     coord = project / "coordination"
+    (coord / ".stand").mkdir(parents=True, exist_ok=True)
+    import yaml as _y
+    (coord / ".stand" / "state.yaml").write_text(_y.safe_dump({
+        "state": "preparing", "queue": [], "history": [],
+        "active_lease": {"lease_id": "L1", "profile": "full-deploy",
+                         "worktree": str(coord.parent / "wt"),
+                         "holder_role": "TESTER", "task": "0001"}}),
+        encoding="utf-8")
 
-    calls: list[dict] = []
-    def fake_press_enter(coord_dir, session, window, role_lower,
-                         agent_type, *, mode, verify, **_kw):
-        calls.append({"role_lower": role_lower,
-                      "agent_type": agent_type,
-                      "mode": mode, "window": window})
-        return (True, "fake-ok")
+    import threading
+    done = threading.Event()
+    seen: dict = {}
+
+    def fake_deploy(c, *, lease_id=None, **_k):
+        seen["lease_id"] = lease_id
+        done.set()
+        return (0, "ok")
+
+    monkeypatch.setattr("greatminds.cli.stand.deploy_lease", fake_deploy)
     monkeypatch.setattr(
-        "greatminds.cli._send_enter.press_enter", fake_press_enter,
-    )
-    # Codex/SK is loop-mode-claude in this fixture; mock sigint too
-    # to make sure the dispatcher never falls into a sigint branch
-    # for the chat-mode claude path.
-    monkeypatch.setattr(
-        coordd_mod, "sigint_sleeping_descendant",
-        lambda c, role, verbose: pytest.fail(
-            "0269: SK is claude chat-mode; must dispatch via press_enter"
-        ),
-    )
+        coordd_mod, "_maybe_drive_driven_role",
+        lambda *a, **k: pytest.fail(
+            "1.6.0: .stand must run coordd deploy, not drive an SK agent"))
+    coordd_mod._DEPLOYING_LEASES.discard("L1")
 
     woke = coordd_mod._route_queue_event(
-        coord, find_canon_dir(), ".stand",
-        "state.yaml", verbose=False,
-    )
-    assert woke is True, (
-        "0269: _route_queue_event must return True for a state.yaml "
-        "change under .stand/ post-fix"
-    )
-    assert len(calls) == 1
-    assert calls[0]["role_lower"] == "stand-keeper"
-    assert calls[0]["agent_type"] == "claude"
-    assert calls[0]["mode"] == "wake"
-    assert calls[0]["window"] == "stand"
+        coord, find_canon_dir(), ".stand", "state.yaml", verbose=False)
+    assert woke is True
+    assert done.wait(timeout=3), "coordd must run deploy_lease for the lease"
+    assert seen["lease_id"] == "L1"
 
 
 def test_route_queue_event_skips_stand_dotfiles_and_template(

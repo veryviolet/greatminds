@@ -92,35 +92,35 @@ def _project_with_driven_sk(tmp_path: Path) -> Path:
     return project
 
 
-def test_route_stand_event_runs_driven_sk_turn(tmp_path, monkeypatch):
-    """A .stand state change with STAND-KEEPER in driven window mode must
-    dispatch an SK driven turn (claude --resume -p), the same direct
-    queue→owner route every driven role uses."""
+def test_route_stand_event_runs_coordd_deploy(tmp_path, monkeypatch):
+    """1.6.0: a .stand change to `preparing` runs the COORDD deploy engine
+    (deploy_lease) — the STAND-KEEPER agent is retired, so no driven turn
+    and no press_enter fire."""
     project = _project_with_driven_sk(tmp_path)
     coord = project / "coordination"
+    (coord / ".stand").mkdir(parents=True, exist_ok=True)
+    import yaml as _y
+    (coord / ".stand" / "state.yaml").write_text(_y.safe_dump({
+        "state": "preparing", "queue": [], "history": [],
+        "active_lease": {"lease_id": "L1", "profile": "full-deploy",
+                         "worktree": str(coord.parent / "wt"),
+                         "holder_role": "TESTER", "task": "0001"}}),
+        encoding="utf-8")
 
-    calls: list[dict] = []
-
-    def fake_spawn(coord_dir, role_lower, session_id, pane, session_name,
-                   bootstrap_file, verbose, *, reg=None, force_fresh=False):
-        calls.append({"role_lower": role_lower, "force_fresh": force_fresh,
-                      "pane": pane})
-        return (True, "fake-driven-ok")
-
-    monkeypatch.setattr(coordd_mod, "_spawn_driven_turn", fake_spawn)
-    # Guard: must NOT fall back to press_enter for a DRIVEN SK.
-    monkeypatch.setattr(
-        "greatminds.cli._send_enter.press_enter",
-        lambda *a, **kw: pytest.fail(
-            "0341: driven SK must run a driven turn, not press_enter"))
+    import threading
+    done = threading.Event()
+    monkeypatch.setattr("greatminds.cli.stand.deploy_lease",
+                        lambda c, *, lease_id=None, **k: (done.set(),
+                                                          (0, "ok"))[-1])
+    monkeypatch.setattr(coordd_mod, "_spawn_driven_turn",
+                        lambda *a, **kw: pytest.fail(
+                            "1.6.0: .stand runs coordd deploy, not an SK turn"))
+    coordd_mod._DEPLOYING_LEASES.discard("L1")
 
     woke = coordd_mod._route_queue_event(
         coord, find_canon_dir(), ".stand", "state.yaml", verbose=False)
     assert woke is True
-    assert len(calls) == 1
-    assert calls[0]["role_lower"] == "stand-keeper"
-    # No session_id in the registry yet → first turn is forced fresh.
-    assert calls[0]["force_fresh"] is True
+    assert done.wait(timeout=3), "coordd must run deploy_lease"
 
 
 def test_route_stand_event_noise_filtered(tmp_path, monkeypatch):

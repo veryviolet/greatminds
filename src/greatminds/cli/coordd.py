@@ -1403,6 +1403,63 @@ def _reconcile_driven_backlog(coord: Path, canon_dir: Path,
                       f"failed: {exc}", file=sys.stderr)
 
 
+# 1.6.0: leases currently being deployed by coordd (dedup so concurrent
+# `.stand` events don't spawn a second deploy for the same lease).
+_DEPLOYING_LEASES: set[str] = set()
+
+
+def _maybe_auto_deploy_stand(coord: Path, verbose: bool) -> bool:
+    """1.6.0: coordd IS the stand deployer — there is no STAND-KEEPER LLM.
+
+    When the stand is ``preparing`` with an active lease, run the lease's
+    deploy profile via the deterministic engine (``stand.deploy_lease`` →
+    ansible-playbook) in a background thread; the engine transitions the
+    stand ready/down by rc. Because the deploy runs in coordd (a plain
+    process), no Claude Code classifier / permission prompt is involved —
+    the structural blocker that stranded full-deploy leases is gone.
+
+    Dedup by lease_id so multiple ``.stand`` events (or a startup sweep +
+    an event) don't double-deploy. Returns True if a deploy was started.
+    """
+    try:
+        from greatminds.cli.stand_state import read_stand_state
+        st = read_stand_state(coord)
+    except Exception:
+        return False
+    if (st or {}).get("state") != "preparing":
+        return False
+    active = (st or {}).get("active_lease") or {}
+    lease_id = active.get("lease_id")
+    profile = active.get("profile")
+    if not lease_id or not profile:
+        return False
+    if lease_id in _DEPLOYING_LEASES:
+        return False
+    _DEPLOYING_LEASES.add(lease_id)
+
+    def _run() -> None:
+        try:
+            from greatminds.cli.stand import deploy_lease
+            rc, _log = deploy_lease(coord, lease_id=lease_id)
+            if verbose:
+                print(f"  1.6.0: coordd auto-deploy lease {lease_id} "
+                      f"rc={rc}", file=sys.stderr)
+        except Exception as exc:  # noqa: BLE001 — never crash coordd
+            if verbose:
+                print(f"  coordd auto-deploy {lease_id} failed: {exc}",
+                      file=sys.stderr)
+        finally:
+            _DEPLOYING_LEASES.discard(lease_id)
+
+    import threading
+    threading.Thread(target=_run, name=f"stand-deploy-{lease_id}",
+                     daemon=True).start()
+    if verbose:
+        print(f"  1.6.0: coordd dispatched stand deploy for lease "
+              f"{lease_id} (profile {profile})", file=sys.stderr)
+    return True
+
+
 def _route_queue_event(coord: Path, canon_dir: Path,
                        queue: str, filename: str, verbose: bool) -> bool:
     """0204: wake the owning role of ``queue`` when a file lands there.
@@ -1431,6 +1488,12 @@ def _route_queue_event(coord: Path, canon_dir: Path,
         return False
     if filename.startswith(".") or filename.startswith("_TEMPLATE"):
         return False
+
+    # 1.6.0: the stand is deployed by COORDD, not a STAND-KEEPER agent.
+    # A `.stand` state change (→ preparing) runs the deterministic deploy
+    # engine directly — no LLM role to wake.
+    if queue == ".stand":
+        return _maybe_auto_deploy_stand(coord, verbose)
 
     owner = _owning_role_for_queue(canon_dir, queue)
     if owner is None:
@@ -2143,6 +2206,9 @@ def coordd(project_dir: Path | None, project_name: str | None,
     try:
         _clear_stale_driven_locks(coord, verbose)
         _reconcile_driven_backlog(coord, canon_dir, verbose)
+        # 1.6.0: a lease left `preparing` when coordd (re)started — e.g.
+        # killed mid-deploy — must be picked up; coordd re-runs the deploy.
+        _maybe_auto_deploy_stand(coord, verbose)
     except Exception as exc:
         if verbose:
             print(f"coordd: startup recovery failed: {exc}", file=sys.stderr)
