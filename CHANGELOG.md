@@ -4,6 +4,22 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.5.15 — 2026-06-04
+
+Fix: a stale driven run-lock permanently stranded a role.
+
+### Fixed
+
+- **coordd clears stale driven run-locks on startup.** A driven turn
+  runs as a coordd-managed subprocess, so NO run-lock survives a coordd
+  restart — yet a lock left behind by a coordd killed mid-turn (e.g. a
+  daemon restart, common during `update`) was treated by BOTH the
+  dispatcher and the startup reconcile as a turn still in flight, so that
+  role was NEVER driven again (its task sat forever; the stand was never
+  leased). coordd now deletes every `.locks/driven-*.lock` / `.pending`
+  on startup (none can be valid in a fresh process) before reconciling
+  the backlog, so the role is re-driven on the next start.
+
 ## 1.5.14 — 2026-06-04
 
 Fix: driven claude roles never ran under the daemon; the dashboard

@@ -1341,6 +1341,31 @@ def _role_has_pending_task(coord: Path, role_meta: dict,
     return False
 
 
+def _clear_stale_driven_locks(coord: Path, verbose: bool) -> int:
+    """A driven turn runs as a coordd-managed subprocess, so NO run-lock
+    can survive a coordd restart — every ``driven-*.lock`` present on a
+    FRESH start is stale (coordd was killed mid-turn, e.g. a daemon
+    restart, taking the turn subprocess with it). Left in place, a stale
+    lock makes the dispatcher AND the startup reconcile believe a turn is
+    forever in-flight, so that role is NEVER re-driven again. Clear the
+    locks (and their pending markers) on startup. Returns the count."""
+    locks = coord / ".locks"
+    if not locks.is_dir():
+        return 0
+    cleared = 0
+    for pat in ("driven-*.lock", "driven-*.pending"):
+        for f in sorted(locks.glob(pat)):
+            try:
+                f.unlink()
+                cleared += 1
+                if verbose:
+                    print(f"coordd: cleared stale driven lock {f.name}",
+                          file=sys.stderr)
+            except OSError:
+                pass
+    return cleared
+
+
 def _reconcile_driven_backlog(coord: Path, canon_dir: Path,
                               verbose: bool) -> None:
     """Startup sweep: coordd is otherwise inotify-reactive, so a task
@@ -2105,16 +2130,22 @@ def coordd(project_dir: Path | None, project_name: str | None,
     )
     known: set[str] = set(baseline)
 
-    # Startup reconcile: drive any driven role that already has pending
-    # work in its claim queues (a task that landed before this coordd
-    # started watching, or whose original event was consumed by a turn
-    # that failed to spawn). Without this, a daemon restart strands a
-    # hanging task — inotify only fires on NEW events.
+    # Startup recovery, in order:
+    #   1. Clear stale driven run-locks — a turn is a coordd subprocess, so
+    #      any lock present on a fresh start is from a coordd that was
+    #      killed mid-turn; left in place it blocks that role's dispatch
+    #      FOREVER (dispatcher + reconcile both treat it as in-flight).
+    #   2. Reconcile the backlog — drive any driven role with pending work
+    #      in its claim queues (a task that landed before this coordd
+    #      started watching, or whose event was consumed by a failed spawn).
+    # Without (1), a daemon restart mid-turn permanently strands the role;
+    # without (2), inotify (NEW events only) never picks up a queued task.
     try:
+        _clear_stale_driven_locks(coord, verbose)
         _reconcile_driven_backlog(coord, canon_dir, verbose)
     except Exception as exc:
         if verbose:
-            print(f"coordd: startup reconcile failed: {exc}", file=sys.stderr)
+            print(f"coordd: startup recovery failed: {exc}", file=sys.stderr)
 
     while not stop["flag"]:
         try:

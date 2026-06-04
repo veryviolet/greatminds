@@ -83,3 +83,41 @@ def test_reconcile_skips_when_turn_in_flight(tmp_path, monkeypatch):
     _patch_driven_tester(monkeypatch, calls)
     cd._reconcile_driven_backlog(coord, tmp_path / "canon", verbose=False)
     assert calls == []
+
+
+# ---------- _clear_stale_driven_locks ----------
+
+
+def test_clear_stale_driven_locks_removes_lock_and_pending(tmp_path):
+    coord = _mk_coord(tmp_path)
+    locks = coord / ".locks"
+    locks.mkdir()
+    (locks / "driven-tester.lock").write_text("")
+    (locks / "driven-tester.pending").write_text("")
+    (locks / "driven-developer.lock").write_text("")
+    (locks / "keep.other").write_text("")     # unrelated → untouched
+
+    n = cd._clear_stale_driven_locks(coord, verbose=False)
+
+    assert n == 3
+    assert not (locks / "driven-tester.lock").exists()
+    assert not (locks / "driven-tester.pending").exists()
+    assert not (locks / "driven-developer.lock").exists()
+    assert (locks / "keep.other").exists()
+
+
+def test_clear_then_reconcile_drives_role_despite_prior_lock(tmp_path, monkeypatch):
+    """A stale lock from a killed coordd must NOT permanently strand the
+    role: clearing it first lets the reconcile drive the pending task."""
+    coord = _mk_coord(tmp_path)
+    (coord / "feature_test" / "0001-verify.yaml").write_text("id: x\n")
+    locks = coord / ".locks"
+    locks.mkdir()
+    (locks / "driven-tester.lock").write_text("")   # stale, from a killed coordd
+    calls: list = []
+    _patch_driven_tester(monkeypatch, calls)
+
+    cd._clear_stale_driven_locks(coord, verbose=False)
+    cd._reconcile_driven_backlog(coord, tmp_path / "canon", verbose=False)
+
+    assert calls and calls[0][0] == "TESTER"
