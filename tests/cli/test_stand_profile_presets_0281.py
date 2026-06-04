@@ -18,11 +18,9 @@ from greatminds.core.paths import find_canon_dir
 
 
 CANON_NAMES = (
-    "full-deploy.yaml", "full-deploy.md",
-    "smoke-only.yaml", "smoke-only.md",
-    # 0295/0296: md-only profile, no yaml twin — exercises execute_md_profile.
-    "liveness-prose.md",
-    # vite-dev: scenario C (LIVE-DEVELOPER rapid UI iteration / HMR).
+    # 1.6.0: YAML/ansible only — MD/prose profiles removed.
+    "full-deploy.yaml",
+    "smoke-only.yaml",
     "vite-dev.yaml",
 )
 
@@ -90,21 +88,6 @@ def test_smoke_only_yaml_is_valid_subset() -> None:
         assert field in play
 
 
-def test_md_presets_mention_dollar_substitution() -> None:
-    """The MD prose presets must reference ``${name}`` so SK readers
-    know substitution is available — and the test pins that they
-    were NOT accidentally authored using the legacy ``<TOKEN>`` form."""
-    base = find_canon_dir() / "templates" / "stand-profiles"
-    for name in ("full-deploy.md", "smoke-only.md"):
-        text = (base / name).read_text(encoding="utf-8")
-        assert "${" in text, (
-            f"0281: {name} must use ${{name}} substitution syntax"
-        )
-
-
-# ---------- setup wire-up ----------
-
-
 def _coord(tmp_path: Path) -> Path:
     coord = tmp_path / "proj" / "coordination"
     coord.mkdir(parents=True)
@@ -113,11 +96,11 @@ def _coord(tmp_path: Path) -> Path:
 
 def test_seed_stand_profiles_copies_all_four(tmp_path: Path) -> None:
     """First-time call must copy every canon preset; returned counts
-    match (copied=6, skipped=0)."""
+    match (copied=3, skipped=0)."""
     coord = _coord(tmp_path)
     copied, skipped = setup_mod._seed_stand_profiles(
         coord, find_canon_dir())
-    assert (copied, skipped) == (6, 0)
+    assert (copied, skipped) == (3, 0)
     landing = coord / "stand-profiles"
     assert landing.is_dir()
     for name in CANON_NAMES:
@@ -129,7 +112,7 @@ def test_seed_stand_profiles_copies_all_four(tmp_path: Path) -> None:
 
 def test_seed_stand_profiles_is_idempotent(tmp_path: Path) -> None:
     """Re-running setup must NOT overwrite operator-edited copies.
-    Second call reports skipped=6, copied=0; content of the
+    Second call reports skipped=3, copied=0; content of the
     operator-edited file survives intact."""
     coord = _coord(tmp_path)
     setup_mod._seed_stand_profiles(coord, find_canon_dir())
@@ -139,7 +122,7 @@ def test_seed_stand_profiles_is_idempotent(tmp_path: Path) -> None:
 
     copied, skipped = setup_mod._seed_stand_profiles(
         coord, find_canon_dir())
-    assert (copied, skipped) == (0, 6)
+    assert (copied, skipped) == (0, 3)
     assert target.read_text(encoding="utf-8") == operator_edit, (
         "0281: setup must NOT overwrite operator-edited preset files"
     )

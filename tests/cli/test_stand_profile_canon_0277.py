@@ -37,13 +37,13 @@ def test_stand_profile_directory_points_to_canon_path() -> None:
     assert sp.get("directory") == "coordination/stand-profiles"
 
 
-def test_stand_profile_declares_both_formats() -> None:
-    """Two on-disk dialects are supported: YAML (ansible-subset,
-    machine-runnable) and MD (free prose, injected into SK's
-    next-tick prompt). Phase A pins both."""
+def test_stand_profile_declares_yaml_only_format() -> None:
+    """1.6.0: YAML (ansible-subset) is the ONLY on-disk dialect — MD
+    (prose) profiles were removed; the deploy runs deterministically in
+    coordd, not via LLM-executed prose."""
     formats = _load_schema()["stand_profile"].get("formats") or []
-    assert "yaml" in formats and "md" in formats, (
-        f"0277: schema.stand_profile.formats must include yaml + md "
+    assert formats == ["yaml"], (
+        f"0277: schema.stand_profile.formats must be [yaml] only "
         f"(got {formats!r})"
     )
 
@@ -60,13 +60,6 @@ def test_stand_profile_yaml_dialect_and_required_fields() -> None:
     )
 
 
-def test_stand_profile_md_dialect_is_free_prose() -> None:
-    """The MD dialect is free-form prose — no schema validation
-    beyond "the file exists"."""
-    assert (_load_schema()["stand_profile"].get("md_dialect")
-            == "free_prose")
-
-
 def test_stand_profile_lookup_pattern_references_profile_enum() -> None:
     """The lookup pattern documents ``<lease.profile>`` so future
     readers tie profile-file resolution to the existing lease enum
@@ -78,7 +71,7 @@ def test_stand_profile_lookup_pattern_references_profile_enum() -> None:
         f"<lease.profile> (got {pattern!r})"
     )
     assert "<directory>" in pattern
-    assert "<format>" in pattern
+    assert pattern.endswith(".yaml")  # 1.6.0: yaml-only, no <format>
 
 
 def test_stand_profile_declares_prereq_only_flag_name() -> None:

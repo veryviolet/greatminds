@@ -65,20 +65,6 @@ def test_load_yaml_profile(tmp_path: Path) -> None:
     assert spec.deploy_prerequisites_only is False
 
 
-def test_load_md_profile(tmp_path: Path) -> None:
-    """MD-only file present → ``format='md'``, ``md_content`` carries
-    the full prose; ``yaml_data`` is None."""
-    pd = _profiles_dir(tmp_path)
-    body = "# Manual deploy\n\nRun the bringup recipe by hand.\n"
-    _write_md(pd, "manual", body)
-
-    spec = sp.load_profile(tmp_path, "manual")
-    assert spec.format == "md"
-    assert spec.md_content == body
-    assert spec.yaml_data is None
-    assert spec.deploy_prerequisites_only is False
-
-
 def test_yaml_preferred_when_both_exist(tmp_path: Path) -> None:
     """Both formats present for the same profile name → YAML wins
     (matches schema.stand_profile.lookup docstring)."""
@@ -94,15 +80,14 @@ def test_yaml_preferred_when_both_exist(tmp_path: Path) -> None:
 
 
 def test_profile_not_found(tmp_path: Path) -> None:
-    """Neither YAML nor MD present → GreatMindsError mentioning both
-    candidate paths so the operator can `touch` the right file."""
+    """No YAML present → GreatMindsError naming the expected YAML path
+    (1.6.0: MD profiles removed, so only the .yaml candidate is named)."""
     _profiles_dir(tmp_path)
     with pytest.raises(GreatMindsError) as exc:
         sp.load_profile(tmp_path, "ghost-profile")
     msg = str(exc.value)
     assert "ghost-profile" in msg
     assert "ghost-profile.yaml" in msg
-    assert "ghost-profile.md" in msg
 
 
 def test_yaml_missing_required_field_rejected(tmp_path: Path) -> None:
@@ -166,68 +151,6 @@ def test_deploy_prerequisites_only_yaml_default_false(tmp_path: Path) -> None:
     _write_yaml(pd, "full-deploy", _valid_playbook())
     spec = sp.load_profile(tmp_path, "full-deploy")
     assert spec.deploy_prerequisites_only is False
-
-
-def test_deploy_prerequisites_only_from_md_frontmatter(tmp_path: Path) -> None:
-    """MD path: optional ``---``-delimited YAML frontmatter at the top
-    carries ``deploy_prerequisites_only: true``; body kept intact."""
-    pd = _profiles_dir(tmp_path)
-    body = (
-        "---\n"
-        "deploy_prerequisites_only: true\n"
-        "owner: STAND-KEEPER\n"
-        "---\n"
-        "# Warmup notes\n\n"
-        "Just ensure venv exists. Don't deploy.\n"
-    )
-    _write_md(pd, "warmup-prose", body)
-    spec = sp.load_profile(tmp_path, "warmup-prose")
-    assert spec.format == "md"
-    assert spec.deploy_prerequisites_only is True
-    # Frontmatter exposed for callers that want other ad-hoc fields.
-    assert spec.md_frontmatter == {
-        "deploy_prerequisites_only": True,
-        "owner": "STAND-KEEPER",
-    }
-    # Body keeps content AFTER the frontmatter only.
-    assert "# Warmup notes" in (spec.md_content or "")
-    assert "owner: STAND-KEEPER" not in (spec.md_content or "")
-
-
-def test_md_without_frontmatter_keeps_full_body(tmp_path: Path) -> None:
-    """An MD profile with no frontmatter at all → body == file text,
-    flag defaults to False, frontmatter dict is None."""
-    pd = _profiles_dir(tmp_path)
-    body = "Plain prose. No frontmatter.\n"
-    _write_md(pd, "plain", body)
-    spec = sp.load_profile(tmp_path, "plain")
-    assert spec.md_content == body
-    assert spec.md_frontmatter is None
-    assert spec.deploy_prerequisites_only is False
-
-
-def test_md_malformed_frontmatter_falls_back_to_full_body(
-    tmp_path: Path,
-) -> None:
-    """A malformed frontmatter block must NOT make the file
-    unloadable — the loader treats it as absent so the operator's
-    prose still drives SK's prompt."""
-    pd = _profiles_dir(tmp_path)
-    body = (
-        "---\n"
-        "[: unparseable :]\n"
-        "---\n"
-        "Body still readable.\n"
-    )
-    _write_md(pd, "weird", body)
-    spec = sp.load_profile(tmp_path, "weird")
-    assert spec.md_frontmatter is None
-    # Whole file kept as body since frontmatter is treated absent.
-    assert "Body still readable." in (spec.md_content or "")
-    assert spec.deploy_prerequisites_only is False
-
-
-# ---------- helper: profile_paths ----------
 
 
 def test_profile_paths_returns_two_candidates(tmp_path: Path) -> None:

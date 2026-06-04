@@ -113,18 +113,6 @@ def test_dispatch_proceeds_when_yaml_spec_matches_lease(
     assert rc == 0
 
 
-def test_dispatch_proceeds_when_md_spec_matches_lease(
-    tmp_path: Path,
-) -> None:
-    spec = _md_spec(tmp_path, name="liveness-prose")
-    lease = _lease(profile="liveness-prose")
-    rc, _ = se.dispatch_profile(spec, lease)
-    assert rc == 0
-
-
-# ---------- backwards-compat for legacy callers ----------
-
-
 def test_dispatch_allows_lease_without_profile_key(
     tmp_path: Path, monkeypatch,
 ) -> None:

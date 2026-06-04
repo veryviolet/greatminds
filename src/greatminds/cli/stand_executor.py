@@ -288,69 +288,6 @@ def execute_yaml_profile(
 
 
 # ---------------------------------------------------------------------------
-# MD profile execution (no subprocess — prompt injection)
-# ---------------------------------------------------------------------------
-
-
-PREREQ_ONLY_NOTICE = (
-    "**Mode: PREREQUISITES ONLY** — execute only the prerequisite "
-    "steps (e.g. host clean, docker installed, venv ready); skip the "
-    "main deploy logic. After the prerequisites succeed, call "
-    "`greatminds stand ready --lease-id <lease_id>` and let TESTER "
-    "run the actual deploy + functional probes.\n\n"
-)
-
-
-def execute_md_profile(
-    spec: ProfileSpec,
-    lease_meta: dict[str, Any],
-) -> tuple[int, str]:
-    """Render an MD-format profile for SK's prompt context.
-
-    No subprocess. Substitutes ``${var}`` references in
-    ``spec.md_content`` against ``lease_meta`` and returns
-    ``(0, rendered_text)``. SK's caller injects the rendered text
-    into its next-tick prompt; the LLM emits the actual Bash
-    commands.
-
-    0283 (0276 Phase G): when the spec's
-    ``deploy_prerequisites_only`` flag is set OR the lease meta
-    overrides it (``lease_meta['deploy_prerequisites_only']``), a
-    machine-readable notice is prepended to the rendered output so
-    the LLM sees the mode switch as the FIRST line of context. The
-    notice tells SK to stop after the prerequisite steps and hand
-    off to TESTER for the actual deploy. Lease-level override
-    wins over spec-level value (CLI flag is the most-recent intent).
-    """
-    if spec.format != "md":
-        raise GreatMindsError(
-            f"execute_md_profile: spec.format must be 'md', "
-            f"got {spec.format!r}",
-            exit_code=2,
-        )
-    body = spec.md_content or ""
-    rendered = _substitute(body, lease_meta)
-    # Lease-level override takes precedence; fall back to the spec's
-    # frontmatter / yaml.vars value.
-    if "deploy_prerequisites_only" in (lease_meta or {}):
-        prereq_only = bool(lease_meta["deploy_prerequisites_only"])
-    else:
-        prereq_only = bool(spec.deploy_prerequisites_only)
-    if prereq_only:
-        rendered = PREREQ_ONLY_NOTICE + rendered
-
-    # 0286: record marker so stand ready can prove SK actually
-    # invoked the executor (even for MD profiles where the LLM does
-    # the work). The marker is informational — its presence proves
-    # the dispatch path ran; SK still does the actual deploy by
-    # acting on the rendered prose.
-    coord = _coord_from_lease_meta(lease_meta)
-    if coord is not None:
-        _write_deploy_marker(coord, lease_meta, rc=0, log=rendered)
-    return (0, rendered)
-
-
-# ---------------------------------------------------------------------------
 # Safety check: distinguish remote / isolated deploys from self-modify
 # ---------------------------------------------------------------------------
 
@@ -590,10 +527,16 @@ def dispatch_profile(
             "title-derived fallback.",
             exit_code=2,
         )
-    if spec.format == "yaml":
-        return execute_yaml_profile(
-            spec, lease_meta,
-            ansible_playbook=ansible_playbook,
-            timeout_seconds=timeout_seconds,
+    # 1.6.0: YAML/ansible only — MD (prose) profiles were removed.
+    if spec.format != "yaml":
+        raise GreatMindsError(
+            f"dispatch_profile: profile {spec.name!r} is "
+            f"{spec.format!r}; only YAML/ansible profiles are supported "
+            "(1.6.0 removed MD/prose profiles).",
+            exit_code=2,
         )
-    return execute_md_profile(spec, lease_meta)
+    return execute_yaml_profile(
+        spec, lease_meta,
+        ansible_playbook=ansible_playbook,
+        timeout_seconds=timeout_seconds,
+    )

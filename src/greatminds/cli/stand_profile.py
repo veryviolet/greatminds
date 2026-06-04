@@ -190,28 +190,6 @@ def _load_yaml_profile(name: str, path: Path) -> ProfileSpec:
     )
 
 
-def _load_md_profile(name: str, path: Path) -> ProfileSpec:
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise GreatMindsError(
-            f"stand-profile {name!r}: failed to read {path}: {exc}",
-            exit_code=2,
-        )
-    front, body = _parse_md_frontmatter(text)
-    prereq = False
-    if front is not None:
-        prereq = bool(front.get(PREREQ_ONLY_KEY, False))
-    return ProfileSpec(
-        name=name,
-        format="md",
-        path=path,
-        md_content=body,
-        deploy_prerequisites_only=prereq,
-        md_frontmatter=front,
-    )
-
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -243,8 +221,17 @@ def load_profile(coord_dir: Path, profile_name: str) -> ProfileSpec:
     if yaml_path.is_file():
         return _load_yaml_profile(profile_name, yaml_path)
     if md_path.is_file():
-        return _load_md_profile(profile_name, md_path)
+        # 1.6.0: MD (prose) profiles are removed — the deploy must be a
+        # declarative ansible playbook run deterministically by coordd,
+        # not LLM-executed prose. Convert the profile to YAML.
+        raise GreatMindsError(
+            f"stand-profile {profile_name!r}: MD/prose profiles were "
+            f"removed in 1.6.0 ({md_path} exists). Convert it to a YAML "
+            f"ansible playbook at {yaml_path} — the deploy is run by "
+            f"coordd, not an LLM.",
+            exit_code=2,
+        )
     raise GreatMindsError(
-        f"no profile {profile_name!r} found at {yaml_path} or {md_path}",
+        f"no profile {profile_name!r} found at {yaml_path}",
         exit_code=2,
     )

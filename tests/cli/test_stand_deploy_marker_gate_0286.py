@@ -169,20 +169,6 @@ def test_yaml_subprocess_failure_still_writes_marker(
     assert "rc=3" in marker.read_text(encoding="utf-8")
 
 
-def test_md_execution_writes_marker(tmp_path: Path) -> None:
-    """MD path also writes a marker so `stand ready` accepts the
-    transition for prose-driven deploys."""
-    coord = _coord(tmp_path)
-    project = tmp_path / "proj"
-    spec = _md_spec(tmp_path)
-    rc, _ = se.execute_md_profile(spec, _lease(coord, project))
-    assert rc == 0
-    assert se.deploy_marker_path(coord, "lease-0286").is_file()
-
-
-# ---------- stand_ready gate ----------
-
-
 def _stand_ready_project(tmp_path: Path, monkeypatch) -> Path:
     project = tmp_path / "proj"
     (project / "coordination" / ".stand").mkdir(parents=True)

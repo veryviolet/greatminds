@@ -252,44 +252,6 @@ def test_execute_yaml_rejects_non_yaml_format(tmp_path: Path,
 # ---------- execute_md_profile ----------
 
 
-def test_execute_md_substitutes_vars(tmp_path: Path) -> None:
-    """The MD body's ``${var}`` references are substituted from the
-    lease meta dict; unknown names stay literal so misconfigurations
-    surface in the rendered text."""
-    spec = _md_spec(
-        tmp_path,
-        "Deploy to ${host} as ${user}; lease=${lease_id}; "
-        "task=${task_id}. (${unknown_var} stays as-is.)",
-    )
-    rc, rendered = se.execute_md_profile(spec, _lease(host="avatar"))
-    assert rc == 0
-    assert "Deploy to avatar as deploy" in rendered
-    assert "lease=lease-uuid" in rendered
-    assert "task=0279-test" in rendered
-    # Unknown vars stay literal (safe_substitute semantics).
-    assert "${unknown_var}" in rendered
-
-
-def test_execute_md_no_subprocess(tmp_path: Path, monkeypatch) -> None:
-    """No subprocess invocation may happen during MD execution —
-    the executor is meant to be a pure render step."""
-    spec = _md_spec(tmp_path, "no subs here")
-    calls: list = []
-    monkeypatch.setattr(se.subprocess, "run",
-                         lambda *a, **k: calls.append(a) or None)
-    se.execute_md_profile(spec, _lease())
-    assert calls == [], "0279: execute_md_profile must NOT subprocess"
-
-
-def test_execute_md_rejects_non_md_format(tmp_path: Path) -> None:
-    spec = _yaml_spec(tmp_path)
-    with pytest.raises(GreatMindsError):
-        se.execute_md_profile(spec, _lease())
-
-
-# ---------- dispatch_profile (single entrypoint) ----------
-
-
 def test_dispatch_routes_yaml_to_ansible(tmp_path: Path,
                                             monkeypatch) -> None:
     spec = _yaml_spec(tmp_path)
@@ -305,17 +267,3 @@ def test_dispatch_routes_yaml_to_ansible(tmp_path: Path,
     assert rc == 0
     assert seen, "0279: YAML dispatch must reach subprocess.run"
     assert seen[0][0] == "/fake/bin/ansible-playbook"
-
-
-def test_dispatch_routes_md_no_subprocess(tmp_path: Path,
-                                             monkeypatch) -> None:
-    spec = _md_spec(tmp_path, "echo ${task_id}")
-    calls: list = []
-    monkeypatch.setattr(se.subprocess, "run",
-                         lambda *a, **k: calls.append(a))
-    rc, rendered = se.dispatch_profile(spec, _lease())
-    assert rc == 0
-    assert "echo 0279-test" in rendered
-    assert calls == [], (
-        "0279: MD dispatch must not invoke subprocess.run"
-    )

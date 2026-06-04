@@ -150,58 +150,6 @@ def test_full_deploy_yaml_cycle_no_prereq_runs_everything(
 # ---------- MD cycle: smoke-only ----------
 
 
-def test_smoke_only_md_cycle_loads_via_phase_b(
-    tmp_path: Path,
-) -> None:
-    """The canon ``smoke-only.yaml`` ships in YAML form (preferred);
-    confirm that the MD fallback is loadable when YAML is absent."""
-    coord = _project_with_seeded_presets(tmp_path)
-    # Remove the YAML so the MD becomes the resolved file (mirrors
-    # an operator who removed the playbook to switch to prose).
-    (coord / "stand-profiles" / "smoke-only.yaml").unlink()
-    spec = sp.load_profile(coord, "smoke-only")
-    assert spec.format == "md"
-    assert spec.path.name == "smoke-only.md"
-    assert "${" in (spec.md_content or "")
-
-
-def test_smoke_only_md_dispatch_substitutes_lease_vars(
-    tmp_path: Path,
-) -> None:
-    """End-to-end: MD spec rendered with lease meta replaces
-    ``${host}`` / ``${user}`` / ``${deploy_path}`` correctly so the
-    prose SK injects into its prompt has concrete values."""
-    coord = _project_with_seeded_presets(tmp_path)
-    (coord / "stand-profiles" / "smoke-only.yaml").unlink()
-    spec = sp.load_profile(coord, "smoke-only")
-
-    rc, rendered = se.dispatch_profile(
-        spec, _lease(host="avatar-test", deploy_path="/opt/x"))
-    assert rc == 0
-    assert "avatar-test" in rendered
-    assert "/opt/x" in rendered
-    # ${unknown} stays literal (safe_substitute pin).
-    assert "${unknown_key}" not in rendered  # smoke-only.md doesn't reference it
-
-
-def test_smoke_only_md_prereq_notice_injected(tmp_path: Path) -> None:
-    """When the lease asks for prereq-only mode on an MD profile,
-    the PREREQUISITES ONLY notice prepends the rendered body."""
-    coord = _project_with_seeded_presets(tmp_path)
-    (coord / "stand-profiles" / "smoke-only.yaml").unlink()
-    spec = sp.load_profile(coord, "smoke-only")
-
-    rc, rendered = se.dispatch_profile(
-        spec, _lease(deploy_prerequisites_only=True))
-    assert rc == 0
-    assert rendered.startswith("**Mode: PREREQUISITES ONLY**")
-    assert "stand ready" in rendered
-    assert "TESTER" in rendered
-
-
-# ---------- optional real ansible exec (skipped in unit suite) ----------
-
-
 @pytest.mark.skipif(
     shutil.which("ansible-playbook") is None,
     reason="ansible-playbook not on PATH; install ansible-core to run",

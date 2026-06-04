@@ -142,54 +142,6 @@ def test_yaml_no_lease_value_falls_back_to_spec(
 # ---------- MD: prereq notice injection ----------
 
 
-def test_md_prereq_prepends_notice_to_rendered(tmp_path: Path) -> None:
-    """Spec opts in → rendered content starts with the canonical
-    PREREQUISITES ONLY notice, the body follows after a blank line."""
-    spec = _md_spec(tmp_path,
-                     content="Deploy step 1.\nDeploy step 2.\n",
-                     prereq_only=True)
-    rc, rendered = se.execute_md_profile(spec, _lease())
-    assert rc == 0
-    assert rendered.startswith("**Mode: PREREQUISITES ONLY**")
-    assert "Deploy step 1." in rendered  # body still present
-
-
-def test_md_no_prereq_no_notice(tmp_path: Path) -> None:
-    spec = _md_spec(tmp_path, content="body\n", prereq_only=False)
-    _, rendered = se.execute_md_profile(spec, _lease())
-    assert not rendered.startswith("**Mode: PREREQUISITES ONLY**")
-
-
-def test_md_lease_override_true_injects_notice(tmp_path: Path) -> None:
-    """Spec is False but the lease carries True → notice STILL
-    injected (CLI flag wins)."""
-    spec = _md_spec(tmp_path, content="body\n", prereq_only=False)
-    _, rendered = se.execute_md_profile(
-        spec, _lease(deploy_prerequisites_only=True))
-    assert "PREREQUISITES ONLY" in rendered
-
-
-def test_md_lease_override_false_strips_notice(tmp_path: Path) -> None:
-    """Spec is True but the lease carries False → no notice."""
-    spec = _md_spec(tmp_path, content="body\n", prereq_only=True)
-    _, rendered = se.execute_md_profile(
-        spec, _lease(deploy_prerequisites_only=False))
-    assert "PREREQUISITES ONLY" not in rendered
-
-
-def test_md_notice_mentions_tester_handoff(tmp_path: Path) -> None:
-    """The notice must tell SK to call ``stand ready`` and hand off
-    to TESTER — otherwise the LLM might try to do the full deploy
-    after the prereqs."""
-    spec = _md_spec(tmp_path, content="x\n", prereq_only=True)
-    _, rendered = se.execute_md_profile(spec, _lease())
-    assert "stand ready" in rendered
-    assert "TESTER" in rendered
-
-
-# ---------- lease CLI flag persists into active_lease ----------
-
-
 def _project(tmp_path: Path, monkeypatch) -> Path:
     project = tmp_path / "proj"
     (project / "coordination" / ".stand").mkdir(parents=True)
