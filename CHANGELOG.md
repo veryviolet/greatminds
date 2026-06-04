@@ -4,6 +4,22 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.5.5 — 2026-06-04
+
+Fix: `greatminds setup` never created the `feature_live` queue.
+
+### Fixed
+
+- **`setup` now creates the `feature_live` queue.** `feature_live` was
+  added to `schema.queues` with the LIVE-DEVELOPER role in 1.5.0, but the
+  hardcoded `setup.QUEUES` list was never updated — so every fresh
+  `greatminds setup` from 1.5.0 through 1.5.4 silently omitted the queue
+  (surfaced when re-bootstrapping a real fleet). Added `feature_live` to
+  the list and pinned it against the schema with a new drift test
+  (`test_setup_queues_match_schema_task_queues`): `setup.QUEUES` must now
+  exactly equal the task-holding queues declared in the schema, so this
+  class of drift can't recur.
+
 ## 1.5.4 — 2026-06-04
 
 Feature: a live fleet status dashboard + tmux status-line config on launch.

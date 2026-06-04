@@ -519,11 +519,17 @@ def _ensure_claude_settings_local(project_dir: Path, canon: Path) -> str:
     return "extended"
 
 
+# Queue directories created on setup. MUST stay in sync with the
+# task-holding queues in schema.queues (kind active/parking/terminal;
+# the state-kind `.stand` is NOT a created dir). feature_live was added
+# with LIVE-DEVELOPER in 1.5.0 but this list wasn't updated, so fresh
+# setups silently lacked the queue — test_setup_queues_match_schema
+# now pins this against the schema to prevent recurrence.
 QUEUES = [
     "feature_inbox", "feature_plan", "feature_dev", "feature_ui_dev",
     "feature_docs", "feature_test", "feature_docs_review",
-    "feature_review", "feature_blocked", "verified", "archive",
-    "user_feedback", "review_sessions",
+    "feature_live", "feature_review", "feature_blocked",
+    "verified", "archive", "user_feedback", "review_sessions",
 ]
 
 ROLES_LOWER = [
