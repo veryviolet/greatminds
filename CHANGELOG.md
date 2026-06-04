@@ -4,6 +4,34 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.5.4 — 2026-06-04
+
+Feature: a live fleet status dashboard + tmux status-line config on launch.
+
+### Added
+
+- **`greatminds dashboard`** — a read-only, non-scrolling console table
+  of the fleet at a glance: per-agent activity (alive/idle/working/
+  running-turn, inferred from registry liveness + heartbeat freshness +
+  driven run-lock + the task in the role's owned queue), active tasks by
+  FSM state, and the singleton stand. Pure observer — holds no role,
+  registers nothing, sends no wakes; safe to kill/restart. Refreshes in
+  place (`--interval`, default 2s); `--once` prints a single frame;
+  `--color/--no-color` (auto-detects a TTY). The `dashboard` coord.yaml
+  window (`mode: dashboard`) now auto-runs it on `greatminds launch`.
+
+### Fixed
+
+- **tmux status line is configured on launch.** A fresh host without the
+  operator's `~/.tmux.conf` got tmux's default `status-left-length` of
+  10, which truncated a session name like `greatminds-dev` so the
+  clipped `[greatminds` title collided with the window list
+  (`0:planner` …). `launch` now sets `status-left-length` to fit the
+  full `[<session>] ` title exactly (`len(session)+4`) and applies the
+  fleet status colors (purple bg / white fg, current window
+  bold+underscored) per-session, so every fleet looks right regardless
+  of personal tmux config.
+
 ## 1.5.3 — 2026-06-04
 
 Patch: waking an idle codex/cursor TUI quit the agent (Ctrl-C to the shell).

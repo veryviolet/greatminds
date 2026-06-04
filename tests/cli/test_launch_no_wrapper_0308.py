@@ -178,6 +178,122 @@ def test_launch_no_wrapper_in_send_keys(
                 )
 
 
+# ---------- dashboard window auto-runs `greatminds dashboard` ----------
+
+
+def test_launch_dashboard_window_runs_dashboard(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """A coord.yaml window with mode:dashboard (role-less bash pane)
+    must auto-run `greatminds dashboard` + Enter — not sit as a plain
+    shell."""
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        launch_mod.subprocess, "run",
+        lambda args, **kw: (
+            calls.append(list(args))
+            or subprocess.CompletedProcess(
+                args=args,
+                returncode=1 if "has-session" in args else 0,
+                stdout="", stderr="")
+        ),
+    )
+    cfg = {
+        "session": "test",
+        "windows": [
+            {"name": "dashboard", "role": "", "tool": "bash",
+             "mode": "dashboard"},
+        ],
+    }
+    launch_mod._emit_tmux(tmp_path, cfg, _env_setup(), recreate=False)
+    send_keys = [c for c in calls
+                 if c and c[0] == "tmux" and c[1] == "send-keys"]
+    dash = [c for c in send_keys
+            if any(a == "greatminds dashboard" for a in c
+                   if isinstance(a, str))]
+    assert len(dash) == 1, "dashboard window must run `greatminds dashboard`"
+    assert "Enter" in dash[0], "dashboard command must be submitted (Enter)"
+    # Role-less pane → no GREATMINDS_ROLE export.
+    for c in send_keys:
+        for a in c:
+            if isinstance(a, str):
+                assert not a.startswith("export GREATMINDS_ROLE"), \
+                    "dashboard pane is role-less; must not export a role"
+
+
+# ---------- status-line config (title fits, fleet colors) ----------
+
+
+def test_launch_configures_status_line_length_and_colors(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """Launch must set per-session tmux status options so the session
+    title fits (no overlap with the window list) and the fleet colors
+    are applied even without a global ~/.tmux.conf."""
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        launch_mod.subprocess, "run",
+        lambda args, **kw: (
+            calls.append(list(args))
+            or subprocess.CompletedProcess(
+                args=args,
+                returncode=1 if "has-session" in args else 0,
+                stdout="", stderr="")
+        ),
+    )
+    cfg = {
+        "session": "greatminds-dev",
+        "windows": [
+            {"name": "planner", "role": "ARCHITECT-PLANNER",
+             "tool": "codex", "mode": "chat"},
+        ],
+    }
+    launch_mod._emit_tmux(tmp_path, cfg, _env_setup(), recreate=False)
+    set_opts = [c for c in calls
+                if c and c[0] == "tmux" and c[1] == "set-option"]
+
+    def opt(name):
+        for c in set_opts:
+            if name in c:
+                return c[c.index(name) + 1]
+        return None
+
+    # length must fit "[greatminds-dev] " (17) → len(session)+4 = 18.
+    assert opt("status-left-length") == str(len("greatminds-dev") + 4)
+    assert opt("status-left") == "[#S] "
+    assert opt("status-style") == "bg=colour54 fg=white"
+    assert "bold,underscore" in (opt("window-status-current-style") or "")
+
+
+def test_status_line_length_scales_with_session_name(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """A longer session name gets a proportionally longer left-length so
+    the title never truncates."""
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        launch_mod.subprocess, "run",
+        lambda args, **kw: (
+            calls.append(list(args))
+            or subprocess.CompletedProcess(
+                args=args,
+                returncode=1 if "has-session" in args else 0,
+                stdout="", stderr="")
+        ),
+    )
+    cfg = {
+        "session": "a-much-longer-fleet-name",
+        "windows": [{"name": "p", "role": "ARCHITECT-PLANNER",
+                     "tool": "codex", "mode": "chat"}],
+    }
+    launch_mod._emit_tmux(tmp_path, cfg, _env_setup(), recreate=False)
+    set_opts = [c for c in calls
+                if c and c[0] == "tmux" and c[1] == "set-option"]
+    length = next((c[c.index("status-left-length") + 1] for c in set_opts
+                   if "status-left-length" in c), None)
+    assert length == str(len("a-much-longer-fleet-name") + 4)
+
+
 # ---------- restart sends full launch command, not bare Enter ----------
 
 

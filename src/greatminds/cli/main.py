@@ -68,6 +68,7 @@ from . import daemon as _daemon_mod
 from . import update as _update_mod
 from . import worktree as _worktree_mod
 from . import agent as _agent_mod
+from . import dashboard as _dashboard_mod
 
 cli.add_command(_task_mod.task)
 cli.add_command(_inbox_mod.inbox)
@@ -96,6 +97,7 @@ cli.add_command(_daemon_mod.daemon)
 cli.add_command(_update_mod.update)
 cli.add_command(_worktree_mod.worktree)
 cli.add_command(_agent_mod.agent)
+cli.add_command(_dashboard_mod.dashboard)
 
 
 if __name__ == "__main__":

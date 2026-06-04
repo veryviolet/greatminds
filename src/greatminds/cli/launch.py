@@ -180,6 +180,33 @@ def _wrapper_loop(launch_cmd: str, role: str) -> str:
     )
 
 
+def _configure_status_line(session: str) -> None:
+    """Per-session tmux status-line config, applied at launch so a fresh
+    host's fleet looks right WITHOUT relying on the operator's global
+    ~/.tmux.conf.
+
+    Two things this fixes, both mandatory on deploy:
+      - status-left-length: tmux defaults to 10, which truncates a
+        session name like ``greatminds-dev`` (``[greatminds-dev] `` is
+        17 chars) so the clipped title collides with the window list
+        (``0:planner`` …). We size it to ``len(session) + 4`` so the
+        full bracketed title fits exactly and windows start cleanly
+        after it.
+      - colors: the established fleet theme (purple bg / white fg, the
+        current window bold+underscored). Set per-session so every fleet
+        on the host looks identical regardless of personal tmux config.
+    """
+    left_len = len(session) + 4  # "[<session>] " is len+3; +1 margin
+    for name, val in (
+        ("status-left", "[#S] "),
+        ("status-left-length", str(left_len)),
+        ("status-style", "bg=colour54 fg=white"),
+        ("window-status-current-style",
+         "bg=colour54 fg=white,bold,underscore"),
+    ):
+        _tmux("set-option", "-t", session, name, val)
+
+
 def _emit_tmux(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
                recreate: bool) -> None:
     session = cfg.get("session") or "agents"
@@ -237,7 +264,12 @@ def _emit_tmux(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
         # turns. So launch leaves the pane idle (no start-agent send);
         # the first inbox/queue event after launch triggers coordd's
         # driven dispatch (force-fresh session on the first turn).
-        if tool == "bash" or not role or mode == "driven":
+        if mode == "dashboard":
+            # The dashboard pane runs the read-only live status table
+            # (agents / tasks / stand). Role-less, registers nothing —
+            # a pure observer. Auto-run it + Enter like any resident pane.
+            launch_cmd = "greatminds dashboard"
+        elif tool == "bash" or not role or mode == "driven":
             launch_cmd = ""
         elif mode == "staged":
             # Interactive, USER-started role (LIVE-DEVELOPER): pre-type the
@@ -287,6 +319,7 @@ def _emit_tmux(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
                 _tmux("send-keys", "-t", f"{session}:{name}",
                       launch_cmd, "Enter")
 
+    _configure_status_line(session)
     _tmux("select-window", "-t", f"{session}:0")
 
     ok(f"\nsession '{session}' created with {len(windows)} windows.")

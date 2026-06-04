@@ -9,7 +9,8 @@
 #   - PANE roles (mode: chat | loop) get a real tmux window. Only the
 #     human-facing / resident roles are paned: PLANNER (interactive
 #     chat), MAINTAINER (self-loop watchdog), plus the `dashboard`
-#     placeholder pane (a future daemon-rendered task-status table).
+#     pane (mode: dashboard) which runs the read-only live status
+#     table `greatminds dashboard` (agents / tasks / stand).
 #   - DRIVEN roles (mode: driven) get NO tmux window. coordd runs each
 #     of their turns as a managed subprocess (claude -p / codex
 #     app-server), holds the per-role run-lock for the turn, and
@@ -31,8 +32,9 @@ windows:
   - name: dashboard
     role: ""
     tool: bash
-    # Placeholder pane. A later change has the daemon render a live
-    # task-status table here; for now it is a plain project shell.
+    # Read-only live status table. `greatminds launch` auto-runs
+    # `greatminds dashboard` here (agents / tasks / stand); pure
+    # observer — no role, registers nothing.
     mode: dashboard
   - name: live
     role: LIVE-DEVELOPER
