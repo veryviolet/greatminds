@@ -910,20 +910,34 @@ def _codex_appserver_argv() -> list[str]:
     return ["codex", "app-server", *cfg]
 
 
-def _codex_appserver_env(role_lower: str | None = None) -> dict:
-    """Environment for the per-turn ``codex app-server``: PATH prepended
-    with node's dir so codex's env-node shebang + any node subprocess
-    resolve even under systemd's minimal PATH.
+def _codex_appserver_env(role_lower: str | None = None,
+                         coord: Path | None = None) -> dict:
+    """Environment for the per-turn ``codex app-server``.
 
-    0311 driven fix: coordd has no role of its own, so a codex driven turn
-    spawned as a coordd subprocess (unlike the claude path, which inherits
-    ``export GREATMINDS_ROLE`` from the pane shell) would run with NO
-    ``GREATMINDS_ROLE`` — the agent's ``greatminds inbox list`` then reads
-    the wrong/empty inbox and the turn does nothing. Set it explicitly to
-    the driven role so codex agents see their own inbox/queues."""
+    Sets, in order of why-it-matters:
+
+    * ``CODEX_HOME`` = the role's per-role home
+      ``<coord>/.codex-home/<role>`` (1.6.1). WITHOUT this the driven
+      codex turn ran in the DEFAULT ``~/.codex`` — missing the role's
+      ``config.toml`` (profile / contract / trust / skills) and writing
+      its session there instead of the per-role home, so the agent had no
+      role context and the turn "completed" doing NOTHING. Interactive
+      codex (start_agent) already sets CODEX_HOME per role; the driven
+      path did not. EMPIRICALLY: with the per-role CODEX_HOME a driven
+      REVIEWER turn lists feature_review, shows the tasks, and reviews.
+    * ``GREATMINDS_ROLE`` — coordd has no role of its own; set it
+      explicitly so the agent's ``greatminds`` CLI resolves the right
+      inbox/queues (0311).
+    * ``PATH`` prepended with node's dir so codex's env-node shebang +
+      any node subprocess resolve under systemd's minimal PATH.
+    """
     env = dict(os.environ)
     if role_lower:
         env["GREATMINDS_ROLE"] = role_lower.upper()
+        if coord is not None:
+            home = coord / ".codex-home" / role_lower
+            if home.is_dir():
+                env["CODEX_HOME"] = str(home)
     node = shutil.which("node")
     if node:
         env["PATH"] = (str(Path(node).resolve().parent) + os.pathsep
@@ -1052,7 +1066,7 @@ def _drive_codex_turn_stdio(
     try:
         proc = _sp.Popen(
             argv, stdin=_sp.PIPE, stdout=_sp.PIPE, stderr=_sp.DEVNULL,
-            env=_codex_appserver_env(role_lower), cwd=cwd or None,
+            env=_codex_appserver_env(role_lower, coord=coord), cwd=cwd or None,
         )
     except OSError as exc:
         raise OSError(f"failed to spawn codex app-server: {exc}")
@@ -1061,9 +1075,22 @@ def _drive_codex_turn_stdio(
         hs_deadline = _time.monotonic() + handshake_timeout
         sess.call(_build_initialize_request(1), hs_deadline)
         if thread_id:
-            sess.call(_build_thread_resume_request(2, thread_id),
-                      hs_deadline)
-        else:
+            resp = sess.call(_build_thread_resume_request(2, thread_id),
+                             hs_deadline)
+            # If thread/resume fails (a phantom / stale threadId whose
+            # rollout was lost), the app-server returns a JSON-RPC error.
+            # Resuming a non-existent thread leaves the agent
+            # context-blind → a turn that "completes" doing NOTHING (the
+            # driven-codex reviewer bug). Fall back to a FRESH thread WITH
+            # baseInstructions (the role contract) so the turn has context.
+            if isinstance(resp, dict) and resp.get("error"):
+                if verbose:
+                    msg = ((resp.get("error") or {}).get("message") or "")
+                    print(f"  0321: thread/resume {thread_id} failed "
+                          f"({msg[:80]}); starting a fresh thread with "
+                          f"contract", file=sys.stderr)
+                thread_id = ""
+        if not thread_id:
             resp = sess.call(
                 _build_thread_start_request(2, base_instructions, cwd),
                 hs_deadline)
@@ -1195,8 +1222,12 @@ def _spawn_driven_codex_turn(
         try:
             transport(_build_initialize_request(1))
             if thread_id:
-                transport(_build_thread_resume_request(2, thread_id))
-            else:
+                resp = transport(_build_thread_resume_request(2, thread_id))
+                # phantom/stale threadId → fall back to a fresh thread
+                # WITH baseInstructions (else the turn runs context-blind).
+                if isinstance(resp, dict) and resp.get("error"):
+                    thread_id = ""
+            if not thread_id:
                 resp = transport(_build_thread_start_request(
                     2, base_instructions, cwd))
                 thread_id = (
