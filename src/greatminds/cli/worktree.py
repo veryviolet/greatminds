@@ -49,6 +49,10 @@ class WorktreePolicy:
     """
     base_path: str = ".worktrees"
     branch_prefix: str = "task/"
+    # Branch that task worktrees base off (last-resort) and merge back
+    # into. Configurable so a project can run its coordination on a
+    # branch other than main; defaults to main.
+    default_branch: str = "main"
     merge_strategy: str = "--no-ff"
     cleanup_on_archive: bool = True
     cleanup_on_verified: bool = True
@@ -73,6 +77,7 @@ def load_worktree_policy() -> WorktreePolicy:
     return WorktreePolicy(
         base_path=str(raw.get("base_path") or ".worktrees"),
         branch_prefix=str(raw.get("branch_prefix") or "task/"),
+        default_branch=str(raw.get("default_branch") or "main"),
         merge_strategy=str(raw.get("merge_strategy") or "--no-ff"),
         cleanup_on_archive=bool(raw.get("cleanup_on_archive", True)),
         cleanup_on_verified=bool(raw.get("cleanup_on_verified", True)),
@@ -106,11 +111,12 @@ def _run_git(cmd: list[str], cwd: Path | None = None,
 
 
 def _resolve_base_commit(project_dir: Path, task_id: str,
-                         explicit: str | None) -> str:
+                         explicit: str | None,
+                         default_branch: str = "main") -> str:
     """Determine the base_commit for a worktree.
 
     Priority: explicit ``--base`` arg → task's plan.base_commit (via
-    find_task) → main branch HEAD (last-resort fallback).
+    find_task) → ``default_branch`` HEAD (last-resort fallback).
     """
     if explicit:
         return explicit
@@ -132,8 +138,8 @@ def _resolve_base_commit(project_dir: Path, task_id: str,
                     bc = block.get("base_commit")
                     if isinstance(bc, str) and bc:
                         return bc
-    # Last-resort fallback: main branch HEAD.
-    cp = _run_git(["rev-parse", "main"], cwd=project_dir, check=False)
+    # Last-resort fallback: default_branch HEAD.
+    cp = _run_git(["rev-parse", default_branch], cwd=project_dir, check=False)
     if cp.returncode == 0 and cp.stdout.strip():
         return cp.stdout.strip()
     raise GreatMindsError(
@@ -157,7 +163,8 @@ def worktree_create(project_dir: Path, task_id: str,
     if wt_path.is_dir() and (wt_path / ".git").exists():
         return wt_path  # idempotent no-op
 
-    base_commit = _resolve_base_commit(project_dir, task_id, base)
+    base_commit = _resolve_base_commit(project_dir, task_id, base,
+                                       policy.default_branch)
     wt_path.parent.mkdir(parents=True, exist_ok=True)
     # ``git worktree add -b <branch> <path> <commit>`` creates the
     # branch if absent. If the branch already exists (leftover from
@@ -215,28 +222,31 @@ class MergeResult:
 def worktree_merge(project_dir: Path, task_id: str,
                    summary: str = "",
                    policy: WorktreePolicy | None = None) -> MergeResult:
-    """Merge ``task/<task_id>`` into main with the policy strategy.
+    """Merge ``task/<task_id>`` into the policy's default_branch.
 
-    On conflict: abort the merge (so main stays clean), return
+    On conflict: abort the merge (so the target branch stays clean), return
     ``MergeResult(ok=False, conflicts=[...])`` so the caller can
     hand back to ``conflict_handback_to`` per policy.
     """
     policy = policy or load_worktree_policy()
     branch = policy.branch_for(task_id)
+    target = policy.default_branch
     # 0300 (upstream issue #6): merge direction MUST be
-    # ``checkout main → merge task/<id>``. Pre-0300 the upstream
-    # reporter saw `git log main` never advance because the merge
+    # ``checkout <target> → merge task/<id>``. Pre-0300 the upstream
+    # reporter saw `git log <target>` never advance because the merge
     # ran from the task branch instead (first parent = task work,
-    # second parent = origin/main — the wrong direction; main was
-    # left orphaned). The current code is correct; the regression
-    # tests added in 0300 pin the order.
-    _run_git(["checkout", "main"], cwd=project_dir)
-    # 0300: fast-forward local main against origin/main BEFORE the
-    # merge so REVIEWER's merge commit lands on top of the latest
+    # second parent = origin/<target> — the wrong direction; the
+    # target was left orphaned). The current code is correct; the
+    # regression tests added in 0300 pin the order. ``target`` is the
+    # configurable default_branch (was hardcoded ``main``) so a project
+    # can run its coordination on another branch.
+    _run_git(["checkout", target], cwd=project_dir)
+    # 0300: fast-forward local <target> against origin/<target> BEFORE
+    # the merge so REVIEWER's merge commit lands on top of the latest
     # remote state, not a stale snapshot. Best-effort — when the
-    # remote is unreachable or main has diverged, we still merge
-    # against the current local main rather than blocking.
-    _run_git(["pull", "--ff-only", "origin", "main"],
+    # remote is unreachable or <target> has diverged, we still merge
+    # against the current local <target> rather than blocking.
+    _run_git(["pull", "--ff-only", "origin", target],
               cwd=project_dir, check=False)
     msg = summary or f"merge({task_id})"
     cp = _run_git(

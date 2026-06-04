@@ -4,6 +4,23 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.5.8 — 2026-06-04
+
+Feature: configurable worktree base/merge branch.
+
+### Added
+
+- **`worktrees.default_branch`** (default `main`). The per-task worktree
+  merge was hardcoded to `main` — `worktree_merge` did `git checkout
+  main` → `git pull --ff-only origin main` → merge the task branch into
+  main, and the base-commit last-resort fallback did `git rev-parse
+  main`. A project therefore could NOT run its coordination on any
+  branch other than main: every completed task's merge forced the work
+  back onto main. The branch is now read from
+  `schema.worktrees.default_branch` and used in both places; defaulting
+  to `main` keeps existing fleets unchanged. coordd / setup / stand-deploy
+  never referenced main and are untouched.
+
 ## 1.5.7 — 2026-06-04
 
 Canon: insist on full-contract reading, add a no-code stand-verification

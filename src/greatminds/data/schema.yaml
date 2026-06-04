@@ -1188,6 +1188,7 @@ product_enums:
 worktrees:
   base_path: .worktrees                    # relative to project_dir; gitignored
   branch_prefix: task/                     # task ids become task/<id> branches
+  default_branch: main                     # branch task worktrees base off + merge back into; set to run coordination on another branch
   merge_strategy: --no-ff                  # explicit per-task boundary in history
   cleanup_on_archive: true
   cleanup_on_verified: true                # after successful merge
