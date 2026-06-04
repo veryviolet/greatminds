@@ -643,6 +643,122 @@ def stand_up(reason: str) -> None:
         click.echo(f"state → free: {reason}")
 
 
+def deploy_lease(coord: Path, *, lease_id: str | None = None,
+                 ansible_playbook: str | None = None,
+                 timeout_seconds: float | None = None) -> tuple[int, str]:
+    """Deterministic, sanctioned deploy of the active lease's profile.
+
+    The single deploy path (1.6.0): load the active lease's YAML/ansible
+    profile, run it (``execute_yaml_profile`` writes the deploy marker +
+    honours ``is_deploy_safe`` / prerequisite tags), then transition the
+    stand ``preparing → ready`` (rc==0) or ``→ down`` (rc!=0). No LLM in
+    the loop — coordd runs this automatically on a ``preparing`` lease,
+    and ``greatminds stand deploy`` exposes the SAME engine for manual /
+    operator runs, so the deploy is a legible command instead of a raw
+    in-agent ``python -c`` that the classifier blocks.
+
+    MD-format profiles are rejected — the deploy must be a declarative
+    playbook, not LLM-executed prose. Returns ``(rc, combined_log)``.
+    """
+    from greatminds.cli import stand_state as ss
+    from greatminds.cli.stand_executor import dispatch_profile
+    from greatminds.cli.stand_profile import load_profile
+
+    cap: dict[str, Any] = {}
+
+    def _read(state):
+        if state.get("state") != "preparing":
+            raise GreatMindsError(
+                f"stand deploy requires state=preparing; current="
+                f"{state.get('state')!r}", exit_code=2)
+        active = state.get("active_lease") or {}
+        if lease_id and active.get("lease_id") != lease_id:
+            raise GreatMindsError(
+                f"active lease is {active.get('lease_id')!r}, not "
+                f"{lease_id!r}", exit_code=3)
+        cap.update(active)
+
+    ss.update_stand_state(coord, _read)
+
+    profile = cap.get("profile")
+    spec = load_profile(coord, profile)
+    if spec.format != "yaml":
+        raise GreatMindsError(
+            f"stand deploy: profile {profile!r} is {spec.format!r}; the "
+            "deploy engine requires a YAML/ansible profile (MD profiles "
+            "are LLM-executed prose, not deterministically deployable)",
+            exit_code=2)
+
+    lease_meta: dict[str, Any] = {
+        "coord": str(coord),
+        "lease_id": cap.get("lease_id"),
+        "profile": profile,
+        "worktree": cap.get("worktree"),
+        "host": cap.get("host"),
+        "task_id": cap.get("task"),
+        "task": cap.get("task"),
+    }
+    for k in ("ansible_become", "deploy_prerequisites_only"):
+        if k in cap:
+            lease_meta[k] = cap[k]
+
+    rc, log = dispatch_profile(spec, lease_meta,
+                               ansible_playbook=ansible_playbook,
+                               timeout_seconds=timeout_seconds)
+    lid = cap.get("lease_id")
+    if rc == 0:
+        ready_cap: dict[str, Any] = {}
+
+        def _ready(state):
+            active = state.get("active_lease") or {}
+            active["ready_at"] = ss.now_iso()
+            ready_cap["holder"] = active.get("holder_role", "")
+            ready_cap["task"] = active.get("task", "")
+            ss.record_transition(state, "preparing", "ready", "COORDD",
+                                 lease_id=lid, reason="deploy ok")
+
+        ss.update_stand_state(coord, _ready)
+        if ready_cap.get("holder"):
+            _file_inbox_info(
+                coord, ready_cap["holder"],
+                f"stand lease {lid} ready; "
+                f"task={ready_cap.get('task', '?')}",
+                task_ref=ready_cap.get("task", ""))
+    else:
+        reason = f"deploy rc={rc}: {(log or '').strip()[:400]}"
+
+        def _down(state):
+            prev = state.get("state") or "preparing"
+            state["down_reason"] = reason
+            state["active_lease"] = None
+            ss.record_transition(state, prev, "down", "COORDD",
+                                 lease_id=lid, reason=reason)
+
+        ss.update_stand_state(coord, _down)
+    return rc, (log or "")
+
+
+@stand.command(name="deploy")
+@click.option("--lease-id", "lease_id", required=True,
+              help="active lease to deploy (must match state.yaml)")
+@click.option("--timeout", "timeout", type=float, default=None,
+              help="kill the playbook after N seconds (rc=124)")
+def stand_deploy(lease_id: str, timeout: float | None) -> None:
+    """1.6.0: run the active lease's deploy profile (ansible) and
+    transition the stand ready/down by result. The deterministic deploy
+    path — coordd runs it automatically on a `preparing` lease; this is
+    the manual/operator entry to the SAME engine. Any role may run it."""
+    coord = find_coord_dir()
+    rc, _log = deploy_lease(coord, lease_id=lease_id, timeout_seconds=timeout)
+    click.echo(
+        f"deploy rc={rc}; stand → {'ready' if rc == 0 else 'down'} "
+        f"(lease {lease_id})")
+    if rc != 0:
+        raise GreatMindsError(
+            f"deploy failed rc={rc}; stand → down",
+            exit_code=(rc if 0 < rc < 256 else 1))
+
+
 @stand.command(name="ready")
 @click.option("--lease-id", "lease_id", required=True,
               help="lease that just finished preparing")
