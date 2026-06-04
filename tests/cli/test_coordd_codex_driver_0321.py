@@ -76,6 +76,7 @@ def test_codex_appserver_argv_is_stdio(monkeypatch) -> None:
     the sandbox/approval ``-c`` overrides so a coordd-spawned codex
     server starts without bubblewrap and runs its tools unattended."""
     import shutil
+    cd._TOOL_BIN_CACHE.clear()
     monkeypatch.setattr(shutil, "which", lambda b: {
         "codex": "/nvm/bin/codex", "node": "/nvm/bin/node"}.get(b))
     argv = cd._codex_appserver_argv()
@@ -89,11 +90,9 @@ def test_codex_appserver_argv_is_stdio(monkeypatch) -> None:
 
 
 def test_codex_appserver_argv_fallback_bare_codex(monkeypatch) -> None:
-    import shutil
-    import glob
-    # Neither PATH nor the nvm glob resolves codex → bare fallback.
-    monkeypatch.setattr(shutil, "which", lambda b: None)
-    monkeypatch.setattr(glob, "glob", lambda *a, **k: [])
+    # Resolution finds nothing (returns the bare name) → bare fallback.
+    cd._TOOL_BIN_CACHE.clear()
+    monkeypatch.setattr(cd, "_resolve_tool_bin", lambda t: t)
     assert cd._codex_appserver_argv() == [
         "codex", "app-server",
         "-c", "sandbox_mode=danger-full-access",

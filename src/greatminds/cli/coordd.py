@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -388,31 +389,6 @@ def heartbeat_age_seconds(coord: Path, role_lower: str) -> float | None:
         return None
 
 
-def role_has_pending_work(coord: Path, schema_roles: dict, role_lower: str) -> bool:
-    """True if role has anything to do: non-empty inbox OR any task file
-    in a queue it claims from (per schema.yaml)."""
-    inbox = coord / "inbox" / role_lower
-    if inbox.is_dir():
-        for f in inbox.glob("*.md"):
-            if f.name != ".gitkeep":
-                return True
-    role_upper = role_lower.upper()
-    meta = schema_roles.get(role_upper)
-    if not isinstance(meta, dict):
-        return False
-    for q in (meta.get("claims_from") or []):
-        if not isinstance(q, str):
-            continue
-        qdir = coord / q
-        if not qdir.is_dir():
-            continue
-        for f in qdir.glob("*.md"):
-            if f.name == "_TEMPLATE.md":
-                continue
-            return True
-    return False
-
-
 def list_live_roles(registry_dir: Path) -> list[str]:
     """Lowercase role names with a registry entry whose pid is alive."""
     out: list[str] = []
@@ -571,10 +547,14 @@ def _build_driven_claude_argv(
     session-id, the caller records it. The bootstrap (system prompt)
     carries the full contract so the new session isn't context-blind.
     """
+    # argv[0] = the REAL absolute claude path (resolved via the login
+    # shell when the daemon's minimal PATH lacks it), so the spawn works
+    # wherever claude is installed and never depends on the daemon's PATH.
+    claude_bin = _resolve_tool_bin("claude")
     if fresh:
-        argv = ["claude", "-p", prompt]
+        argv = [claude_bin, "-p", prompt]
     else:
-        argv = ["claude", "--resume", session_id, "-p", prompt]
+        argv = [claude_bin, "--resume", session_id, "-p", prompt]
     # 0311 driven fix: a headless ``claude -p`` turn that uses ANY tool blocks
     # on MCP-server initialization before it can act. The fleet's default MCP
     # discovery includes heavy npm-exec browser servers (playwright,
@@ -595,6 +575,70 @@ def _build_driven_claude_argv(
     if bootstrap_file:
         argv.extend(["--append-system-prompt-file", bootstrap_file])
     return argv
+
+
+_TOOL_BIN_CACHE: dict[str, str] = {}
+
+
+def _resolve_tool_bin(tool: str) -> str:
+    """Resolve the REAL absolute path to a tool binary (claude / codex).
+
+    coordd runs as a systemd-user daemon with a MINIMAL PATH
+    (``/usr/bin:/bin:…``), so a bare ``claude`` / ``codex`` argv[0] fails
+    to spawn — the driven turn then silently never runs (the claude-driven
+    roles TESTER / DEVELOPER / UI-DEVELOPER / READER never ran on a real
+    fleet). We must hand the spawn the ACTUAL path, wherever the user
+    installed it — even a non-standard location.
+
+    Resolution order (cached): ``shutil.which`` (if the daemon PATH
+    happens to carry it) → the user's LOGIN shell (``bash -lc 'command -v
+    <tool>'``), which carries the PATH the user actually installed under
+    (``~/.local/bin``, an nvm node dir, a custom prefix, …) → the bare
+    name as a last resort. Symlinks are resolved to the real target."""
+    if tool in _TOOL_BIN_CACHE:
+        return _TOOL_BIN_CACHE[tool]
+    found = shutil.which(tool)
+    if not found:
+        try:
+            cp = subprocess.run(
+                ["bash", "-lc", f"command -v {tool} 2>/dev/null"],
+                capture_output=True, text=True, timeout=15,
+            )
+            for line in reversed((cp.stdout or "").splitlines()):
+                cand = line.strip()
+                if cand and Path(cand).exists():
+                    found = cand
+                    break
+        except (OSError, subprocess.TimeoutExpired):
+            found = None
+    resolved = str(Path(found).resolve()) if found else tool
+    _TOOL_BIN_CACHE[tool] = resolved
+    return resolved
+
+
+def _driven_subprocess_env(role_lower: str) -> dict[str, str]:
+    """Env for a driven-turn subprocess: ``GREATMINDS_ROLE`` plus a PATH
+    that includes the resolved tool's own dir and node's dir, so any
+    CHILD process the tool spawns (a tool's ``env node`` shebang, helper
+    binaries) also resolves under the daemon's otherwise-minimal PATH.
+    The turn's own binary is launched by ABSOLUTE path (see
+    ``_resolve_tool_bin``), so the spawn no longer depends on PATH."""
+    dirs: list[str] = []
+    for t in ("claude", "codex"):
+        b = _resolve_tool_bin(t)
+        if os.path.isabs(b):
+            dirs.append(str(Path(b).resolve().parent))
+    node = shutil.which("node") or _resolve_tool_bin("node")
+    if os.path.isabs(node):
+        dirs.append(str(Path(node).resolve().parent))
+    cur = os.environ.get("PATH", "")
+    seen, ordered = set(), []
+    for d in [*dirs, *cur.split(":")]:
+        if d and d not in seen:
+            seen.add(d)
+            ordered.append(d)
+    return {**os.environ, "GREATMINDS_ROLE": role_lower.upper(),
+            "PATH": ":".join(ordered)}
 
 
 # 0317: session-reset policy. ``claude --resume`` accumulates
@@ -743,7 +787,7 @@ def _spawn_driven_turn(
                 # so the agent's greatminds CLI resolves caller_role and
                 # the static bootstrap's $GREATMINDS_ROLE is set (mirrors
                 # the codex driver's _codex_appserver_env).
-                env={**os.environ, "GREATMINDS_ROLE": role_lower.upper()},
+                env=_driven_subprocess_env(role_lower),
             )
             try:
                 _turn_log_path(coord, role_lower).write_text(
@@ -833,7 +877,6 @@ def _codex_appserver_argv() -> list[str]:
     Prefers an absolute ``<node> <codex.js>`` (codex's shebang is the
     relative ``#!/usr/bin/env node`` and coordd under systemd may lack
     node on PATH — the 0320 lesson), falling back to bare ``codex``."""
-    import shutil, glob
     # 0311 driven fix: codex app-server's Linux sandbox uses bubblewrap, which
     # needs user-namespace creation — unavailable under the systemd user
     # service, so the server aborts at startup ("needs access to create user
@@ -852,18 +895,17 @@ def _codex_appserver_argv() -> list[str]:
     # Resolve codex by PATH first, then fall back to the nvm node installs,
     # and run it with the node co-located with the codex bin (version match)
     # so a fresh systemd-spawned turn finds both binaries by absolute path.
-    codex = shutil.which("codex")
-    if not codex:
-        cands = sorted(glob.glob(
-            str(Path.home() / ".nvm/versions/node/*/bin/codex")))
-        if cands:
-            codex = cands[-1]
-    if codex:
+    # Resolve codex to its REAL path (login shell handles non-standard
+    # installs when the daemon's minimal PATH lacks it); run it with the
+    # node co-located with the codex bin (version match) so a fresh
+    # systemd-spawned turn finds both binaries by absolute path.
+    codex = _resolve_tool_bin("codex")
+    if os.path.isabs(codex):
         codex_bin = Path(codex)
         codex_js = str(codex_bin.resolve())
-        node_sib = codex_bin.parent / "node"
+        node_sib = codex_bin.resolve().parent / "node"
         node = (str(node_sib) if node_sib.exists()
-                else (shutil.which("node") or "node"))
+                else (shutil.which("node") or _resolve_tool_bin("node")))
         return [node, codex_js, "app-server", *cfg]
     return ["codex", "app-server", *cfg]
 
@@ -879,7 +921,6 @@ def _codex_appserver_env(role_lower: str | None = None) -> dict:
     ``GREATMINDS_ROLE`` — the agent's ``greatminds inbox list`` then reads
     the wrong/empty inbox and the turn does nothing. Set it explicitly to
     the driven role so codex agents see their own inbox/queues."""
-    import shutil
     env = dict(os.environ)
     if role_lower:
         env["GREATMINDS_ROLE"] = role_lower.upper()
@@ -1270,6 +1311,71 @@ def _maybe_drive_driven_role(coord: Path, canon_dir: Path,
         return ok
     # Driven but an unknown tool — no driver; let the caller fall back.
     return None
+
+
+def _role_has_pending_task(coord: Path, role_meta: dict,
+                           role_lower: str) -> bool:
+    """True if the role has an actionable file waiting: a message in its
+    inbox OR a task in a queue it ``claims_from`` (per schema). Counts
+    ``.yaml`` AND ``.md`` (1.x tasks/messages are yaml), excluding
+    templates / processed markers / dotfiles."""
+    def _actionable(d: Path, *, processed_ok: bool) -> bool:
+        if not d.is_dir():
+            return False
+        for f in d.iterdir():
+            if not f.is_file() or f.suffix not in (".yaml", ".md"):
+                continue
+            n = f.name
+            if n.startswith(".") or n.startswith("_TEMPLATE"):
+                continue
+            if not processed_ok and n.startswith("processed-"):
+                continue
+            return True
+        return False
+
+    if _actionable(coord / "inbox" / role_lower, processed_ok=True):
+        return True
+    for q in (role_meta.get("claims_from") or []):
+        if isinstance(q, str) and _actionable(coord / q, processed_ok=False):
+            return True
+    return False
+
+
+def _reconcile_driven_backlog(coord: Path, canon_dir: Path,
+                              verbose: bool) -> None:
+    """Startup sweep: coordd is otherwise inotify-reactive, so a task
+    already sitting in a queue when coordd (re)starts — or whose event
+    was consumed by a turn that failed to spawn — would never be driven
+    (no fresh inotify event). On start, drive ONE turn for each DRIVEN
+    role that has pending work in a queue it claims from and is not
+    mid-turn (no run-lock). Makes ``update`` / a daemon restart pick up
+    a hanging task instead of stranding it."""
+    schema_roles = load_schema_roles(canon_dir)
+    if not schema_roles:
+        return
+    coord_yaml_doc = _read_coord_yaml(coord.parent)
+    for role_upper, meta in schema_roles.items():
+        if not isinstance(meta, dict):
+            continue
+        role_lower = str(role_upper).lower()
+        if _lifecycle_for_role(canon_dir, role_upper) != "driven":
+            continue
+        if _window_mode_for_role(coord_yaml_doc, role_upper) != "driven":
+            continue
+        if _driven_run_lock_path(coord, role_lower).is_file():
+            continue  # a turn is already in flight
+        if not _role_has_pending_task(coord, meta, role_lower):
+            continue
+        located = _window_and_tool_for_role(coord_yaml_doc, role_upper)
+        try:
+            _maybe_drive_driven_role(
+                coord, canon_dir, coord_yaml_doc, located, role_upper,
+                verbose, trigger=" (startup-reconcile)",
+            )
+        except Exception as exc:  # never let recovery crash startup
+            if verbose:
+                print(f"coordd: reconcile dispatch for {role_upper} "
+                      f"failed: {exc}", file=sys.stderr)
 
 
 def _route_queue_event(coord: Path, canon_dir: Path,
@@ -1998,6 +2104,18 @@ def coordd(project_dir: Path | None, project_name: str | None,
         else lambda timeout_s: (time.sleep(timeout_s), [])[-1]
     )
     known: set[str] = set(baseline)
+
+    # Startup reconcile: drive any driven role that already has pending
+    # work in its claim queues (a task that landed before this coordd
+    # started watching, or whose original event was consumed by a turn
+    # that failed to spawn). Without this, a daemon restart strands a
+    # hanging task — inotify only fires on NEW events.
+    try:
+        _reconcile_driven_backlog(coord, canon_dir, verbose)
+    except Exception as exc:
+        if verbose:
+            print(f"coordd: startup reconcile failed: {exc}", file=sys.stderr)
+
     while not stop["flag"]:
         try:
             events = poll_or_event_wait(interval) or []

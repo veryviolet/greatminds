@@ -79,7 +79,8 @@ def _snapshot(agents=None, tasks=None, stand=None):
         "agents": agents if agents is not None else [{
             "role": "ARCHITECT-PLANNER", "tool": "codex",
             "lifecycle": "interactive", "mode": "chat", "alive": True,
-            "registered": True, "heartbeat": "7m", "doing": "idle",
+            "registered": True, "state": "alive", "heartbeat": "7m",
+            "doing": "idle",
         }],
         "tasks": tasks if tasks is not None else [],
         "stand": stand or {
@@ -113,18 +114,67 @@ def test_render_alive_dead_staged_glyphs():
     agents = [
         {"role": "A", "tool": "codex", "lifecycle": "interactive",
          "mode": "chat", "alive": True, "registered": True,
-         "heartbeat": "fresh", "doing": "working"},
+         "state": "alive", "heartbeat": "fresh", "doing": "working"},
         {"role": "B", "tool": "claude", "lifecycle": "interactive",
          "mode": "staged", "alive": False, "registered": True,
-         "heartbeat": "—", "doing": "awaiting USER start"},
-        {"role": "C", "tool": "claude", "lifecycle": "driven",
-         "mode": "driven", "alive": False, "registered": True,
-         "heartbeat": "1d", "doing": "—"},
+         "state": "staged", "heartbeat": "—", "doing": "awaiting USER start"},
+        {"role": "C", "tool": "claude", "lifecycle": "self-loop",
+         "mode": "loop", "alive": False, "registered": True,
+         "state": "dead", "heartbeat": "1d", "doing": "—"},
     ]
     out = db.render_dashboard(_snapshot(agents=agents), width=100)
     assert "● alive" in out
     assert "◌ staged" in out
     assert "○ dead" in out
+
+
+# ---------- driven STATE / DOING coherence (the dead+running bug) ----------
+
+
+def test_agent_state_driven_never_dead():
+    """A driven role is NEVER 'dead' — idle between turns, running during
+    a live turn. This is the fix for the 'dead + running turn' contradiction."""
+    rec_dead = {"alive": False, "heartbeat_age": 99999}
+    assert db._agent_state(rec_dead, "driven", "driven", running=False) == "idle"
+    assert db._agent_state(rec_dead, "driven", "driven", running=True) == "running"
+    # interactive/self-loop with a dead pid IS dead (should be persistent).
+    assert db._agent_state(rec_dead, "loop", "self-loop", running=False) == "dead"
+    assert db._agent_state({"alive": True}, "chat", "interactive", False) == "alive"
+
+
+def test_render_driven_running_and_idle_are_coherent():
+    """Render: a driven role shows 'running' (not dead) during a turn and
+    'idle' (not dead) between turns — never 'dead + running turn'."""
+    agents = [
+        {"role": "DEV", "tool": "claude", "lifecycle": "driven",
+         "mode": "driven", "alive": False, "registered": True,
+         "state": "running", "heartbeat": "fresh", "doing": "running turn · 0042"},
+        {"role": "TESTER", "tool": "claude", "lifecycle": "driven",
+         "mode": "driven", "alive": False, "registered": True,
+         "state": "idle", "heartbeat": "—", "doing": "—"},
+    ]
+    out = db.render_dashboard(_snapshot(agents=agents), width=120)
+    assert "● running" in out
+    assert "◦ idle" in out
+    # the contradiction must NOT appear: no driven row says dead.
+    assert "○ dead" not in out
+    for line in out.splitlines():
+        if "running turn" in line:
+            assert "dead" not in line, f"dead + running turn contradiction: {line}"
+
+
+def test_task_num_extracts_leading_number():
+    assert db._task_num("0001-verify-full-deploy-stand-from-unify") == "0001"
+    assert db._task_num("0042") == "0042"
+    assert db._task_num("weird-no-number") == "weird-no-number"
+
+
+def test_render_tasks_shows_number_not_slug():
+    rows = [{"id": "0001-verify-full-deploy-stand-from-unify",
+             "queue": "feature_test", "owner": "TESTER", "title": "verify"}]
+    out = db.render_dashboard(_snapshot(tasks=rows), width=120)
+    assert "0001 " in out
+    assert "verify-full-deploy" not in out      # long slug gone from ID col
 
 
 def test_render_tasks_table():

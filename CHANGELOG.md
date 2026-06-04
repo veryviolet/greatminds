@@ -4,6 +4,49 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.5.14 — 2026-06-04
+
+Fix: driven claude roles never ran under the daemon; the dashboard
+contradicted itself on driven roles; a daemon restart stranded a queued
+task.
+
+### Fixed
+
+- **Driven turns spawn the tool by its REAL absolute path.** coordd runs
+  as a systemd-user daemon with a minimal PATH (no `~/.local/bin`), so a
+  bare `claude` / `codex` argv[0] failed to spawn — the claude-driven
+  roles (TESTER / DEVELOPER / UI-DEVELOPER / READER) silently never ran
+  (only codex roles survived, via their own app-server unit). New
+  `_resolve_tool_bin` resolves the real path (PATH → the user's LOGIN
+  shell `command -v` → bare), so it works even for a non-standard install
+  location; driven argv[0] and the subprocess PATH use it.
+- **coordd reconciles its backlog on startup.** coordd was purely
+  inotify-reactive, so a task already sitting in a queue when it
+  (re)started — or whose event was consumed by a turn that failed to
+  spawn — was never driven. On start it now drives one turn for each
+  driven role that has pending work in a queue it claims from and isn't
+  mid-turn. A daemon restart (e.g. after `update`) now picks up a hanging
+  task instead of stranding it.
+
+### Dashboard
+
+- **Driven roles are no longer shown as `dead` + `running turn` at
+  once.** STATE was derived from a persistent registry pid, which driven
+  roles don't have — so a role running a turn read as "dead". STATE is
+  now coherent with the driven model: `running` during a live turn (lock
+  + live pid/heartbeat), `idle` between turns (normal — coordd drives on
+  events), never `dead`. A stale run-lock from a killed coordd no longer
+  reads as "running" forever.
+- **TASKS table aligns; the ID column shows just the task number.** The
+  full slug (`0001-verify-full-deploy-…`) overflowed the ID column and
+  broke alignment; it now shows `0001`.
+
+### Internal
+
+- Removed dead code (`role_has_pending_work`, an unused `*.md`-only
+  pending-work scan from the legacy-MD era; redundant local `shutil` /
+  `glob` imports).
+
 ## 1.5.13 — 2026-06-04
 
 Fix: `update` could report success without actually upgrading (and needed

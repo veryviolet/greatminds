@@ -111,6 +111,29 @@ def _fleet_roster(coord_yaml: dict | None) -> list[dict[str, str]]:
     return roster
 
 
+# A driven run-lock only means "running" while the turn is actually
+# live — a lock left behind by a coordd that was killed mid-turn must
+# NOT read as "running" forever. Gate on a live pid OR a recent
+# heartbeat within this window (a turn touches its heartbeat as it works).
+_RUN_LOCK_LIVE_SEC = 600.0
+
+
+def _agent_state(rec: dict[str, Any], mode: str, lifecycle: str,
+                 running: bool) -> str:
+    """Coherent STATE token. Driven roles are NEVER 'dead': they have no
+    persistent process by design — coordd runs each turn on an event, so
+    between turns they are 'idle', and during a (live) turn 'running'.
+    Only roles that SHOULD hold a persistent agent (interactive /
+    self-loop) are 'dead' when their pid is gone."""
+    if lifecycle == "driven":
+        return "running" if running else "idle"
+    if rec["alive"]:
+        return "alive"
+    if mode == "staged":
+        return "staged"
+    return "dead"
+
+
 def _agent_doing(rec: dict[str, Any], mode: str, lifecycle: str,
                  driven_turn: bool, fresh_sec: float,
                  claimed: list[str]) -> str:
@@ -120,6 +143,9 @@ def _agent_doing(rec: dict[str, Any], mode: str, lifecycle: str,
         if claimed else ""
     if driven_turn:
         return f"running turn{task_suffix}"
+    if lifecycle == "driven":
+        # idle-by-design between turns — not an error, not "working".
+        return f"idle{task_suffix}" if claimed else "—"
     if not rec["alive"]:
         if mode == "staged":
             return "awaiting USER start"
@@ -143,7 +169,15 @@ def collect_agents(coord: Path, coord_yaml: dict | None, canon_dir: Path,
         rec = collect_agent_status(coord, role)
         lifecycle = _lifecycle_for_role(canon_dir, role) or ""
         lock = _driven_run_lock_path(coord, role.lower())
-        driven_turn = lifecycle == "driven" and lock.is_file()
+        hb_age = rec.get("heartbeat_age")
+        # A turn is RUNNING only if its run-lock exists AND the turn is
+        # demonstrably live (pid alive or a recent heartbeat) — a stale
+        # lock from a killed coordd must not read as "running".
+        driven_turn = (
+            lifecycle == "driven" and lock.is_file()
+            and (rec["alive"]
+                 or (hb_age is not None and hb_age < _RUN_LOCK_LIVE_SEC))
+        )
         claimed = tasks_by_owner.get(role, [])
         rows.append({
             "role": role,
@@ -152,7 +186,8 @@ def collect_agents(coord: Path, coord_yaml: dict | None, canon_dir: Path,
             "mode": entry["mode"],
             "alive": rec["alive"],
             "registered": rec["registered"],
-            "heartbeat": _fmt_age(rec.get("heartbeat_age")),
+            "state": _agent_state(rec, entry["mode"], lifecycle, driven_turn),
+            "heartbeat": _fmt_age(hb_age),
             "doing": _agent_doing(rec, entry["mode"], lifecycle,
                                   driven_turn, PUSH_FRESH_GUARD_SEC, claimed),
         })
@@ -250,20 +285,28 @@ def _render_agents(rows: list[dict[str, Any]], width: int, color: bool) -> list[
     out = [_paint("AGENTS", "head", color)]
     hdr = f"{'ROLE':<19}{'TOOL':<7}{'LIFECYCLE':<13}{'STATE':<9}{'HB':<7}DOING"
     out.append(_clip(hdr, width))
+    glyph = {
+        "alive":   ("●", "alive"),
+        "running": ("●", "alive"),
+        "idle":    ("◦", "idle"),    # driven, between turns — normal
+        "staged":  ("◌", "staged"),
+        "dead":    ("○", "dead"),
+    }
     for r in rows:
-        if r["alive"]:
-            dot, key = "●", "alive"
-            state = "alive"
-        elif r["mode"] == "staged":
-            dot, key = "◌", "staged"
-            state = "staged"
-        else:
-            dot, key = "○", "dead"
-            state = "dead"
+        state = r.get("state") or ("alive" if r["alive"] else "dead")
+        dot, key = glyph.get(state, ("○", "dead"))
         line = (f"{r['role']:<19}{r['tool']:<7}{r['lifecycle']:<13}"
                 f"{dot} {state:<7}{r['heartbeat']:<7}{r['doing']}")
         out.append(_paint(_clip(line, width), key, color))
     return out
+
+
+def _task_num(tid: Any) -> str:
+    """Just the leading task number (``0001`` from
+    ``0001-verify-full-deploy-…``) — the long slug blew the ID column and
+    broke alignment; the number alone identifies the task in the table."""
+    head = str(tid).split("-", 1)[0]
+    return head if head.isdigit() else str(tid)
 
 
 def _render_tasks(rows: list[dict[str, Any]], width: int, color: bool) -> list[str]:
@@ -273,7 +316,7 @@ def _render_tasks(rows: list[dict[str, Any]], width: int, color: bool) -> list[s
         return out
     out.append(_clip(f"{'ID':<6}{'STATE':<18}{'OWNER':<19}TITLE", width))
     for r in rows:
-        line = (f"{str(r['id']):<6}{r['queue']:<18}{r['owner']:<19}"
+        line = (f"{_task_num(r['id']):<6}{r['queue']:<18}{r['owner']:<19}"
                 f"{r['title']}")
         out.append(_clip(line, width))
     return out
