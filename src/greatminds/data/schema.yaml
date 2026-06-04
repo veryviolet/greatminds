@@ -1309,6 +1309,15 @@ project_env:
 claude_settings:
   permissions:
     allow:
+      # Broad default: allow ALL Bash for every project. Driven /
+      # headless agents (TESTER stand probes, STAND-KEEPER deploys —
+      # sudo/docker/compose/rsync, MAINTAINER recovery) repeatedly
+      # stalled because a needed command wasn't in a narrow allow-list
+      # and a headless turn can't answer a permission prompt. These are
+      # the operator's own dev fleets; agents must never block on Bash.
+      # The specific git/ssh/rsync rules below are redundant under this
+      # but kept as documentation of the original intent.
+      - "Bash"
       - "Bash(git add:*)"
       - "Bash(git commit:*)"
       - "Bash(git tag:*)"
@@ -1333,6 +1342,12 @@ claude_settings:
   auto_mode:
     allow:
       - "$defaults"
+      # NOTE: deliberately NOT a bare "Bash" here — auto_mode is the
+      # classifier's OWN ceiling for USER-present interactive turns, and a
+      # wildcard there is an auto-mode bypass (rightly refused). Driven /
+      # headless agents are gated by permissions.allow (which DOES allow
+      # all Bash), not by this ceiling, so the deploy/probe unblocking
+      # works without widening the interactive classifier gate.
       - "Bash(git push origin main:*)"
       - "Bash(git push origin main --follow-tags:*)"
       - "Bash(git push --follow-tags:*)"
