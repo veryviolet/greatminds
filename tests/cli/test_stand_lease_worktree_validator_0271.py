@@ -165,6 +165,16 @@ def _project_with_state(tmp_path: Path) -> Path:
     (project / "coordination" / ".stand" / "state.yaml").write_text(
         yaml.safe_dump({"state": "free"}), encoding="utf-8",
     )
+    # The lease resolves --profile to a real playbook file in
+    # stand-profiles/ (profile.yaml IS the ansible playbook). Seed one so
+    # the profile check passes and the worktree validator (the subject of
+    # these tests) is what decides accept/reject.
+    sp = project / "coordination" / "stand-profiles"
+    sp.mkdir(parents=True, exist_ok=True)
+    (sp / "full-deploy.yaml").write_text(
+        yaml.safe_dump([{"name": "p", "hosts": "localhost", "tasks": []}]),
+        encoding="utf-8",
+    )
     return project
 
 

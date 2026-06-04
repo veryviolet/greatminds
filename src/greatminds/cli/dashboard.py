@@ -130,15 +130,20 @@ def _agent_state(rec: dict[str, Any], mode: str, lifecycle: str,
 def _agent_doing(rec: dict[str, Any], mode: str, lifecycle: str,
                  driven_turn: bool, fresh_sec: float,
                  claimed: list[str]) -> str:
-    """Inferred activity word + the task the role owns, if any."""
+    """Inferred activity word. The owned task is attached ONLY while the
+    role is actively on it (running a turn / fresh heartbeat). An idle
+    role is NOT working its queue's task — showing it there read as
+    'still on X' after the turn ended; the task still appears in the
+    TASKS table below."""
     task_suffix = f" · {claimed[0]}" + (f" (+{len(claimed)-1})"
                                         if len(claimed) > 1 else "") \
         if claimed else ""
     if driven_turn:
         return f"running turn{task_suffix}"
     if lifecycle == "driven":
-        # idle-by-design between turns — not an error, not "working".
-        return f"idle{task_suffix}" if claimed else "—"
+        # idle-by-design between turns — STATE already shows 'idle'; don't
+        # attribute the queue's task here (it read as "still on X").
+        return "—"
     if not rec["alive"]:
         if mode == "staged":
             return "awaiting USER start"
@@ -146,7 +151,7 @@ def _agent_doing(rec: dict[str, Any], mode: str, lifecycle: str,
     age = rec.get("heartbeat_age")
     if age is not None and age < fresh_sec:
         return f"working{task_suffix}"
-    return f"idle{task_suffix}"
+    return "idle"
 
 
 def collect_agents(coord: Path, coord_yaml: dict | None, canon_dir: Path,
@@ -275,7 +280,7 @@ def _rule(width: int, color: bool) -> str:
 
 def _render_agents(rows: list[dict[str, Any]], width: int, color: bool) -> list[str]:
     out = [_paint("AGENTS", "head", color)]
-    hdr = f"{'ROLE':<19}{'TOOL':<7}{'LIFECYCLE':<13}{'STATE':<9}{'HB':<7}DOING"
+    hdr = f"{'ROLE':<19}{'TOOL':<7}{'LIFECYCLE':<13}{'STATE':<12}{'HB':<7}DOING"
     out.append(_clip(hdr, width))
     glyph = {
         "alive":   ("●", "alive"),

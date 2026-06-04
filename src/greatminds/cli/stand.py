@@ -80,7 +80,6 @@ def task_exists_in_active(coord: Path, task_id: str) -> bool:
 
 _REQUEST_TYPES = ["deploy", "restart", "rebuild", "smoke",
                   "remote_sync", "gpu_check", "teardown"]
-_PROFILES = ["full-deploy", "vite-dev"]
 
 
 @click.group(help="stand_request stream — request a stand op, record result")
@@ -181,22 +180,18 @@ def _stand_keeper_notification_target(event: str) -> str | None:
     return None
 
 
-def _allowed_profiles() -> list[str]:
-    """0244: read ``stand.profiles_allowed`` from schema. Default to
-    the plan-documented enum if absent (defensive)."""
-    try:
-        import yaml as _yaml
-        from greatminds.core.paths import find_canon_dir
-        doc = _yaml.safe_load(
-            (find_canon_dir() / "schema.yaml").read_text(encoding="utf-8")
-        ) or {}
-    except Exception:
-        return ["full-deploy", "vite-dev", "smoke-only"]
-    stand_doc = (doc.get("stand") or {}).get("resource") or {}
-    profiles = stand_doc.get("profiles_allowed")
-    if not isinstance(profiles, list) or not profiles:
-        return ["full-deploy", "vite-dev", "smoke-only"]
-    return [str(p) for p in profiles]
+def _available_profiles(coord: Path) -> list[str]:
+    """Profile names present in THIS project's ``stand-profiles/`` dir —
+    the real set a leaser may name (each fleet's own, e.g. mlgpu2 /
+    orange, plus the seeded presets full-deploy / vite-dev / smoke-only).
+    The lease no longer restricts to a hardcoded schema enum: whatever
+    profile the leaser names is what coordd deploys."""
+    d = coord / "stand-profiles"
+    if not d.is_dir():
+        return []
+    return sorted({p.stem for p in d.iterdir()
+                   if p.suffix in (".yaml", ".md")
+                   and not p.name.startswith("_")})
 
 
 def _holder_role() -> str:
@@ -295,8 +290,9 @@ def _file_inbox_info(coord: Path, to_role: str, body: str,
 @click.option("--worktree", required=True,
               help="path to the worktree SK will deploy from")
 @click.option("--profile", required=True,
-              help="deploy profile enum (schema.stand.resource."
-                   "profiles_allowed)")
+              help="deploy profile NAME — any profile file in this "
+                   "project's stand-profiles/ (the leaser picks it; "
+                   "coordd deploys exactly that profile)")
 @click.option("--ttl-seconds", type=int, default=None,
               help="override ttl (default: schema lease.ttl_seconds_default)")
 @click.option("--deploy-prerequisites-only", "deploy_prerequisites_only",
@@ -323,11 +319,21 @@ def stand_lease(task_id: str, worktree: str, profile: str,
     from greatminds.cli import stand_state as ss
 
     holder = _holder_role()
-    allowed = _allowed_profiles()
-    if profile not in allowed:
+    coord = find_coord_dir()
+    # The leaser names ANY profile that exists in this project's
+    # stand-profiles/ dir — each fleet ships its own (e.g. mlgpu2 /
+    # orange) alongside the seeded presets (full-deploy / vite-dev /
+    # smoke-only). coordd deploys EXACTLY the profile named here, so
+    # validate it the same way coordd will resolve it: by load_profile.
+    # No hardcoded enum — that is what silently collapsed every lease
+    # onto the seeded full-deploy preset.
+    from greatminds.cli.stand_profile import load_profile
+    try:
+        load_profile(coord, profile)
+    except GreatMindsError as exc:
         raise GreatMindsError(
-            f"--profile {profile!r} not in schema.stand.resource."
-            f"profiles_allowed: {allowed}",
+            f"--profile {profile!r}: {exc} (available in stand-profiles/: "
+            f"{_available_profiles(coord)})",
             exit_code=2,
         )
 
@@ -354,7 +360,6 @@ def stand_lease(task_id: str, worktree: str, profile: str,
             ttl_seconds = 14400
 
     new_lease_id = uuid.uuid4().hex
-    coord = find_coord_dir()
 
     def mutator(state):
         lease_obj = {

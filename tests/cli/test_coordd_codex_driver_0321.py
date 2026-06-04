@@ -70,29 +70,27 @@ def test_build_thread_resume_request_shape() -> None:
 
 
 def test_codex_appserver_argv_is_stdio(monkeypatch) -> None:
-    """The driver spawns ``codex app-server`` over STDIO (no
-    ``--listen``, no ``proxy``); node is named explicitly when it
-    resolves (env-node shebang lesson). The headless turn also carries
-    the sandbox/approval ``-c`` overrides so a coordd-spawned codex
-    server starts without bubblewrap and runs its tools unattended."""
+    """The driver spawns ``codex app-server`` over STDIO (no ``--listen``,
+    no ``proxy``) with the sandbox/approval ``-c`` overrides. 1.6.2: codex
+    is resolved by a plain ``which`` (the daemon unit bakes the operator
+    PATH); codex's own ``#!/usr/bin/env node`` shebang finds node — no
+    explicit node in argv, no in-code resolver."""
     import shutil
-    cd._TOOL_BIN_CACHE.clear()
-    monkeypatch.setattr(shutil, "which", lambda b: {
-        "codex": "/nvm/bin/codex", "node": "/nvm/bin/node"}.get(b))
+    monkeypatch.setattr(
+        shutil, "which", lambda b: "/nvm/bin/codex" if b == "codex" else None)
     argv = cd._codex_appserver_argv()
+    assert argv[0] == "/nvm/bin/codex"
     assert "app-server" in argv
     assert "--listen" not in argv and "proxy" not in argv
-    assert argv[0].endswith("/node")
-    assert any(a.endswith("/codex") for a in argv[:2])
-    # Headless overrides: no bubblewrap sandbox, auto-approve tools.
     assert "sandbox_mode=danger-full-access" in argv
     assert "approval_policy=never" in argv
 
 
 def test_codex_appserver_argv_fallback_bare_codex(monkeypatch) -> None:
-    # Resolution finds nothing (returns the bare name) → bare fallback.
-    cd._TOOL_BIN_CACHE.clear()
-    monkeypatch.setattr(cd, "_resolve_tool_bin", lambda t: t)
+    """`which` finds nothing → bare ``codex`` (PATH at spawn / the unit's
+    Environment=PATH resolves it)."""
+    import shutil
+    monkeypatch.setattr(shutil, "which", lambda _b: None)
     assert cd._codex_appserver_argv() == [
         "codex", "app-server",
         "-c", "sandbox_mode=danger-full-access",

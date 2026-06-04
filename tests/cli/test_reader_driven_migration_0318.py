@@ -21,15 +21,6 @@ import yaml
 
 from greatminds.cli import launch as launch_mod
 from greatminds.cli import coordd as cd
-import pytest as _pytest
-
-
-@_pytest.fixture(autouse=True)
-def _bare_tool_bin(monkeypatch):
-    """argv tests assert bare `claude`; pin tool resolution to the bare
-    name (real-path resolution is covered by test_driven_tool_path)."""
-    cd._TOOL_BIN_CACHE.clear()
-    monkeypatch.setattr(cd, "_resolve_tool_bin", lambda t: t)
 from greatminds.core.paths import find_canon_dir
 
 

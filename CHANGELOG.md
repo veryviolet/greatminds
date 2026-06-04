@@ -4,6 +4,41 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.6.2 — 2026-06-05
+
+Make the driven deploy/dispatch model survive failures, and let the leaser
+pick the real stand profile.
+
+### Fixed
+
+- **The lease names ANY real profile (no hardcoded enum).** `stand lease
+  --profile X` is validated by resolving an actual playbook file in the
+  project's `stand-profiles/` (e.g. `mlgpu2` / `orange`, alongside the
+  seeded presets), not against a fixed `profiles_allowed` list. The enum
+  silently collapsed every lease onto the seeded `full-deploy` preset and
+  hid each fleet's real profiles — so coordd deployed the wrong playbook.
+- **Driven turns retry on failure (rate-limit / error / timeout).** A
+  driven turn that failed moved no task, so no event fired and the role
+  froze forever. coordd now classifies each finished turn (claude
+  `--output-format json` `is_error`/`api_error_status`; codex stream) and
+  re-dispatches failures with backoff: rate-limit (429/529) ~forever,
+  other errors `RETRY_HARD_MAX` times then **escalated to MAINTAINER**
+  (auto-retry stops until a real event). Clean completions are NOT
+  retried. A turn also has a wall-clock timeout.
+- **The daemon runs with the operator's PATH.** `daemon install` bakes
+  `Environment=PATH` into the unit so the systemd-user daemon's spawned
+  driven turns find `codex` / `claude` / `node` (nvm / `~/.local/bin`).
+  Removed the in-code tool-resolver fallback tower; bare `codex`/`claude`
+  resolve via PATH.
+- **Driven codex runs in the role's per-role `CODEX_HOME`** (was the
+  default `~/.codex`, missing the role config), with a resume→fresh-thread
+  fallback when a cached threadId can't be resumed.
+
+### Dashboard
+
+- An idle role no longer carries its queue's task in DOING (read as "still
+  on X" after a turn ended); the STATE column is a few chars wider.
+
 ## 1.5.16 — 2026-06-04
 
 Fix: the dashboard showed a running driven turn as `idle`.

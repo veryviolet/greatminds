@@ -207,31 +207,45 @@ def _template_unit_body() -> str:
     Falls back to an inline body when the canon file is missing.
     """
     exec_cmd = _resolved_greatminds_exec()
+    body = None
     try:
         src = find_canon_dir() / "systemd" / TEMPLATE_UNIT_NAME
         if src.is_file():
-            body = src.read_text(encoding="utf-8")
-            return body.replace("__GREATMINDS_BIN__", exec_cmd)
+            body = src.read_text(encoding="utf-8").replace(
+                "__GREATMINDS_BIN__", exec_cmd)
     except Exception:  # noqa: BLE001
-        pass
-    return (
-        "[Unit]\n"
-        "Description=greatminds coordination daemon for project %i\n"
-        "After=default.target\n"
-        "\n"
-        "[Service]\n"
-        "Type=simple\n"
-        f"ExecStart={exec_cmd} coordd --project %i\n"
-        # 0346: always (not on-failure) — coordd exits 0 on SIGTERM, so
-        # on-failure left a killed coordd dead. always resurrects it
-        # after an external kill/crash; a commanded `systemctl stop` is
-        # still honoured.
-        "Restart=always\n"
-        "RestartSec=2\n"
-        "\n"
-        "[Install]\n"
-        "WantedBy=default.target\n"
-    )
+        body = None
+    if body is None:
+        body = (
+            "[Unit]\n"
+            "Description=greatminds coordination daemon for project %i\n"
+            "After=default.target\n"
+            "\n"
+            "[Service]\n"
+            "Type=simple\n"
+            f"ExecStart={exec_cmd} coordd --project %i\n"
+            # 0346: always (not on-failure) — coordd exits 0 on SIGTERM, so
+            # on-failure left a killed coordd dead. always resurrects it
+            # after an external kill/crash; a commanded `systemctl stop` is
+            # still honoured.
+            "Restart=always\n"
+            "RestartSec=2\n"
+            "\n"
+            "[Install]\n"
+            "WantedBy=default.target\n"
+        )
+    # 1.6.2: bake the operator's PATH into the unit. The systemd-user
+    # default PATH lacks nvm / ~/.local/bin, so the daemon's spawned
+    # driven turns (codex / claude / node) couldn't find their binaries —
+    # the whole reason for the resolver kludges. `daemon install` runs
+    # from the operator's shell, whose PATH HAS the tools; capture it
+    # once here. One place, no in-code fallbacks: the daemon then resolves
+    # everything with a plain `which`, and codex's env-node shebang works.
+    path_val = os.environ.get("PATH", "")
+    if path_val and "Environment=PATH=" not in body:
+        body = body.replace(
+            "[Service]\n", f"[Service]\nEnvironment=PATH={path_val}\n", 1)
+    return body
 
 
 def install_template_unit() -> bool:

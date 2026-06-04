@@ -39,6 +39,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -159,6 +160,26 @@ DEAD_REPORT_INTERVAL_SEC = float(os.environ.get("COORDD_DEAD_REPORT_INTERVAL_SEC
 INTENT_REAP_INTERVAL_SEC = float(
     os.environ.get("COORDD_INTENT_REAP_INTERVAL_SEC", "300"))
 INTENT_ORPHAN_MIN_AGE_DEFAULT = 300.0
+# Driven-turn retry policy. A driven turn that ERRORS or TIMES OUT is
+# retried; a clean completion is NOT (the agent may legitimately have had
+# nothing to do). Rate-limit (429/529) retries effectively forever with
+# exponential backoff; other errors retry RETRY_HARD_MAX times then the
+# role is escalated to MAINTAINER and auto-retry stops until a real event.
+RETRY_RL_BASE_SEC   = float(os.environ.get("COORDD_RETRY_RL_BASE_SEC",   "30"))
+RETRY_RL_CAP_SEC    = float(os.environ.get("COORDD_RETRY_RL_CAP_SEC",   "300"))
+RETRY_RL_NOTIFY_AT  = int(os.environ.get("COORDD_RETRY_RL_NOTIFY_AT",     "20"))
+RETRY_HARD_BASE_SEC = float(os.environ.get("COORDD_RETRY_HARD_BASE_SEC", "30"))
+RETRY_HARD_CAP_SEC  = float(os.environ.get("COORDD_RETRY_HARD_CAP_SEC", "120"))
+RETRY_HARD_MAX      = int(os.environ.get("COORDD_RETRY_HARD_MAX",         "3"))
+DRIVEN_TURN_TIMEOUT_SEC = float(
+    os.environ.get("COORDD_DRIVEN_TURN_TIMEOUT_SEC", "1800"))
+# Periodic re-reconcile of the driven backlog. The startup reconcile runs
+# once; without a periodic repeat a driven turn that FAILED (rate-limit /
+# transient error) or completed without moving its task never retries — no
+# queue event fires, so the role freezes. This re-drives pending roles
+# gently (it is lock-safe: skips roles with a turn in flight).
+RECONCILE_INTERVAL_SEC = float(
+    os.environ.get("COORDD_RECONCILE_INTERVAL_SEC", "90"))
 
 # 0199: PyPI version check. Defaults match schema.auto_update.
 # Operator can override per-project via env (test/dev convenience).
@@ -547,14 +568,13 @@ def _build_driven_claude_argv(
     session-id, the caller records it. The bootstrap (system prompt)
     carries the full contract so the new session isn't context-blind.
     """
-    # argv[0] = the REAL absolute claude path (resolved via the login
-    # shell when the daemon's minimal PATH lacks it), so the spawn works
-    # wherever claude is installed and never depends on the daemon's PATH.
-    claude_bin = _resolve_tool_bin("claude")
+    # 1.6.2: bare `claude` — the daemon unit bakes the operator's PATH
+    # (Environment=PATH), so claude resolves via PATH like in a shell. No
+    # in-code path resolver.
     if fresh:
-        argv = [claude_bin, "-p", prompt]
+        argv = ["claude", "-p", prompt]
     else:
-        argv = [claude_bin, "--resume", session_id, "-p", prompt]
+        argv = ["claude", "--resume", session_id, "-p", prompt]
     # 0311 driven fix: a headless ``claude -p`` turn that uses ANY tool blocks
     # on MCP-server initialization before it can act. The fleet's default MCP
     # discovery includes heavy npm-exec browser servers (playwright,
@@ -577,68 +597,13 @@ def _build_driven_claude_argv(
     return argv
 
 
-_TOOL_BIN_CACHE: dict[str, str] = {}
-
-
-def _resolve_tool_bin(tool: str) -> str:
-    """Resolve the REAL absolute path to a tool binary (claude / codex).
-
-    coordd runs as a systemd-user daemon with a MINIMAL PATH
-    (``/usr/bin:/bin:…``), so a bare ``claude`` / ``codex`` argv[0] fails
-    to spawn — the driven turn then silently never runs (the claude-driven
-    roles TESTER / DEVELOPER / UI-DEVELOPER / READER never ran on a real
-    fleet). We must hand the spawn the ACTUAL path, wherever the user
-    installed it — even a non-standard location.
-
-    Resolution order (cached): ``shutil.which`` (if the daemon PATH
-    happens to carry it) → the user's LOGIN shell (``bash -lc 'command -v
-    <tool>'``), which carries the PATH the user actually installed under
-    (``~/.local/bin``, an nvm node dir, a custom prefix, …) → the bare
-    name as a last resort. Symlinks are resolved to the real target."""
-    if tool in _TOOL_BIN_CACHE:
-        return _TOOL_BIN_CACHE[tool]
-    found = shutil.which(tool)
-    if not found:
-        try:
-            cp = subprocess.run(
-                ["bash", "-lc", f"command -v {tool} 2>/dev/null"],
-                capture_output=True, text=True, timeout=15,
-            )
-            for line in reversed((cp.stdout or "").splitlines()):
-                cand = line.strip()
-                if cand and Path(cand).exists():
-                    found = cand
-                    break
-        except (OSError, subprocess.TimeoutExpired):
-            found = None
-    resolved = str(Path(found).resolve()) if found else tool
-    _TOOL_BIN_CACHE[tool] = resolved
-    return resolved
-
 
 def _driven_subprocess_env(role_lower: str) -> dict[str, str]:
-    """Env for a driven-turn subprocess: ``GREATMINDS_ROLE`` plus a PATH
-    that includes the resolved tool's own dir and node's dir, so any
-    CHILD process the tool spawns (a tool's ``env node`` shebang, helper
-    binaries) also resolves under the daemon's otherwise-minimal PATH.
-    The turn's own binary is launched by ABSOLUTE path (see
-    ``_resolve_tool_bin``), so the spawn no longer depends on PATH."""
-    dirs: list[str] = []
-    for t in ("claude", "codex"):
-        b = _resolve_tool_bin(t)
-        if os.path.isabs(b):
-            dirs.append(str(Path(b).resolve().parent))
-    node = shutil.which("node") or _resolve_tool_bin("node")
-    if os.path.isabs(node):
-        dirs.append(str(Path(node).resolve().parent))
-    cur = os.environ.get("PATH", "")
-    seen, ordered = set(), []
-    for d in [*dirs, *cur.split(":")]:
-        if d and d not in seen:
-            seen.add(d)
-            ordered.append(d)
-    return {**os.environ, "GREATMINDS_ROLE": role_lower.upper(),
-            "PATH": ":".join(ordered)}
+    """Env for a driven-turn subprocess: the daemon's env (which carries
+    the operator PATH baked into the unit) plus ``GREATMINDS_ROLE`` so the
+    agent's ``greatminds`` CLI resolves the right inbox/queues. 1.6.2: no
+    PATH munging — the unit's Environment=PATH already has the tools."""
+    return {**os.environ, "GREATMINDS_ROLE": role_lower.upper()}
 
 
 # 0317: session-reset policy. ``claude --resume`` accumulates
@@ -699,6 +664,158 @@ def _record_driven_turn(registry_dir: Path, role_lower: str,
         f.write_text(json.dumps(reg, indent=2) + "\n", encoding="utf-8")
     except OSError:
         pass
+
+
+# ---- driven-turn outcome classification + retry scheduling (1.6.2) -------
+#
+# Driven roles have no persistent process: coordd runs each turn once and
+# the event chain (a moved task → inotify → next role) sustains the
+# pipeline. A turn that FAILS (rate-limit / crash / timeout) moves no
+# task, so no event fires and the role would freeze forever. These helpers
+# classify each finished turn and re-dispatch failed ones with backoff;
+# rate-limit retries ~forever, other errors escalate to MAINTAINER.
+
+_RETRY_LOCK = threading.Lock()
+# role_lower -> {attempts:int, klass:str, next_at:float (monotonic),
+#                escalated:bool, notified:bool}
+_DRIVEN_RETRY: dict[str, dict] = {}
+
+
+def _classify_turn_outcome(rc, stdout, *, timed_out: bool = False) -> str:
+    """Classify a finished driven turn: ``ok`` | ``rate_limit`` |
+    ``error`` | ``timeout``. claude emits a JSON result object
+    (``--output-format json``) carrying ``is_error`` / ``api_error_status``;
+    a non-zero rc with no parseable success JSON is a hard error. When
+    unsure we return ``error`` (bounded retry + escalate) — never a silent
+    ``ok`` (would drop the work) nor ``rate_limit`` (would retry forever)."""
+    if timed_out:
+        return "timeout"
+    obj = None
+    if stdout:
+        try:
+            obj = json.loads(stdout)
+        except (ValueError, TypeError):
+            obj = None
+    if isinstance(obj, dict) and obj.get("is_error"):
+        status = obj.get("api_error_status")
+        blob = f"{obj.get('result', '')} {status}".lower()
+        if status in (429, 529) or "rate limit" in blob \
+                or "rate-limit" in blob or "overloaded" in blob \
+                or "temporarily limiting" in blob:
+            return "rate_limit"
+        return "error"
+    if rc not in (0, None):
+        return "error"
+    return "ok"
+
+
+def _retry_delay(klass: str, attempts: int) -> float:
+    base, cap = ((RETRY_RL_BASE_SEC, RETRY_RL_CAP_SEC)
+                 if klass == "rate_limit"
+                 else (RETRY_HARD_BASE_SEC, RETRY_HARD_CAP_SEC))
+    return min(cap, base * (2 ** max(0, attempts - 1)))
+
+
+def _escalate_to_maintainer(coord: Path, role_lower: str, klass: str,
+                            attempts: int, detail: str) -> None:
+    """Best-effort inbox-info to MAINTAINER (shells out so the journal +
+    heartbeat side-effects fire through the normal CLI path)."""
+    body = (f"driven {role_lower.upper()} turn failed {attempts}x "
+            f"({klass}); auto-retry stopped — investigate. "
+            f"detail: {detail[:300]}")
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "greatminds.cli.main",
+             "inbox", "send", "MAINTAINER", "--kind", "info",
+             "--body", body],
+            cwd=str(coord.parent),
+            env={**os.environ, "GREATMINDS_ROLE": "MAINTAINER"},
+            capture_output=True, text=True, timeout=10,
+        )
+    except Exception:  # noqa: BLE001 — notification is best-effort
+        pass
+
+
+def _note_turn_outcome(coord: Path, role_lower: str, klass: str,
+                       detail: str, verbose: bool) -> dict | None:
+    """Update per-role retry state from a finished turn. ``ok`` clears the
+    state. ``rate_limit`` schedules a backoff retry (and notifies once if
+    it persists). ``error``/``timeout`` schedules a bounded retry, then
+    escalates + stops. Returns a snapshot of the state (or None on ok)."""
+    now = time.monotonic()
+    with _RETRY_LOCK:
+        if klass == "ok":
+            _DRIVEN_RETRY.pop(role_lower, None)
+            return None
+        st = _DRIVEN_RETRY.get(role_lower)
+        if st is None or st.get("klass") != klass:
+            st = {"attempts": 0, "klass": klass, "next_at": 0.0,
+                  "escalated": False, "notified": False}
+            _DRIVEN_RETRY[role_lower] = st
+        st["attempts"] += 1
+        if klass == "rate_limit":
+            st["next_at"] = now + _retry_delay(klass, st["attempts"])
+            do_notify = (st["attempts"] == RETRY_RL_NOTIFY_AT
+                         and not st["notified"])
+            if do_notify:
+                st["notified"] = True
+        else:
+            if st["attempts"] >= RETRY_HARD_MAX:
+                st["escalated"] = True
+            else:
+                st["next_at"] = now + _retry_delay(klass, st["attempts"])
+        snap = dict(st)
+    if klass != "rate_limit" and snap.get("escalated"):
+        _escalate_to_maintainer(coord, role_lower, klass,
+                                snap["attempts"], detail)
+    elif klass == "rate_limit" and snap.get("notified"):
+        _escalate_to_maintainer(
+            coord, role_lower, klass, snap["attempts"],
+            f"{detail} — still rate-limited, continuing to retry")
+    if verbose:
+        print(f"  retry: {role_lower} {klass} attempt {snap['attempts']}"
+              f"{' → ESCALATED (auto-retry stopped)' if snap.get('escalated') else ''}",
+              file=sys.stderr)
+    return snap
+
+
+def _clear_retry_state(role_lower: str) -> None:
+    """A real event (queue move / inbox) drove the role — drop any
+    backoff/escalation so it gets a fresh chance."""
+    with _RETRY_LOCK:
+        _DRIVEN_RETRY.pop(role_lower, None)
+
+
+def _process_due_retries(coord: Path, canon_dir: Path, verbose: bool) -> None:
+    """Main-loop step: re-dispatch driven roles whose retry backoff is due.
+    Targeted (only roles whose last turn failed), not a blanket sweep;
+    escalated roles are skipped until a real event clears them."""
+    now = time.monotonic()
+    due: list[str] = []
+    with _RETRY_LOCK:
+        for role_lower, st in _DRIVEN_RETRY.items():
+            if st.get("escalated"):
+                continue
+            if st.get("next_at") and now >= st["next_at"]:
+                st["next_at"] = 0.0  # consumed; the turn outcome reschedules
+                due.append(role_lower)
+    if not due:
+        return
+    coord_yaml_doc = _read_coord_yaml(coord.parent)
+    for role_lower in due:
+        if _driven_run_lock_path(coord, role_lower).is_file():
+            continue  # a turn is already running
+        role_upper = role_lower.upper()
+        located = _window_and_tool_for_role(coord_yaml_doc, role_upper)
+        try:
+            _maybe_drive_driven_role(
+                coord, canon_dir, coord_yaml_doc, located, role_upper,
+                verbose, trigger=" (retry)",
+            )
+        except Exception as exc:  # noqa: BLE001
+            if verbose:
+                print(f"coordd: retry dispatch for {role_upper} failed: "
+                      f"{exc}", file=sys.stderr)
 
 
 def _spawn_driven_turn(
@@ -779,6 +896,8 @@ def _spawn_driven_turn(
 
     def _worker() -> None:
         new_sid: str | None = None
+        klass = "error"
+        detail = ""
         try:
             proc = subprocess.run(
                 run_argv, cwd=str(coord.parent),
@@ -788,6 +907,7 @@ def _spawn_driven_turn(
                 # the static bootstrap's $GREATMINDS_ROLE is set (mirrors
                 # the codex driver's _codex_appserver_env).
                 env=_driven_subprocess_env(role_lower),
+                timeout=DRIVEN_TURN_TIMEOUT_SEC,
             )
             try:
                 _turn_log_path(coord, role_lower).write_text(
@@ -805,7 +925,23 @@ def _spawn_driven_turn(
                            else None) or None
             except (ValueError, TypeError, AttributeError):
                 new_sid = None
+            klass = _classify_turn_outcome(proc.returncode, proc.stdout)
+            detail = (proc.stderr or proc.stdout or "")[:300]
+        except subprocess.TimeoutExpired:
+            klass = "timeout"
+            detail = f"turn exceeded {DRIVEN_TURN_TIMEOUT_SEC:.0f}s"
+            try:
+                _turn_log_path(coord, role_lower).write_text(
+                    f"$ {' '.join(run_argv)}\n\n=== TIMEOUT after "
+                    f"{DRIVEN_TURN_TIMEOUT_SEC:.0f}s ===\n", encoding="utf-8")
+            except OSError:
+                pass
+            if verbose:
+                print(f"  driven claude turn for {role_lower} timed out",
+                      file=sys.stderr)
         except Exception as exc:  # noqa: BLE001 — log, never crash coordd
+            klass = "error"
+            detail = str(exc)[:300]
             if verbose:
                 print(f"  driven claude turn for {role_lower} failed: "
                       f"{exc}", file=sys.stderr)
@@ -816,18 +952,21 @@ def _spawn_driven_turn(
                 lock.unlink()
             except OSError:
                 pass
-            # Re-fire one event that arrived mid-turn.
+            _note_turn_outcome(coord, role_lower, klass, detail, verbose)
+            # Re-fire a mid-turn event ONLY on success; a failed turn is
+            # re-dispatched by the retry scheduler (avoid double-spawn).
             pend = _driven_pending_path(coord, role_lower)
             if pend.exists():
                 try:
                     pend.unlink()
                 except OSError:
                     pass
-                _spawn_driven_turn(
-                    coord, role_lower, (new_sid or session_id),
-                    pane, session_name, bootstrap_file, verbose,
-                    reg=read_registry(coord / REGISTRY_DIR, role_lower),
-                )
+                if klass == "ok":
+                    _spawn_driven_turn(
+                        coord, role_lower, (new_sid or session_id),
+                        pane, session_name, bootstrap_file, verbose,
+                        reg=read_registry(coord / REGISTRY_DIR, role_lower),
+                    )
 
     import threading
     threading.Thread(target=_worker, daemon=True,
@@ -899,15 +1038,12 @@ def _codex_appserver_argv() -> list[str]:
     # installs when the daemon's minimal PATH lacks it); run it with the
     # node co-located with the codex bin (version match) so a fresh
     # systemd-spawned turn finds both binaries by absolute path.
-    codex = _resolve_tool_bin("codex")
-    if os.path.isabs(codex):
-        codex_bin = Path(codex)
-        codex_js = str(codex_bin.resolve())
-        node_sib = codex_bin.resolve().parent / "node"
-        node = (str(node_sib) if node_sib.exists()
-                else (shutil.which("node") or _resolve_tool_bin("node")))
-        return [node, codex_js, "app-server", *cfg]
-    return ["codex", "app-server", *cfg]
+    # 1.6.2: plain resolution. The daemon unit bakes the operator's PATH
+    # (Environment=PATH), so `codex` resolves via PATH and its
+    # `#!/usr/bin/env node` shebang finds the matching node on PATH too —
+    # no in-code resolver / nvm globbing / node co-location guessing.
+    codex = shutil.which("codex") or "codex"
+    return [codex, "app-server", *cfg]
 
 
 def _codex_appserver_env(role_lower: str | None = None,
@@ -928,8 +1064,9 @@ def _codex_appserver_env(role_lower: str | None = None,
     * ``GREATMINDS_ROLE`` — coordd has no role of its own; set it
       explicitly so the agent's ``greatminds`` CLI resolves the right
       inbox/queues (0311).
-    * ``PATH`` prepended with node's dir so codex's env-node shebang +
-      any node subprocess resolve under systemd's minimal PATH.
+
+    PATH is NOT touched (1.6.2): the daemon unit bakes the operator's
+    PATH, so node is already resolvable for codex's env-node shebang.
     """
     env = dict(os.environ)
     if role_lower:
@@ -938,10 +1075,6 @@ def _codex_appserver_env(role_lower: str | None = None,
             home = coord / ".codex-home" / role_lower
             if home.is_dir():
                 env["CODEX_HOME"] = str(home)
-    node = shutil.which("node")
-    if node:
-        env["PATH"] = (str(Path(node).resolve().parent) + os.pathsep
-                       + env.get("PATH", ""))
     return env
 
 
@@ -1247,11 +1380,23 @@ def _spawn_driven_codex_turn(
             return (False, f"codex transport failed: {exc}"[:200])
 
     def _worker() -> None:
+        klass = "ok"
+        detail = ""
         try:
             _drive_codex_turn_stdio(
                 coord, role_lower, thread_id, base_instructions, cwd,
                 verbose)
         except Exception as exc:  # noqa: BLE001 — log, never crash coordd
+            msg = str(exc)
+            low = msg.lower()
+            if "timeout" in low:
+                klass = "timeout"
+            elif any(m in low for m in ("rate limit", "rate-limit",
+                                        "overloaded", "429", "529")):
+                klass = "rate_limit"
+            else:
+                klass = "error"
+            detail = msg[:300]
             if verbose:
                 print(
                     f"  0321: codex turn for {role_lower} failed: {exc}",
@@ -1262,17 +1407,20 @@ def _spawn_driven_codex_turn(
                 lock.unlink()
             except OSError:
                 pass
-            # Re-fire one event that arrived mid-turn.
+            _note_turn_outcome(coord, role_lower, klass, detail, verbose)
+            # Re-fire a mid-turn event ONLY on success; a failed turn is
+            # re-dispatched by the retry scheduler (avoid double-spawn).
             pend = _driven_pending_path(coord, role_lower)
             if pend.exists():
                 try:
                     pend.unlink()
                 except OSError:
                     pass
-                _spawn_driven_codex_turn(
-                    coord, role_lower, base_instructions, cwd, verbose,
-                    reg=read_registry(coord / REGISTRY_DIR, role_lower),
-                )
+                if klass == "ok":
+                    _spawn_driven_codex_turn(
+                        coord, role_lower, base_instructions, cwd, verbose,
+                        reg=read_registry(coord / REGISTRY_DIR, role_lower),
+                    )
 
     if not run_async:
         _worker()
@@ -1305,6 +1453,11 @@ def _maybe_drive_driven_role(coord: Path, canon_dir: Path,
     window_mode = _window_mode_for_role(coord_yaml_doc, role)
     if lifecycle != "driven" or window_mode != "driven":
         return None
+    if "retry" not in trigger:
+        # A REAL event (queue move / inbox / reconcile) drives the role —
+        # clear any prior-failure backoff/escalation so genuinely new work
+        # gets a clean chance (the retry path passes trigger=" (retry)").
+        _clear_retry_state(role.lower())
     if tool == "claude":
         reg = read_registry(coord / REGISTRY_DIR, role.lower())
         session_id = (reg or {}).get("session_id") or ""
@@ -2247,6 +2400,15 @@ def coordd(project_dir: Path | None, project_name: str | None,
     while not stop["flag"]:
         try:
             events = poll_or_event_wait(interval) or []
+
+            # Re-dispatch driven roles whose last turn failed and whose
+            # backoff is now due (targeted retry, not a blanket sweep).
+            try:
+                _process_due_retries(coord, canon_dir, verbose)
+            except Exception as exc:  # noqa: BLE001
+                if verbose:
+                    print(f"coordd: retry scheduler error: {exc}",
+                          file=sys.stderr)
 
             # 0204: route non-inbox queue events directly to owning
             # roles. Pre-0204 a file landing in feature_inbox / stand_

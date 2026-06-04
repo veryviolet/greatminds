@@ -87,11 +87,13 @@ def test_doing_fresh_heartbeat_is_working():
     assert d == "working"
 
 
-def test_doing_stale_heartbeat_is_idle_with_task_count():
+def test_doing_stale_heartbeat_is_idle_without_task():
+    # 1.6.2: an idle role no longer carries its queue's task in DOING
+    # (that read as "still on X" after a turn ended).
     d = db._agent_doing(_rec(True, 900), "chat", "interactive",
                         driven_turn=False, fresh_sec=60,
                         claimed=["0042", "0043", "0044"])
-    assert d == "idle · 0042 (+2)"
+    assert d == "idle"
 
 
 # ---------- render_dashboard (pure) ----------

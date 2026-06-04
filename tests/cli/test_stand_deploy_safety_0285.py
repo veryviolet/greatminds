@@ -24,6 +24,24 @@ from greatminds.cli import stand as stand_mod
 from greatminds.cli import stand_state as ss
 
 
+@pytest.fixture(autouse=True)
+def _resolvable_presets(monkeypatch):
+    """Lease validates --profile by resolving a file in stand-profiles/;
+    these tests don't seed files, so stub the resolver (presets resolve,
+    anything else raises like a missing profile file)."""
+    from greatminds.core.errors import GreatMindsError
+
+    class _Spec:
+        format = "yaml"
+
+    def _fake(_coord, name):
+        if name in {"full-deploy", "vite-dev", "smoke-only"}:
+            return _Spec()
+        raise GreatMindsError(f"profile {name!r} has no file")
+
+    monkeypatch.setattr("greatminds.cli.stand_profile.load_profile", _fake)
+
+
 # ---------- is_deploy_safe ----------
 
 

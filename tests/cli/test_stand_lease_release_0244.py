@@ -42,6 +42,27 @@ def _invoke(args: list[str], cwd: Path, role: str = "TESTER",
     return CliRunner().invoke(stand_mod.stand, args)
 
 
+@pytest.fixture(autouse=True)
+def _resolvable_presets(monkeypatch):
+    """The lease validates ``--profile`` by RESOLVING it (a real file in
+    the project's ``stand-profiles/``) — no hardcoded enum. These
+    lease-mechanics tests don't seed profile files, so stub the resolver:
+    the canonical presets resolve, anything else raises exactly like a
+    missing profile file (→ the lease rejects it)."""
+    from greatminds.core.errors import GreatMindsError
+
+    class _Spec:
+        format = "yaml"
+
+    def _fake(_coord, name):
+        if name in {"full-deploy", "vite-dev", "smoke-only"}:
+            return _Spec()
+        raise GreatMindsError(f"profile {name!r} has no file")
+
+    monkeypatch.setattr(
+        "greatminds.cli.stand_profile.load_profile", _fake)
+
+
 # ---------- schema pin ----------
 
 
@@ -84,9 +105,10 @@ def test_lease_on_free_transitions_to_preparing(tmp_path, monkeypatch) -> None:
 
 
 def test_lease_rejects_unknown_profile(tmp_path, monkeypatch) -> None:
-    """0244 schema-enforced: --profile must be in
-    stand.resource.profiles_allowed. Mechanical refusal — no
-    free-text profile values."""
+    """A profile with no file in the project's stand-profiles/ is
+    rejected (resolved via load_profile, no hardcoded enum). The leaser
+    may name any REAL profile (mlgpu2 / orange / a seeded preset); only
+    a non-existent one is refused."""
     coord = tmp_path / "coordination"
     coord.mkdir()
     result = _invoke(
@@ -97,7 +119,7 @@ def test_lease_rejects_unknown_profile(tmp_path, monkeypatch) -> None:
     assert result.exit_code != 0
     out = result.output + (str(result.exception) if result.exception else "")
     assert "rogue-profile" in out
-    assert "profiles_allowed" in out
+    assert "stand-profiles" in out
 
 
 def test_lease_returns_unique_lease_ids(tmp_path, monkeypatch) -> None:
