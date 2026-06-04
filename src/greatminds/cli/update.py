@@ -214,6 +214,17 @@ def _self_replace_to_post_pip() -> None:
         raise click.exceptions.Exit(cp.returncode)
 
 
+def _step_migrate_project_config() -> None:
+    """Bring the project's on-disk config to the installed version:
+    canon refresh + coord.yaml driven-model migration + legacy-artifact
+    removal. Without this, ``update`` bumped the package but left a stale
+    coord.yaml (old all-paned window model), refreshed neither canon nor
+    queues — the package/config drift the operator hit as a 'bug'."""
+    from greatminds.cli.migrate import run_migration
+    info("==> migrating project config to the new version...")
+    run_migration(Path.cwd(), run_setup=True)
+
+
 def _step_migrate_legacy_coordd() -> None:
     """If the old singleton coordd.service is still enabled, retire it."""
     from greatminds.cli.daemon import detect_legacy_coordd, _systemctl, SYSTEMD_USER_DIR, LEGACY_UNIT_NAME
@@ -410,6 +421,9 @@ def update(post_pip: bool, check: bool, dry_run: bool, major: bool,
         return  # pragma: no cover
 
     # --post-pip phase (idempotent; called by self-replace or by user).
+    # Project-config migration FIRST so the daemon + agents below start
+    # on the migrated config (new coord.yaml model, refreshed canon).
+    _step_migrate_project_config()
     _step_migrate_legacy_coordd()
     _step_ensure_template_unit_installed()  # 0202: fill the migration gap
     _step_restart_daemon(project_name)

@@ -66,14 +66,43 @@ class WorktreePolicy:
         return project_dir / self.base_path / task_id
 
 
-def load_worktree_policy() -> WorktreePolicy:
-    """Read schema.yaml's ``worktrees:`` section into a typed policy."""
+def load_worktree_policy(project_dir: Path | None = None) -> WorktreePolicy:
+    """Build the worktree policy: canon (package) schema defaults, then
+    overlaid by the project's per-project override in ``coord.yaml``.
+
+    The canon ``schema.yaml`` (read via ``find_canon_dir`` — the PACKAGE
+    data dir) supplies host-wide defaults and is overwritten on every
+    upgrade, so it is the WRONG place for a project to pin its own
+    ``default_branch``. The per-project override lives in ``coord.yaml``
+    (project-local, never overwritten by ``setup``/``upgrade``), e.g.::
+
+        worktrees:
+          default_branch: unify
+
+    so a project can run its fleet on a branch other than main cleanly.
+    When ``project_dir`` is None only the canon defaults apply.
+    """
     schema_path = find_canon_dir() / "schema.yaml"
+    raw: dict = {}
     try:
         doc = yaml.safe_load(schema_path.read_text(encoding="utf-8")) or {}
+        if isinstance(doc.get("worktrees"), dict):
+            raw = dict(doc["worktrees"])
     except (OSError, yaml.YAMLError):
-        return WorktreePolicy()
-    raw = doc.get("worktrees") or {}
+        raw = {}
+    # Per-project override from coord.yaml (durable across upgrades).
+    if project_dir is not None:
+        for cand in (project_dir / "coord.yaml",
+                     project_dir / "coordination" / "coord.yaml"):
+            if cand.is_file():
+                try:
+                    cdoc = yaml.safe_load(cand.read_text(encoding="utf-8")) or {}
+                    over = cdoc.get("worktrees")
+                    if isinstance(over, dict):
+                        raw.update(over)  # project wins over canon defaults
+                except (OSError, yaml.YAMLError):
+                    pass
+                break
     return WorktreePolicy(
         base_path=str(raw.get("base_path") or ".worktrees"),
         branch_prefix=str(raw.get("branch_prefix") or "task/"),
@@ -156,7 +185,7 @@ def worktree_create(project_dir: Path, task_id: str,
     returns the path without error. The branch ``task/<task_id>`` is
     created off ``base_commit`` (plan default or explicit override).
     """
-    policy = policy or load_worktree_policy()
+    policy = policy or load_worktree_policy(project_dir)
     wt_path = policy.worktree_path_for(project_dir, task_id)
     branch = policy.branch_for(task_id)
 
@@ -193,7 +222,7 @@ def worktree_remove(project_dir: Path, task_id: str,
     Returns True if anything was removed, False if the worktree
     didn't exist (idempotent no-op).
     """
-    policy = policy or load_worktree_policy()
+    policy = policy or load_worktree_policy(project_dir)
     wt_path = policy.worktree_path_for(project_dir, task_id)
     branch = policy.branch_for(task_id)
     removed = False
@@ -228,7 +257,7 @@ def worktree_merge(project_dir: Path, task_id: str,
     ``MergeResult(ok=False, conflicts=[...])`` so the caller can
     hand back to ``conflict_handback_to`` per policy.
     """
-    policy = policy or load_worktree_policy()
+    policy = policy or load_worktree_policy(project_dir)
     branch = policy.branch_for(task_id)
     target = policy.default_branch
     # 0300 (upstream issue #6): merge direction MUST be
@@ -306,7 +335,7 @@ def worktree_prune(project_dir: Path,
     orphan-sweep tick. Idempotent — repeated calls with the same
     active set yield no further removals.
     """
-    policy = policy or load_worktree_policy()
+    policy = policy or load_worktree_policy(project_dir)
     base = project_dir / policy.base_path
     if not base.is_dir():
         return []
@@ -416,7 +445,7 @@ def cli_path(task_id: str, project_dir: Path | None) -> None:
     isolated tree.
     """
     pd = project_dir or _default_project_dir()
-    policy = load_worktree_policy()
+    policy = load_worktree_policy(pd)
     click.echo(str(policy.worktree_path_for(pd, task_id)))
 
 

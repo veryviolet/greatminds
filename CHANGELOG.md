@@ -4,6 +4,40 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.5.9 — 2026-06-04
+
+Make the fleet's working branch cleanly project-configurable, and make
+`upgrade` migrate the whole project (not just the package).
+
+### Fixed
+
+- **`worktrees.default_branch` is now per-project configurable via
+  `coord.yaml`.** 1.5.8 added the setting but `load_worktree_policy` read
+  it only from the canon (package) `schema.yaml` — which ships `main`, is
+  shared across every project on the host, and is overwritten on each
+  upgrade. So a project could not actually pin its own branch. The policy
+  now overlays a `worktrees:` override from the project's `coord.yaml`
+  (project-local, never overwritten) on top of the canon defaults. To run
+  a fleet on another branch: put `worktrees: { default_branch: <branch> }`
+  in `coord.yaml`.
+
+### Added
+
+- **`greatminds migrate`** + **`greatminds update` now migrates the whole
+  project.** Previously `update` bumped the package but left the project's
+  config stale (e.g. a pre-driven `coord.yaml` with every role paned → 10
+  tmux windows on launch; missing `feature_live`; leftover
+  `command_START.yaml` / per-role docs / `bot_*` queues). `update` now runs
+  a migration step (and it is also available standalone as `greatminds
+  migrate`, for fleets already on the new package but with stale config):
+  refresh canon (`setup`: schema / COORDINATE / bootstrap / missing queues
+  / `.gitignore`), migrate `coord.yaml` from the old all-paned model to the
+  current driven model (workers → `driven`, add `dashboard` + `live`),
+  preserving session / `project_dir` / the `worktrees` override / custom
+  role-less windows and backing up the old file, and remove artifacts
+  deleted in newer versions (`command_START.yaml`, per-role `<ROLE>.md`
+  docs, empty `bot_*` queues).
+
 ## 1.5.8 — 2026-06-04
 
 Feature: configurable worktree base/merge branch.

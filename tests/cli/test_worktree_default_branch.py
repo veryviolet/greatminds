@@ -68,6 +68,35 @@ def test_merge_still_main_by_default(tmp_path: Path, monkeypatch):
 # ---------- base fallback uses default_branch ----------
 
 
+# ---------- per-project override via coord.yaml ----------
+
+
+def test_coord_yaml_overrides_default_branch(tmp_path: Path):
+    """A project pins its working branch in coord.yaml (durable across
+    upgrades), NOT in the package schema."""
+    (tmp_path / "coord.yaml").write_text(
+        "session: proj\nworktrees:\n  default_branch: unify\n",
+        encoding="utf-8")
+    p = wt_mod.load_worktree_policy(tmp_path)
+    assert p.default_branch == "unify"
+
+
+def test_coord_yaml_override_under_coordination(tmp_path: Path):
+    (tmp_path / "coordination").mkdir()
+    (tmp_path / "coordination" / "coord.yaml").write_text(
+        "session: proj\nworktrees:\n  default_branch: dev\n", encoding="utf-8")
+    assert wt_mod.load_worktree_policy(tmp_path).default_branch == "dev"
+
+
+def test_no_coord_override_falls_back_to_canon_main(tmp_path: Path):
+    # no coord.yaml in project → canon default (main).
+    assert wt_mod.load_worktree_policy(tmp_path).default_branch == "main"
+
+
+def test_no_project_dir_uses_canon_only(tmp_path: Path):
+    assert wt_mod.load_worktree_policy().default_branch == "main"
+
+
 def test_base_fallback_uses_default_branch(tmp_path: Path, monkeypatch):
     calls = _capture(monkeypatch)
     # no coordination/task → find_task yields nothing → fallback to
