@@ -4,6 +4,42 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.5.7 — 2026-06-04
+
+Canon: insist on full-contract reading, add a no-code stand-verification
+FSM path, and a read-only PROJECT.md surface.
+
+### Added
+
+- **`plan.verify_only` → `feature_plan → feature_test`.** A no-code
+  stand/playbook task (e.g. "deploy the full stand by profile X",
+  "verify this playbook") had no clean FSM path — `feature_test` was
+  reachable only from an implementer queue with an `implementation`
+  block. PLANNER now routes a `verify_only` plan straight to TESTER, who
+  leases a stand, runs the profile/probe, and records stand evidence
+  (mirrors the READER `audit_only` path). "Deploy the stand" and "test
+  the stand" are the SAME path differing only in verification depth
+  (readiness-only vs functional probes) — documented in COORDINATE §8.2.
+  There is deliberately NO task-less stand deploy: every lease serves an
+  auditable task, which is what anchors the tested/verified gate.
+- **`greatminds project show`** — read-only print of
+  `coordination/PROJECT.md`. Closes a protocol gap: the contract requires
+  agents to read PROJECT.md, but it lives under `coordination/` and the
+  mutations-via-CLI rule left no sanctioned CLI to obtain it.
+
+### Changed
+
+- **bootstrap.md now insists on reading the contract IN FULL.** The old
+  wording ("YOUR contract is `roles.<ROLE>`") let agents — codex
+  especially — skim to their role section and stop, then propose moves
+  the FSM forbids. It now requires reading the whole `schema.yaml` every
+  tick (glossary, the full queue graph, and the exact transitions of the
+  path the task is on); the role block is necessary but not sufficient.
+- **The "CLI-only" rule is scoped to MUTATIONS.** Reading the canon docs
+  (`schema.yaml`, `COORDINATE.md`, `bootstrap.md`, `coordination/PROJECT.md`)
+  directly is now explicitly allowed — they are docs, not FSM state.
+  Only mutations + queue/inbox/task ops go through the CLI.
+
 ## 1.5.6 — 2026-06-04
 
 Fix: MAINTAINER tick cadence + runtime files leaking into git.

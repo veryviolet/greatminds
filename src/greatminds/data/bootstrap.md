@@ -6,11 +6,19 @@ lives in canon — read it FIRST, every tick, before acting; it changes
 across long sessions, so never operate on stale memory:
 
 - `schema.yaml` (at the project root — the directory containing
-  `coordination/`): the machine-readable contract. YOUR contract is
-  `roles.<GREATMINDS_ROLE>` (responsibilities, forbidden_actions,
-  event_triggers, claims_from, lifecycle). Term definitions are under
-  `glossary`. The FSM you operate in is `queues` / `transitions` /
-  `block_kinds` / `queue_accepts_blocks`.
+  `coordination/`): the machine-readable contract. READ IT IN FULL,
+  every tick — do NOT skim to your role section and stop. Your role
+  block `roles.<GREATMINDS_ROLE>` (responsibilities, forbidden_actions,
+  event_triggers, claims_from, lifecycle) is NECESSARY but NOT
+  SUFFICIENT: you operate inside the whole FSM, so you must also read
+  and understand `glossary` (every term, not just yours), the queue
+  graph `queues` / `transitions` / `block_kinds` / `queue_accepts_blocks`
+  IN FULL, and in particular the exact transitions, `requires:`, and
+  `by:` roles for the path the task in front of you is on (which queue
+  it can move to, what block + fields that move demands, who may perform
+  it). Stopping at your own role is the most common failure — it makes
+  you propose moves the FSM forbids. Analyze the contract, don't sample
+  it.
 - `COORDINATE.md` (project root): the coordination philosophy, the hard
   ownership invariant, and the stand / tested-verified gates.
 - `coordination/PROJECT.md`: this project's concrete specifics — hosts,
@@ -29,9 +37,16 @@ Follow your lifecycle — `glossary.lifecycles[<your lifecycle>]`:
 - `interactive`: you are USER-paced — wait for USER input between turns;
   do not self-schedule.
 
-ALL access to `coordination/` goes through the `greatminds` CLI only —
-never raw `ls` / `cat` / `mv` / `Edit` / `Write` on coordination files.
-The CLI resolves paths regardless of cwd, enforces the FSM, and writes
-the intent / journal / heartbeat side effects for you.
+Every MUTATION of FSM state under `coordination/` — tasks, inbox,
+queues, the stand — goes through the `greatminds` CLI ONLY: never raw
+`mv` / `Edit` / `Write` / hand-authored task or inbox files, and never
+`ls` a queue (use `greatminds task list`). The CLI resolves paths
+regardless of cwd, enforces the FSM, and writes the intent / journal /
+heartbeat side effects for you. READING the canon docs directly is
+expected and fine — they are docs, not FSM state: `schema.yaml`,
+`COORDINATE.md`, `bootstrap.md` (project root) and
+`coordination/PROJECT.md` (also via `greatminds project show`). Read
+them with your normal file-read tool; the CLI-only rule is about
+mutating state, not reading documentation.
 
 Now act on your tick.

@@ -311,6 +311,49 @@ Convention:
 Schema source-of-truth: `schema.stand_profile`. The runtime loader and
 validator read profiles from there.
 
+### 8.2 Stand-only verification tasks (`plan.verify_only`)
+
+A task whose whole point is to exercise the stand — "deploy the full
+stand by profile X", "bring the stand up and confirm it works", "verify
+this playbook" — produces NO product code, so it does NOT flow through
+an implementer queue. There is deliberately NO task-less stand deploy:
+every lease serves an auditable task (`stand lease --task` is required),
+which is what anchors the stand's audit trail and the tested/verified
+gate. So "just deploy the stand" and "test the stand" are the SAME FSM
+path — a `verify_only` task — differing only in the verification DEPTH:
+
+- **deploy-only** ("разверни стенд по профилю X"): the bar is readiness —
+  SK deploys the profile and TESTER confirms the stand came up healthy
+  (ssh / docker / health GET). No functional probes required.
+- **behavioural test** ("проверь, что работает X"): the bar adds
+  `functional_probes` + `tester_observations` — TESTER exercises the
+  behaviour on the deployed stand.
+
+PLANNER maps a bare "deploy the stand by profile X" to a `verify_only`
+task with that profile and a readiness-only bar — it does NOT invent a
+separate mechanism and does NOT hand-run a manual runbook. The flow:
+
+1. **PLANNER** plans it with `stand_required: true`, a concrete
+   `stand_reason`, the `profile` to exercise (e.g. `full-deploy` for
+   scenarios A/B, `vite-dev` for live UI, `smoke-only` for warmup), and
+   `verify_only: true`. PLANNER routes it `feature_plan → feature_test`
+   directly (the `plan.verify_only` transition — no implementer step).
+   PLANNER never runs ansible or checks the product itself.
+2. **STAND-KEEPER** executes the profile on the lease and does readiness
+   ONLY — ssh-reachable, `docker`/health GET, gpu, endpoint presence.
+   It does not do acceptance.
+3. **TESTER** holds the `feature_test` lease, waits for `ready`, exercises
+   the behaviour on the deployed stand, and records a `tests` block with
+   real stand evidence (`reproduction_steps`, `observed_*`, `lease_id`,
+   `result`, `commit`, plus `functional_probes` + `tester_observations`
+   for backend/ui), then runs `gate-check`. It advances via the normal
+   `feature_test → feature_review → verified` path.
+4. Behavioural "use it like a user" verification can instead be an
+   **EXPLORER** `review_sessions` lease; bugs found go to `feature_inbox`.
+
+So: deploy/readiness = STAND-KEEPER, behavioural verification = TESTER
+(or EXPLORER), bug intake = `feature_inbox`, planning/routing = PLANNER.
+
 ---
 
 ## 9. Tested / verified — definition

@@ -807,6 +807,16 @@ def is_interactive_task(data: dict[str, Any]) -> bool:
     return bool(p and p.get("interactive") is True)
 
 
+def is_verify_only(data: dict[str, Any]) -> bool:
+    """No-code stand/playbook verification marker: the latest plan sets
+    ``verify_only: true``. Such a task produces NO implementation — it
+    routes feature_plan → feature_test directly so TESTER leases a stand,
+    runs the playbook/probe, and records stand evidence (mirrors the
+    READER ``audit_only`` path that skips the implementer)."""
+    p = latest_plan(data)
+    return bool(p and p.get("verify_only") is True)
+
+
 def require_target_readiness(data: dict[str, Any],
                              from_q: str, to_q: str) -> None:
     """Some transitions require the latest block to set a ready_for_* flag."""
@@ -894,6 +904,31 @@ def require_target_readiness(data: dict[str, Any],
             raise GreatMindsError(
                 f"mv → feature_review (from {from_q}) requires "
                 f"{block_kind}.{flag}=true"
+            , exit_code=2)
+        return
+
+    # A verify-only task (plan.verify_only: true) has NO implementer
+    # step — it routes feature_plan → feature_test directly so TESTER
+    # leases a stand, runs the playbook/probe, and records stand
+    # evidence. Bypass the implementation.ready_for_test gate (there is
+    # no implementation block); still require the plan to be marked
+    # ready_for_implementation. Mirrors the audit_only feature_docs_review
+    # path. (feature_dev/feature_ui_dev → feature_test still hit the
+    # generic implementation gate below.)
+    if to_q == "feature_test" and from_q == "feature_plan":
+        p = latest_plan(data)
+        if not (p and p.get("verify_only") is True):
+            raise GreatMindsError(
+                "mv feature_plan → feature_test requires the latest plan "
+                "block to set verify_only: true (the no-code stand/playbook "
+                "verification path — TESTER leases a stand and records "
+                "evidence; otherwise route via an implementer queue and "
+                "advance with an implementation block)"
+            , exit_code=2)
+        if not p.get("ready_for_implementation"):
+            raise GreatMindsError(
+                "mv feature_plan → feature_test (verify_only) requires "
+                "plan.ready_for_implementation=true"
             , exit_code=2)
         return
 
@@ -1447,6 +1482,25 @@ def _check_plan_interactive(data: dict[str, Any],
     )
 
 
+def _check_plan_verify_only(data: dict[str, Any],
+                            from_q: str, to_q: str) -> str | None:
+    """feature_plan → feature_test requires the latest plan block to set
+    ``verify_only: true`` (the no-code stand/playbook verification path:
+    TESTER leases a stand, runs the playbook/probe, records stand
+    evidence — no implementer step)."""
+    if is_verify_only(data):
+        return None
+    return (
+        "plan.verify_only: feature_plan → feature_test requires the latest "
+        "plan block to set verify_only: true (no-code stand/playbook "
+        "verification — TESTER leases a stand and records evidence). "
+        "Append `greatminds task append-block plan --id <X> --field "
+        "verify_only=true ...`, or route via an implementer queue "
+        "(feature_dev / feature_ui_dev) and advance with an implementation "
+        "block."
+    )
+
+
 # ---------------------------------------------------------------------------
 SCHEMA_REQUIRES_VALIDATORS: dict[str, "callable"] = {
     # Empty pre-condition is always satisfied.
@@ -1474,6 +1528,9 @@ SCHEMA_REQUIRES_VALIDATORS: dict[str, "callable"] = {
     # feature_plan → feature_live: real gate on the latest plan's
     # interactive marker (the LIVE-DEVELOPER routing path).
     "plan.interactive": _check_plan_interactive,
+    # feature_plan → feature_test: real gate on the latest plan's
+    # verify_only marker (the no-code stand/playbook verification path).
+    "plan.verify_only": _check_plan_verify_only,
     # 0225 doc: implementation_block / tests_block names appear in
     # ``feature_plan → feature_dev`` and ``feature_dev → feature_test``
     # requires but the named block doesn't exist yet at mv time (it

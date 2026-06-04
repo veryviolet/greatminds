@@ -52,7 +52,7 @@ glossary:
     feature_dev: "Backend implementation."
     feature_ui_dev: "UI implementation."
     feature_docs: "Documentation implementation."
-    feature_test: "Implemented code ready for TESTER validation on a deployed stand."
+    feature_test: "Implemented code ready for TESTER validation on a deployed stand. Two entry paths: from an implementer queue (feature_dev / feature_ui_dev with an implementation block), or directly from feature_plan when plan.verify_only — a no-code stand/playbook verification task TESTER runs on a leased stand (no implementer step)."
     feature_docs_review: "Docs ready for READER review."
     feature_live: "Interactive single-task work for LIVE-DEVELOPER (routed by PLANNER when plan.interactive). The role leases a stand, works live with the USER, and hands to feature_review as a sprint task on USER approval."
     feature_review: "Final review; ARCHITECT-REVIEWER approves or hands back."
@@ -644,6 +644,16 @@ transitions:
     to: feature_live
     by: ARCHITECT-PLANNER
     requires: [plan_block, plan.interactive]
+  # No-code stand/playbook verification: a plan marked plan.verify_only:
+  # true has NO implementer step — PLANNER routes it straight to TESTER,
+  # who leases a stand, runs the playbook/probe, and records real stand
+  # evidence on a tests block, then advances via the normal feature_test
+  # → feature_review → verified path. Mirrors the audit_only feature_docs
+  # _review path (skip the implementer, go straight to the verifier).
+  - from: feature_plan
+    to: feature_test
+    by: ARCHITECT-PLANNER
+    requires: [plan_block, plan.verify_only]
   - from: feature_dev
     to: feature_test
     by: DEVELOPER

@@ -43,7 +43,10 @@ def test_static_bootstrap_carries_cli_only_rule() -> None:
     """The single static system prompt every agent receives must state
     the CLI-only coordination-access rule (the agent also reads
     schema.coordination_access itself)."""
-    text = (find_canon_dir() / "bootstrap.md").read_text(encoding="utf-8")
-    assert "greatminds` CLI only" in text or "greatminds CLI only" in text, (
-        "bootstrap.md must state coordination/ access is CLI-only")
+    text = (find_canon_dir() / "bootstrap.md").read_text(encoding="utf-8").lower()
+    # 1.5.7 reworded this to scope the rule to MUTATIONS (reading docs like
+    # PROJECT.md is explicitly allowed) — match case-insensitively so the
+    # clarified phrasing ("through the `greatminds` CLI ONLY") still passes.
+    assert "greatminds` cli only" in text or "greatminds cli only" in text, (
+        "bootstrap.md must state coordination/ FSM-state access is CLI-only")
     assert "coordination/" in text
