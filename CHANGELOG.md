@@ -4,6 +4,29 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.5.6 — 2026-06-04
+
+Fix: MAINTAINER tick cadence + runtime files leaking into git.
+
+### Fixed
+
+- **MAINTAINER self-loop cadence is pinned to 1 hour in canon.** The
+  1.5.0 refactor dropped the per-role docs (where the hourly recovery
+  cadence used to live) and never carried it into the schema, so a fresh
+  MAINTAINER fell back to the agent's own ~5-minute default loop — and
+  any operator "set it to an hour" was lost on the next session /
+  re-bootstrap. Added `schema.roles.MAINTAINER.self_loop_wake_seconds:
+  3600`, and the `self-loop` lifecycle + `bootstrap.md` now instruct the
+  agent to re-arm for that configured cadence (shorter only while
+  mid-recovery) rather than inventing a faster interval.
+- **`setup` gitignores per-role tool runtime.** The seeded
+  `coordination/.gitignore` excluded heartbeats / registry / locks but
+  NOT `.codex-home*/` (codex sessions, logs, and an embedded plugin git
+  repo), `.turns/` (driven-turn logs), or `.stand/` (live lease state +
+  deploy logs) — so a `git add` of `coordination/` swept codex runtime
+  (and a nested git repo) into the project. Added those three to the
+  generated `.gitignore`.
+
 ## 1.5.5 — 2026-06-04
 
 Fix: `greatminds setup` never created the `feature_live` queue.

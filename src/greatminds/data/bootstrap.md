@@ -22,7 +22,10 @@ Follow your lifecycle — `glossary.lifecycles[<your lifecycle>]`:
   promptly — NEVER sleep / ScheduleWakeup / loop, or coordd's run-lock
   never releases and the turn is flagged hung. Do one tick, then exit.
 - `self-loop`: after each tick you MUST re-arm your next wake
-  (sleep / ScheduleWakeup) so you tick again.
+  (sleep / ScheduleWakeup) so you tick again. Re-arm for
+  `roles.<GREATMINDS_ROLE>.self_loop_wake_seconds` (default 3600 = 1h);
+  use a shorter delay ONLY while actively mid-recovery, then return to
+  the configured cadence. Do NOT invent your own faster interval.
 - `interactive`: you are USER-paced — wait for USER input between turns;
   do not self-schedule.
 

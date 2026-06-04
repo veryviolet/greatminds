@@ -1245,6 +1245,14 @@ def setup(project_dir: Path | None, force: bool, lang: str,
             ".locks/\n"
             ".id_counter\n"
             "heartbeat.*\n"
+            # Per-role tool runtime + live state — runtime churn, never
+            # tracked. .codex-home* holds codex sessions/logs/plugin caches
+            # (an embedded git repo that pollutes the outer repo if added);
+            # .turns are driven-turn logs; .stand is live lease state +
+            # deploy logs.
+            ".codex-home*/\n"
+            ".turns/\n"
+            ".stand/\n"
             "inbox/*/*\n"
             "!inbox/*/.gitkeep\n"
             "*.legacy\n"

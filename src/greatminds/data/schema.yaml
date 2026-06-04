@@ -35,7 +35,7 @@ glossary:
     MAINTAINER: "System operator, self-loop watchdog. Handles infrastructure the product pipeline cannot self-heal: agent restart, dead-pid recovery, greatminds CLI + schema.yaml maintenance, cutover orchestration. Receives asks at inbox/maintainer/ from coordd and from product agents when an issue is structural/schema rather than product. Sweeps PROACTIVELY every tick (an empty inbox is NOT 'nothing to do'): reclaims stale stand leases past TTL with a dead/absent holder, restarts dead agents and coordd, and escalates stalled task/queue chains to ARCHITECT-PLANNER. Does NOT claim product queues, triage user_feedback, or write plans."
   lifecycles:
     interactive: "Human-paced chat in a tmux pane; the USER drives each turn. coordd never runs its turns. The agent waits for USER input between turns — it does not self-schedule."
-    self-loop: "Runs its own loop in a tmux pane. After each tick it MUST re-arm its next wake (sleep / ScheduleWakeup) so it ticks again. coordd may nudge it (tmux_send_keys) but never runs its turns."
+    self-loop: "Runs its own loop in a tmux pane. After each tick it MUST re-arm its next wake (sleep / ScheduleWakeup) for roles.<ROLE>.self_loop_wake_seconds (default 3600s = 1h) so it ticks again on that cadence — a shorter delay is allowed ONLY while actively mid-recovery, then return to the configured cadence; the agent must NOT invent a faster interval. coordd may nudge it (tmux_send_keys) but never runs its turns."
     driven: "No tmux pane; coordd runs each turn as a managed subprocess (claude -p / codex app-server) on queue / inbox / .stand events, holding the per-role run-lock for the full turn. The turn MUST return promptly — NEVER sleep / ScheduleWakeup / loop, or the run-lock never releases and the hang detector flags the turn."
   wake_mechanisms:
     tmux_send_keys: "Wake by typing WAKE_TEXT then Enter into the role's tmux pane. The only safe mechanism for interactive / self-loop roles (SIGINT to a live TUI is Ctrl-C → quit); also claude's default."
@@ -488,6 +488,12 @@ roles:
     # run recovery (no queue-claim, USER-absent operation). It
     # self-paces a recovery tick; it is not a human-paced chat seat.
     lifecycle: self-loop
+    # Self-loop cadence (seconds). The recovery watchdog ticks HOURLY —
+    # it is not a busy-poll. Pinned here because the agent otherwise
+    # defaults to its own ~5-min loop; the cadence must live in canon so
+    # it survives fresh sessions and re-bootstraps. A shorter delay is
+    # allowed ONLY while actively mid-recovery, then return to this.
+    self_loop_wake_seconds: 3600
     claims_from: []
     responsibilities:
       - agent_restart
