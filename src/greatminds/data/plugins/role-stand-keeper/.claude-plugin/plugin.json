@@ -1,7 +1,0 @@
-{
-  "name": "role-stand-keeper",
-  "version": "0.1.0",
-  "description": "STAND-KEEPER role skills: stand bring-up, fresh-DB volume wipes, fault isolation.",
-  "author": { "name": "Guardora coordination", "email": "support@guardora.ai" },
-  "keywords": ["coordination", "role-stand-keeper"]
-}

@@ -32,7 +32,7 @@ CANONICAL_WINDOWS = [
     ("tester",     "TESTER",             "claude", "driven"),
     ("reader",     "READER",             "claude", "driven"),
     ("explorer",   "EXPLORER",           "codex",  "driven"),
-    ("stand",      "STAND-KEEPER",       "claude", "driven"),
+    # 1.6.0: STAND-KEEPER retired — coordd deploys the stand itself.
 ]
 
 
@@ -163,7 +163,7 @@ def test_generated_coord_yaml_has_canonical_windows(tmp_path):
     doc = yaml.safe_load((project_dir / "coord.yaml").read_text())
 
     assert isinstance(doc["windows"], list)
-    assert len(doc["windows"]) == len(CANONICAL_WINDOWS) == 12
+    assert len(doc["windows"]) == len(CANONICAL_WINDOWS) == 11
 
     for window, (name, role, tool, mode) in zip(
         doc["windows"], CANONICAL_WINDOWS,

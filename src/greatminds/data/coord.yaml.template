@@ -72,7 +72,3 @@ windows:
     role: EXPLORER
     tool: codex
     mode: driven
-  - name: stand
-    role: STAND-KEEPER
-    tool: claude
-    mode: driven
