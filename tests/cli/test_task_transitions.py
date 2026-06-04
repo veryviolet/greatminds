@@ -72,6 +72,43 @@ def test_transitions_for_resolves_any_resume_to_queue_wildcard(monkeypatch):
     assert matches[0]["by"] == "ARCHITECT-REVIEWER"
 
 
+def test_resume_wildcard_excludes_terminal_archive(monkeypatch):
+    """Regression: ``any_resume_to_queue`` must NOT match the terminal
+    ``archive`` queue. With both the exact withdraw row and the resume
+    wildcard present (as in real schema), ``feature_blocked → archive``
+    must match ONLY the withdraw row — otherwise the resume path's
+    wake-check (all_dependencies_exist_per_wake_check) fires on a
+    withdrawn task whose sentinel dependency never resolves, making
+    archive impossible."""
+    _install_schema(monkeypatch, [
+        {"from": "feature_blocked", "to": "archive", "by": "ARCHITECT-REVIEWER",
+         "requires": ["feature_blocked_withdrawn_reason"]},
+        {"from": "feature_blocked", "to": "any_resume_to_queue",
+         "by": "ARCHITECT-REVIEWER",
+         "requires": ["all_dependencies_exist_per_wake_check"]},
+    ], queues={
+        "feature_blocked": {"owner": "ARCHITECT-REVIEWER",
+                            "writers": ["ARCHITECT-REVIEWER"], "kind": "parking"},
+        "feature_dev": {"owner": "DEVELOPER", "writers": ["DEVELOPER"],
+                        "kind": "active"},
+        "archive": {"owner": "ARCHITECT-PLANNER",
+                    "writers": ["ARCHITECT-PLANNER", "ARCHITECT-REVIEWER"],
+                    "kind": "terminal"},
+        "verified": {"owner": "ARCHITECT-REVIEWER",
+                     "writers": ["ARCHITECT-REVIEWER"], "kind": "terminal"},
+    })
+    # archive (terminal): only the exact withdraw row, no wake-check.
+    arch = task_mod.transitions_for("feature_blocked", "archive")
+    assert len(arch) == 1
+    assert arch[0]["requires"] == ["feature_blocked_withdrawn_reason"]
+    # verified (terminal): the wildcard must not invent a transition.
+    assert task_mod.transitions_for("feature_blocked", "verified") == []
+    # feature_dev (active resume): wildcard still applies, wake-check stays.
+    resume = task_mod.transitions_for("feature_blocked", "feature_dev")
+    assert len(resume) == 1
+    assert resume[0]["requires"] == ["all_dependencies_exist_per_wake_check"]
+
+
 def test_transitions_for_singular_back_compat(monkeypatch):
     _install_schema(monkeypatch, [
         {"from": "review_sessions", "to": "archive", "by": "ARCHITECT-PLANNER"},

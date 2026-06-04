@@ -4,6 +4,28 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.5.2 — 2026-06-04
+
+Patch: the documented task-withdraw path was broken — a withdrawn task
+could never be archived.
+
+### Fixed
+
+- **`feature_blocked → archive` (withdraw) no longer collides with the
+  resume wildcard.** `transitions_for` resolved `any_resume_to_queue`
+  against *any* concrete `to_q`, including the terminal `archive` queue.
+  So `feature_blocked → archive` matched BOTH the exact withdraw row
+  (`requires: feature_blocked_withdrawn_reason`) AND the resume wildcard
+  (`requires: all_dependencies_exist_per_wake_check`), and
+  `enforce_schema_requires` runs the requires from every matching row —
+  so the resume path's wake-check fired on the withdraw path. A
+  withdrawn task carries a never-resolving sentinel dependency by design,
+  making the wake-check (and therefore archive) impossible. The two
+  paths are mutually exclusive. `any_resume_to_queue` now matches only
+  non-terminal queues, so a parked task can be withdrawn-archived (the
+  canonical PLANNER-blocks → REVIEWER-archives cleanup path) without its
+  sentinel dependency having to resolve.
+
 ## 1.5.1 — 2026-06-03
 
 Patch: two issues surfaced operating the 1.5.0 fleet live.

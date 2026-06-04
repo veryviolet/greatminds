@@ -208,7 +208,18 @@ def transitions_for(from_q: str, to_q: str) -> list[dict[str, Any]]:
 
     Wildcards resolved here:
       ``from == "any_active_queue"``       → matches any concrete ``from_q``.
-      ``to   == "any_resume_to_queue"``    → matches any concrete ``to_q``.
+      ``to   == "any_resume_to_queue"``    → matches any NON-TERMINAL
+          concrete ``to_q``. "Resume" returns a parked task to active
+          work; it must never resolve to a terminal queue (archive /
+          verified). Letting it match terminal queues was a real FSM
+          bug: ``feature_blocked → archive`` then matched BOTH the exact
+          withdraw row (requires feature_blocked_withdrawn_reason) AND
+          this wildcard (requires all_dependencies_exist_per_wake_check),
+          and enforce_schema_requires runs requires from every matching
+          row — so the resume path's wake-check fired on the withdraw
+          path. A withdrawn task carries a never-resolving sentinel dep
+          by design, making archive impossible. The two paths are
+          mutually exclusive; the wildcard must stay out of terminals.
     """
     matches: list[dict[str, Any]] = []
     for t in schema().get("transitions") or []:
@@ -216,10 +227,22 @@ def transitions_for(from_q: str, to_q: str) -> list[dict[str, Any]]:
             continue
         f, to = t.get("from"), t.get("to")
         f_ok = (f == from_q) or (f == "any_active_queue")
-        to_ok = (to == to_q) or (to == "any_resume_to_queue")
+        resume_ok = (to == "any_resume_to_queue"
+                     and not _is_terminal_queue(to_q))
+        to_ok = (to == to_q) or resume_ok
         if f_ok and to_ok:
             matches.append(t)
     return matches
+
+
+def _is_terminal_queue(queue: str) -> bool:
+    """True if ``queue`` is a known terminal queue (archive / verified).
+
+    Tolerant of unknown names (returns False) so the resume-wildcard
+    matcher never raises on a non-queue ``to_q``.
+    """
+    q = (schema().get("queues") or {}).get(queue)
+    return isinstance(q, dict) and q.get("kind") == "terminal"
 
 
 def transition_for(from_q: str, to_q: str) -> dict[str, Any] | None:
