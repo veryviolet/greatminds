@@ -160,11 +160,13 @@ def test_lease_on_busy_enqueues(tmp_path, monkeypatch) -> None:
 # ---------- stand ready (SK-only) + inbox-info ----------
 
 
-def test_ready_requires_stand_keeper(tmp_path, monkeypatch) -> None:
-    """0244: only STAND-KEEPER may transition preparing→ready."""
+def test_ready_gated_by_marker_not_role(tmp_path, monkeypatch) -> None:
+    """1.6.0: the SK-only role guard is GONE (coordd deploys; manual
+    ready/down is operator-override, any role). `ready` is still gated by
+    the deploy marker — so a non-SK role without a marker fails on the
+    marker, not on a role check."""
     coord = tmp_path / "coordination"
     coord.mkdir()
-    # Seed: a lease in preparing state.
     ss.update_stand_state(coord, lambda s: s.update({
         "state": "preparing",
         "active_lease": {"lease_id": "abc", "task": "0099",
@@ -176,7 +178,7 @@ def test_ready_requires_stand_keeper(tmp_path, monkeypatch) -> None:
     )
     assert result.exit_code != 0
     out = result.output + (str(result.exception) if result.exception else "")
-    assert "STAND-KEEPER" in out
+    assert "marker" in out and "STAND-KEEPER" not in out
 
 
 def test_ready_transitions_state(tmp_path, monkeypatch) -> None:
@@ -334,12 +336,16 @@ def test_release_queued_lease_is_cancellation(tmp_path,
 # ---------- stand down / up ----------
 
 
-def test_down_requires_stand_keeper(tmp_path, monkeypatch) -> None:
+def test_down_any_role_allowed(tmp_path, monkeypatch) -> None:
+    """1.6.0: no SK-only guard — any role may mark the stand down
+    (operator-override; coordd marks down automatically on a failed
+    deploy). The actor is recorded as whoever ran it."""
     coord = tmp_path / "coordination"
     coord.mkdir()
     result = _invoke(["down", "--reason", "deploy failed"],
                      tmp_path, role="DEVELOPER", monkeypatch=monkeypatch)
-    assert result.exit_code != 0
+    assert result.exit_code == 0, result.output
+    assert ss.read_stand_state(coord)["state"] == "down"
 
 
 def test_down_sets_reason_and_state(tmp_path, monkeypatch) -> None:

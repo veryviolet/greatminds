@@ -559,12 +559,7 @@ def stand_down(reason: str) -> None:
     """0244: SK-only. Mark the stand DOWN (failed deploy / infra
     incident). Halts queue processing until `stand up`."""
     from greatminds.cli import stand_state as ss
-    role = (os.environ.get("GREATMINDS_ROLE") or "").upper()
-    if role != "STAND-KEEPER":
-        raise GreatMindsError(
-            "only STAND-KEEPER may transition state to down",
-            exit_code=3,
-        )
+    role = (os.environ.get("GREATMINDS_ROLE") or "OPERATOR").upper()
     coord = find_coord_dir()
 
     captured: dict[str, Any] = {}
@@ -606,12 +601,7 @@ def stand_up(reason: str) -> None:
     """0244: SK-only. Transition down→free; resumes queue processing
     on SK's next tick."""
     from greatminds.cli import stand_state as ss
-    role = (os.environ.get("GREATMINDS_ROLE") or "").upper()
-    if role != "STAND-KEEPER":
-        raise GreatMindsError(
-            "only STAND-KEEPER may transition state out of down",
-            exit_code=3,
-        )
+    role = (os.environ.get("GREATMINDS_ROLE") or "OPERATOR").upper()
     coord = find_coord_dir()
 
     captured: dict[str, Any] = {}
@@ -775,12 +765,7 @@ def stand_ready(lease_id: str) -> None:
     from greatminds.cli import stand_state as ss
     from greatminds.cli.stand_executor import deploy_marker_path
 
-    role = (os.environ.get("GREATMINDS_ROLE") or "").upper()
-    if role != "STAND-KEEPER":
-        raise GreatMindsError(
-            "only STAND-KEEPER may transition state to ready",
-            exit_code=3,
-        )
+    role = (os.environ.get("GREATMINDS_ROLE") or "OPERATOR").upper()
     coord = find_coord_dir()
 
     # 0286 gate: marker must exist for this lease_id BEFORE we touch
