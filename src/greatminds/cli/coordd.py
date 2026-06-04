@@ -173,6 +173,14 @@ RETRY_HARD_CAP_SEC  = float(os.environ.get("COORDD_RETRY_HARD_CAP_SEC", "120"))
 RETRY_HARD_MAX      = int(os.environ.get("COORDD_RETRY_HARD_MAX",         "3"))
 DRIVEN_TURN_TIMEOUT_SEC = float(
     os.environ.get("COORDD_DRIVEN_TURN_TIMEOUT_SEC", "1800"))
+# Stand auto-deploy retry: a deploy that RAISES before transitioning
+# leaves the stand stuck in `preparing`. coordd re-attempts it periodically
+# and, after DEPLOY_MAX_ATTEMPTS, escalates to MAINTAINER and forces the
+# stand `down` so it is not stuck forever. (rc!=0 ansible failures already
+# transition to `down` inside deploy_lease — those are not retried here.)
+DEPLOY_MAX_ATTEMPTS = int(os.environ.get("COORDD_DEPLOY_MAX_ATTEMPTS", "3"))
+DEPLOY_RETRY_INTERVAL_SEC = float(
+    os.environ.get("COORDD_DEPLOY_RETRY_INTERVAL_SEC", "60"))
 # Periodic re-reconcile of the driven backlog. The startup reconcile runs
 # once; without a periodic repeat a driven turn that FAILED (rate-limit /
 # transient error) or completed without moving its task never retries — no
@@ -1590,9 +1598,13 @@ def _reconcile_driven_backlog(coord: Path, canon_dir: Path,
 # 1.6.0: leases currently being deployed by coordd (dedup so concurrent
 # `.stand` events don't spawn a second deploy for the same lease).
 _DEPLOYING_LEASES: set[str] = set()
+# 1.6.3: per-lease auto-deploy attempt counter (a deploy that RAISES leaves
+# the stand `preparing`; retry then escalate). lease_id -> attempts.
+_DEPLOY_ATTEMPTS: dict[str, int] = {}
 
 
-def _maybe_auto_deploy_stand(coord: Path, verbose: bool) -> bool:
+def _maybe_auto_deploy_stand(coord: Path, verbose: bool,
+                             *, run_async: bool = True) -> bool:
     """1.6.0: coordd IS the stand deployer — there is no STAND-KEEPER LLM.
 
     When the stand is ``preparing`` with an active lease, run the lease's
@@ -1625,19 +1637,51 @@ def _maybe_auto_deploy_stand(coord: Path, verbose: bool) -> bool:
         try:
             from greatminds.cli.stand import deploy_lease
             rc, _log = deploy_lease(coord, lease_id=lease_id)
+            # deploy_lease transitioned the stand (ready on rc==0, down on
+            # rc!=0) — the attempt completed. Clear the retry counter.
+            _DEPLOY_ATTEMPTS.pop(lease_id, None)
             if verbose:
-                print(f"  1.6.0: coordd auto-deploy lease {lease_id} "
-                      f"rc={rc}", file=sys.stderr)
-        except Exception as exc:  # noqa: BLE001 — never crash coordd
-            if verbose:
-                print(f"  coordd auto-deploy {lease_id} failed: {exc}",
+                print(f"  coordd auto-deploy lease {lease_id} rc={rc}",
                       file=sys.stderr)
+        except Exception as exc:  # noqa: BLE001 — never crash coordd
+            # The deploy RAISED before transitioning → the stand is still
+            # `preparing`. Count the attempt; retry until DEPLOY_MAX_ATTEMPTS,
+            # then escalate + force the stand `down` so it is not stuck.
+            n = _DEPLOY_ATTEMPTS.get(lease_id, 0) + 1
+            _DEPLOY_ATTEMPTS[lease_id] = n
+            detail = str(exc)[:300]
+            if verbose:
+                print(f"  coordd auto-deploy {lease_id} failed "
+                      f"(attempt {n}/{DEPLOY_MAX_ATTEMPTS}): {exc}",
+                      file=sys.stderr)
+            if n >= DEPLOY_MAX_ATTEMPTS:
+                _escalate_to_maintainer(
+                    coord, "stand-deploy", "error", n,
+                    f"lease {lease_id} profile {profile}: {detail}")
+                try:
+                    from greatminds.cli import stand_state as ss
+                    reason = f"coordd auto-deploy failed {n}x: {detail}"
+
+                    def _down(state: dict) -> None:
+                        prev = state.get("state") or "preparing"
+                        state["down_reason"] = reason
+                        state["active_lease"] = None
+                        ss.record_transition(state, prev, "down", "COORDD",
+                                             lease_id=lease_id, reason=reason)
+
+                    ss.update_stand_state(coord, _down)
+                except Exception:  # noqa: BLE001
+                    pass
+                _DEPLOY_ATTEMPTS.pop(lease_id, None)
+            # else: leave `preparing` — the periodic re-attempt retries.
         finally:
             _DEPLOYING_LEASES.discard(lease_id)
 
-    import threading
-    threading.Thread(target=_run, name=f"stand-deploy-{lease_id}",
-                     daemon=True).start()
+    if run_async:
+        threading.Thread(target=_run, name=f"stand-deploy-{lease_id}",
+                         daemon=True).start()
+    else:
+        _run()  # test seam: run the deploy inline
     if verbose:
         print(f"  1.6.0: coordd dispatched stand deploy for lease "
               f"{lease_id} (profile {profile})", file=sys.stderr)
@@ -2397,9 +2441,24 @@ def coordd(project_dir: Path | None, project_name: str | None,
         if verbose:
             print(f"coordd: startup recovery failed: {exc}", file=sys.stderr)
 
+    _last_deploy_retry = time.monotonic()
     while not stop["flag"]:
         try:
             events = poll_or_event_wait(interval) or []
+
+            # Re-attempt a stand deploy stuck in `preparing` (the deploy
+            # raised before transitioning and fired no further event).
+            # _maybe_auto_deploy_stand is a no-op unless the stand is
+            # preparing with a lease not already deploying.
+            _now_d = time.monotonic()
+            if _now_d - _last_deploy_retry >= DEPLOY_RETRY_INTERVAL_SEC:
+                _last_deploy_retry = _now_d
+                try:
+                    _maybe_auto_deploy_stand(coord, verbose)
+                except Exception as exc:  # noqa: BLE001
+                    if verbose:
+                        print(f"coordd: deploy-retry error: {exc}",
+                              file=sys.stderr)
 
             # Re-dispatch driven roles whose last turn failed and whose
             # backoff is now due (targeted retry, not a blanket sweep).

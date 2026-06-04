@@ -4,6 +4,33 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.6.3 — 2026-06-05
+
+Fix the stand-deploy freeze, the daemon's polluted PATH, and document the
+inbox-read protocol structurally.
+
+### Fixed
+
+- **coordd retries a stand deploy stuck in `preparing`.** A deploy that
+  RAISED before transitioning (vs an ansible rc!=0, which already goes
+  `down`) left the stand in `preparing` forever — no event fired, the
+  pipeline froze. coordd now re-attempts it periodically and, after
+  `DEPLOY_MAX_ATTEMPTS`, escalates to MAINTAINER and forces the stand
+  `down` so it is not stuck.
+- **The daemon unit bakes a CLEAN minimal PATH.** 1.6.2 baked the
+  operator's RAW shell PATH, which dragged in cuda / flutter / plugin bins
+  / another project's `.venv-coord` (so the daemon resolved `ansible-
+  playbook` from the wrong, cross-project venv). `daemon install` now
+  resolves exactly the project's own venv bin (its ansible + greatminds),
+  the agent tool dirs (node / claude / codex), and the standard system
+  dirs.
+- **The role-inbox read protocol is documented structurally.** Agents
+  knew to "check inbox" (wake text) but not HOW — `schema.inbox` only had
+  `allowed_kinds`, so an agent guessed `greatminds task list inbox` (no
+  such queue → empty) and never saw its messages. `schema.inbox` now
+  carries `read` / `show` / `ack` / `dir` / `check_when` (machine-readable,
+  not prose in bootstrap).
+
 ## 1.6.2 — 2026-06-05
 
 Make the driven deploy/dispatch model survive failures, and let the leaser

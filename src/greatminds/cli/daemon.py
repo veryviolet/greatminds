@@ -192,6 +192,57 @@ def _resolve_project_name(project: str | None,
 # ---------------------------------------------------------------------------
 
 
+def _clean_daemon_path(exec_cmd: str) -> str:
+    """A MINIMAL, deliberate PATH for the daemon unit — NOT the operator's
+    raw shell PATH (which drags in cuda / flutter / plugin bins / another
+    project's ``.venv-coord``). The daemon needs exactly: the project's
+    own venv bin (greatminds + its ansible), the dirs of the resolved
+    agent tools (node / claude / codex — typically nvm + ``~/.local/bin``),
+    and the standard system dirs. Resolved once, at install time."""
+    import shutil
+
+    dirs: list[str] = []
+    # 1. the project's OWN venv bin (from ExecStart) — its ansible-playbook
+    #    and greatminds, ahead of everything else.
+    try:
+        first = exec_cmd.split()[0]
+        dirs.append(str(Path(first).resolve().parent))
+    except Exception:  # noqa: BLE001
+        pass
+    # 2. dirs of the agent tools, resolved via which / the login shell.
+    #    NOT ansible — the project venv above provides it; resolving it
+    #    here risks pulling in a cross-project venv (the .venv-coord bug).
+    for tool in ("node", "claude", "codex"):
+        p = shutil.which(tool)
+        if not p:
+            try:
+                cp = subprocess.run(
+                    ["bash", "-lc", f"command -v {tool} 2>/dev/null"],
+                    capture_output=True, text=True, timeout=10)
+                for line in reversed((cp.stdout or "").splitlines()):
+                    cand = line.strip()
+                    if cand and Path(cand).exists():
+                        p = cand
+                        break
+            except Exception:  # noqa: BLE001
+                p = None
+        if p and Path(p).exists():
+            # the dir where the command was FOUND (a ~/.local/bin symlink,
+            # an nvm bin) — NOT the symlink's resolved target dir, which
+            # may be a versions/ parent with no invokable entry.
+            dirs.append(str(Path(p).parent))
+    # 3. standard system dirs.
+    dirs += ["/usr/local/sbin", "/usr/local/bin", "/usr/sbin",
+             "/usr/bin", "/sbin", "/bin"]
+    seen: set[str] = set()
+    out: list[str] = []
+    for d in dirs:
+        if d and d not in seen:
+            seen.add(d)
+            out.append(d)
+    return ":".join(out)
+
+
 def _template_unit_body() -> str:
     """Compose the systemd template unit with the resolved ExecStart path.
 
@@ -234,14 +285,14 @@ def _template_unit_body() -> str:
             "[Install]\n"
             "WantedBy=default.target\n"
         )
-    # 1.6.2: bake the operator's PATH into the unit. The systemd-user
-    # default PATH lacks nvm / ~/.local/bin, so the daemon's spawned
-    # driven turns (codex / claude / node) couldn't find their binaries —
-    # the whole reason for the resolver kludges. `daemon install` runs
-    # from the operator's shell, whose PATH HAS the tools; capture it
-    # once here. One place, no in-code fallbacks: the daemon then resolves
-    # everything with a plain `which`, and codex's env-node shebang works.
-    path_val = os.environ.get("PATH", "")
+    # 1.6.3: bake a CLEAN, minimal PATH into the unit (the systemd-user
+    # default PATH lacks nvm / ~/.local/bin, so the daemon's driven turns
+    # couldn't find codex / claude / node). NOT the operator's raw shell
+    # PATH — that dragged in cuda / flutter / plugin bins / another
+    # project's .venv-coord. `_clean_daemon_path` resolves exactly: the
+    # project's own venv bin (greatminds + its ansible), the agent tool
+    # dirs, and the standard system dirs.
+    path_val = _clean_daemon_path(exec_cmd)
     if path_val and "Environment=PATH=" not in body:
         body = body.replace(
             "[Service]\n", f"[Service]\nEnvironment=PATH={path_val}\n", 1)
