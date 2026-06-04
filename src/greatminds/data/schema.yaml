@@ -846,6 +846,14 @@ watchdog:
 # ---------------------------------------------------------------------------
 inbox:
   allowed_kinds: [wake, ask, info]
+  # Per-role message inbox: coordd and other roles message YOU here
+  # (wakes, asks, infos). Read it FIRST every tick. It is NOT a task
+  # queue — `greatminds task list inbox` is wrong (no such queue).
+  dir: "coordination/inbox/${GREATMINDS_ROLE}/"
+  read: "greatminds inbox list"          # role from $GREATMINDS_ROLE
+  show: "greatminds inbox show <path>"
+  ack: "greatminds inbox ack <path>"     # after acting on the message
+  check_when: "first each tick (wake text: 'check inbox and continue your tick')"
 
 # ---------------------------------------------------------------------------
 # Git permissions
