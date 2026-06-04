@@ -258,10 +258,13 @@ def _holder_alive(coord: Path, holder_role: str) -> bool:
 
 def _file_inbox_info(coord: Path, to_role: str, body: str,
                      task_ref: str = "") -> None:
-    """0244: file an inbox info-message to ``to_role`` from STAND-KEEPER
-    (the role responsible for ``ready`` transitions). Best-effort:
-    failure does NOT block the state transition — the state file is
-    the FSM source-of-truth; inbox messages are a notification layer.
+    """File an inbox info-message to ``to_role`` about a stand lifecycle
+    event. 1.6.0: the stand is driven by coordd (no STAND-KEEPER role), so
+    the notification is filed as MAINTAINER (the system/infra role —
+    STAND-KEEPER is gone and would be rejected as an unknown sender).
+    Best-effort: failure does NOT block the state transition — the state
+    file is the FSM source-of-truth; inbox messages are a notification
+    layer.
 
     Shells out to ``greatminds inbox send`` so the journal entry +
     heartbeat side-effects fire through the normal CLI path."""
@@ -273,7 +276,7 @@ def _file_inbox_info(coord: Path, to_role: str, body: str,
              "--body", body]
             + (["--task", task_ref] if task_ref else []),
             cwd=str(coord.parent),
-            env={**os.environ, "GREATMINDS_ROLE": "STAND-KEEPER"},
+            env={**os.environ, "GREATMINDS_ROLE": "MAINTAINER"},
             capture_output=True, text=True, timeout=10,
         )
         if cp.returncode != 0:

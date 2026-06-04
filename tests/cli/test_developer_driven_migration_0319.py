@@ -34,7 +34,7 @@ from greatminds.core.paths import find_canon_dir
 
 
 # Roles migrated to driven in this batch.
-MIGRATED = ["DEVELOPER", "UI-DEVELOPER", "TESTER", "STAND-KEEPER"]
+MIGRATED = ["DEVELOPER", "UI-DEVELOPER", "TESTER"]
 # Roles that MUST stay non-driven: only the two paned, resident seats.
 # Every worker — including the codex ones (ARCHITECT-REVIEWER, EXPLORER,
 # TECHNICAL-WRITER) — is driven.

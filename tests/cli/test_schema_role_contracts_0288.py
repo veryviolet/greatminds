@@ -28,7 +28,6 @@ PRODUCT_ROLES = (
     "TESTER",
     "READER",
     "EXPLORER",
-    "STAND-KEEPER",
     "MAINTAINER",
 )
 
@@ -123,26 +122,6 @@ def test_tester_forbidden_includes_fake_evidence() -> None:
     forb = _schema_roles()["TESTER"]["forbidden_actions"]
     assert "fill_fake_stand_evidence" in forb
     assert "deploy_stand" in forb
-
-
-def test_sk_event_triggers_lease_preparing_executor_chain() -> None:
-    """STAND-KEEPER's on_lease_preparing must invoke the executor
-    BEFORE stand ready — exactly the 0286 mandatory contract."""
-    entry = _schema_roles()["STAND-KEEPER"]
-    steps = entry["event_triggers"]["on_lease_preparing"]
-    joined = " ".join(steps)
-    assert "load_profile" in joined
-    assert "dispatch_profile" in joined or "execute_yaml" in joined
-    assert "stand_ready" in joined
-    assert "stand_down" in joined
-
-
-def test_sk_forbidden_includes_mv_to_review() -> None:
-    """SK must not perform product-pipeline moves; that's TESTER /
-    REVIEWER territory."""
-    forb = _schema_roles()["STAND-KEEPER"]["forbidden_actions"]
-    assert "probe_feature" in forb
-    assert "mv_to_feature_review" in forb
 
 
 def test_developer_forbidden_pins_loop_contract_rules() -> None:

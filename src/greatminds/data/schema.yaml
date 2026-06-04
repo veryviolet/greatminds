@@ -30,7 +30,6 @@ glossary:
     TESTER: "Validates implemented features on a deployed stand. Acquires the stand by lease, probes once it is ready, and runs greatminds gate-check before mv to feature_review/."
     READER: "Reads docs as a fresh user; validates clarity and accuracy; routes the result out of feature_docs_review/."
     EXPLORER: "Uses the live system on the stand as a real user (scenario B), whatever the stand's shape. Files bugs as kind:bugfix tasks in feature_inbox/."
-    STAND-KEEPER: "Owns the singleton stand resource (state.yaml-driven, lease-based). Brings the active lease to ready via a deploy profile (glossary.stand_profiles), or down on failure."
     USER: "Writes user_feedback/ or initiates an ARCHITECT-PLANNER chat. Never creates implementation tasks directly."
     MAINTAINER: "System operator, self-loop watchdog. Handles infrastructure the product pipeline cannot self-heal: agent restart, dead-pid recovery, greatminds CLI + schema.yaml maintenance, cutover orchestration. Receives asks at inbox/maintainer/ from coordd and from product agents when an issue is structural/schema rather than product. Sweeps PROACTIVELY every tick (an empty inbox is NOT 'nothing to do'): reclaims stale stand leases past TTL with a dead/absent holder, restarts dead agents and coordd, and escalates stalled task/queue chains to ARCHITECT-PLANNER. Does NOT claim product queues, triage user_feedback, or write plans."
   lifecycles:
@@ -60,7 +59,7 @@ glossary:
     archive: "Duplicate, abandoned, superseded, or triaged-away product work."
     user_feedback: "Product feedback awaiting PLANNER triage."
     review_sessions: "Scenario-B review sessions; EXPLORER iterates live-stand exploration and files bugs to feature_inbox."
-    .stand: "Singleton stand resource state.yaml + lease bookkeeping; coordd watches it to wake STAND-KEEPER on lease lifecycle events."
+    .stand: "Singleton stand resource state.yaml + lease bookkeeping; coordd watches it and runs the deploy itself on lease lifecycle events (1.6.0: no STAND-KEEPER role)."
   stand_profiles:
     full-deploy: "Full backend deployment on the target hosts with service health checks; scenarios A and B."
     vite-dev: "Backend deployed plus a Vite UI dev server with HMR (UI changes reload, no per-change redeploy); scenario C."
@@ -160,14 +159,11 @@ queues:
     owner: EXPLORER
     writers: [ARCHITECT-PLANNER, EXPLORER]
     kind: active
-  # .stand is a state-kind watch path, NOT a claim-from queue. It is
-  # listed so coordd's _owning_role_for_queue resolves STAND-KEEPER as
-  # the role to wake when state.yaml changes (lease lifecycle events),
-  # landing the event on SK's turn directly instead of waiting for its
-  # next self-scheduled tick.
+  # .stand is a state-kind watch path, NOT a claim-from queue. coordd
+  # watches state.yaml and runs the deploy itself on a `preparing` lease
+  # (1.6.0: no STAND-KEEPER role — see coordd._maybe_auto_deploy_stand).
   .stand:
-    owner: STAND-KEEPER
-    writers: [STAND-KEEPER, TESTER, ARCHITECT-PLANNER, MAINTAINER]
+    writers: [TESTER, ARCHITECT-PLANNER, MAINTAINER, LIVE-DEVELOPER, EXPLORER, ARCHITECT-REVIEWER]
     kind: state
 
 # ---------------------------------------------------------------------------
@@ -426,48 +422,6 @@ roles:
         - append_session_iteration_block
         - release_lease
         - mv_to_archive_when_complete
-  STAND-KEEPER:
-    category: service
-    lifecycle: driven
-    # No stand queue: SK watches coordination/.stand/state.yaml for
-    # lease grants (event-driven via coordd inotify on .stand/).
-    claims_from: []
-    responsibilities:
-      - serve_singleton_stand_via_lease
-      - deploy_via_profile_executor
-    forbidden_actions:
-      - probe_feature
-      - fill_tests_block
-      - mv_to_feature_review
-      - claim_product_queues
-      - mark_ready_without_executor_run
-    # Readiness probing is GET / observe ONLY — infra liveness, never
-    # product acceptance. The token classes below are the canon
-    # boundary (defs: glossary.stand_probes); concrete endpoints /
-    # bundles / route names are project-shaped and live in PROJECT.md.
-    allowed_readiness_checks:
-      - docker_ps
-      - http_health_get_200
-      - ssh_reachable
-      - gpu_check
-      - endpoint_presence
-      - get_only_route_status
-    forbidden_probes:
-      - any_post
-      - response_body_validation
-      - acceptance_criteria
-      - followup_bug_filing
-      - e2e_browser_flow
-      - regression_scenario
-      - gate_check
-    event_triggers:
-      on_lease_preparing:
-        - load_profile_via_load_profile
-        - dispatch_profile_via_execute_yaml
-        - on_success_run_stand_ready
-        - on_failure_run_stand_down
-      on_state_ready_release:
-        - pop_next_lease_from_queue
   USER:
     category: entry
     # USER is the human entry point — interactive by definition.
@@ -823,15 +777,15 @@ task_kinds:
 scenarios:
   A:
     label: feature_or_refactor
-    active_roles: [ARCHITECT-PLANNER, ARCHITECT-REVIEWER, DEVELOPER, UI-DEVELOPER, TECHNICAL-WRITER, TESTER, READER, STAND-KEEPER]
+    active_roles: [ARCHITECT-PLANNER, ARCHITECT-REVIEWER, DEVELOPER, UI-DEVELOPER, TECHNICAL-WRITER, TESTER, READER]
     stand_profile: full-deploy
   B:
     label: intensive_review
-    active_roles: [ARCHITECT-PLANNER, ARCHITECT-REVIEWER, EXPLORER, DEVELOPER, UI-DEVELOPER, TESTER, STAND-KEEPER]
+    active_roles: [ARCHITECT-PLANNER, ARCHITECT-REVIEWER, EXPLORER, DEVELOPER, UI-DEVELOPER, TESTER]
     stand_profile: full-deploy
   C:
     label: ui_rapid_iteration
-    active_roles: [LIVE-DEVELOPER, STAND-KEEPER]
+    active_roles: [LIVE-DEVELOPER]
     stand_profile: vite-dev
 
 # ---------------------------------------------------------------------------
@@ -944,26 +898,26 @@ stand:
     transitions:
       - from: free
         to: preparing
-        by: STAND-KEEPER
+        by: COORDD
         requires: [active_lease_set]
       - from: preparing
         to: ready
-        by: STAND-KEEPER
+        by: COORDD
         requires: [deploy_smoke_ok]
       - from: preparing
         to: down
-        by: STAND-KEEPER
+        by: COORDD
         requires: [deploy_failure_logged]
       - from: ready
         to: free
-        by: lease_holder_or_stand_keeper_auto
+        by: lease_holder_or_coordd_auto
       - from: ready
         to: down
-        by: STAND-KEEPER
+        by: COORDD
         requires: [infra_incident_logged]
       - from: down
         to: free
-        by: STAND-KEEPER
+        by: COORDD
         requires: [recovery_logged]
     lease:
       ttl_seconds_default: 14400        # 4h
@@ -1121,7 +1075,7 @@ block_kinds:
     # broke nothing external). Treated as an approve → verified.
     allowed_outcomes: [approved, approved_sprint, changes_requested]
   stand_result:
-    authored_by: [STAND-KEEPER]
+    authored_by: [COORDD]
     allowed_results: [ok, partial, fail]
     allowed_statuses: [READY, DEGRADED, DOWN, BLOCKED]
   session_iteration:
@@ -1204,7 +1158,6 @@ plugins:
     DEVELOPER:          [postman]
     UI-DEVELOPER:       [playwright, chrome-devtools-mcp, postman]
     TESTER:             [playwright, sentry, postman, codspeed]
-    STAND-KEEPER:       [sentry]
     READER:             []
     MAINTAINER:         []
   codex_marketplace:

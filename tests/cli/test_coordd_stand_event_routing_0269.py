@@ -28,19 +28,16 @@ from greatminds.core.paths import find_canon_dir
 # ---------- schema source-of-truth ----------
 
 
-def test_schema_lists_stand_with_stand_keeper_owner() -> None:
-    """0269: schema.yaml ``queues['.stand']`` must declare
-    STAND-KEEPER as the owner. Without this entry the entire
-    ``coordd → press_enter → SK`` path is silently broken."""
+def test_schema_lists_stand_as_coordd_internal_state_queue() -> None:
+    """1.6.0: `.stand` is a state-kind queue with NO role owner — coordd
+    watches it and runs the deploy itself (STAND-KEEPER retired)."""
     doc = yaml.safe_load(
         (find_canon_dir() / "schema.yaml").read_text(encoding="utf-8")
     ) or {}
     entry = (doc.get("queues") or {}).get(".stand")
-    assert isinstance(entry, dict), (
-        "0269: schema.queues missing '.stand' — coordd cannot resolve "
-        "owner for state.yaml inotify events"
-    )
-    assert entry.get("owner") == "STAND-KEEPER"
+    assert isinstance(entry, dict), "schema.queues missing '.stand'"
+    assert entry.get("kind") == "state"
+    assert entry.get("owner") is None  # no role owns it
 
 
 def test_schema_stand_queue_kind_is_not_active_or_terminal() -> None:
@@ -69,7 +66,7 @@ def test_schema_lease_writers_include_tester_and_planner() -> None:
         (find_canon_dir() / "schema.yaml").read_text(encoding="utf-8")
     ) or {}
     writers = ((doc.get("queues") or {})[".stand"]).get("writers") or []
-    for required in ("STAND-KEEPER", "TESTER"):
+    for required in ("TESTER", "ARCHITECT-PLANNER"):
         assert required in writers, (
             f"0269: schema.queues['.stand'].writers missing {required!r}"
         )
@@ -78,16 +75,11 @@ def test_schema_lease_writers_include_tester_and_planner() -> None:
 # ---------- coordd resolves the owner via schema ----------
 
 
-def test_owning_role_for_stand_resolves_stand_keeper() -> None:
-    """The helper ``coordd._owning_role_for_queue('.stand', canon)``
-    must return ``STAND-KEEPER`` post-0269 so ``_route_queue_event``
-    reaches the dispatch branch instead of silently dropping the
-    event."""
+def test_owning_role_for_stand_is_none_coordd_internal() -> None:
+    """1.6.0: `.stand` has no role owner — coordd handles it directly
+    (`_route_queue_event` special-cases `.stand` → auto-deploy)."""
     owner = coordd_mod._owning_role_for_queue(find_canon_dir(), ".stand")
-    assert owner == "STAND-KEEPER", (
-        f"0269: _owning_role_for_queue('.stand') returned {owner!r}; "
-        "expected 'STAND-KEEPER'"
-    )
+    assert owner is None
 
 
 # ---------- regression: other queues still resolve correctly ----------

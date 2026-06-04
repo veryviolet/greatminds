@@ -24,7 +24,6 @@ EXPECTED = {
     "UI-DEVELOPER": "driven",
     "TESTER": "driven",
     "READER": "driven",
-    "STAND-KEEPER": "driven",
     "ARCHITECT-REVIEWER": "driven",
     "TECHNICAL-WRITER": "driven",
     "EXPLORER": "driven",
@@ -79,7 +78,7 @@ def test_maintainer_is_self_loop() -> None:
 def test_workers_are_driven() -> None:
     roles = _roles()
     for worker in ("DEVELOPER", "UI-DEVELOPER", "TESTER", "READER",
-                    "STAND-KEEPER", "ARCHITECT-REVIEWER",
+                    "ARCHITECT-REVIEWER",
                     "TECHNICAL-WRITER", "EXPLORER"):
         assert roles[worker]["lifecycle"] == "driven", (
             f"0312: worker {worker} must be driven"
