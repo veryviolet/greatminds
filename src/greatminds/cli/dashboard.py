@@ -111,13 +111,6 @@ def _fleet_roster(coord_yaml: dict | None) -> list[dict[str, str]]:
     return roster
 
 
-# A driven run-lock only means "running" while the turn is actually
-# live — a lock left behind by a coordd that was killed mid-turn must
-# NOT read as "running" forever. Gate on a live pid OR a recent
-# heartbeat within this window (a turn touches its heartbeat as it works).
-_RUN_LOCK_LIVE_SEC = 600.0
-
-
 def _agent_state(rec: dict[str, Any], mode: str, lifecycle: str,
                  running: bool) -> str:
     """Coherent STATE token. Driven roles are NEVER 'dead': they have no
@@ -170,14 +163,13 @@ def collect_agents(coord: Path, coord_yaml: dict | None, canon_dir: Path,
         lifecycle = _lifecycle_for_role(canon_dir, role) or ""
         lock = _driven_run_lock_path(coord, role.lower())
         hb_age = rec.get("heartbeat_age")
-        # A turn is RUNNING only if its run-lock exists AND the turn is
-        # demonstrably live (pid alive or a recent heartbeat) — a stale
-        # lock from a killed coordd must not read as "running".
-        driven_turn = (
-            lifecycle == "driven" and lock.is_file()
-            and (rec["alive"]
-                 or (hb_age is not None and hb_age < _RUN_LOCK_LIVE_SEC))
-        )
+        # The run-lock IS the authoritative "turn in flight" marker: coordd
+        # holds it for the turn's duration and clears stale locks on
+        # startup (1.5.15), so while coordd is alive a present lock means a
+        # real running turn. A driven claude turn has no persistent
+        # registered pid / heartbeat, so do NOT gate on those — that hid a
+        # genuinely-running turn as "idle".
+        driven_turn = lifecycle == "driven" and lock.is_file()
         claimed = tasks_by_owner.get(role, [])
         rows.append({
             "role": role,

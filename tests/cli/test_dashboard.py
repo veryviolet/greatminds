@@ -39,6 +39,30 @@ def _rec(alive, age):
     return {"alive": alive, "heartbeat_age": age}
 
 
+def test_collect_agents_held_lock_is_running(tmp_path, monkeypatch):
+    """A driven role with its run-lock held reads as `running` even with
+    no live pid / heartbeat (a driven claude turn has neither). coordd
+    clears stale locks on startup, so a present lock = a real turn."""
+    coord = tmp_path / "coordination"
+    (coord / ".locks").mkdir(parents=True)
+    (coord / ".locks" / "driven-tester.lock").write_text("")
+
+    from greatminds.cli import agent as agent_mod
+    from greatminds.cli import coordd as cd
+    monkeypatch.setattr(db, "_fleet_roster",
+                        lambda _y: [{"role": "TESTER", "tool": "claude",
+                                     "mode": "driven"}])
+    monkeypatch.setattr(agent_mod, "collect_agent_status",
+                        lambda _c, _r: {"alive": False, "registered": True,
+                                        "heartbeat_age": None, "tool": "claude"})
+    monkeypatch.setattr(cd, "_lifecycle_for_role", lambda _c, _r: "driven")
+
+    rows = db.collect_agents(coord, {"session": "x"}, tmp_path / "canon",
+                             {"TESTER": ["0001-verify"]})
+    assert rows[0]["state"] == "running"
+    assert rows[0]["doing"].startswith("running turn")
+
+
 def test_doing_driven_turn_wins():
     d = db._agent_doing(_rec(True, 5), "driven", "driven",
                         driven_turn=True, fresh_sec=60, claimed=["0042"])

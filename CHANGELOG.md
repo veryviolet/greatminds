@@ -4,6 +4,21 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.5.16 — 2026-06-04
+
+Fix: the dashboard showed a running driven turn as `idle`.
+
+### Dashboard
+
+- **A held driven run-lock now reads as `running`.** The run-lock is
+  coordd's authoritative "turn in flight" marker, and coordd clears stale
+  locks on startup (1.5.15), so while coordd is alive a present lock means
+  a real running turn. The previous gate also required a live pid / fresh
+  heartbeat — which a driven claude turn never has — so an actively-
+  running TESTER / STAND-KEEPER turn was shown as `idle`. Dropped that
+  gate; driven STATE is now `running` (lock held) / `idle` (between
+  turns), never falsely idle-while-working.
+
 ## 1.5.15 — 2026-06-04
 
 Fix: a stale driven run-lock permanently stranded a role.
