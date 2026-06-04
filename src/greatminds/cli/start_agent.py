@@ -206,10 +206,20 @@ def discover_codex_session(role: str,
                     continue
                 fp = Path(dirpath) / fname
                 try:
-                    with fp.open("rb") as f:
-                        head = f.read(131072)
-                    if needle not in head:
-                        continue
+                    # 0158-era per-role codex home: sessions/ holds ONLY
+                    # this role's rollouts, so pick the newest by mtime —
+                    # no needle. The "You are {ROLE} agent" needle was for
+                    # the legacy SHARED ~/.codex home AND no longer matches
+                    # the 1.5.0 bootstrap ("You are a greatminds
+                    # coordination agent"), so applying it to the per-role
+                    # home made discovery ALWAYS miss → codex relaunched
+                    # FRESH = silent session reset on every restart/update.
+                    # The needle now filters ONLY the legacy fallback.
+                    if not is_0158_era:
+                        with fp.open("rb") as f:
+                            head = f.read(131072)
+                        if needle not in head:
+                            continue
                     mt = fp.stat().st_mtime
                 except OSError:
                     continue

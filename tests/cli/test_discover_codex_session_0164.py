@@ -191,19 +191,23 @@ def test_discovery_signature_accepts_legacy_call(tmp_path: Path,
 # ---------- role-name filter still applies ----------
 
 
-def test_discovery_does_not_cross_roles(tmp_path: Path, monkeypatch) -> None:
-    """The head-content check ``"You are <ROLE> agent"`` is still
-    applied. A DEVELOPER rollout under TESTER's per-role home (e.g.
-    operator manually copied) must NOT match a TESTER discovery
-    call."""
+def test_discovery_finds_session_with_generic_1_5_0_bootstrap_head(
+        tmp_path: Path, monkeypatch) -> None:
+    """REGRESSION: the 1.5.0+ codex bootstrap head is generic ('You are a
+    greatminds coordination agent'), NOT 'You are <ROLE> agent'. The old
+    per-role needle therefore rejected the role's OWN rollouts → discovery
+    returned "" → codex relaunched FRESH = silent session reset on every
+    restart / update. Per-role codex homes are already role-isolated, so
+    discovery now takes the newest rollout regardless of head — the
+    session resumes instead of resetting."""
     project = tmp_path / "project"
     home = tmp_path / "home"
     monkeypatch.setattr(Path, "home", staticmethod(lambda: home))
 
     tester_home = (project / "coordination" / ".codex-home" / "tester"
                    / "sessions")
-    _seed_rollout(tester_home, "DEVELOPER",  # wrong role intro
-                  "aa11aa11aa11")
+    # Head is the generic 1.5.0 bootstrap, NOT "You are TESTER agent".
+    _seed_rollout(tester_home, "a greatminds coordination", "aa11aa11aa11")
 
     found = sa_mod.discover_codex_session("TESTER", project_dir=project)
-    assert found == ""
+    assert found == "aa11aa11aa11"  # resumed, NOT reset to fresh
