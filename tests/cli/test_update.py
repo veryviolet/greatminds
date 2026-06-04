@@ -184,13 +184,29 @@ def test_full_update_refuses_major_without_flag(fake_pypi, fake_subprocess,
     assert fake_execv.calls == []
 
 
-def test_full_update_already_up_to_date_exits_zero(fake_pypi, fake_subprocess,
-                                                    fake_execv):
+def test_already_up_to_date_still_reconciles_config(fake_pypi, fake_subprocess,
+                                                    fake_execv, monkeypatch):
+    """1.5.10: when the package is already current, `update` no longer
+    exits early — it still runs the config-migration + restart phase, so
+    a stale project config (old coord.yaml etc.) is reconciled even when
+    the package needs no bump. No package bump → no self-replace execv."""
     fake_pypi["latest"] = GM_VERSION
+    monkeypatch.setattr(
+        "greatminds.cli.daemon.detect_legacy_coordd", lambda: False)
+    from greatminds.cli import update as _update_mod
+    monkeypatch.setattr(
+        _update_mod, "_resolve_session_from_coord_yaml", lambda: "greatminds")
+    monkeypatch.setattr(_update_mod, "_tmux_session_present", lambda _s: True)
+
     result = _invoke([])
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
     assert "already up to date" in result.output
+    # No bump → no os.execv self-replace...
     assert fake_execv.calls == []
+    # ...but the config-reconcile phase STILL ran: daemon restart fired.
+    daemon_calls = [c for c in fake_subprocess
+                    if "daemon" in c and "restart" in c]
+    assert len(daemon_calls) == 1
 
 
 # ---------------------------------------------------------------------------

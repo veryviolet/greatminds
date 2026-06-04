@@ -4,6 +4,23 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.5.10 — 2026-06-04
+
+Fix: `update` skipped the migration when the package was already current.
+
+### Fixed
+
+- **`greatminds update` reconciles config even when the package is up to
+  date.** 1.5.9 added the project-config migration to `update`, but only
+  in the post-pip phase reached after an actual version bump — `update`
+  did an early "already up to date" exit before it. So a fleet already on
+  the latest package but with stale config (old all-paned coord.yaml,
+  missing queues, leftover artifacts) ran `update` and migrated nothing.
+  `update` now falls through to the migration + daemon/agent restart phase
+  in-process when no bump is needed (no self-replace), so it ALWAYS brings
+  the project config to the installed version. (`greatminds migrate`
+  remains available standalone.)
+
 ## 1.5.9 — 2026-06-04
 
 Make the fleet's working branch cleanly project-configurable, and make

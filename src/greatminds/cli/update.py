@@ -140,17 +140,22 @@ def _upgrade_command_for_env(env_type: str | None,
             "greatminds"]
 
 
-def _step_pip_upgrade(major: bool) -> str:
-    """Run the env-appropriate upgrade command; return the just-
-    installed version string."""
+def _step_pip_upgrade(major: bool) -> bool:
+    """Run the env-appropriate upgrade command.
+
+    Returns True if an upgrade was actually performed (caller must
+    self-replace into the new binary), False if the package was already
+    current (caller still runs the config-migration + restart phase
+    in-process — config can be stale even when the package is current).
+    """
     current = __version__
     info(f"==> current: greatminds {current}")
     latest = _fetch_latest_pypi_version()
     info(f"==> latest on PyPI: {latest}")
 
     if _parse_semver(latest) <= _parse_semver(current):
-        ok("already up to date")
-        raise click.exceptions.Exit(0)
+        ok("already up to date (package); will still reconcile config")
+        return False
 
     if _is_major_bump(current, latest) and not major:
         err(
@@ -190,7 +195,7 @@ def _step_pip_upgrade(major: bool) -> str:
             raise click.exceptions.Exit(cp2.returncode)
         ok("    ✓ uv sync")
 
-    return latest
+    return True
 
 
 def _self_replace_to_post_pip() -> None:
@@ -414,13 +419,20 @@ def update(post_pip: bool, check: bool, dry_run: bool, major: bool,
 
     if not post_pip:
         # Phase 1: pip step (in the OLD binary).
-        new_version = _step_pip_upgrade(major)
-        # Phase 2: self-replace via os.execv → continues as `--post-pip`.
-        _self_replace_to_post_pip()
-        # If execv ever returns, something went very wrong.
-        return  # pragma: no cover
+        bumped = _step_pip_upgrade(major)
+        if bumped:
+            # Phase 2: self-replace via os.execv → continues as `--post-pip`
+            # in the freshly-installed binary (which has the new migration).
+            _self_replace_to_post_pip()
+            return  # pragma: no cover — execv replaces the process
+        # Package already current → NO self-replace needed (this binary is
+        # the right version). Fall through to run the same config-migration
+        # + restart phase in-process, so `update` ALWAYS reconciles the
+        # project config to the installed version, not just the package.
+        info("==> reconciling project config to installed version...")
 
-    # --post-pip phase (idempotent; called by self-replace or by user).
+    # --post-pip phase (idempotent; reached via self-replace, explicit
+    # --post-pip, or the already-current fall-through above).
     # Project-config migration FIRST so the daemon + agents below start
     # on the migrated config (new coord.yaml model, refreshed canon).
     _step_migrate_project_config()
