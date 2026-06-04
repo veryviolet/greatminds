@@ -1408,6 +1408,19 @@
 <p>All notable changes to <strong>greatminds</strong> are documented here. Format follows
 <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a> loosely; versions
 follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
+<h2 id="1516-2026-06-04">1.5.16 — 2026-06-04<a class="headerlink" href="#1516-2026-06-04" title="Permanent link">&para;</a></h2>
+<p>Fix: the dashboard showed a running driven turn as <code>idle</code>.</p>
+<h3 id="dashboard">Dashboard<a class="headerlink" href="#dashboard" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>A held driven run-lock now reads as <code>running</code>.</strong> The run-lock is
+  coordd's authoritative "turn in flight" marker, and coordd clears stale
+  locks on startup (1.5.15), so while coordd is alive a present lock means
+  a real running turn. The previous gate also required a live pid / fresh
+  heartbeat — which a driven claude turn never has — so an actively-
+  running TESTER / STAND-KEEPER turn was shown as <code>idle</code>. Dropped that
+  gate; driven STATE is now <code>running</code> (lock held) / <code>idle</code> (between
+  turns), never falsely idle-while-working.</li>
+</ul>
 <h2 id="1515-2026-06-04">1.5.15 — 2026-06-04<a class="headerlink" href="#1515-2026-06-04" title="Permanent link">&para;</a></h2>
 <p>Fix: a stale driven run-lock permanently stranded a role.</p>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
@@ -1444,7 +1457,7 @@ task.</p>
   mid-turn. A daemon restart (e.g. after <code>update</code>) now picks up a hanging
   task instead of stranding it.</li>
 </ul>
-<h3 id="dashboard">Dashboard<a class="headerlink" href="#dashboard" title="Permanent link">&para;</a></h3>
+<h3 id="dashboard_1">Dashboard<a class="headerlink" href="#dashboard_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Driven roles are no longer shown as <code>dead</code> + <code>running turn</code> at
   once.</strong> STATE was derived from a persistent registry pid, which driven
