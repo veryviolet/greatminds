@@ -1224,6 +1224,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#greatminds-migrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        migrate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#greatminds-migrate-stand-history" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2163,6 +2174,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#greatminds-migrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        migrate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#greatminds-migrate-stand-history" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2728,6 +2750,18 @@ warned about but do not fail.</p>
 <p><strong>Options:</strong></p>
 <div class="highlight"><pre><span></span><code>  --canon-dir DIRECTORY  canon data dir (default: packaged greatminds.data)
   -h, --help             Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-migrate">greatminds migrate<a class="headerlink" href="#greatminds-migrate" title="Permanent link">&para;</a></h3>
+<p>Bring a project's coord.yaml / canon / queues up to the installed
+greatminds version (coord.yaml driven-model migration, canon refresh,
+legacy-artifact removal). Idempotent; backs up coord.yaml.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds migrate [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --project-dir TEXT  project root (default: cwd).
+  --no-setup          skip the canon refresh (setup) step.
+  -h, --help          Show this message and exit.
 </code></pre></div>
 <h3 id="greatminds-migrate-stand-history">greatminds migrate-stand-history<a class="headerlink" href="#greatminds-migrate-stand-history" title="Permanent link">&para;</a></h3>
 <p>Move legacy coordination/stand_done/* into coordination/archive/stand-history/ (0247 cleanup).</p>
