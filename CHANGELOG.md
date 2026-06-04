@@ -4,6 +4,30 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.5.13 — 2026-06-04
+
+Fix: `update` could report success without actually upgrading (and needed
+two runs to converge) when a foreign virtualenv was on PATH.
+
+### Fixed
+
+- **`update` resolves its own binary from the running venv, not PATH.**
+  The self-replace used `shutil.which("greatminds")`, which is PATH-first
+  — a foreign activated virtualenv (e.g. an unrelated `.venv-coord`
+  leaking onto PATH, common when you have one project's venv active while
+  running `uv run` in another) could shadow the project's greatminds, so
+  the self-replace exec'd the WRONG version and the upgrade appeared to
+  "need two runs". `_greatminds_bin` now pins to `sys.executable`'s
+  sibling (the env update is installed in).
+- **`update` verifies the upgrade actually landed.** It printed a
+  hardcoded `✓ … (old → new)` and `done: greatminds at <old>` even when
+  the venv hadn't changed (the in-process `__version__` is stale right
+  after a same-run upgrade). It now reads the REAL installed version in a
+  fresh subprocess, forces one `uv sync --reinstall-package` pass if uv
+  lagged, and FAILS LOUDLY if the version didn't change — instead of a
+  fake success that silently needs a second run. The final "done" line
+  reports the freshly-read version.
+
 ## 1.5.12 — 2026-06-04
 
 Fix: a plain restart silently destroyed driven-agent sessions.

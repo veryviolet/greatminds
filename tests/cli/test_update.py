@@ -151,6 +151,9 @@ def test_full_update_calls_pip_then_self_replaces(fake_pypi, fake_subprocess,
             env_type="venv", activation="", source="(test stub)",
         ),
     )
+    # The upgrade subprocess is faked (no real install), so stub the
+    # post-upgrade verify to report the upgrade landed → self-replace fires.
+    monkeypatch.setattr(upd, "_installed_version_fresh", lambda: "1.99.0")
 
     with pytest.raises(fake_execv.sentinel):
         # The fake execv raises; we let the exception escape so the test

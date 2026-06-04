@@ -95,13 +95,40 @@ def _is_major_bump(current: str, latest: str) -> bool:
 
 
 def _greatminds_bin() -> str:
-    """Resolve the absolute path to the `greatminds` console script,
-    normalized to absolute (see also cli/setup.py:_greatminds_bin).
+    """Resolve the `greatminds` console script, PINNED to the venv of the
+    RUNNING interpreter — NOT PATH.
+
+    ``shutil.which`` is PATH-first, so a foreign activated virtualenv
+    (e.g. an unrelated ``.venv-coord`` leaking onto PATH under ``uv run``)
+    can shadow the project's greatminds and make the self-replace exec the
+    wrong version. ``sys.executable``'s sibling is the right binary for
+    the env update is installed in. Falls back to PATH, then the module.
     """
+    cand = Path(sys.executable).resolve().parent / "greatminds"
+    if cand.is_file():
+        return str(cand)
     found = shutil.which("greatminds")
     if found:
         return str(Path(found).resolve())
     return f"{sys.executable} -m greatminds.cli.main"
+
+
+def _installed_version_fresh() -> str | None:
+    """The ACTUALLY-installed greatminds version, read in a FRESH
+    subprocess of the venv interpreter.
+
+    In-process ``importlib.metadata`` (hence ``greatminds.__version__``)
+    is resolved at import time and goes STALE right after a ``uv sync`` /
+    pip upgrade in the same process — the running code is still the old
+    module, and even the dist-info read can be cached. A fresh subprocess
+    reads the new ``.dist-info``. Returns None on failure."""
+    cp = subprocess.run(
+        [sys.executable, "-c",
+         "import importlib.metadata as m; print(m.version('greatminds'))"],
+        capture_output=True, text=True,
+    )
+    v = (cp.stdout or "").strip()
+    return v or None
 
 
 # ---------------------------------------------------------------------------
@@ -179,22 +206,39 @@ def _step_pip_upgrade(major: bool) -> bool:
         if cp.stderr:
             click.echo(cp.stderr, nl=False, err=True)
         raise click.exceptions.Exit(cp.returncode)
-    ok(f"    ✓ {' '.join(cmd[:3])}… ({current} → {latest})")
 
     # 0299: uv needs a second pass to actually pull the new wheel
     # into the venv after the lock refresh. Other env managers do
     # this implicitly in their `update` command.
     if setup.env_type == "uv":
-        sync_cmd = ["uv", "sync"]
-        info(f"==> {' '.join(sync_cmd)}")
-        cp2 = subprocess.run(sync_cmd, capture_output=True, text=True)
+        info("==> uv sync")
+        cp2 = subprocess.run(["uv", "sync"], capture_output=True, text=True)
         if cp2.returncode != 0:
             err("uv sync failed after lock refresh:")
             if cp2.stderr:
                 click.echo(cp2.stderr, nl=False, err=True)
             raise click.exceptions.Exit(cp2.returncode)
-        ok("    ✓ uv sync")
 
+    # VERIFY the upgrade ACTUALLY landed — never print a fake "✓". The
+    # upgrade subprocess returning 0 is not proof the venv changed (a
+    # running daemon holding the venv, a foreign activated env, or a uv
+    # pass that didn't sync the active env can leave the OLD version in
+    # place while the command exits 0). Read the real installed version
+    # in a fresh subprocess; for uv, force one reinstall pass if it
+    # lagged, then fail loudly rather than silently needing a 2nd run.
+    got = _installed_version_fresh()
+    if got != latest and setup.env_type == "uv":
+        warn(f"    installed still {got} after sync — forcing reinstall")
+        subprocess.run(["uv", "sync", "--reinstall-package", "greatminds"],
+                       capture_output=True, text=True)
+        got = _installed_version_fresh()
+    if got != latest:
+        err(f"upgrade did not take effect: installed={got!r}, expected "
+            f"{latest!r}. Re-run, or check for a process holding the venv "
+            f"(a running daemon) or a foreign activated virtualenv "
+            f"(deactivate it, then re-run).")
+        raise click.exceptions.Exit(1)
+    ok(f"    ✓ installed greatminds {got} (verified)")
     return True
 
 
@@ -440,7 +484,9 @@ def update(post_pip: bool, check: bool, dry_run: bool, major: bool,
     _step_ensure_template_unit_installed()  # 0202: fill the migration gap
     _step_restart_daemon(project_name)
     _step_restart_agents()
-    ok(f"==> done: greatminds at {__version__}")
+    # Fresh read — in-process __version__ is stale right after a same-run
+    # upgrade (it reflects the OLD module the process imported at start).
+    ok(f"==> done: greatminds at {_installed_version_fresh() or __version__}")
 
 
 if __name__ == "__main__":
