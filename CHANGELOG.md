@@ -4,6 +4,38 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.6.7 — 2026-06-05
+
+Host-agnostic stand deploys + autonomous backlog recovery.
+
+### Changed
+
+- **greatminds no longer owns host topology.** `execute_yaml_profile` hands
+  the WHOLE `coordination/PROJECT.env` (plus lease meta) to ansible as
+  `--extra-vars` and runs the profile in `cwd=coord`. Removed the
+  single-host inventory synthesis (`_build_inventory` / `_host_from_playbook`),
+  the `${}` playbook substitution, and the `lease_meta.host` requirement. The
+  profile AUTHOR targets hosts by ansible-native means — `add_host` from
+  PROJECT.env vars (1 or N nodes), or a static inventory shipped alongside
+  (auto-discovered via the fleet's `ansible.cfg`). Canon profile templates
+  rewritten to the `add_host` reference pattern. **Migration: a profile using
+  `hosts: "${STAND_HOST}"` must move to the add_host pattern (or a static
+  inventory) — `${}` is no longer substituted.**
+- **PROJECT.env is injected as a real environment.** A per-instance systemd
+  `EnvironmentFile=` drop-in gives the daemon — and every driven agent it
+  spawns (they inherit its env) — every PROJECT.env var. Interactive agents
+  source it at launch / restart. One source, visible to ansible + the daemon
+  + all agents.
+
+### Fixed
+
+- **Autonomy: the daemon recovers stuck pipelines.** The startup backlog
+  reconcile is now also periodic (`RECONCILE_INTERVAL_SEC`, 90s): a driven
+  role that parked with pending work in its claim queue is re-driven instead
+  of frozen until a new event. Escalation now wakes an IDLE MAINTAINER via
+  its input_sock (freshness-gated — a mid-turn MAINTAINER is never
+  interrupted) so it acts on failures now, not on its next hourly self-loop.
+
 ## 1.6.6 — 2026-06-05
 
 ### Fixed
