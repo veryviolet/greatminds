@@ -211,7 +211,11 @@ roles:
       - run_ansible
       - mark_stand_ready
       - claim_review_sessions
-      - archive_in_lifecycle_work_directly
+      # Exception: a scope:release UMBRELLA already decomposed into its
+      # implementer sub-task(s) MAY be closed to archive — it is a tracking
+      # gate, not in-flight work. Otherwise a release umbrella dead-ends in
+      # feature_plan (no implementer route AND no close path).
+      - archive_in_lifecycle_work_directly_except_decomposed_release_umbrella
     event_triggers:
       on_user_feedback_claim:
         - read_user_feedback_block
@@ -224,6 +228,13 @@ roles:
         - write_plan_block
         - set_stand_required
         - route_to_feature_dev_or_feature_ui_dev_or_feature_docs
+        # scope:release is an umbrella GATE, not implementer work — there is
+        # no single implementer queue for it. Decompose it into the concrete
+        # implementer sub-task(s) that perform the release (packaging / smoke
+        # / push), then close the umbrella to archive once its children are
+        # verified. Without this a scope:release task parks forever in
+        # feature_plan with no route and no close path.
+        - decompose_scope_release_umbrella_into_subtasks_then_archive_umbrella
       # stand_down classifiers — PLANNER reads SK's auto-notification
       # and routes the fix per the down_reason signature.
       on_stand_down_yaml_playbook_error:

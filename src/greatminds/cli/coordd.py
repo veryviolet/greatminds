@@ -2631,6 +2631,18 @@ def coordd(project_dir: Path | None, project_name: str | None,
             if now_ts - last_hang_check >= HANG_CHECK_INTERVAL_SEC:
                 last_hang_check = now_ts
                 locks_dir = coord / ".locks"
+                # A DRIVEN turn (claude -p / codex) does NOT refresh a
+                # heartbeat, so the heartbeat-based hang_threshold (300s)
+                # false-flagged EVERY legitimately-long driven turn as hung
+                # (e.g. a 6-min task or a TESTER turn awaiting a multi-minute
+                # remote compute) → a flood of bogus "hung-<role>" asks to
+                # MAINTAINER. coordd already KILLS a driven turn at
+                # DRIVEN_TURN_TIMEOUT_SEC, so a run-lock older than that means
+                # the kill did not release it = a GENUINE stuck turn. Use that
+                # as the bound for driven locks; heartbeat is just an early-out
+                # for any tool that happens to refresh it.
+                driven_hang_threshold = max(hang_threshold,
+                                            DRIVEN_TURN_TIMEOUT_SEC)
                 if locks_dir.is_dir():
                     for lk in sorted(locks_dir.glob("driven-*.lock")):
                         role_lower = lk.name[len("driven-"):-len(".lock")]
@@ -2638,12 +2650,12 @@ def coordd(project_dir: Path | None, project_name: str | None,
                             lock_age = now_ts - lk.stat().st_mtime
                         except OSError:
                             continue
-                        if lock_age < hang_threshold:
-                            continue  # turn young — not hung yet
+                        if lock_age < driven_hang_threshold:
+                            continue  # turn within its kill bound — not hung
                         hb_age = heartbeat_age_seconds(coord, role_lower)
                         if hb_age is not None and hb_age < hang_threshold:
                             continue  # heartbeat fresh → turn is progressing
-                        if now_ts - last_hang_report.get(role_lower, 0.0) < hang_threshold:
+                        if now_ts - last_hang_report.get(role_lower, 0.0) < driven_hang_threshold:
                             continue  # already escalated recently
                         write_hang_report(coord, role_lower, lock_age,
                                           hb_age, now_ts)
