@@ -4,6 +4,20 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.6.9 — 2026-06-05
+
+### Fixed
+
+- **Driven run-lock leaked on the claude `-p` path (issue #11).** In the
+  claude driven worker's `finally`, `_record_driven_turn` (registry write)
+  ran BEFORE `lock.unlink()`; a throw there skipped the unlink, orphaning
+  `coordination/.locks/driven-<role>.lock`. coordd's reconcile then treated
+  the role as still-running and never re-drove it (the pipeline froze), while
+  the hang detector false-flagged the completed turn as hung — costing real
+  API spend per stuck turn and forcing a manual `rm`. The lock is now
+  released FIRST and unconditionally in the finally (matching the already-
+  correct codex worker). Regression test added.
+
 ## 1.6.8 — 2026-06-05
 
 ### Fixed

@@ -108,6 +108,32 @@ def test_spawn_seam_releases_lock_when_it_returns(
     )
 
 
+def test_run_lock_released_even_when_record_turn_throws(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """issue #11: the run-lock MUST be released on turn exit even if
+    recording the turn (registry write) raises. A throw in
+    ``_record_driven_turn`` used to skip the lock.unlink() that followed it
+    in the claude worker's finally — orphaning the lock so coordd's
+    reconcile treated the role as still-running (never re-drove it) and the
+    hang detector false-flagged it. Lock release must be unconditional."""
+    coord = _coord(tmp_path)
+
+    def _boom(*_a, **_k):
+        raise OSError("registry write failed")
+    monkeypatch.setattr(cd, "_record_driven_turn", _boom)
+
+    with pytest.raises(OSError):
+        cd._spawn_driven_turn(
+            coord, "developer", "sess-1", "dev", "test-session",
+            None, verbose=False, spawn=lambda argv: None,
+        )
+    assert not cd._driven_run_lock_path(coord, "developer").exists(), (
+        "issue #11: run-lock must be released even when _record_driven_turn "
+        "raises"
+    )
+
+
 # ---------- lifecycle gating ----------
 
 

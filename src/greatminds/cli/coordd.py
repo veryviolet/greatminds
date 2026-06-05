@@ -978,12 +978,18 @@ def _spawn_driven_turn(
                 print(f"  driven claude turn for {role_lower} failed: "
                       f"{exc}", file=sys.stderr)
         finally:
-            _record_driven_turn(coord / REGISTRY_DIR, role_lower,
-                                reset=reset, new_session_id=new_sid)
+            # Release the run-lock FIRST and unconditionally. Anything below
+            # (_record_driven_turn writing the registry, _note_turn_outcome)
+            # can raise on I/O, and a throw there used to skip the unlink —
+            # leaving an orphan lock that coordd's reconcile then treats as a
+            # live turn (so the role never re-drives) and the hang detector
+            # flags as hung. The lock MUST always go on turn exit. (issue #11)
             try:
                 lock.unlink()
             except OSError:
                 pass
+            _record_driven_turn(coord / REGISTRY_DIR, role_lower,
+                                reset=reset, new_session_id=new_sid)
             _note_turn_outcome(coord, role_lower, klass, detail, verbose)
             # Re-fire a mid-turn event ONLY on success; a failed turn is
             # re-dispatched by the retry scheduler (avoid double-spawn).
