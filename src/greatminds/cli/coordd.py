@@ -742,6 +742,30 @@ def _escalate_to_maintainer(coord: Path, role_lower: str, klass: str,
         )
     except Exception:  # noqa: BLE001 — notification is best-effort
         pass
+    # Wake MAINTAINER so it acts on the escalation now, not on its next
+    # self-loop wake (up to an hour away) — but ONLY if it is idle.
+    _wake_maintainer_if_asleep(coord)
+
+
+def _wake_maintainer_if_asleep(coord: Path, verbose: bool = False) -> None:
+    """Nudge MAINTAINER's input_sock so it picks up a just-filed escalation
+    immediately — but ONLY when MAINTAINER is idle (heartbeat stale). A
+    MAINTAINER mid-turn is left alone: we never interrupt active work (and
+    don't burn wake diagnosability). MAINTAINER is in
+    NO_KEYSTROKE_INJECT_ROLES (coordd's normal driven-wake never touches it),
+    so this is the one deliberate, freshness-gated exception for escalation."""
+    hb = coord / "heartbeat.maintainer"
+    try:
+        if hb.is_file() and (
+                time.time() - hb.stat().st_mtime) < PUSH_FRESH_GUARD_SEC:
+            return  # MAINTAINER is active — do not disturb
+    except OSError:
+        pass
+    try:
+        push_to_role(coord, "MAINTAINER", "escalation", verbose,
+                     bypass_fresh_guard=True)
+    except Exception:  # noqa: BLE001 — best-effort wake
+        pass
 
 
 def _note_turn_outcome(coord: Path, role_lower: str, klass: str,
@@ -2442,9 +2466,28 @@ def coordd(project_dir: Path | None, project_name: str | None,
             print(f"coordd: startup recovery failed: {exc}", file=sys.stderr)
 
     _last_deploy_retry = time.monotonic()
+    _last_reconcile = time.monotonic()
     while not stop["flag"]:
         try:
             events = poll_or_event_wait(interval) or []
+
+            # Periodic backlog reconcile — the autonomy backstop. coordd is
+            # otherwise inotify-reactive, so a driven role that parked (its
+            # turn completed without moving its task, or a self-set "wake in
+            # 1h") with work still pending in its claim queue would freeze:
+            # no new event fires to re-drive it. This periodic sweep re-drives
+            # such roles (lock-safe: skips any role mid-turn; a no-op when no
+            # role has pending work). Cheap formal check; only spawns a turn
+            # when there is genuinely stranded work.
+            _now_r = time.monotonic()
+            if _now_r - _last_reconcile >= RECONCILE_INTERVAL_SEC:
+                _last_reconcile = _now_r
+                try:
+                    _reconcile_driven_backlog(coord, canon_dir, verbose)
+                except Exception as exc:  # noqa: BLE001
+                    if verbose:
+                        print(f"coordd: periodic reconcile error: {exc}",
+                              file=sys.stderr)
 
             # Re-attempt a stand deploy stuck in `preparing` (the deploy
             # raised before transitioning and fired no further event).
