@@ -4,6 +4,29 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.6.4 — 2026-06-05
+
+Fix: the YAML stand deploy never reached its target host.
+
+### Fixed
+
+- **The deploy resolves its host from PROJECT.env via the profile.** The
+  YAML executor never read `PROJECT.env` and never `${KEY}`-substituted
+  the playbook (that machinery was dead code left from the removed prose
+  profiles), so the host — which lives in `coordination/PROJECT.env` (e.g.
+  `STAND_HOST_GPU=mlgpu2`) — could not reach ansible, and
+  `execute_yaml_profile` raised "lease_meta.host is required". Now
+  `execute_yaml_profile` reads PROJECT.env, substitutes the playbook, and
+  takes the host from the playbook's own `hosts:`.
+- **Consistent host scheme.** PROJECT.env is the single per-fleet source
+  of host/user values (read by the deploy AND by EXPLORER/TESTER for their
+  SSH probes). A profile is self-documenting but does not duplicate the
+  value — `hosts: "${STAND_HOST_*}"`. The inventory is a bare SSH alias
+  (no forced `ansible_user`, so the alias's `~/.ssh/config` User applies);
+  a profile overrides the user with a play-level
+  `remote_user: "${STAND_USER_*}"`. Validated live against an ssh-config
+  alias. The stray `--host` lease option was reverted.
+
 ## 1.6.3 — 2026-06-05
 
 Fix the stand-deploy freeze, the daemon's polluted PATH, and document the
