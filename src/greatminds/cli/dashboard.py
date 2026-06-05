@@ -129,20 +129,28 @@ def _agent_state(rec: dict[str, Any], mode: str, lifecycle: str,
 
 def _agent_doing(rec: dict[str, Any], mode: str, lifecycle: str,
                  driven_turn: bool, fresh_sec: float,
-                 claimed: list[str]) -> str:
+                 claimed: list[str], stand_holder: str = "",
+                 stand_task: str = "", role: str = "") -> str:
     """Inferred activity word. The owned task is attached ONLY while the
     role is actively on it (running a turn / fresh heartbeat). An idle
     role is NOT working its queue's task — showing it there read as
     'still on X' after the turn ended; the task still appears in the
     TASKS table below."""
-    task_suffix = f" · {claimed[0]}" + (f" (+{len(claimed)-1})"
+    role = (role or "").upper()
+    task_suffix =f" · {claimed[0]}" + (f" (+{len(claimed)-1})"
                                         if len(claimed) > 1 else "") \
         if claimed else ""
     if driven_turn:
         return f"running turn{task_suffix}"
     if lifecycle == "driven":
-        # idle-by-design between turns — STATE already shows 'idle'; don't
-        # attribute the queue's task here (it read as "still on X").
+        # idle-by-design between turns — STATE shows 'idle'. EXCEPTION: if
+        # this role holds the stand lease, it is mid-verification (between
+        # ticks while a deploy / remote compute runs), NOT idle-with-nothing.
+        # Surfacing it stops a legitimately-waiting verifier reading as a
+        # hung task.
+        if stand_holder and role and stand_holder == role:
+            tk = _task_num(stand_task) if stand_task else ""
+            return f"verifying · {tk} (holds stand)" if tk else "verifying (holds stand)"
         return "—"
     if not rec["alive"]:
         if mode == "staged":
@@ -155,7 +163,8 @@ def _agent_doing(rec: dict[str, Any], mode: str, lifecycle: str,
 
 
 def collect_agents(coord: Path, coord_yaml: dict | None, canon_dir: Path,
-                   tasks_by_owner: dict[str, list[str]]) -> list[dict[str, Any]]:
+                   tasks_by_owner: dict[str, list[str]],
+                   stand: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     from greatminds.cli.agent import collect_agent_status
     from greatminds.cli.coordd import (
         PUSH_FRESH_GUARD_SEC, _driven_run_lock_path, _lifecycle_for_role,
@@ -199,7 +208,10 @@ def collect_agents(coord: Path, coord_yaml: dict | None, canon_dir: Path,
             "state": _agent_state(rec, entry["mode"], lifecycle, driven_turn),
             "heartbeat": hb_display,
             "doing": _agent_doing(rec, entry["mode"], lifecycle,
-                                  driven_turn, PUSH_FRESH_GUARD_SEC, claimed),
+                                  driven_turn, PUSH_FRESH_GUARD_SEC, claimed,
+                                  stand_holder=(stand or {}).get("holder") or "",
+                                  stand_task=(stand or {}).get("task") or "",
+                                  role=role),
         })
     return rows
 
@@ -264,11 +276,12 @@ def collect_snapshot(coord: Path) -> dict[str, Any]:
     by_owner: dict[str, list[str]] = {}
     for t in tasks:
         by_owner.setdefault(t["owner"], []).append(t["id"])
+    stand = collect_stand(coord)
     return {
         "session": (coord_yaml or {}).get("session") or "greatminds",
-        "agents": collect_agents(coord, coord_yaml, canon_dir, by_owner),
+        "agents": collect_agents(coord, coord_yaml, canon_dir, by_owner, stand),
         "tasks": tasks,
-        "stand": collect_stand(coord),
+        "stand": stand,
     }
 
 
