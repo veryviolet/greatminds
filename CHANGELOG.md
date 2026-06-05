@@ -4,6 +4,20 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.6.6 — 2026-06-05
+
+### Fixed
+
+- **Canon stand-profile templates no longer self-reference / build an
+  empty-user rsync dest.** `deploy_path: "{{ deploy_path | default(...) }}"`
+  recursed (a play var referencing itself), and the rsync delegate built
+  `{{ ansible_user | default('') }}@{{ inventory_hostname }}` → an empty
+  user when the SSH alias supplies it → `Permission denied`. Templates now
+  use literal var defaults (extra-vars still override) and rsync to the
+  bare ssh-config alias (`{{ inventory_hostname }}`).
+- **The dashboard collapses a multi-line ansible `down_reason`** (PLAY/TASK
+  banners + newlines) to a single clean line so it doesn't shred the panel.
+
 ## 1.6.5 — 2026-06-05
 
 Fix: the deploy forced privilege escalation, overriding the playbook.

@@ -7,7 +7,7 @@
   gather_facts: false
   become: false
   vars:
-    deploy_path: "{{ deploy_path | default('/srv/greatminds') }}"
+    deploy_path: "/srv/greatminds"
 
   tasks:
     - name: ssh reachable + remote shell working

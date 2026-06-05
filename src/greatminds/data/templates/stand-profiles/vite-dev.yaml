@@ -21,9 +21,9 @@
   gather_facts: false
   become: false
   vars:
-    deploy_path: "{{ deploy_path | default('/srv/greatminds') }}"
-    vite_port: "{{ vite_port | default('5173') }}"
-    ui_dir: "{{ ui_dir | default('ui') }}"
+    deploy_path: "/srv/greatminds"
+    vite_port: "5173"
+    ui_dir: "ui"
 
   tasks:
     - name: ensure deploy_path exists
@@ -42,7 +42,7 @@
           --exclude=__pycache__
           --exclude=node_modules
           {{ worktree }}/
-          {{ ansible_user | default('') }}@{{ inventory_hostname }}:{{ deploy_path }}/
+          {{ inventory_hostname }}:{{ deploy_path }}/
       delegate_to: localhost
       changed_when: true
       tags: [prerequisite]

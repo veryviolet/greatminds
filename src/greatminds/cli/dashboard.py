@@ -337,7 +337,11 @@ def _render_stand(st: dict[str, Any], width: int, color: bool) -> list[str]:
         out.append(_clip(f"       last change: {st['last_change_at']} "
                          f"by {st['last_change_by']}", width))
     if st["down_reason"]:
-        out.append(_clip(f"       down: {st['down_reason']}", width))
+        # down_reason may carry a multi-line ansible log (PLAY/TASK ***
+        # banners + newlines) — collapse to a single clean line so it
+        # doesn't shred the panel.
+        reason = " ".join(str(st["down_reason"]).split())
+        out.append(_clip(f"       down: {reason}", width))
     return out
 
 

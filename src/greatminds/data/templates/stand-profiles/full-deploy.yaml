@@ -18,8 +18,8 @@
   gather_facts: false
   become: false
   vars:
-    deploy_path: "{{ deploy_path | default('/srv/greatminds') }}"
-    expected_version: "{{ expected_version | default('') }}"
+    deploy_path: "/srv/greatminds"
+    expected_version: ""
 
   tasks:
     - name: ensure deploy_path exists
@@ -42,7 +42,7 @@
           --exclude=.worktrees
           --exclude=__pycache__
           {{ worktree }}/
-          {{ ansible_user | default('') }}@{{ inventory_hostname }}:{{ deploy_path }}/
+          {{ inventory_hostname }}:{{ deploy_path }}/
       delegate_to: localhost
       changed_when: true
 
