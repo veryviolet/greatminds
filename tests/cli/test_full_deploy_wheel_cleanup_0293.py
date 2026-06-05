@@ -22,7 +22,7 @@ def _tasks() -> list[dict]:
             / "full-deploy.yaml")
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert isinstance(data, list) and data
-    return data[0].get("tasks") or []
+    return data[-1].get("tasks") or []
 
 
 def _task_index(name_substring: str) -> int:

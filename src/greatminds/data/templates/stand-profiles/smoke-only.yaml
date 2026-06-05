@@ -1,9 +1,27 @@
-# smoke-only.yaml — fast reachability + CLI-responds probe. No
-# rsync, no install. Used for warmup leases and post-deploy
+# smoke-only.yaml — REFERENCE profile: fast reachability + CLI-responds
+# probe. No rsync, no install. Used for warmup leases and post-deploy
 # liveness checks.
+#
+# Host scheme (same as full-deploy.yaml): greatminds passes the WHOLE
+# coordination/PROJECT.env as --extra-vars; Play 1 registers the stand
+# node(s) from `STAND_HOST` (single alias, or comma list) via add_host;
+# Play 2 probes each.
 ---
+- name: register stand node(s) — control node only
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: add each stand host to the stand_nodes group
+      ansible.builtin.add_host:
+        name: "{{ item }}"
+        groups: stand_nodes
+      loop: >-
+        {{ (STAND_HOST | default('localhost')).split(',')
+           | map('trim') | reject('equalto', '') | list }}
+      tags: [prerequisite]
+
 - name: greatminds smoke
-  hosts: "${STAND_HOST}"
+  hosts: stand_nodes
   gather_facts: false
   become: false
   vars:

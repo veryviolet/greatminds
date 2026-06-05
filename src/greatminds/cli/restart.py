@@ -530,6 +530,12 @@ def _restart_dead_agents(
             # Clear the bash line first (defense against partial
             # text left by a crashed agent).
             _tmux("send-keys", "-t", f"{session}:{name}", "C-u")
+            # Re-source PROJECT.env so a resurrected agent sees fleet
+            # variables even if the pane's shell was reset since launch
+            # (mirrors launch.py step 2.5; no-op when the file is absent).
+            _tmux("send-keys", "-t", f"{session}:{name}",
+                  "set -a; [ -f coordination/PROJECT.env ] && "
+                  ". coordination/PROJECT.env; set +a", "Enter")
             cp = _tmux(
                 "send-keys", "-t", f"{session}:{name}",
                 launch_cmd, "Enter",

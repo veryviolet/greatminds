@@ -1,23 +1,31 @@
-# vite-dev.yaml — coordd reference playbook for scenario C
-# (LIVE-DEVELOPER rapid UI iteration). Brings the backend up once, then
-# leaves a Vite dev server running with HMR so the lease HOLDER
-# (LIVE-DEVELOPER) can edit UI in its worktree and see changes reload
-# live — no per-edit redeploy. The dev server stays up across the whole
-# interactive session; only the backend is (re)deployed.
+# vite-dev.yaml — REFERENCE profile: LIVE-DEVELOPER rapid UI iteration.
+# Brings the backend up once, then leaves a Vite dev server running with HMR
+# so the lease HOLDER edits UI in its worktree and sees changes reload live —
+# no per-edit redeploy. The dev server stays up across the interactive session.
 #
-# Substitution variables (lease metadata + PROJECT.env):
-#   - {{ host }} / {{ user }}  — target host + SSH user (inventory line)
-#   - {{ deploy_path }}        — remote root, e.g. /srv/greatminds
-#   - {{ worktree }}           — local worktree (the UI source Vite serves)
-#   - {{ vite_port }}          — Vite dev-server port (default 5173)
-#   - {{ ui_dir }}             — UI subdir within the worktree (default ui)
-#   - {{ lease_id }} / {{ task_id }} — bookkeeping
+# Host scheme (same as full-deploy.yaml): greatminds is host-agnostic — it
+# passes the WHOLE coordination/PROJECT.env (+ lease meta) as --extra-vars, so
+# every key is `{{ KEY }}` here. Play 1 registers the stand node(s) from
+# `STAND_HOST` (single alias, or comma list) via add_host; Play 2 deploys.
+# Override any var (deploy_path / vite_port / ui_dir) from PROJECT.env.
 #
-# `prerequisite`-tagged tasks are the subset a warmup lease
-# (deploy_prerequisites_only=True) runs.
+# `prerequisite`-tagged tasks are the subset a warmup lease runs.
 ---
+- name: register stand node(s) — control node only, deploys nothing
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: add each stand host to the stand_nodes group
+      ansible.builtin.add_host:
+        name: "{{ item }}"
+        groups: stand_nodes
+      loop: >-
+        {{ (STAND_HOST | default('localhost')).split(',')
+           | map('trim') | reject('equalto', '') | list }}
+      tags: [prerequisite]
+
 - name: greatminds vite-dev stand
-  hosts: "${STAND_HOST}"
+  hosts: stand_nodes
   gather_facts: false
   become: false
   vars:
@@ -26,10 +34,17 @@
     ui_dir: "ui"
 
   tasks:
-    - name: ensure deploy_path exists
+    - name: detect deploy user
+      ansible.builtin.command: whoami
+      register: _deploy_user
+      changed_when: false
+      tags: [prerequisite]
+    - name: ensure deploy_path exists (root-created, owned by deploy user)
+      become: true
       ansible.builtin.file:
         path: "{{ deploy_path }}"
         state: directory
+        owner: "{{ _deploy_user.stdout }}"
         mode: "0755"
       tags: [prerequisite]
 

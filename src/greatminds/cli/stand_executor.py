@@ -1,41 +1,24 @@
-"""0279 (0276 Phase C): SK execution path for stand profiles.
+"""Stand profile execution: run ``ansible-playbook`` against a YAML profile.
 
-Two execution dialects, both consuming the :class:`ProfileSpec`
-returned by Phase B's :mod:`stand_profile` loader:
+``execute_yaml_profile`` consumes the :class:`ProfileSpec` from the
+:mod:`stand_profile` loader and runs ansible. greatminds is HOST-AGNOSTIC:
+it hands the whole ``PROJECT.env`` (plus lease meta) to ansible as
+``--extra-vars`` and runs the playbook in the fleet's coord dir. The
+profile author owns host topology by ansible-native means — ``add_host``
+from those vars, or a static inventory shipped alongside (auto-discovered
+via the fleet's ``ansible.cfg``). No inventory synthesis, no ``${}``
+substitution, no required host. ``deploy_prerequisites_only`` adds
+``--tags prerequisite`` so only tagged tasks run.
 
-  * ``execute_yaml_profile`` — runs ``ansible-playbook`` against the
-    YAML playbook with an inventory + extra-vars synthesized from
-    the lease metadata. Returns ``(exit_code, log)``. Honors the
-    spec's ``deploy_prerequisites_only`` flag by adding
-    ``--tags prerequisite`` so only tagged tasks run.
-  * ``execute_md_profile`` — does NOT subprocess. Substitutes
-    ``${var}`` references in the prose body and returns the
-    rendered text; SK (the caller) injects the result into its
-    next-tick prompt context for the LLM to act on.
-
-Substitution variables surfaced in both dialects (``${name}`` shell
-form, ``string.Template.safe_substitute`` semantics so unknown
-names stay literal):
-
-  - ``${lease_id}``, ``${task_id}``, ``${worktree}`` — lease fields
-  - ``${host}``, ``${user}``, ``${deploy_path}`` — current host loop
-  - any ``${KEY}`` whose value lives in lease_meta or PROJECT.env
-
-No SK runtime wiring here; that happens in ``stand.py`` (the
-dispatch helper) and STAND-KEEPER.md's workflow update (also in
-this phase). Future Phase D adds the ansible-core dependency
-declaration; this phase emits a clear error if ``ansible-playbook``
-is missing on PATH.
+Emits a clear error if ``ansible-playbook`` is missing on PATH.
 """
 from __future__ import annotations
 
 import os
-import shlex
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from string import Template
 from typing import Any
 
 from greatminds.core.errors import GreatMindsError
@@ -50,41 +33,16 @@ PREREQ_TAG = "prerequisite"
 # ---------------------------------------------------------------------------
 
 
-def _resolve_substitution_vars(lease_meta: dict[str, Any]) -> dict[str, str]:
-    """Build the substitution dict from lease metadata.
-
-    Keys passed by callers (lease_id / task_id / worktree / host /
-    user / deploy_path / any PROJECT.env var) are stringified. None
-    values become empty strings so ``${var}`` substitution doesn't
-    insert a literal "None".
-    """
-    out: dict[str, str] = {}
-    for k, v in (lease_meta or {}).items():
-        if not isinstance(k, str):
-            continue
-        out[k] = "" if v is None else str(v)
-    return out
-
-
-def _substitute(text: str, lease_meta: dict[str, Any]) -> str:
-    """``${var}``-substitute ``text`` against the lease meta dict.
-
-    Uses :func:`string.Template.safe_substitute` so unmatched names
-    stay literal — operators see the unresolved token instead of a
-    silent empty string, which makes the misconfigure obvious.
-    """
-    return Template(text).safe_substitute(
-        _resolve_substitution_vars(lease_meta))
-
-
 def read_project_env(coord: Path | None) -> dict[str, str]:
     """Parse ``coordination/PROJECT.env`` (``KEY=value`` lines) into a dict.
 
-    PROJECT.env is the SINGLE per-fleet source of host/user values that
-    every role reads (the deploy here, EXPLORER/TESTER for their SSH
-    probes). A stand profile never hard-codes a host — it references one
-    via ``${KEY}`` (e.g. ``hosts: "${STAND_HOST_GPU}"``) and the value is
-    resolved from here at deploy time."""
+    PROJECT.env is the SINGLE per-fleet config source, visible to everyone:
+    injected into the daemon + every driven agent's process environment
+    (systemd ``EnvironmentFile=``), sourced into interactive agent shells,
+    and handed to ansible as ``--extra-vars`` here so a profile reads any
+    fleet variable as ``{{ KEY }}``. greatminds owns no host topology — the
+    profile author targets hosts natively (``add_host`` from these vars, or
+    a static inventory shipped alongside)."""
     if coord is None:
         return {}
     f = coord / "PROJECT.env"
@@ -104,28 +62,6 @@ def read_project_env(coord: Path | None) -> dict[str, str]:
     except OSError:
         return {}
     return out
-
-
-def _host_from_playbook(playbook_text: str) -> str | None:
-    """The deploy host = the first play's ``hosts:`` value (after ${}
-    substitution it is the resolved SSH alias, e.g. ``mlgpu2``). The
-    profile self-documents its target host this way; the inventory is
-    built for exactly this host."""
-    import yaml as _yaml
-    try:
-        data = _yaml.safe_load(playbook_text)
-    except _yaml.YAMLError:
-        return None
-    play = None
-    if isinstance(data, list) and data:
-        play = data[0]
-    elif isinstance(data, dict):
-        play = data
-    if isinstance(play, dict):
-        h = play.get("hosts")
-        if isinstance(h, str) and h.strip():
-            return h.strip()
-    return None
 
 
 # ---------------------------------------------------------------------------
@@ -152,54 +88,20 @@ def _ansible_playbook_path() -> str:
     return found
 
 
-def _build_inventory(host: str | None, lease_meta: dict[str, Any]) -> str:
-    """Single-host INI inventory for ``host`` — the SSH alias resolved
-    from the profile's ``hosts:`` (e.g. ``mlgpu2``). ansible shells out to
-    the system ``ssh``, so the alias's ``~/.ssh/config`` block
-    (HostName / IdentityFile / ProxyJump) applies.
-
-    Neither ``ansible_user`` nor ``ansible_become`` is forced: the alias's
-    own ``User`` applies (a profile overrides it with a play-level
-    ``remote_user:``), and privilege escalation is the PLAYBOOK's decision
-    (``become:`` per play/task) — forcing ``ansible_become=true`` here
-    overrode a play's ``become: false`` and made tasks run as root
-    (breaking, e.g., a later rsync done as the login user). A lease may
-    still pin ``ansible_user`` / ``ansible_become`` explicitly.
-    """
-    if not host:
-        raise GreatMindsError(
-            "execute_yaml_profile: no deploy host — the profile's "
-            "`hosts:` did not resolve. Put the host in PROJECT.env (e.g. "
-            "STAND_HOST_GPU=mlgpu2) and reference it in the profile as "
-            '`hosts: "${STAND_HOST_GPU}"`.',
-            exit_code=2,
-        )
-    line = str(host)
-    user = (lease_meta or {}).get("user") or ""
-    if user:
-        line += f" ansible_user={shlex.quote(str(user))}"
-    become = (lease_meta or {}).get("ansible_become")
-    if become is not None:
-        line += f" ansible_become={'true' if become else 'false'}"
-    return line + "\n"
-
-
 def _build_extra_vars(lease_meta: dict[str, Any]) -> dict[str, Any]:
-    """Filter ``lease_meta`` into the dict ansible receives via
-    ``--extra-vars``.
-
-    We keep every entry whose key is a valid ansible variable name
-    (string starting with a letter/underscore). ``host`` / ``user`` /
-    ``ansible_become`` are dropped because they're already on the
-    inventory line and including them in extra-vars would be
-    redundant noise in the playbook log.
+    """The lease-meta slice ansible receives via ``--extra-vars`` (merged
+    under PROJECT.env by the caller). Keeps every string-keyed entry —
+    ``worktree`` / ``task_id`` / ``lease_id`` and any extra a caller pins.
+    Drops the legacy single-host inventory keys (``host`` / ``user`` /
+    ``ansible_become``) that the retired inventory-synthesis used; in the
+    host-agnostic scheme hosts come from PROJECT.env (e.g. STAND_HOST_*).
     """
-    inventory_only = {"host", "user", "ansible_become"}
+    legacy_inventory = {"host", "user", "ansible_become"}
     out: dict[str, Any] = {}
     for k, v in (lease_meta or {}).items():
         if not isinstance(k, str):
             continue
-        if k in inventory_only:
+        if k in legacy_inventory:
             continue
         # Stringify None so ansible doesn't see ``null``.
         out[k] = "" if v is None else v
@@ -268,32 +170,21 @@ def execute_yaml_profile(
 
     binary = ansible_playbook or _ansible_playbook_path()
 
-    # 1.6.3: PROJECT.env is the single per-fleet source of host/user
-    # values; the profile references them via ${KEY}. Substitute them into
-    # the playbook, then take the deploy host from the playbook's own
-    # `hosts:` (the resolved SSH alias). A lease field overrides PROJECT.env
-    # (a deliberate per-lease override wins).
-    subst = {**read_project_env(coord),
-             **_resolve_substitution_vars(lease_meta)}
-    playbook_text = Template(
-        spec.path.read_text(encoding="utf-8")).safe_substitute(subst)
-    host = _host_from_playbook(playbook_text) or (lease_meta or {}).get("host")
-
-    inventory_text = _build_inventory(host, lease_meta)
-    extra_vars = _build_extra_vars(lease_meta)
+    # Clean host scheme: greatminds is HOST-AGNOSTIC. The WHOLE PROJECT.env
+    # (plus lease meta: worktree / task_id / lease_id …) is handed to ansible
+    # as ``--extra-vars`` so a playbook reads any fleet variable as
+    # ``{{ KEY }}``. The profile AUTHOR owns host topology by ansible-native
+    # means — ``add_host`` from those vars (dynamic, 1 or N nodes), or a
+    # static inventory the fleet ships alongside (picked up via ``ansible.cfg``
+    # because we run with ``cwd=coord``). We do NOT synthesize an inventory,
+    # do NOT ${}-substitute the playbook, and do NOT require a host: ``hosts:``
+    # resolves against whatever the author set up (or the implicit localhost
+    # an ``add_host`` bootstrap play runs on).
+    extra_vars: dict[str, Any] = {**read_project_env(coord),
+                                  **_build_extra_vars(lease_meta)}
 
     with tempfile.TemporaryDirectory(prefix="stand-profile-") as tmpd:
-        inv_path = Path(tmpd) / "inventory.ini"
-        inv_path.write_text(inventory_text, encoding="utf-8")
-        # Run the SUBSTITUTED playbook so ${KEY} resolves to real values.
-        pb_path = Path(tmpd) / spec.path.name
-        pb_path.write_text(playbook_text, encoding="utf-8")
-
-        cmd: list[str] = [
-            binary,
-            "-i", str(inv_path),
-            str(pb_path),
-        ]
+        cmd: list[str] = [binary, str(spec.path)]
         if extra_vars:
             # Pass as JSON via the @file form so values with shell
             # metacharacters survive intact.
@@ -323,6 +214,11 @@ def execute_yaml_profile(
                 capture_output=capture_output,
                 text=True,
                 timeout=timeout_seconds,
+                # Run in the fleet's coord dir so an author-shipped
+                # ansible.cfg / inventory is auto-discovered; absent that,
+                # ansible falls back to the implicit localhost an add_host
+                # bootstrap play uses.
+                cwd=str(coord) if coord is not None else None,
                 env={**os.environ, "ANSIBLE_FORCE_COLOR": "0"},
             )
         except subprocess.TimeoutExpired as exc:

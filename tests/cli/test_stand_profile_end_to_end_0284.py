@@ -24,6 +24,7 @@ in full).
 """
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -81,9 +82,9 @@ def test_full_deploy_yaml_cycle_loads_via_phase_b(
     spec = sp.load_profile(coord, "full-deploy")
     assert spec.format == "yaml"
     assert spec.path.name == "full-deploy.yaml"
-    # Canon ships as list-of-plays.
-    assert isinstance(spec.yaml_data, list) and len(spec.yaml_data) == 1
-    play = spec.yaml_data[0]
+    # Canon ships as list-of-plays (add_host bootstrap + deploy play).
+    assert isinstance(spec.yaml_data, list) and len(spec.yaml_data) >= 1
+    play = spec.yaml_data[-1]
     for field in ("name", "hosts", "tasks"):
         assert field in play
 
@@ -91,11 +92,13 @@ def test_full_deploy_yaml_cycle_loads_via_phase_b(
 def test_full_deploy_yaml_cycle_dispatches_to_ansible(
     tmp_path: Path, monkeypatch,
 ) -> None:
-    """End-to-end: load → dispatch wires the ansible-playbook
-    subprocess with inventory derived from the lease, ``--extra-vars
-    @<json>`` carrying the non-inventory keys, and (when the lease
+    """End-to-end: load → dispatch wires the ansible-playbook subprocess
+    host-agnostically — NO ``-i`` synthesis, the WHOLE PROJECT.env funneled
+    via ``--extra-vars @<json>``, run with ``cwd=coord``, and (when the lease
     sets the prereq flag) ``--tags prerequisite``."""
     coord = _project_with_seeded_presets(tmp_path)
+    (coord / "PROJECT.env").write_text(
+        "STAND_HOST=avatar\n", encoding="utf-8")
 
     monkeypatch.setattr(se.shutil, "which",
                          lambda _name: "/fake/bin/ansible-playbook")
@@ -103,15 +106,16 @@ def test_full_deploy_yaml_cycle_dispatches_to_ansible(
 
     def fake_run(cmd, **kwargs):
         captured["cmd"] = list(cmd)
-        inv_path = Path(cmd[cmd.index("-i") + 1])
-        captured["inventory"] = inv_path.read_text(encoding="utf-8")
+        captured["cwd"] = kwargs.get("cwd")
+        ev_arg = cmd[cmd.index("--extra-vars") + 1]
+        captured["extra_vars"] = json.loads(
+            Path(ev_arg[1:]).read_text(encoding="utf-8"))
         return subprocess.CompletedProcess(
             args=cmd, returncode=0, stdout="ok\n", stderr="")
     monkeypatch.setattr(se.subprocess, "run", fake_run)
 
     # is_deploy_safe is covered by 0285/0286; here we exercise the
-    # ansible wiring, so don't let the safety gate (now reached because
-    # we pass coord for PROJECT.env) short-circuit it.
+    # ansible wiring, so don't let the safety gate short-circuit it.
     monkeypatch.setattr(se, "is_deploy_safe", lambda *a, **k: (True, ""))
     spec = sp.load_profile(coord, "full-deploy")
     rc, log = se.dispatch_profile(
@@ -120,14 +124,15 @@ def test_full_deploy_yaml_cycle_dispatches_to_ansible(
 
     cmd = captured["cmd"]
     assert cmd[0] == "/fake/bin/ansible-playbook"
-    assert "-i" in cmd
+    assert "-i" not in cmd
     assert any(c.endswith(spec.path.name) for c in cmd)
     assert "--extra-vars" in cmd
     # Lease flag → prereq tag.
     assert "--tags" in cmd
     assert "prerequisite" in cmd
-    # Inventory carries the lease's host.
-    assert "avatar" in captured["inventory"]
+    # Run in coord; PROJECT.env funneled into extra-vars.
+    assert captured["cwd"] == str(coord)
+    assert captured["extra_vars"]["STAND_HOST"] == "avatar"
 
 
 def test_full_deploy_yaml_cycle_no_prereq_runs_everything(

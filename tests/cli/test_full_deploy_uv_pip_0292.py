@@ -21,7 +21,7 @@ def _full_deploy_playbook() -> dict:
             / "full-deploy.yaml")
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert isinstance(data, list) and data
-    return data[0]
+    return data[-1]  # deploy play (add_host bootstrap play precedes it)
 
 
 def _install_task(play: dict) -> dict:

@@ -322,6 +322,40 @@ def install_template_unit() -> bool:
     return True
 
 
+def _project_dropin_dir(name: str) -> Path:
+    return SYSTEMD_USER_DIR / f"{_instance_unit(name)}.d"
+
+
+def install_project_dropin(name: str, project_dir: Path) -> bool:
+    """Per-instance drop-in giving the daemon — and every driven agent it
+    spawns, which inherit its process env — the fleet's ``PROJECT.env`` as a
+    systemd ``EnvironmentFile``. This is the single, clean injection point:
+    one file → coordd + all driven turns see every PROJECT.env var as a real
+    environment variable. The shared template can't carry it (the coord path
+    is per-project), so it lives in the instance drop-in.
+
+    The leading ``-`` makes the file optional: a fleet with no PROJECT.env
+    yet (or before setup writes it) simply gets no extra env, no failure.
+    Returns True when the drop-in was written/changed.
+    """
+    env_file = project_dir / "coordination" / "PROJECT.env"
+    body = (
+        "[Service]\n"
+        f"EnvironmentFile=-{env_file}\n"
+    )
+    d = _project_dropin_dir(name)
+    d.mkdir(parents=True, exist_ok=True)
+    target = d / "10-project-env.conf"
+    if target.is_file():
+        try:
+            if target.read_text(encoding="utf-8") == body:
+                return False
+        except OSError:
+            pass
+    target.write_text(body, encoding="utf-8")
+    return True
+
+
 # ---------------------------------------------------------------------------
 # 0320 (0311 Phase 3a): codex app-server template unit
 # ---------------------------------------------------------------------------
@@ -540,12 +574,19 @@ def install_cmd(name: str | None, project_dir: Path | None) -> None:
 
     wrote_unit = install_template_unit()
     register_project(resolved, pd)
+    # Wire the fleet's PROJECT.env into the daemon (and every driven agent
+    # it spawns) as a systemd EnvironmentFile — the single clean injection.
+    wrote_dropin = install_project_dropin(resolved, pd)
 
-    if wrote_unit:
+    if wrote_unit or wrote_dropin:
         _systemctl("daemon-reload")
+    if wrote_unit:
         ok(f"template unit installed at {SYSTEMD_USER_DIR / TEMPLATE_UNIT_NAME}")
     else:
         info("template unit already present, no rewrite")
+    if wrote_dropin:
+        ok("PROJECT.env wired into daemon env "
+           f"(EnvironmentFile=-{pd / 'coordination' / 'PROJECT.env'})")
     ok(f"project '{resolved}' registered → {pd}")
 
     # 0307: enable the per-project instance unit so it lives under

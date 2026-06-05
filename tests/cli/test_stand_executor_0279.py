@@ -98,29 +98,13 @@ def test_ansible_playbook_path_returns_resolved(monkeypatch) -> None:
 # ---------- inventory / extra-vars synthesis ----------
 
 
-def test_build_inventory_includes_user_and_become() -> None:
-    inv = se._build_inventory("avatar", _lease(user="deploy", ansible_become=True))
-    assert "avatar" in inv
-    assert "ansible_user=deploy" in inv
-    assert "ansible_become=true" in inv
-
-
-def test_build_inventory_can_disable_become() -> None:
-    inv = se._build_inventory(
-        "avatar", _lease(user="deploy", ansible_become=False))
-    assert "ansible_become=false" in inv
-
-
-def test_build_inventory_become_unset_by_default() -> None:
-    # the playbook decides become; the executor no longer forces it.
-    inv = se._build_inventory("avatar", {"user": "deploy"})
-    assert "ansible_become" not in inv
-
-
-def test_build_inventory_missing_host_rejected() -> None:
-    with pytest.raises(GreatMindsError) as exc:
-        se._build_inventory(None, {"user": "deploy"})  # no host
-    assert "host" in str(exc.value).lower()
+def test_executor_has_no_inventory_synthesis() -> None:
+    # The clean host scheme retired single-host inventory synthesis +
+    # ${}-substitution; the profile author owns hosts (add_host from
+    # PROJECT.env vars, or a static inventory shipped alongside).
+    assert not hasattr(se, "_build_inventory")
+    assert not hasattr(se, "_host_from_playbook")
+    assert not hasattr(se, "_substitute")
 
 
 def test_build_extra_vars_drops_inventory_only_keys() -> None:
@@ -139,18 +123,22 @@ def test_build_extra_vars_drops_inventory_only_keys() -> None:
 
 def test_execute_yaml_builds_expected_argv(tmp_path: Path,
                                               monkeypatch) -> None:
-    """The synthesized command line must include ``ansible-playbook``,
-    ``-i <tmp-inventory>``, ``<playbook-path>``, ``--extra-vars @<json>``
-    (and no ``--tags`` when prereq_only=False)."""
+    """Host-agnostic command line: ``ansible-playbook <profile>
+    --extra-vars @<json>`` with NO ``-i`` synthesis, run with
+    ``cwd=coord``. The extra-vars JSON carries the WHOLE PROJECT.env
+    (so ``{{ STAND_HOST_A }}`` resolves) merged with lease meta, and
+    drops the legacy single-host inventory keys."""
+    # coord = tmp_path (the profile lives under tmp_path/stand-profiles/).
+    # Its PROJECT.env must be funneled into extra-vars.
+    (tmp_path / "PROJECT.env").write_text(
+        "STAND_HOST_A=node-a\nSTAND_HOST_B=node-b\n", encoding="utf-8")
     spec = _yaml_spec(tmp_path, prereq_only=False)
     captured: dict = {}
 
     def fake_run(cmd, **kwargs):
-        # Snapshot the command + the inventory + extra-vars contents
-        # before the temp dir is cleaned up.
         captured["cmd"] = list(cmd)
-        inv_path = Path(cmd[cmd.index("-i") + 1])
-        captured["inventory"] = inv_path.read_text(encoding="utf-8")
+        captured["cwd"] = kwargs.get("cwd")
+        assert "-i" not in cmd, "executor must not synthesize an inventory"
         if "--extra-vars" in cmd:
             ev_arg = cmd[cmd.index("--extra-vars") + 1]
             assert ev_arg.startswith("@"), (
@@ -164,23 +152,27 @@ def test_execute_yaml_builds_expected_argv(tmp_path: Path,
     monkeypatch.setattr(se.subprocess, "run", fake_run)
     monkeypatch.setattr(se.shutil, "which",
                          lambda _name: "/fake/bin/ansible-playbook")
+    # Safety gate is covered by 0285; here we exercise argv wiring.
+    monkeypatch.setattr(se, "is_deploy_safe", lambda *a, **k: (True, ""))
 
-    rc, log = se.execute_yaml_profile(spec, _lease())
+    rc, log = se.execute_yaml_profile(spec, _lease(coord=str(tmp_path)))
     assert rc == 0
     assert log == "ok\n"
     cmd = captured["cmd"]
     assert cmd[0] == "/fake/bin/ansible-playbook"
-    assert "-i" in cmd
+    assert "-i" not in cmd
     assert any(c.endswith(spec.path.name) for c in cmd)
     assert "--extra-vars" in cmd
     assert "--tags" not in cmd
-    # Inventory shape: bare host (the alias) + user + become, no group.
-    assert "avatar" in captured["inventory"]
-    assert "[stand]" not in captured["inventory"]
-    # Extra-vars JSON does NOT include host/user/ansible_become.
+    # Run in the fleet's coord dir (so author ansible.cfg/inventory applies).
+    assert captured["cwd"] == str(tmp_path)
+    # Extra-vars carries the WHOLE PROJECT.env + lease meta, minus legacy
+    # inventory keys.
     ev = captured["extra_vars"]
-    assert "host" not in ev
+    assert ev["STAND_HOST_A"] == "node-a"
+    assert ev["STAND_HOST_B"] == "node-b"
     assert ev["task_id"] == "0279-test"
+    assert "host" not in ev
 
 
 def test_execute_yaml_passes_prereq_tag_when_flag_set(

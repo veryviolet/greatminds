@@ -44,17 +44,17 @@ def test_canon_ships_all_four_preset_files() -> None:
 
 
 def test_full_deploy_yaml_is_valid_ansible_subset() -> None:
-    """The canonical ``full-deploy.yaml`` parses as YAML, top-level
-    is a list, the single play has the schema-required fields
-    (``name``, ``hosts``, ``tasks``)."""
+    """The canonical ``full-deploy.yaml`` parses as YAML, top-level is a
+    list of plays; the deploy play (the last one — an add_host bootstrap
+    play precedes it) has the schema-required fields."""
     src = (find_canon_dir() / "templates" / "stand-profiles"
            / "full-deploy.yaml")
     data = yaml.safe_load(src.read_text(encoding="utf-8"))
-    assert isinstance(data, list) and len(data) == 1
-    play = data[0]
+    assert isinstance(data, list) and len(data) >= 1
+    play = data[-1]
     for field in ("name", "hosts", "tasks"):
         assert field in play, (
-            f"0281: full-deploy.yaml play missing {field!r}"
+            f"0281: full-deploy.yaml deploy play missing {field!r}"
         )
     assert isinstance(play["tasks"], list) and play["tasks"]
 
@@ -66,7 +66,7 @@ def test_full_deploy_yaml_tags_prerequisite_steps() -> None:
     src = (find_canon_dir() / "templates" / "stand-profiles"
            / "full-deploy.yaml")
     data = yaml.safe_load(src.read_text(encoding="utf-8"))
-    play = data[0]
+    play = data[-1]
     has_prereq = any(
         "prerequisite" in (t.get("tags") or [])
         for t in play["tasks"]
@@ -82,8 +82,8 @@ def test_smoke_only_yaml_is_valid_subset() -> None:
     src = (find_canon_dir() / "templates" / "stand-profiles"
            / "smoke-only.yaml")
     data = yaml.safe_load(src.read_text(encoding="utf-8"))
-    assert isinstance(data, list) and len(data) == 1
-    play = data[0]
+    assert isinstance(data, list) and len(data) >= 1
+    play = data[-1]
     for field in ("name", "hosts", "tasks"):
         assert field in play
 
