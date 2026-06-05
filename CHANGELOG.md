@@ -4,6 +4,20 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.6.5 — 2026-06-05
+
+Fix: the deploy forced privilege escalation, overriding the playbook.
+
+### Fixed
+
+- **The executor no longer forces `ansible_become=true`.** The synthesized
+  inventory pinned `ansible_become=true` by default, which OVERRODE a
+  play's `become: false` and made tasks run as root — e.g. a deploy that
+  creates its target dir without sudo and then rsyncs to it as the login
+  user broke (the dir ended up root-owned). Privilege escalation is now
+  the PLAYBOOK's decision (`become:` per play/task); a lease may still pin
+  `ansible_become` / `ansible_user` explicitly.
+
 ## 1.6.4 — 2026-06-05
 
 Fix: the YAML stand deploy never reached its target host.

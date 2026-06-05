@@ -158,11 +158,13 @@ def _build_inventory(host: str | None, lease_meta: dict[str, Any]) -> str:
     the system ``ssh``, so the alias's ``~/.ssh/config`` block
     (HostName / IdentityFile / ProxyJump) applies.
 
-    No ``ansible_user`` is forced: the alias's own ``User`` applies by
-    default, and a profile overrides it with a play-level ``remote_user:``
-    when the alias defaults to the wrong user (e.g. root). ``ansible_become``
-    defaults true (deploys usually sudo); a lease may override via
-    ``ansible_become``.
+    Neither ``ansible_user`` nor ``ansible_become`` is forced: the alias's
+    own ``User`` applies (a profile overrides it with a play-level
+    ``remote_user:``), and privilege escalation is the PLAYBOOK's decision
+    (``become:`` per play/task) — forcing ``ansible_become=true`` here
+    overrode a play's ``become: false`` and made tasks run as root
+    (breaking, e.g., a later rsync done as the login user). A lease may
+    still pin ``ansible_user`` / ``ansible_become`` explicitly.
     """
     if not host:
         raise GreatMindsError(
@@ -172,15 +174,13 @@ def _build_inventory(host: str | None, lease_meta: dict[str, Any]) -> str:
             '`hosts: "${STAND_HOST_GPU}"`.',
             exit_code=2,
         )
-    user = (lease_meta or {}).get("user") or ""
-    become = (lease_meta or {}).get("ansible_become")
-    if become is None:
-        become = True
     line = str(host)
+    user = (lease_meta or {}).get("user") or ""
     if user:
         line += f" ansible_user={shlex.quote(str(user))}"
-    if become:
-        line += " ansible_become=true"
+    become = (lease_meta or {}).get("ansible_become")
+    if become is not None:
+        line += f" ansible_become={'true' if become else 'false'}"
     return line + "\n"
 
 

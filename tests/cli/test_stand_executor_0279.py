@@ -99,7 +99,7 @@ def test_ansible_playbook_path_returns_resolved(monkeypatch) -> None:
 
 
 def test_build_inventory_includes_user_and_become() -> None:
-    inv = se._build_inventory("avatar", _lease(user="deploy"))
+    inv = se._build_inventory("avatar", _lease(user="deploy", ansible_become=True))
     assert "avatar" in inv
     assert "ansible_user=deploy" in inv
     assert "ansible_become=true" in inv
@@ -108,6 +108,12 @@ def test_build_inventory_includes_user_and_become() -> None:
 def test_build_inventory_can_disable_become() -> None:
     inv = se._build_inventory(
         "avatar", _lease(user="deploy", ansible_become=False))
+    assert "ansible_become=false" in inv
+
+
+def test_build_inventory_become_unset_by_default() -> None:
+    # the playbook decides become; the executor no longer forces it.
+    inv = se._build_inventory("avatar", {"user": "deploy"})
     assert "ansible_become" not in inv
 
 
