@@ -14,7 +14,7 @@
 # (deploy_prerequisites_only=True) run only those steps.
 ---
 - name: greatminds full deploy
-  hosts: stand
+  hosts: "${STAND_HOST}"
   gather_facts: false
   become: false
   vars:

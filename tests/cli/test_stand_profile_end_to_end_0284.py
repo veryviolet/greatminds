@@ -47,6 +47,7 @@ def _project_with_seeded_presets(tmp_path: Path) -> Path:
     coord = tmp_path / "proj" / "coordination"
     coord.mkdir(parents=True)
     setup_mod._seed_stand_profiles(coord, find_canon_dir())
+    (coord / "PROJECT.env").write_text("STAND_HOST=avatar\n", encoding="utf-8")
     return coord
 
 
@@ -108,15 +109,19 @@ def test_full_deploy_yaml_cycle_dispatches_to_ansible(
             args=cmd, returncode=0, stdout="ok\n", stderr="")
     monkeypatch.setattr(se.subprocess, "run", fake_run)
 
+    # is_deploy_safe is covered by 0285/0286; here we exercise the
+    # ansible wiring, so don't let the safety gate (now reached because
+    # we pass coord for PROJECT.env) short-circuit it.
+    monkeypatch.setattr(se, "is_deploy_safe", lambda *a, **k: (True, ""))
     spec = sp.load_profile(coord, "full-deploy")
     rc, log = se.dispatch_profile(
-        spec, _lease(deploy_prerequisites_only=True))
+        spec, _lease(coord=str(coord), deploy_prerequisites_only=True))
     assert rc == 0 and log == "ok\n"
 
     cmd = captured["cmd"]
     assert cmd[0] == "/fake/bin/ansible-playbook"
     assert "-i" in cmd
-    assert str(spec.path) in cmd
+    assert any(c.endswith(spec.path.name) for c in cmd)
     assert "--extra-vars" in cmd
     # Lease flag → prereq tag.
     assert "--tags" in cmd

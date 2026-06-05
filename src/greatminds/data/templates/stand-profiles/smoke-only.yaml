@@ -3,7 +3,7 @@
 # liveness checks.
 ---
 - name: greatminds smoke
-  hosts: stand
+  hosts: "${STAND_HOST}"
   gather_facts: false
   become: false
   vars:

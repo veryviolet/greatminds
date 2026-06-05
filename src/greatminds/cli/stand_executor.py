@@ -77,6 +77,57 @@ def _substitute(text: str, lease_meta: dict[str, Any]) -> str:
         _resolve_substitution_vars(lease_meta))
 
 
+def read_project_env(coord: Path | None) -> dict[str, str]:
+    """Parse ``coordination/PROJECT.env`` (``KEY=value`` lines) into a dict.
+
+    PROJECT.env is the SINGLE per-fleet source of host/user values that
+    every role reads (the deploy here, EXPLORER/TESTER for their SSH
+    probes). A stand profile never hard-codes a host — it references one
+    via ``${KEY}`` (e.g. ``hosts: "${STAND_HOST_GPU}"``) and the value is
+    resolved from here at deploy time."""
+    if coord is None:
+        return {}
+    f = coord / "PROJECT.env"
+    if not f.is_file():
+        return {}
+    out: dict[str, str] = {}
+    try:
+        for raw in f.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key = key.strip()
+            val = val.strip().strip('"').strip("'")
+            if key:
+                out[key] = val
+    except OSError:
+        return {}
+    return out
+
+
+def _host_from_playbook(playbook_text: str) -> str | None:
+    """The deploy host = the first play's ``hosts:`` value (after ${}
+    substitution it is the resolved SSH alias, e.g. ``mlgpu2``). The
+    profile self-documents its target host this way; the inventory is
+    built for exactly this host."""
+    import yaml as _yaml
+    try:
+        data = _yaml.safe_load(playbook_text)
+    except _yaml.YAMLError:
+        return None
+    play = None
+    if isinstance(data, list) and data:
+        play = data[0]
+    elif isinstance(data, dict):
+        play = data
+    if isinstance(play, dict):
+        h = play.get("hosts")
+        if isinstance(h, str) and h.strip():
+            return h.strip()
+    return None
+
+
 # ---------------------------------------------------------------------------
 # YAML profile execution
 # ---------------------------------------------------------------------------
@@ -101,35 +152,36 @@ def _ansible_playbook_path() -> str:
     return found
 
 
-def _build_inventory(lease_meta: dict[str, Any]) -> str:
-    """Build a single-host INI inventory string for ansible.
+def _build_inventory(host: str | None, lease_meta: dict[str, Any]) -> str:
+    """Single-host INI inventory for ``host`` — the SSH alias resolved
+    from the profile's ``hosts:`` (e.g. ``mlgpu2``). ansible shells out to
+    the system ``ssh``, so the alias's ``~/.ssh/config`` block
+    (HostName / IdentityFile / ProxyJump) applies.
 
-    Group name is ``stand`` (matches the playbook's typical
-    ``hosts: stand`` directive — playbooks may also use ``all`` /
-    a literal host pattern; ansible matches by name).
-
-    Required keys in ``lease_meta``: ``host``. Optional: ``user``,
-    ``ansible_become`` (defaults to true since SK deploys typically
-    need privilege escalation; operators can override via PROJECT.env).
+    No ``ansible_user`` is forced: the alias's own ``User`` applies by
+    default, and a profile overrides it with a play-level ``remote_user:``
+    when the alias defaults to the wrong user (e.g. root). ``ansible_become``
+    defaults true (deploys usually sudo); a lease may override via
+    ``ansible_become``.
     """
-    host = lease_meta.get("host")
     if not host:
         raise GreatMindsError(
-            "execute_yaml_profile: lease_meta.host is required for "
-            "ansible inventory synthesis",
+            "execute_yaml_profile: no deploy host — the profile's "
+            "`hosts:` did not resolve. Put the host in PROJECT.env (e.g. "
+            "STAND_HOST_GPU=mlgpu2) and reference it in the profile as "
+            '`hosts: "${STAND_HOST_GPU}"`.',
             exit_code=2,
         )
-    user = lease_meta.get("user") or ""
-    become = lease_meta.get("ansible_become")
+    user = (lease_meta or {}).get("user") or ""
+    become = (lease_meta or {}).get("ansible_become")
     if become is None:
         become = True
-
     line = str(host)
     if user:
         line += f" ansible_user={shlex.quote(str(user))}"
     if become:
         line += " ansible_become=true"
-    return "[stand]\n" + line + "\n"
+    return line + "\n"
 
 
 def _build_extra_vars(lease_meta: dict[str, Any]) -> dict[str, Any]:
@@ -216,17 +268,31 @@ def execute_yaml_profile(
 
     binary = ansible_playbook or _ansible_playbook_path()
 
-    inventory_text = _build_inventory(lease_meta)
+    # 1.6.3: PROJECT.env is the single per-fleet source of host/user
+    # values; the profile references them via ${KEY}. Substitute them into
+    # the playbook, then take the deploy host from the playbook's own
+    # `hosts:` (the resolved SSH alias). A lease field overrides PROJECT.env
+    # (a deliberate per-lease override wins).
+    subst = {**read_project_env(coord),
+             **_resolve_substitution_vars(lease_meta)}
+    playbook_text = Template(
+        spec.path.read_text(encoding="utf-8")).safe_substitute(subst)
+    host = _host_from_playbook(playbook_text) or (lease_meta or {}).get("host")
+
+    inventory_text = _build_inventory(host, lease_meta)
     extra_vars = _build_extra_vars(lease_meta)
 
     with tempfile.TemporaryDirectory(prefix="stand-profile-") as tmpd:
         inv_path = Path(tmpd) / "inventory.ini"
         inv_path.write_text(inventory_text, encoding="utf-8")
+        # Run the SUBSTITUTED playbook so ${KEY} resolves to real values.
+        pb_path = Path(tmpd) / spec.path.name
+        pb_path.write_text(playbook_text, encoding="utf-8")
 
         cmd: list[str] = [
             binary,
             "-i", str(inv_path),
-            str(spec.path),
+            str(pb_path),
         ]
         if extra_vars:
             # Pass as JSON via the @file form so values with shell

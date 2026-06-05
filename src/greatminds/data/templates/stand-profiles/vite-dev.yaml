@@ -17,7 +17,7 @@
 # (deploy_prerequisites_only=True) runs.
 ---
 - name: greatminds vite-dev stand
-  hosts: stand
+  hosts: "${STAND_HOST}"
   gather_facts: false
   become: false
   vars:

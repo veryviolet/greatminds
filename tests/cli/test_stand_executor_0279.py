@@ -31,7 +31,7 @@ def _yaml_spec(tmp_path: Path,
     path.write_text(
         yaml.safe_dump({
             "name": "full-deploy",
-            "hosts": "stand",
+            "hosts": "avatar",
             "tasks": [{"name": "ping", "ansible.builtin.ping": None}],
         }),
         encoding="utf-8",
@@ -99,8 +99,7 @@ def test_ansible_playbook_path_returns_resolved(monkeypatch) -> None:
 
 
 def test_build_inventory_includes_user_and_become() -> None:
-    inv = se._build_inventory(_lease(host="avatar", user="deploy"))
-    assert "[stand]" in inv
+    inv = se._build_inventory("avatar", _lease(user="deploy"))
     assert "avatar" in inv
     assert "ansible_user=deploy" in inv
     assert "ansible_become=true" in inv
@@ -108,13 +107,13 @@ def test_build_inventory_includes_user_and_become() -> None:
 
 def test_build_inventory_can_disable_become() -> None:
     inv = se._build_inventory(
-        _lease(host="avatar", user="deploy", ansible_become=False))
+        "avatar", _lease(user="deploy", ansible_become=False))
     assert "ansible_become" not in inv
 
 
 def test_build_inventory_missing_host_rejected() -> None:
     with pytest.raises(GreatMindsError) as exc:
-        se._build_inventory({"user": "deploy"})  # no host
+        se._build_inventory(None, {"user": "deploy"})  # no host
     assert "host" in str(exc.value).lower()
 
 
@@ -165,12 +164,13 @@ def test_execute_yaml_builds_expected_argv(tmp_path: Path,
     assert log == "ok\n"
     cmd = captured["cmd"]
     assert cmd[0] == "/fake/bin/ansible-playbook"
-    assert "-i" in cmd and str(spec.path) in cmd
+    assert "-i" in cmd
+    assert any(c.endswith(spec.path.name) for c in cmd)
     assert "--extra-vars" in cmd
     assert "--tags" not in cmd
-    # Inventory shape: [stand] group + host + user + become.
-    assert "[stand]" in captured["inventory"]
+    # Inventory shape: bare host (the alias) + user + become, no group.
     assert "avatar" in captured["inventory"]
+    assert "[stand]" not in captured["inventory"]
     # Extra-vars JSON does NOT include host/user/ansible_become.
     ev = captured["extra_vars"]
     assert "host" not in ev
