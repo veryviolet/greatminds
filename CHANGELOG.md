@@ -4,7 +4,7 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
-## 1.6.8 — 2026-06-05 (unreleased — dashboard readability)
+## 1.6.8 — 2026-06-05
 
 ### Fixed
 
