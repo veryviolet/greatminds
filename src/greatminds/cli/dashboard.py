@@ -176,6 +176,19 @@ def collect_agents(coord: Path, coord_yaml: dict | None, canon_dir: Path,
         # genuinely-running turn as "idle".
         driven_turn = lifecycle == "driven" and lock.is_file()
         claimed = tasks_by_owner.get(role, [])
+        # A driven turn does NOT refresh a heartbeat, so the HB column would
+        # show a misleading stale age while the turn runs ("running · 8m" reads
+        # as a hang). When a turn is in flight, show its DURATION instead (the
+        # run-lock's age) prefixed with ⟳ — the real "how long active" signal,
+        # which also surfaces a genuinely hung turn (e.g. ⟳31m).
+        if driven_turn:
+            try:
+                turn_age = time.time() - lock.stat().st_mtime
+                hb_display = "⟳" + _fmt_age(turn_age)
+            except OSError:
+                hb_display = _fmt_age(hb_age)
+        else:
+            hb_display = _fmt_age(hb_age)
         rows.append({
             "role": role,
             "tool": entry["tool"] or (rec.get("tool") or "—"),
@@ -184,7 +197,7 @@ def collect_agents(coord: Path, coord_yaml: dict | None, canon_dir: Path,
             "alive": rec["alive"],
             "registered": rec["registered"],
             "state": _agent_state(rec, entry["mode"], lifecycle, driven_turn),
-            "heartbeat": _fmt_age(hb_age),
+            "heartbeat": hb_display,
             "doing": _agent_doing(rec, entry["mode"], lifecycle,
                                   driven_turn, PUSH_FRESH_GUARD_SEC, claimed),
         })
@@ -292,8 +305,11 @@ def _render_agents(rows: list[dict[str, Any]], width: int, color: bool) -> list[
     for r in rows:
         state = r.get("state") or ("alive" if r["alive"] else "dead")
         dot, key = glyph.get(state, ("○", "dead"))
+        # STATE column is 12 wide (header). The glyph + space take 2, so the
+        # state string is padded to 10 → 12 total, keeping HB aligned. Using
+        # <7 collided HB with longer states ("running" → "runningfresh").
         line = (f"{r['role']:<19}{r['tool']:<7}{r['lifecycle']:<13}"
-                f"{dot} {state:<7}{r['heartbeat']:<7}{r['doing']}")
+                f"{dot} {state:<10}{r['heartbeat']:<7}{r['doing']}")
         out.append(_paint(_clip(line, width), key, color))
     return out
 

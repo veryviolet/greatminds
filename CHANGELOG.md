@@ -4,6 +4,20 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.6.8 — 2026-06-05 (unreleased — dashboard readability)
+
+### Fixed
+
+- **Dashboard agent table alignment.** The STATE column rendered the state
+  string padded to 7 while the header reserved 12, so longer states collided
+  with the HB column ("running" → "runningfresh" / "running8m"). State is now
+  padded to fill the 12-wide column; HB stays aligned.
+- **Dashboard HB column for a running driven turn.** A driven turn does not
+  refresh a heartbeat, so the HB column showed a misleading STALE age while a
+  turn ran ("running · 8m" read as a hang). While a turn is in flight the
+  column now shows the turn's DURATION from the run-lock age, prefixed ⟳
+  (e.g. ⟳4m) — the real activity signal, which also surfaces a hung turn.
+
 ## 1.6.7 — 2026-06-05
 
 Host-agnostic stand deploys + autonomous backlog recovery.
