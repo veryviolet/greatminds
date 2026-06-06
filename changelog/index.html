@@ -1408,6 +1408,14 @@
 <p>All notable changes to <strong>greatminds</strong> are documented here. Format follows
 <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a> loosely; versions
 follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
+<h2 id="1610-2026-06-06">1.6.10 — 2026-06-06<a class="headerlink" href="#1610-2026-06-06" title="Permanent link">&para;</a></h2>
+<h3 id="fixed-stand-infra-release-chain-code-level-verified-live-validated-post-upgrade">Fixed (stand-infra release chain — code-level verified; live-validated post-upgrade)<a class="headerlink" href="#fixed-stand-infra-release-chain-code-level-verified-live-validated-post-upgrade" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>#9 — coordd stand deploy lacks lease_meta.host resolution</strong> (0363): stand.py / stand_profile.py resolve host topology correctly for the host-agnostic deploy.</li>
+<li><strong>#16 — stand deploy marks ready after empty-inventory / no-hosts no-op</strong> (0366): stand_executor now FAILS a vacuous run (0 hosts matched / 0 tasks) instead of returning rc=0 -&gt; ready, so a no-op deploy can never falsely mark a stand ready.</li>
+<li><strong>#17 — reused fleets keep stale seeded stand profiles because setup does not overwrite</strong> (0367): setup/migrate re-seed stale full-deploy/smoke-only profiles to the add_host topology so existing fleets get the non-vacuous deploy path.</li>
+</ul>
+<p>These three unblock real (non-vacuous) stand deploys; the remaining release-gated batch (#11/#12/#13/#14/#18 etc.) is live-validated against this release post-upgrade.</p>
 <h2 id="169-2026-06-05">1.6.9 — 2026-06-05<a class="headerlink" href="#169-2026-06-05" title="Permanent link">&para;</a></h2>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
