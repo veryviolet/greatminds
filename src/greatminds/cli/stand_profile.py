@@ -38,6 +38,12 @@ from greatminds.core.paths import find_canon_dir
 
 STAND_PROFILES_DIRNAME = "stand-profiles"
 PREREQ_ONLY_KEY = "deploy_prerequisites_only"
+# 0363 (GitHub #9): a profile MAY declare its deploy host so coordd can
+# thread it into ``lease_meta`` (the lease state-file carries no host).
+# Lives under the first play's ``vars:`` block — an ansible-safe location
+# (``host:`` at play level is an invalid play directive). Read by
+# ``deploy_lease`` as an override on the profile-name-as-host default.
+DEPLOY_HOST_KEY = "deploy_host"
 
 # Default YAML required-field list — overridden at load-time from the
 # schema's ``stand_profile.yaml_required_fields`` if the schema is
@@ -60,6 +66,11 @@ class ProfileSpec:
     yaml_data: dict[str, Any] | None = None
     md_content: str | None = None
     deploy_prerequisites_only: bool = False
+    # 0363 (GitHub #9): optional deploy host declared by the profile (first
+    # play ``vars.deploy_host``). ``None`` when unset — ``deploy_lease``
+    # then falls back to the profile name. Threaded into ``lease_meta.host``
+    # for the is_deploy_safe classifier + deploy-marker evidence.
+    host: str | None = None
     # Diagnostic: when the MD frontmatter parsed, the raw frontmatter
     # dict is kept here so callers can read additional ad-hoc metadata
     # without re-parsing.
@@ -181,12 +192,17 @@ def _load_yaml_profile(name: str, path: Path) -> ProfileSpec:
         vars_block = {}
     prereq = bool(vars_block.get(PREREQ_ONLY_KEY, False))
 
+    host_raw = vars_block.get(DEPLOY_HOST_KEY)
+    host = str(host_raw).strip() if host_raw is not None else ""
+    host = host or None
+
     return ProfileSpec(
         name=name,
         format="yaml",
         path=path,
         yaml_data=data,
         deploy_prerequisites_only=prereq,
+        host=host,
     )
 
 

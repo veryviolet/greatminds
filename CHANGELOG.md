@@ -4,6 +4,16 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.6.10 — 2026-06-06
+
+### Fixed (stand-infra release chain — code-level verified; live-validated post-upgrade)
+
+- **#9 — coordd stand deploy lacks lease_meta.host resolution** (0363): stand.py / stand_profile.py resolve host topology correctly for the host-agnostic deploy.
+- **#16 — stand deploy marks ready after empty-inventory / no-hosts no-op** (0366): stand_executor now FAILS a vacuous run (0 hosts matched / 0 tasks) instead of returning rc=0 -> ready, so a no-op deploy can never falsely mark a stand ready.
+- **#17 — reused fleets keep stale seeded stand profiles because setup does not overwrite** (0367): setup/migrate re-seed stale full-deploy/smoke-only profiles to the add_host topology so existing fleets get the non-vacuous deploy path.
+
+These three unblock real (non-vacuous) stand deploys; the remaining release-gated batch (#11/#12/#13/#14/#18 etc.) is live-validated against this release post-upgrade.
+
 ## 1.6.9 — 2026-06-05
 
 ### Fixed

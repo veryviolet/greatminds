@@ -153,6 +153,41 @@ def test_deploy_prerequisites_only_yaml_default_false(tmp_path: Path) -> None:
     assert spec.deploy_prerequisites_only is False
 
 
+# ---------- deploy_host extraction (0363 / GitHub #9) ----------
+
+
+def test_deploy_host_from_yaml_vars(tmp_path: Path) -> None:
+    """YAML path: ``vars.deploy_host`` lifts into ``spec.host`` so coordd
+    can thread it into ``lease_meta``."""
+    pd = _profiles_dir(tmp_path)
+    data = _valid_playbook()
+    data["vars"] = {"deploy_host": "srv5-mlgpu-2.area.zov"}
+    _write_yaml(pd, "mlgpu2", data)
+
+    spec = sp.load_profile(tmp_path, "mlgpu2")
+    assert spec.host == "srv5-mlgpu-2.area.zov"
+
+
+def test_deploy_host_default_none(tmp_path: Path) -> None:
+    """No ``vars.deploy_host`` → ``spec.host`` is None (deploy_lease then
+    falls back to the profile name)."""
+    pd = _profiles_dir(tmp_path)
+    _write_yaml(pd, "full-deploy", _valid_playbook())
+    spec = sp.load_profile(tmp_path, "full-deploy")
+    assert spec.host is None
+
+
+def test_deploy_host_blank_is_none(tmp_path: Path) -> None:
+    """A blank/whitespace ``vars.deploy_host`` collapses to None rather
+    than an empty-string host that would defeat the profile-name fallback."""
+    pd = _profiles_dir(tmp_path)
+    data = _valid_playbook()
+    data["vars"] = {"deploy_host": "   "}
+    _write_yaml(pd, "blankhost", data)
+    spec = sp.load_profile(tmp_path, "blankhost")
+    assert spec.host is None
+
+
 def test_profile_paths_returns_two_candidates(tmp_path: Path) -> None:
     """``profile_paths`` is the canonical helper for resolving the
     two candidate file paths. Tests that need to assert error

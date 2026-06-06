@@ -211,6 +211,28 @@ def run_migration(project_dir: Path, run_setup: bool = True) -> None:
     else:
         info("    none")
 
+    # 0367: existing fleets keep stale seeded stand profiles because setup
+    # never overwrites them; the pre-add_host topology matches zero hosts
+    # (vacuous deploy). Refresh pristine seeded copies to the current
+    # add_host/STAND_HOST template, leaving operator-customized profiles
+    # alone. setup does NOT do this (it stays strictly additive) — the
+    # reseed only runs on the deliberate migrate/update path.
+    info("==> migrating stale seeded stand profiles to add_host topology...")
+    from greatminds.cli.setup import reseed_stale_stand_profiles
+    sp = reseed_stale_stand_profiles(project_dir / "coordination", find_canon_dir())
+    if sp["reseeded"]:
+        ok(f"    ✓ reseeded {len(sp['reseeded'])} stale profile(s): "
+           f"{', '.join(sp['reseeded'])} "
+           "(old bytes backed up under stand-profiles/.backups/)")
+    if sp["customized"]:
+        warn("    customized stale profile(s) left in place — migrate by "
+             f"hand: {', '.join(sp['customized'])}")
+    if sp["missing_template"]:
+        warn("    template missing for: "
+             f"{', '.join(sp['missing_template'])} (partial build?)")
+    if not any((sp["reseeded"], sp["customized"], sp["missing_template"])):
+        info("    none stale (profiles already current or operator-owned)")
+
 
 @click.command(name="migrate",
                short_help="migrate project config to the current greatminds version")

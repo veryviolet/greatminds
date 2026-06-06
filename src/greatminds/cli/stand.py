@@ -687,12 +687,22 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
             "are LLM-executed prose, not deterministically deployable)",
             exit_code=2)
 
+    # 0363 (GitHub #9): the lease state-file carries no host (the lease CLI
+    # takes only --task/--worktree/--profile), so coordd-driven deploys
+    # reached the executor with host=None. Resolve a host here — lease value
+    # (if a future --host ever sets it) > profile YAML (``vars.deploy_host``)
+    # > profile-name default — so is_deploy_safe + the deploy marker see a
+    # concrete target instead of an empty string. Host is NOT forwarded to
+    # ansible (the host-agnostic executor drops it; topology comes from
+    # PROJECT.env / add_host); it is greatminds metadata for the safety
+    # classifier + deploy evidence only.
+    resolved_host = cap.get("host") or getattr(spec, "host", None) or profile
     lease_meta: dict[str, Any] = {
         "coord": str(coord),
         "lease_id": cap.get("lease_id"),
         "profile": profile,
         "worktree": cap.get("worktree"),
-        "host": cap.get("host"),
+        "host": resolved_host,
         "task_id": cap.get("task"),
         "task": cap.get("task"),
     }
