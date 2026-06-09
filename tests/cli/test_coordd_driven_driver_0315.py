@@ -134,6 +134,55 @@ def test_run_lock_released_even_when_record_turn_throws(
     )
 
 
+# ---------- issue #11: orphan-lock decision (hang sweep) ----------
+
+# Representative thresholds (mirror the production constants' relationship:
+# driven_hang_threshold == max(hang, kill-bound); grace beyond that).
+_HANG = 300.0
+_DHT = 1800.0          # driven_hang_threshold (kill bound)
+_GRACE = 300.0         # ORPHAN_RECLAIM_GRACE_SEC
+
+
+def test_lock_decision_skip_within_kill_bound() -> None:
+    """A lock younger than the kill bound is a live turn → skip (neither
+    escalate nor reclaim)."""
+    assert cd._driven_lock_decision(
+        _DHT - 1, None, _HANG, _DHT, _GRACE, since_last_report=1e9) == "skip"
+
+
+def test_lock_decision_skip_when_heartbeat_fresh() -> None:
+    """Past the kill bound but heartbeat advanced within the window → the
+    turn is progressing (a tool refreshed it) → skip."""
+    assert cd._driven_lock_decision(
+        _DHT + 10, _HANG - 1, _HANG, _DHT, _GRACE,
+        since_last_report=1e9) == "skip"
+
+
+def test_lock_decision_report_once_then_throttle() -> None:
+    """Just past the kill bound with a stale/absent heartbeat and no recent
+    report → escalate once; a recent report throttles to skip."""
+    assert cd._driven_lock_decision(
+        _DHT + 10, None, _HANG, _DHT, _GRACE,
+        since_last_report=_DHT + 1) == "report"
+    assert cd._driven_lock_decision(
+        _DHT + 10, None, _HANG, _DHT, _GRACE,
+        since_last_report=1.0) == "skip"
+
+
+def test_lock_decision_reclaim_orphan_past_grace() -> None:
+    """issue #11: past the kill bound PLUS the reclaim grace, the
+    subprocess is certainly dead but the lock survived → reclaim (unlink),
+    not merely report. Reclaim takes precedence over the report throttle."""
+    assert cd._driven_lock_decision(
+        _DHT + _GRACE, None, _HANG, _DHT, _GRACE,
+        since_last_report=0.0) == "reclaim"
+    # Even with a heartbeat that is stale-but-present, an orphaned lock past
+    # grace still reclaims.
+    assert cd._driven_lock_decision(
+        _DHT + _GRACE + 99, _HANG + 1, _HANG, _DHT, _GRACE,
+        since_last_report=1e9) == "reclaim"
+
+
 # ---------- lifecycle gating ----------
 
 
