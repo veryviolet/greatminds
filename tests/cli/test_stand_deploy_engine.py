@@ -83,3 +83,64 @@ def test_deploy_lease_lease_id_mismatch(tmp_path, monkeypatch):
     _patch(monkeypatch, rc=0)
     with pytest.raises(GreatMindsError):
         stand.deploy_lease(coord, lease_id="OTHER")
+
+
+# ---------------------------------------------------------------------------
+# 0363 (GitHub #9): lease_meta.host resolution. The lease state-file carries
+# no host, so coordd-driven deploys must resolve one — profile-name default,
+# profile YAML (``vars.deploy_host``) override, lease value wins if present.
+# ---------------------------------------------------------------------------
+
+
+def _patch_capture(monkeypatch, *, rc=0, spec_host=None):
+    """Mock load_profile (with an optional ``host`` on the spec) and capture
+    the ``lease_meta`` dispatch_profile receives."""
+    captured: dict = {}
+    monkeypatch.setattr(
+        "greatminds.cli.stand_profile.load_profile",
+        lambda _c, p: SimpleNamespace(format="yaml", name=p, host=spec_host))
+
+    def _dispatch(spec, meta, **k):
+        captured["meta"] = meta
+        return (rc, f"log rc={rc}")
+
+    monkeypatch.setattr(
+        "greatminds.cli.stand_executor.dispatch_profile", _dispatch)
+    return captured
+
+
+def test_host_defaults_to_profile_name(tmp_path, monkeypatch):
+    coord = tmp_path / "coordination"
+    _prepare(coord, profile="mlgpu2")
+    cap = _patch_capture(monkeypatch, spec_host=None)
+
+    stand.deploy_lease(coord, lease_id="L1")
+
+    # No host on the lease, no host in the profile → profile name is the host.
+    assert cap["meta"]["host"] == "mlgpu2"
+
+
+def test_profile_yaml_host_overrides_default(tmp_path, monkeypatch):
+    coord = tmp_path / "coordination"
+    _prepare(coord, profile="mlgpu2")
+    cap = _patch_capture(monkeypatch, spec_host="srv5-mlgpu-2.area.zov")
+
+    stand.deploy_lease(coord, lease_id="L1")
+
+    # Profile YAML declared a host → it wins over the profile-name default.
+    assert cap["meta"]["host"] == "srv5-mlgpu-2.area.zov"
+
+
+def test_lease_host_wins_over_profile(tmp_path, monkeypatch):
+    coord = tmp_path / "coordination"
+    _prepare(coord, profile="mlgpu2")
+    # Simulate a lease that DID carry a host (future --host flag).
+    st = _state(coord)
+    st["active_lease"]["host"] = "lease-host.example"
+    (coord / ".stand" / "state.yaml").write_text(
+        yaml.safe_dump(st), encoding="utf-8")
+    cap = _patch_capture(monkeypatch, spec_host="profile-host.example")
+
+    stand.deploy_lease(coord, lease_id="L1")
+
+    assert cap["meta"]["host"] == "lease-host.example"
