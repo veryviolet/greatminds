@@ -1588,6 +1588,36 @@ def _clear_stale_driven_locks(coord: Path, verbose: bool) -> int:
     return cleared
 
 
+def _reconcile_dispatch_decision(
+    coord: Path, canon_dir: Path, coord_yaml_doc: "dict | None",
+    role_upper: str, meta: dict,
+) -> tuple[bool, str]:
+    """0374: decide whether the reconcile sweep should drive ``role_upper``
+    this pass, returning ``(should_drive, reason)``.
+
+    The dispatch trigger is a NON-EMPTY owned claim queue (e.g.
+    ``feature_review`` for ARCHITECT-REVIEWER) — explicitly INDEPENDENT of
+    whether the role has a live pid. A driven codex/claude role has no
+    persistent process between turns (``.agent_registry/<role>.json`` holds
+    only a ``thread_id`` / ``session_id``, no ``pid``); that absence is the
+    normal driven steady state, NOT a dead-agent condition, and must never
+    gate dispatch (GitHub #22 — a full feature_review produced zero
+    REVIEWER turns and the skip had no observable reason). Split out as a
+    pure decision fn so the per-role reason is unit-testable and emittable
+    as a diagnostic, distinct from the codex auth/app-server failure (#21)
+    that makes a *dispatched* turn complete without doing work."""
+    role_lower = str(role_upper).lower()
+    if _lifecycle_for_role(canon_dir, role_upper) != "driven":
+        return (False, "skip: lifecycle != driven")
+    if _window_mode_for_role(coord_yaml_doc, role_upper) != "driven":
+        return (False, "skip: coord.yaml window mode != driven")
+    if _driven_run_lock_path(coord, role_lower).is_file():
+        return (False, "skip: turn in flight (run-lock held)")
+    if not _role_has_pending_task(coord, meta, role_lower):
+        return (False, "skip: no pending work in claim queues")
+    return (True, "drive: pending work in an owned claim queue")
+
+
 def _reconcile_driven_backlog(coord: Path, canon_dir: Path,
                               verbose: bool) -> None:
     """Startup sweep: coordd is otherwise inotify-reactive, so a task
@@ -1604,14 +1634,18 @@ def _reconcile_driven_backlog(coord: Path, canon_dir: Path,
     for role_upper, meta in schema_roles.items():
         if not isinstance(meta, dict):
             continue
-        role_lower = str(role_upper).lower()
-        if _lifecycle_for_role(canon_dir, role_upper) != "driven":
-            continue
-        if _window_mode_for_role(coord_yaml_doc, role_upper) != "driven":
-            continue
-        if _driven_run_lock_path(coord, role_lower).is_file():
-            continue  # a turn is already in flight
-        if not _role_has_pending_task(coord, meta, role_lower):
+        should, reason = _reconcile_dispatch_decision(
+            coord, canon_dir, coord_yaml_doc, role_upper, meta)
+        # Diagnostic (#22): log the reconcile decision for DRIVEN roles —
+        # the dispatch path was previously a silent ``continue`` per skip,
+        # so a non-empty owned queue producing no turns was undebuggable.
+        # The two non-driven early-outs (lifecycle / window) would fire for
+        # every interactive/self-loop role every pass — skip logging those.
+        if verbose and not reason.startswith(
+                ("skip: lifecycle", "skip: coord.yaml window")):
+            print(f"coordd: reconcile {role_upper}: {reason}",
+                  file=sys.stderr)
+        if not should:
             continue
         located = _window_and_tool_for_role(coord_yaml_doc, role_upper)
         try:
