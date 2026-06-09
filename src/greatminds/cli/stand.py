@@ -345,6 +345,15 @@ def stand_lease(task_id: str, worktree: str, profile: str,
     project_dir = find_coord_dir().parent
     _validate_lease_worktree(task_id, worktree, project_dir)
 
+    # GitHub #10 (Bug A): store an ABSOLUTE worktree path. A relative
+    # ``--worktree`` resolves correctly against the leaser's cwd here,
+    # but coordd later re-resolves the stored string against ITS OWN cwd
+    # (often /home/<user> under systemd-user with no WorkingDirectory=),
+    # so is_deploy_safe rejects it as "unknown worktree location"
+    # (rc 126). Resolve now, while cwd is the leaser's, and persist the
+    # absolute path so the deploy is cwd-independent.
+    worktree = str(Path(worktree).resolve(strict=False))
+
     # Read schema's default ttl.
     if ttl_seconds is None:
         try:

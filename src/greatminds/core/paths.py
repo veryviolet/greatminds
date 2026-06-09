@@ -29,6 +29,18 @@ from pathlib import Path
 from .util import die
 
 
+def _under_worktrees(path: Path) -> bool:
+    """True if ``path`` has a ``.worktrees`` ancestor segment.
+
+    A ``coordination/`` directory nested under ``.worktrees/<id>/`` is
+    never the canonical project store (GitHub #10): it is an orphan that
+    a stray write created from inside a per-task worktree. Path
+    resolution must walk PAST it to the real project root rather than
+    stop at the worktree and read an empty coordination/ with no queues.
+    """
+    return ".worktrees" in path.parts
+
+
 def find_coord_dir(start: Path | None = None, *, strict: bool = True) -> Path:
     """Locate the project-local ``coordination/`` directory.
 
@@ -47,15 +59,28 @@ def find_coord_dir(start: Path | None = None, *, strict: bool = True) -> Path:
     env_dir = os.environ.get("GREATMINDS_PROJECT_DIR")
     if env_dir:
         p = Path(env_dir) / "coordination"
-        if p.is_dir():
+        # Skip an orphan coordination/ that lives inside a worktree even
+        # when GREATMINDS_PROJECT_DIR points at the worktree (GitHub #10).
+        if p.is_dir() and not _under_worktrees(p):
             return p
     cur = (start or Path.cwd()).resolve()
     for p in [cur, *cur.parents]:
         c = p / "coordination"
-        if c.is_dir():
+        # A coordination/ under .worktrees/<id>/ is an orphan, not the
+        # project store: keep walking up to the canonical project root.
+        if c.is_dir() and not _under_worktrees(c):
             return c
     if not strict:
-        return cur / "coordination"
+        # Best-effort fallback. Never point at an orphan coordination/
+        # inside a worktree: if cwd is under .worktrees/, root the
+        # fallback at the directory holding .worktrees (the project root).
+        base = cur
+        if _under_worktrees(cur):
+            for anc in cur.parents:
+                if anc.name == ".worktrees":
+                    base = anc.parent
+                    break
+        return base / "coordination"
     die(1, f"no coordination/ directory found from {cur}")
     raise SystemExit  # unreachable, helps type-checkers
 
