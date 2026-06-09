@@ -1408,6 +1408,14 @@
 <p>All notable changes to <strong>greatminds</strong> are documented here. Format follows
 <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a> loosely; versions
 follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
+<h2 id="1611-2026-06-09">1.6.11 — 2026-06-09<a class="headerlink" href="#1611-2026-06-09" title="Permanent link">&para;</a></h2>
+<h3 id="fixed-driven-fsm-autonomy-batch-operational-merge-user-authorized-path-2-self-referential-infra-avatar-validated">Fixed (driven-FSM autonomy batch — operational merge, USER-authorized path 2; self-referential infra, avatar-validated)<a class="headerlink" href="#fixed-driven-fsm-autonomy-batch-operational-merge-user-authorized-path-2-self-referential-infra-avatar-validated" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>#14/#21 — driven Codex roles must use one machine Codex login</strong> (0375): coordd runs driven Codex roles against the single machine <code>$HOME/.codex</code> (no per-role <code>coordination/.codex-home/&lt;role&gt;</code> auth copies/symlinks); role model/config injected via <code>-c</code>/app-server params; adds <code>_machine_codex_home()</code> resolution + <code>_CodexAuthError</code> fail-fast. Avatar-validated: a driven REVIEWER turn reports <code>codex_home=$HOME/.codex</code> with non-zero real FSM work and no auth errors, and a real task completed the full autonomous lifecycle (feature_docs → feature_docs_review → feature_review → verified) via coordd-dispatched driven Codex roles with no manual pokes.</li>
+<li><strong>#22 — coordd does not reliably auto-dispatch driven roles from queue/backlog</strong> (0374): <code>_reconcile_driven_backlog</code> + stale-driven-lock reconcile harden driven-role dispatch so queued work wakes the driven role without manual nudges (fixes the transient orphan-lock that left queued tasks unstarted).</li>
+<li><strong>host ENOSPC corrupts Codex token refresh + driven turns</strong> (0376): coordd disk preflight blocks driven spawn below a free-space threshold, adds ENOSPC-aware failure enrichment, and caps <code>.turns</code> retention — a full disk no longer silently empties driven turns or breaks Codex token persistence.</li>
+</ul>
+<p>Integrated release enabling end-to-end autonomous FSM operation. Supersedes the per-worktree proofs: each fix was release-gated because the running fleet could not review/validate the very fix that repairs its driven-Codex review path.</p>
 <h2 id="1610-2026-06-06">1.6.10 — 2026-06-06<a class="headerlink" href="#1610-2026-06-06" title="Permanent link">&para;</a></h2>
 <h3 id="fixed-stand-infra-release-chain-code-level-verified-live-validated-post-upgrade">Fixed (stand-infra release chain — code-level verified; live-validated post-upgrade)<a class="headerlink" href="#fixed-stand-infra-release-chain-code-level-verified-live-validated-post-upgrade" title="Permanent link">&para;</a></h3>
 <ul>
