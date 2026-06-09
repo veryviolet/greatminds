@@ -720,10 +720,42 @@ def stop_cmd(project: str | None, project_dir: Path | None) -> None:
     _run_verb("stop", _resolve_project_name(project, project_dir))
 
 
+def _refresh_units_before_restart(name: str,
+                                  project_dir: Path | None) -> bool:
+    """issue #13: re-render + rewrite the on-disk systemd units so a restart
+    always comes up with the CURRENT baked PATH.
+
+    A template unit rendered before PATH-baking (pre-1.6.3) — or rendered
+    when a tool was not yet resolvable — carries no ``Environment=PATH=``,
+    so a plain ``systemctl restart`` brings coordd up with systemd's bare
+    --user PATH and it can no longer exec claude / codex / ansible-playbook
+    (driven turns + stand deploys break). ``install_template_unit`` /
+    ``install_project_dropin`` / ``install_appserver_unit`` are idempotent
+    (they skip the write when the on-disk body already matches the freshly
+    rendered one), so when the units are already current this is a no-op.
+    Returns True if any unit changed (the caller then ``daemon-reload``s)."""
+    changed = install_template_unit()
+    pd = project_dir.resolve() if project_dir else lookup_project_dir(name)
+    if pd is not None:
+        if install_project_dropin(name, pd):
+            changed = True
+        if has_driven_codex_roles(pd) and install_appserver_unit():
+            changed = True
+    if changed:
+        _systemctl("daemon-reload")
+    return changed
+
+
 @daemon.command("restart", short_help="restart the daemon for a project")
 @_project_options
 def restart_cmd(project: str | None, project_dir: Path | None) -> None:
-    _run_verb("restart", _resolve_project_name(project, project_dir))
+    name = _resolve_project_name(project, project_dir)
+    # issue #13: refresh the on-disk unit (re-bake PATH) before restarting,
+    # so a stale pre-PATH unit self-heals instead of restarting coordd with
+    # systemd's bare PATH (which cannot exec claude / codex / ansible).
+    if _refresh_units_before_restart(name, project_dir):
+        info("daemon units refreshed (PATH re-baked) before restart")
+    _run_verb("restart", name)
 
 
 @daemon.command("status", short_help="show daemon status for a project")
