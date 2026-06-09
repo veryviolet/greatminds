@@ -706,6 +706,14 @@ def _setup_codex_homes_per_role(canon: Path,
     ``CODEX_HOME=<project>/coordination/.codex-home/<role>`` at launch
     and passes ``--profile <role>``.
 
+    0375: these homes are config SOURCE ONLY (developer_instructions,
+    model, skills) — they MUST NOT contain an ``auth.json``, and setup
+    never copies one in. Driven codex roles authenticate against the
+    SINGLE machine Codex login (``$HOME/.codex``), never a per-role auth
+    copy (codex 0.137 refreshes single-use tokens that diverge across
+    copies). The driven path reads only ``model`` from here, via a
+    ``-c model=`` override (coordd._codex_role_model).
+
     0332 (codex 0.135 CONFIG_PROFILE_V2): the per-role home is now SPLIT
     — ``config.toml`` is the BASE (developer_instructions + per-project
     trust + UX), with NO ``[profiles.<role>]`` table; ``<role>.config.toml``

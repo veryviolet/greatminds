@@ -141,7 +141,7 @@ def test_drive_codex_turn_stdio_first_turn_end_to_end(
     coord = _coord(tmp_path)
     monkeypatch.setattr(
         cd, "_codex_appserver_argv",
-        lambda: [sys.executable, "-c", _FAKE_APPSERVER])
+        lambda *a, **k: [sys.executable, "-c", _FAKE_APPSERVER])
     tid = cd._drive_codex_turn_stdio(
         coord, "explorer", "", "CONTRACT", str(tmp_path), False,
         handshake_timeout=10.0, turn_timeout=10.0)
@@ -159,7 +159,7 @@ def test_drive_codex_turn_stdio_resume_turn_end_to_end(
     coord = _coord(tmp_path)
     monkeypatch.setattr(
         cd, "_codex_appserver_argv",
-        lambda: [sys.executable, "-c", _FAKE_APPSERVER])
+        lambda *a, **k: [sys.executable, "-c", _FAKE_APPSERVER])
     tid = cd._drive_codex_turn_stdio(
         coord, "explorer", "th_keep", None, str(tmp_path), False,
         handshake_timeout=10.0, turn_timeout=10.0)
@@ -173,7 +173,7 @@ def test_drive_codex_turn_stdio_raises_on_dead_server(
     coord = _coord(tmp_path)
     monkeypatch.setattr(
         cd, "_codex_appserver_argv",
-        lambda: [sys.executable, "-c", "pass"])
+        lambda *a, **k: [sys.executable, "-c", "pass"])
     with pytest.raises(OSError):
         cd._drive_codex_turn_stdio(
             coord, "explorer", "", "C", str(tmp_path), False,
@@ -269,7 +269,7 @@ def test_async_path_releases_lock_after_turn(
     coord = _coord(tmp_path)
     monkeypatch.setattr(
         cd, "_codex_appserver_argv",
-        lambda: [sys.executable, "-c", _FAKE_APPSERVER])
+        lambda *a, **k: [sys.executable, "-c", _FAKE_APPSERVER])
     ok, _ = cd._spawn_driven_codex_turn(
         coord, "explorer", "CONTRACT", str(tmp_path), False,
         reg=None, run_async=False,

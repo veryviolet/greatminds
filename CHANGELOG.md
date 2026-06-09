@@ -4,6 +4,16 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 1.6.11 — 2026-06-09
+
+### Fixed (driven-FSM autonomy batch — operational merge, USER-authorized path 2; self-referential infra, avatar-validated)
+
+- **#14/#21 — driven Codex roles must use one machine Codex login** (0375): coordd runs driven Codex roles against the single machine `$HOME/.codex` (no per-role `coordination/.codex-home/<role>` auth copies/symlinks); role model/config injected via `-c`/app-server params; adds `_machine_codex_home()` resolution + `_CodexAuthError` fail-fast. Avatar-validated: a driven REVIEWER turn reports `codex_home=$HOME/.codex` with non-zero real FSM work and no auth errors, and a real task completed the full autonomous lifecycle (feature_docs → feature_docs_review → feature_review → verified) via coordd-dispatched driven Codex roles with no manual pokes.
+- **#22 — coordd does not reliably auto-dispatch driven roles from queue/backlog** (0374): `_reconcile_driven_backlog` + stale-driven-lock reconcile harden driven-role dispatch so queued work wakes the driven role without manual nudges (fixes the transient orphan-lock that left queued tasks unstarted).
+- **host ENOSPC corrupts Codex token refresh + driven turns** (0376): coordd disk preflight blocks driven spawn below a free-space threshold, adds ENOSPC-aware failure enrichment, and caps `.turns` retention — a full disk no longer silently empties driven turns or breaks Codex token persistence.
+
+Integrated release enabling end-to-end autonomous FSM operation. Supersedes the per-worktree proofs: each fix was release-gated because the running fleet could not review/validate the very fix that repairs its driven-Codex review path.
+
 ## 1.6.10 — 2026-06-06
 
 ### Fixed (stand-infra release chain — code-level verified; live-validated post-upgrade)

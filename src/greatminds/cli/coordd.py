@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -188,6 +189,39 @@ DEPLOY_RETRY_INTERVAL_SEC = float(
 # gently (it is lock-safe: skips roles with a turn in flight).
 RECONCILE_INTERVAL_SEC = float(
     os.environ.get("COORDD_RECONCILE_INTERVAL_SEC", "90"))
+# 0376: ENOSPC / low-disk resilience. A full root disk silently breaks
+# driven turns: codex/claude obtains a refreshed auth token but cannot
+# persist auth.json (ENOSPC), so the next turn reuses an already-consumed
+# refresh token and fails with refresh_token_reused/token_expired — looking
+# like an auth bug, not a disk bug. coordd refuses to spawn a driven turn
+# when the coordination filesystem is below EITHER threshold (absolute MB or
+# percent free) and surfaces an explicit ENOSPC blocker to MAINTAINER. Both
+# thresholds default low (a turn is cheap to defer; a corrupted token is
+# expensive) and are env-overridable for tests / tighter fleets.
+DISK_MIN_FREE_MB = float(os.environ.get("COORDD_DISK_MIN_FREE_MB", "512"))
+DISK_MIN_FREE_PCT = float(os.environ.get("COORDD_DISK_MIN_FREE_PCT", "1.0"))
+# Re-notify MAINTAINER about a sustained low-disk block at most this often
+# (a flood of queue events must not spam the inbox).
+LOW_DISK_RENOTIFY_SEC = float(
+    os.environ.get("COORDD_LOW_DISK_RENOTIFY_SEC", "600"))
+# Retention cap on coordd's own .turns/ logs. One log was written per driven
+# turn (``_turn_log_path``) and NEVER pruned — the greatminds-owned unbounded
+# growth this task identified (19k files on a long-lived fleet). Keep the most
+# recent N per role; older ones are operator-irrelevant once superseded.
+TURN_LOG_KEEP_PER_ROLE = int(
+    os.environ.get("COORDD_TURN_LOG_KEEP_PER_ROLE", "50"))
+# Failure-text markers that an ENOSPC can cause (auth refresh that could not
+# be persisted, or a direct write failure). When a turn fails with one of
+# these, coordd appends the live disk status to the outcome detail so an
+# operator can see whether a low disk likely corrupted the auth refresh.
+_AUTH_DISK_FAILURE_MARKERS = (
+    "refresh_token_reused",
+    "token_expired",
+    "no space left",
+    "enospc",
+    "disk quota exceeded",
+    "401",
+)
 
 # 0199: PyPI version check. Defaults match schema.auto_update.
 # Operator can override per-project via env (test/dev convenience).
@@ -850,6 +884,147 @@ def _process_due_retries(coord: Path, canon_dir: Path, verbose: bool) -> None:
                       f"{exc}", file=sys.stderr)
 
 
+# ---------------------------------------------------------------------------
+# 0376: low-disk / ENOSPC guards.
+# ---------------------------------------------------------------------------
+# Dedup low-disk escalations across roles (the disk is shared). Guarded by
+# _RETRY_LOCK (reused; both are coordd-thread-local concerns).
+_LOW_DISK_LAST_NOTIFY = {"at": 0.0}
+
+
+def _disk_free(path: Path) -> tuple[int, float]:
+    """(free_bytes, free_pct) for the filesystem holding ``path``. On any
+    OSError returns (-1, 100.0) — a sentinel that ALWAYS passes the preflight
+    (never block a turn because we couldn't stat the disk: fail open)."""
+    try:
+        usage = shutil.disk_usage(str(path))
+        pct = (usage.free / usage.total * 100.0) if usage.total else 100.0
+        return usage.free, pct
+    except OSError:
+        return -1, 100.0
+
+
+def _disk_status_str(path: Path) -> str:
+    free, pct = _disk_free(path)
+    if free < 0:
+        return "disk: unknown (statvfs failed)"
+    return f"disk: free={free // (1024 * 1024)}MB ({pct:.1f}%)"
+
+
+def _disk_preflight(path: Path) -> tuple[bool, str]:
+    """(ok, diagnostic). ok=False when the filesystem holding ``path`` is
+    below the absolute-MB OR the percent-free threshold — spawning a turn
+    then risks an ENOSPC that corrupts the auth refresh. The diagnostic
+    names ENOSPC / low-disk explicitly and is the operator-facing blocker."""
+    free, pct = _disk_free(path)
+    if free < 0:
+        return True, ""  # couldn't stat — fail open, never block on unknowns
+    free_mb = free / (1024 * 1024)
+    if free_mb < DISK_MIN_FREE_MB or pct < DISK_MIN_FREE_PCT:
+        return (False,
+                f"LOW DISK / ENOSPC risk: free={free_mb:.0f}MB ({pct:.1f}%) "
+                f"on {path} is below threshold "
+                f"({DISK_MIN_FREE_MB:.0f}MB / {DISK_MIN_FREE_PCT:.1f}%). "
+                f"Driven turn NOT spawned — a refreshed Codex/Claude auth "
+                f"token may fail to persist (refresh_token_reused / "
+                f"token_expired). Free disk space, then re-drive.")
+    return True, ""
+
+
+def _enrich_failure_detail(detail: str, coord: Path) -> str:
+    """When a turn-failure detail matches an auth/persistence marker that an
+    ENOSPC can cause, append the live disk status (and a likely-cause hint
+    when the disk is actually below threshold) so operators can tell an
+    auth bug apart from disk-induced auth corruption. No-op otherwise."""
+    low = (detail or "").lower()
+    if not any(m in low for m in _AUTH_DISK_FAILURE_MARKERS):
+        return detail
+    free, pct = _disk_free(coord)
+    status = _disk_status_str(coord)
+    hint = ""
+    if free >= 0:
+        free_mb = free / (1024 * 1024)
+        if free_mb < DISK_MIN_FREE_MB or pct < DISK_MIN_FREE_PCT:
+            hint = (" — LIKELY ENOSPC-CAUSED AUTH CORRUPTION (disk below "
+                    "threshold; a refreshed token may not have persisted)")
+    return f"{detail} [{status}{hint}]"
+
+
+def _note_low_disk_blocker(coord: Path, role_lower: str, diag: str,
+                           verbose: bool) -> None:
+    """Record + escalate a low-disk preflight block. Writes a turn-log record
+    (the operator-visible turn artifact, so a blocked role isn't silent) and
+    files ONE inbox-info to MAINTAINER per LOW_DISK_RENOTIFY_SEC window — a
+    storm of queue events must surface the blocker, not spam the inbox."""
+    try:
+        _turn_log_path(coord, role_lower).write_text(
+            f"=== DRIVEN TURN BLOCKED (low disk / ENOSPC) ===\n{diag}\n",
+            encoding="utf-8")
+    except OSError:
+        pass
+    now = time.monotonic()
+    with _RETRY_LOCK:
+        due = (now - _LOW_DISK_LAST_NOTIFY["at"]) >= LOW_DISK_RENOTIFY_SEC
+        if due:
+            _LOW_DISK_LAST_NOTIFY["at"] = now
+    if verbose:
+        print(f"  0376: driven turn for {role_lower} BLOCKED — {diag}",
+              file=sys.stderr)
+    if not due:
+        return
+    body = (f"DRIVEN TURNS BLOCKED — low disk / ENOSPC. {diag} (first "
+            f"blocked role: {role_lower.upper()}). coordd is refusing to "
+            f"spawn driven turns until free space recovers.")
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "greatminds.cli.main",
+             "inbox", "send", "MAINTAINER", "--kind", "info",
+             "--body", body],
+            cwd=str(coord.parent),
+            env={**os.environ, "GREATMINDS_ROLE": "MAINTAINER"},
+            capture_output=True, text=True, timeout=10,
+        )
+    except Exception:  # noqa: BLE001 — escalation is best-effort
+        pass
+    _wake_maintainer_if_asleep(coord)
+
+
+def _prune_turn_logs(coord: Path, keep_per_role: int = TURN_LOG_KEEP_PER_ROLE,
+                     verbose: bool = False) -> int:
+    """Cap coordd's own .turns/ growth: keep the most recent ``keep_per_role``
+    log files per role, delete older ones. One log is written per driven turn
+    and was never pruned (greatminds-owned unbounded growth identified by
+    0376). Returns the number of files removed. Best-effort; never raises."""
+    d = coord / ".turns"
+    if not d.is_dir():
+        return 0
+    by_role: dict[str, list[Path]] = {}
+    try:
+        for f in d.glob("*.log"):
+            stem = f.name[:-4]  # strip ".log"
+            # filename shape: <role>-<ISO-timestamp>.log; role may itself
+            # contain hyphens, so split off only the trailing timestamp token.
+            role = stem.rsplit("-", 1)[0] if "-" in stem else stem
+            by_role.setdefault(role, []).append(f)
+    except OSError:
+        return 0
+    removed = 0
+    for files in by_role.values():
+        if len(files) <= keep_per_role:
+            continue
+        # ISO timestamps sort lexicographically → oldest first.
+        files.sort(key=lambda p: p.name)
+        for f in files[:-keep_per_role]:
+            try:
+                f.unlink()
+                removed += 1
+            except OSError:
+                pass
+    if verbose and removed:
+        print(f"coordd: pruned {removed} old .turns/ log(s)", file=sys.stderr)
+    return removed
+
+
 def _spawn_driven_turn(
     coord: Path,
     role_lower: str,
@@ -990,6 +1165,7 @@ def _spawn_driven_turn(
                 pass
             _record_driven_turn(coord / REGISTRY_DIR, role_lower,
                                 reset=reset, new_session_id=new_sid)
+            detail = _enrich_failure_detail(detail, coord)
             _note_turn_outcome(coord, role_lower, klass, detail, verbose)
             # Re-fire a mid-turn event ONLY on success; a failed turn is
             # re-dispatched by the retry scheduler (avoid double-spawn).
@@ -1042,7 +1218,7 @@ def _spawn_driven_turn(
 # ---------------------------------------------------------------------------
 
 
-def _codex_appserver_argv() -> list[str]:
+def _codex_appserver_argv(model: str | None = None) -> list[str]:
     """0321-iter3: argv for a per-turn ``codex app-server`` over STDIO
     (no ``--listen``). PLANNER transport decision: drop the WS/socket
     layer entirely and drive a fresh ``codex app-server`` per turn over
@@ -1053,7 +1229,16 @@ def _codex_appserver_argv() -> list[str]:
 
     Prefers an absolute ``<node> <codex.js>`` (codex's shebang is the
     relative ``#!/usr/bin/env node`` and coordd under systemd may lack
-    node on PATH — the 0320 lesson), falling back to bare ``codex``."""
+    node on PATH — the 0320 lesson), falling back to bare ``codex``.
+
+    0375: ``model`` is the role's model, injected as a ``-c model=``
+    override instead of via a per-role ``[profiles.<role>]`` / per-role
+    CODEX_HOME. Driven Codex now runs in the SINGLE machine Codex home
+    (auth lives there); role config that used to ride the per-role home
+    is passed as ``-c`` overrides (model here; approval/sandbox below)
+    plus the role contract in ``baseInstructions``. ``--profile`` is NOT
+    used — on codex 0.135+ it only selects config inside a per-role
+    CODEX_HOME, which is exactly the per-role-auth path we're removing."""
     # 0311 driven fix: codex app-server's Linux sandbox uses bubblewrap, which
     # needs user-namespace creation — unavailable under the systemd user
     # service, so the server aborts at startup ("needs access to create user
@@ -1065,6 +1250,10 @@ def _codex_appserver_argv() -> list[str]:
     # these and fails (bubblewrap) without.
     cfg = ["-c", "sandbox_mode=danger-full-access",
            "-c", "approval_policy=never"]
+    # 0375: role model as a -c override (TOML string value), so the role
+    # keeps its model without a per-role CODEX_HOME / --profile.
+    if model:
+        cfg += ["-c", f'model="{model}"']
     # 0311 driven fix (codex never spawned under systemd): coordd's systemd
     # user-service PATH does NOT include the nvm node bin dir, so
     # ``shutil.which("codex")`` returns None and the argv fell back to a bare
@@ -1084,35 +1273,95 @@ def _codex_appserver_argv() -> list[str]:
     return [codex, "app-server", *cfg]
 
 
+def _machine_codex_home() -> str:
+    """0375: the SINGLE machine Codex home for driven turns.
+
+    Driven Codex roles authenticate via the ONE machine ChatGPT login,
+    never per-role ``auth.json`` copies. Codex 0.137 stores AND refreshes
+    the ChatGPT auth in ``$CODEX_HOME/auth.json`` with single-use refresh
+    tokens; per-role copies diverge the moment one role refreshes
+    (``refresh_token_reused`` / ``token_expired``), and every other
+    role's driven turn then completes doing zero useful work — the shared
+    root cause blocking #14/#21/#22 and the feature_review queue. The
+    machine login is the only place auth is valid, and codex 0.137
+    exposes no native split between auth home and session/state home, so
+    the whole driven turn runs in the machine home.
+
+    Resolution order:
+      1. ``GREATMINDS_CODEX_HOME`` — explicit operator override.
+      2. An inherited ``CODEX_HOME`` that is NOT a per-role
+         ``coordination/.codex-home/<role>`` home (a real machine home
+         the daemon was launched with).
+      3. ``~/.codex`` (codex's default).
+    """
+    override = os.environ.get("GREATMINDS_CODEX_HOME")
+    if override:
+        return override
+    inherited = os.environ.get("CODEX_HOME")
+    if inherited and ".codex-home" not in inherited:
+        return inherited
+    return os.path.expanduser("~/.codex")
+
+
+def _codex_role_model(coord: Path | None, role_lower: str | None) -> str | None:
+    """0375: read the role's model from its codex profile SOURCE.
+
+    The per-role ``coordination/.codex-home/<role>`` home is retained as
+    role-profile SOURCE MATERIAL ONLY (model selection) — NEVER for auth.
+    We read ``model = "..."`` from the profile layer
+    ``<role>.config.toml`` (the 0332 split) or the base ``config.toml``
+    and inject it via a ``-c model=`` argv override, so a driven turn
+    keeps its role model while authenticating against the single machine
+    login. Returns ``None`` when no model is declared (codex uses its own
+    default)."""
+    if not coord or not role_lower:
+        return None
+    home = coord / ".codex-home" / role_lower
+    for name in (f"{role_lower}.config.toml", "config.toml"):
+        try:
+            text = (home / name).read_text(encoding="utf-8")
+        except OSError:
+            continue
+        m = re.search(r'^\s*model\s*=\s*"([^"]+)"', text, re.M)
+        if m:
+            return m.group(1)
+    return None
+
+
 def _codex_appserver_env(role_lower: str | None = None,
                          coord: Path | None = None) -> dict:
-    """Environment for the per-turn ``codex app-server``.
+    """Environment for the per-turn ``codex app-server`` (0375 rewrite).
 
-    Sets, in order of why-it-matters:
+    ``CODEX_HOME`` points at the SINGLE machine Codex home (see
+    :func:`_machine_codex_home`), NOT a per-role
+    ``coordination/.codex-home/<role>`` home. WHY (0375): codex 0.137
+    refreshes the ChatGPT auth in ``$CODEX_HOME/auth.json`` with
+    single-use tokens, so per-role auth copies diverge after the first
+    refresh and driven turns fail with ``refresh_token_reused`` /
+    ``token_expired`` — zero-work completions that blocked #14/#21/#22.
+    The machine login is the only valid auth.
 
-    * ``CODEX_HOME`` = the role's per-role home
-      ``<coord>/.codex-home/<role>`` (1.6.1). WITHOUT this the driven
-      codex turn ran in the DEFAULT ``~/.codex`` — missing the role's
-      ``config.toml`` (profile / contract / trust / skills) and writing
-      its session there instead of the per-role home, so the agent had no
-      role context and the turn "completed" doing NOTHING. Interactive
-      codex (start_agent) already sets CODEX_HOME per role; the driven
-      path did not. EMPIRICALLY: with the per-role CODEX_HOME a driven
-      REVIEWER turn lists feature_review, shows the tasks, and reviews.
-    * ``GREATMINDS_ROLE`` — coordd has no role of its own; set it
-      explicitly so the agent's ``greatminds`` CLI resolves the right
-      inbox/queues (0311).
+    Role-specific behavior is preserved WITHOUT a per-role auth home:
 
-    PATH is NOT touched (1.6.2): the daemon unit bakes the operator's
-    PATH, so node is already resolvable for codex's env-node shebang.
+    * the role contract / bootstrap rides in ``baseInstructions``
+      (``thread/start``), unchanged;
+    * the role model is injected via a ``-c model=`` override (see
+      :func:`_codex_role_model` / :func:`_codex_appserver_argv`);
+    * ``approval_policy`` / ``sandbox_mode`` are already ``-c`` overrides.
+
+    ``GREATMINDS_ROLE`` is set explicitly (coordd has no role of its own)
+    so the agent's ``greatminds`` CLI resolves the right inbox/queues.
+
+    ``coord`` is retained for signature compatibility (callers still pass
+    it) but is no longer used to build a per-role CODEX_HOME. PATH is NOT
+    touched (1.6.2): the daemon unit bakes the operator's PATH.
     """
     env = dict(os.environ)
     if role_lower:
         env["GREATMINDS_ROLE"] = role_lower.upper()
-        if coord is not None:
-            home = coord / ".codex-home" / role_lower
-            if home.is_dir():
-                env["CODEX_HOME"] = str(home)
+    # 0375: single machine Codex login (auth.json lives here), never a
+    # per-role auth copy.
+    env["CODEX_HOME"] = _machine_codex_home()
     return env
 
 
@@ -1154,6 +1403,31 @@ def _build_thread_resume_request(req_id: int, thread_id: str) -> dict:
     state is persisted by codex, so we resume by id)."""
     return {"jsonrpc": "2.0", "id": req_id, "method": "thread/resume",
             "params": {"threadId": thread_id}}
+
+
+# 0375: auth-failure signatures. A driven Codex turn that fails auth must
+# NOT be reported as a zero-work "ok" completion (the #14/#21/#22 bug);
+# detect these substrings anywhere in the app-server stream and surface a
+# failure so coordd escalates to MAINTAINER (recovery = ``codex login`` on
+# the machine $HOME/.codex).
+_CODEX_AUTH_SIGNATURES = (
+    "refresh_token_reused",
+    "token_expired",
+    "no codex credentials",
+    "not logged in",
+    "please run codex login",
+    "please run `codex login`",
+    "401 unauthorized",
+    "unauthorized",
+)
+
+
+class _CodexAuthError(OSError):
+    """0375: a driven codex turn failed on a Codex auth problem
+    (single-use refresh-token reuse / expiry / missing credentials).
+    Recovery is a MAINTAINER ``codex login`` on the machine
+    ``$HOME/.codex`` — so the turn is surfaced as a failure, never a
+    silent zero-work ``ok``."""
 
 
 class _CodexStdioSession:
@@ -1207,15 +1481,54 @@ class _CodexStdioSession:
             if isinstance(msg, dict) and msg.get("id") == want:
                 return msg
 
-    def wait_turn_completed(self, thread_id: str, deadline: float) -> dict:
-        """Read notifications until ``turn/completed`` for ``thread_id``."""
+    def consume_turn(self, thread_id: str, deadline: float,
+                     *, turn_req_id: int = 3) -> tuple[int, str]:
+        """0375: read app-server messages until ``turn/completed`` for
+        ``thread_id``; return ``(work_items, transcript)``.
+
+        Raises :class:`_CodexAuthError` on an auth-failure signature
+        anywhere in the stream, and ``OSError`` on a ``turn/failed`` or
+        an error RESPONSE to the ``turn/start`` request — so an
+        auth-broken or failed turn is classified as a failure, not a
+        zero-work ``ok``. ``work_items`` counts assistant/tool activity
+        notifications, so the caller records whether the turn did real
+        (non-zero) work — the avatar-gate evidence."""
+        work_items = 0
+        transcript: list[str] = []
         while True:
             msg = self._read_msg(deadline)
-            if (isinstance(msg, dict)
-                    and msg.get("method") == "turn/completed"
-                    and ((msg.get("params") or {}).get("threadId")
-                         in (thread_id, None))):
-                return msg
+            if not isinstance(msg, dict):
+                continue
+            blob = json.dumps(msg).lower()
+            if any(sig in blob for sig in _CODEX_AUTH_SIGNATURES):
+                raise _CodexAuthError(
+                    f"codex auth failure during driven turn: {blob[:200]}")
+            # An error RESPONSE to the turn/start request → the turn never
+            # ran; do not treat the eventual stream as a clean completion.
+            if msg.get("id") == turn_req_id and msg.get("error"):
+                emsg = (msg.get("error") or {}).get("message", "")
+                raise OSError(f"turn/start error: {emsg}"[:200])
+            method = msg.get("method")
+            if method == "turn/failed":
+                raise OSError(
+                    f"turn/failed: {json.dumps(msg.get('params'))}"[:200])
+            if method == "turn/completed":
+                if ((msg.get("params") or {}).get("threadId")
+                        in (thread_id, None)):
+                    return work_items, "\n".join(transcript)
+            elif method and method.startswith(
+                    ("item/", "codex/event", "thread/event", "agent")):
+                # assistant / tool activity → the turn did real work
+                work_items += 1
+                if len(transcript) < 40:
+                    transcript.append(method)
+
+    def wait_turn_completed(self, thread_id: str, deadline: float) -> dict:
+        """Superseded by :meth:`consume_turn` (0375); kept as a thin
+        compat shim — returns a minimal completion marker."""
+        self.consume_turn(thread_id, deadline)
+        return {"method": "turn/completed",
+                "params": {"threadId": thread_id}}
 
 
 def _drive_codex_turn_stdio(
@@ -1230,10 +1543,17 @@ def _drive_codex_turn_stdio(
 
     Sequence: spawn → ``initialize`` → ``thread/start`` (first turn,
     baseInstructions) or ``thread/resume`` (subsequent) → ``turn/start``
-    → wait ``turn/completed`` → close (process exits)."""
+    → wait ``turn/completed`` → close (process exits).
+
+    0375: spawns against the SINGLE machine Codex home (auth), injects
+    the role model via ``-c model=``, and records the codexHome + a
+    non-zero-work signal in the turn-log (avatar-gate evidence). Raises
+    :class:`_CodexAuthError` when the turn fails on a Codex auth
+    problem — never a silent zero-work ``ok``."""
     import subprocess as _sp
     import time as _time
-    argv = _codex_appserver_argv()
+    argv = _codex_appserver_argv(_codex_role_model(coord, role_lower))
+    codex_home = _machine_codex_home()
     try:
         proc = _sp.Popen(
             argv, stdin=_sp.PIPE, stdout=_sp.PIPE, stderr=_sp.DEVNULL,
@@ -1244,7 +1564,18 @@ def _drive_codex_turn_stdio(
     sess = _CodexStdioSession(proc)
     try:
         hs_deadline = _time.monotonic() + handshake_timeout
-        sess.call(_build_initialize_request(1), hs_deadline)
+        init_resp = sess.call(_build_initialize_request(1), hs_deadline)
+        # 0375: the app-server reports its codexHome in the initialize
+        # response — capture it for the turn-log so the avatar gate can
+        # confirm the machine home (not a per-role .codex-home) was used.
+        reported_home = codex_home
+        try:
+            mm = re.search(r'"codex_?[Hh]ome"\s*:\s*"([^"]+)"',
+                           json.dumps(init_resp))
+            if mm:
+                reported_home = mm.group(1)
+        except (TypeError, ValueError):
+            pass
         if thread_id:
             resp = sess.call(_build_thread_resume_request(2, thread_id),
                              hs_deadline)
@@ -1274,17 +1605,21 @@ def _drive_codex_turn_stdio(
             _record_codex_thread(coord / REGISTRY_DIR, role_lower,
                                  thread_id)
         sess.send(_build_turn_start_request(3, thread_id))
-        sess.wait_turn_completed(
+        work_items, transcript = sess.consume_turn(
             thread_id, _time.monotonic() + turn_timeout)
-        # Per-turn record (driven roles have no pane). Minimal for now —
-        # marks the turn ran to completion + the thread it ran on. Full
-        # assistant-transcript capture from the app-server notification
-        # stream is a later enhancement.
+        # Per-turn record (driven roles have no pane). 0375: record the
+        # codexHome (machine home, not a per-role auth copy) + whether the
+        # turn did non-zero work — the avatar-gate evidence (#14/#21/#22).
         try:
             _turn_log_path(coord, role_lower).write_text(
                 f"codex app-server turn for {role_lower}\n"
                 f"thread_id: {thread_id}\n"
-                f"status: turn/completed\n",
+                f"codex_home: {codex_home}\n"
+                f"reported_codex_home: {reported_home}\n"
+                f"work_items: {work_items}\n"
+                f"non_zero_work: {bool(work_items)}\n"
+                f"status: turn/completed\n"
+                + (f"activity: {transcript}\n" if transcript else ""),
                 encoding="utf-8",
             )
         except OSError:
@@ -1292,10 +1627,25 @@ def _drive_codex_turn_stdio(
         if verbose:
             print(
                 f"  0321: codex turn/completed for {role_lower} "
-                f"(thread {thread_id})",
+                f"(thread {thread_id}, codex_home={codex_home}, "
+                f"work_items={work_items})",
                 file=sys.stderr,
             )
         return thread_id
+    except _CodexAuthError as exc:
+        # 0375: record a clear auth-failure outcome (NOT a zero-work ok).
+        try:
+            _turn_log_path(coord, role_lower).write_text(
+                f"codex app-server turn for {role_lower}\n"
+                f"thread_id: {thread_id}\n"
+                f"codex_home: {codex_home}\n"
+                f"status: auth_failure\n"
+                f"detail: {exc}\n",
+                encoding="utf-8",
+            )
+        except OSError:
+            pass
+        raise
     finally:
         for stream in (proc.stdin, proc.stdout):
             try:
@@ -1424,6 +1774,19 @@ def _spawn_driven_codex_turn(
             _drive_codex_turn_stdio(
                 coord, role_lower, thread_id, base_instructions, cwd,
                 verbose)
+        except _CodexAuthError as exc:
+            # 0375: a Codex auth failure is NOT a retryable transport
+            # blip and NEVER a zero-work ok — surface it loudly so the
+            # escalation tells MAINTAINER to run `codex login` on the
+            # machine $HOME/.codex (per-role auth copies are gone).
+            klass = "error"
+            detail = f"AUTH: {exc}"[:300]
+            if verbose:
+                print(
+                    f"  0375: codex turn for {role_lower} AUTH FAILURE: "
+                    f"{exc}",
+                    file=sys.stderr,
+                )
         except Exception as exc:  # noqa: BLE001 — log, never crash coordd
             msg = str(exc)
             low = msg.lower()
@@ -1445,6 +1808,7 @@ def _spawn_driven_codex_turn(
                 lock.unlink()
             except OSError:
                 pass
+            detail = _enrich_failure_detail(detail, coord)
             _note_turn_outcome(coord, role_lower, klass, detail, verbose)
             # Re-fire a mid-turn event ONLY on success; a failed turn is
             # re-dispatched by the retry scheduler (avoid double-spawn).
@@ -1491,6 +1855,15 @@ def _maybe_drive_driven_role(coord: Path, canon_dir: Path,
     window_mode = _window_mode_for_role(coord_yaml_doc, role)
     if lifecycle != "driven" or window_mode != "driven":
         return None
+    # 0376: ENOSPC preflight — never spawn a driven turn into a critically
+    # low disk. A refreshed Codex/Claude auth token may then fail to persist
+    # and the next turn fails with refresh_token_reused/token_expired,
+    # looking like an auth bug. Surface an explicit blocker to MAINTAINER
+    # (deduped) and decline to spawn rather than burn a zero-work turn.
+    ok_disk, disk_diag = _disk_preflight(coord)
+    if not ok_disk:
+        _note_low_disk_blocker(coord, role.lower(), disk_diag, verbose)
+        return False
     if "retry" not in trigger:
         # A REAL event (queue move / inbox / reconcile) drives the role —
         # clear any prior-failure backoff/escalation so genuinely new work
@@ -1588,6 +1961,36 @@ def _clear_stale_driven_locks(coord: Path, verbose: bool) -> int:
     return cleared
 
 
+def _reconcile_dispatch_decision(
+    coord: Path, canon_dir: Path, coord_yaml_doc: "dict | None",
+    role_upper: str, meta: dict,
+) -> tuple[bool, str]:
+    """0374: decide whether the reconcile sweep should drive ``role_upper``
+    this pass, returning ``(should_drive, reason)``.
+
+    The dispatch trigger is a NON-EMPTY owned claim queue (e.g.
+    ``feature_review`` for ARCHITECT-REVIEWER) — explicitly INDEPENDENT of
+    whether the role has a live pid. A driven codex/claude role has no
+    persistent process between turns (``.agent_registry/<role>.json`` holds
+    only a ``thread_id`` / ``session_id``, no ``pid``); that absence is the
+    normal driven steady state, NOT a dead-agent condition, and must never
+    gate dispatch (GitHub #22 — a full feature_review produced zero
+    REVIEWER turns and the skip had no observable reason). Split out as a
+    pure decision fn so the per-role reason is unit-testable and emittable
+    as a diagnostic, distinct from the codex auth/app-server failure (#21)
+    that makes a *dispatched* turn complete without doing work."""
+    role_lower = str(role_upper).lower()
+    if _lifecycle_for_role(canon_dir, role_upper) != "driven":
+        return (False, "skip: lifecycle != driven")
+    if _window_mode_for_role(coord_yaml_doc, role_upper) != "driven":
+        return (False, "skip: coord.yaml window mode != driven")
+    if _driven_run_lock_path(coord, role_lower).is_file():
+        return (False, "skip: turn in flight (run-lock held)")
+    if not _role_has_pending_task(coord, meta, role_lower):
+        return (False, "skip: no pending work in claim queues")
+    return (True, "drive: pending work in an owned claim queue")
+
+
 def _reconcile_driven_backlog(coord: Path, canon_dir: Path,
                               verbose: bool) -> None:
     """Startup sweep: coordd is otherwise inotify-reactive, so a task
@@ -1604,14 +2007,18 @@ def _reconcile_driven_backlog(coord: Path, canon_dir: Path,
     for role_upper, meta in schema_roles.items():
         if not isinstance(meta, dict):
             continue
-        role_lower = str(role_upper).lower()
-        if _lifecycle_for_role(canon_dir, role_upper) != "driven":
-            continue
-        if _window_mode_for_role(coord_yaml_doc, role_upper) != "driven":
-            continue
-        if _driven_run_lock_path(coord, role_lower).is_file():
-            continue  # a turn is already in flight
-        if not _role_has_pending_task(coord, meta, role_lower):
+        should, reason = _reconcile_dispatch_decision(
+            coord, canon_dir, coord_yaml_doc, role_upper, meta)
+        # Diagnostic (#22): log the reconcile decision for DRIVEN roles —
+        # the dispatch path was previously a silent ``continue`` per skip,
+        # so a non-empty owned queue producing no turns was undebuggable.
+        # The two non-driven early-outs (lifecycle / window) would fire for
+        # every interactive/self-loop role every pass — skip logging those.
+        if verbose and not reason.startswith(
+                ("skip: lifecycle", "skip: coord.yaml window")):
+            print(f"coordd: reconcile {role_upper}: {reason}",
+                  file=sys.stderr)
+        if not should:
             continue
         located = _window_and_tool_for_role(coord_yaml_doc, role_upper)
         try:
@@ -2463,6 +2870,8 @@ def coordd(project_dir: Path | None, project_name: str | None,
     # without (2), inotify (NEW events only) never picks up a queued task.
     try:
         _clear_stale_driven_locks(coord, verbose)
+        # 0376: cap coordd's own unbounded .turns/ log growth on startup.
+        _prune_turn_logs(coord, verbose=verbose)
         _reconcile_driven_backlog(coord, canon_dir, verbose)
         # 1.6.0: a lease left `preparing` when coordd (re)started — e.g.
         # killed mid-deploy — must be picked up; coordd re-runs the deploy.
@@ -2490,6 +2899,10 @@ def coordd(project_dir: Path | None, project_name: str | None,
                 _last_reconcile = _now_r
                 try:
                     _reconcile_driven_backlog(coord, canon_dir, verbose)
+                    # 0376: keep .turns/ bounded on a long-lived coordd too
+                    # (startup-only pruning never fires on a process that
+                    # never restarts).
+                    _prune_turn_logs(coord, verbose=verbose)
                 except Exception as exc:  # noqa: BLE001
                     if verbose:
                         print(f"coordd: periodic reconcile error: {exc}",

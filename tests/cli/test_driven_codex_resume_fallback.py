@@ -88,21 +88,84 @@ def test_resume_success_does_not_start_fresh(tmp_path):
     assert turn["params"]["threadId"] == "GOOD-THREAD"
 
 
-# ---------- 1.6.1: per-role CODEX_HOME for the driven app-server ----------
+# ---------- 0375: SINGLE machine CODEX_HOME for the driven app-server ----
+#
+# Reverses the 1.6.1 per-role-CODEX_HOME behavior: codex 0.137 refreshes
+# single-use auth tokens in $CODEX_HOME/auth.json, so per-role copies
+# diverge (refresh_token_reused) and driven turns do zero work. Driven
+# codex now runs against the SINGLE machine login ($HOME/.codex); role
+# config (model) is injected via -c overrides + baseInstructions.
 
 
-def test_codex_appserver_env_sets_per_role_codex_home(tmp_path):
+def test_codex_appserver_env_uses_machine_home_not_per_role(
+        tmp_path, monkeypatch):
+    """Even when a per-role home exists, the driven app-server env points
+    CODEX_HOME at the single MACHINE home, never the per-role copy."""
+    monkeypatch.delenv("CODEX_HOME", raising=False)
+    monkeypatch.delenv("GREATMINDS_CODEX_HOME", raising=False)
+    monkeypatch.setattr(cd.os.path, "expanduser",
+                        lambda p: p.replace("~", "/home/violet"))
     coord = tmp_path / "coordination"
-    home = coord / ".codex-home" / "architect-reviewer"
-    home.mkdir(parents=True)
+    (coord / ".codex-home" / "architect-reviewer").mkdir(parents=True)
     env = cd._codex_appserver_env("architect-reviewer", coord=coord)
-    assert env["CODEX_HOME"] == str(home), \
-        "driven codex must run in the role's per-role home, not ~/.codex"
+    assert env["CODEX_HOME"] == "/home/violet/.codex", \
+        "driven codex must use the single machine login, not a per-role home"
+    assert ".codex-home" not in env["CODEX_HOME"]
     assert env["GREATMINDS_ROLE"] == "ARCHITECT-REVIEWER"
 
 
-def test_codex_appserver_env_no_home_when_dir_absent(tmp_path):
+def test_machine_codex_home_resolution(monkeypatch):
+    """Override > inherited-non-per-role CODEX_HOME > ~/.codex; a per-role
+    inherited CODEX_HOME is rejected (it's the diverging-auth path)."""
+    monkeypatch.setattr(cd.os.path, "expanduser",
+                        lambda p: p.replace("~", "/home/violet"))
+    # 1. explicit override wins
+    monkeypatch.setenv("GREATMINDS_CODEX_HOME", "/custom/codex")
+    assert cd._machine_codex_home() == "/custom/codex"
+    # 2. inherited real machine home is honored
+    monkeypatch.delenv("GREATMINDS_CODEX_HOME", raising=False)
+    monkeypatch.setenv("CODEX_HOME", "/opt/machine/.codex")
+    assert cd._machine_codex_home() == "/opt/machine/.codex"
+    # 3. an inherited PER-ROLE home is rejected → fall back to ~/.codex
+    monkeypatch.setenv(
+        "CODEX_HOME", "/proj/coordination/.codex-home/architect-reviewer")
+    assert cd._machine_codex_home() == "/home/violet/.codex"
+    # 4. nothing set → ~/.codex
+    monkeypatch.delenv("CODEX_HOME", raising=False)
+    assert cd._machine_codex_home() == "/home/violet/.codex"
+
+
+# ---------- 0375: role model injected via -c (no per-role profile) -------
+
+
+def test_codex_role_model_read_from_profile_layer(tmp_path):
+    """The role model is read from the per-role profile SOURCE (layer
+    file preferred), to inject via -c model= without per-role auth."""
     coord = tmp_path / "coordination"
-    coord.mkdir()
-    env = cd._codex_appserver_env("architect-reviewer", coord=coord)
-    assert "CODEX_HOME" not in env  # absent home → don't set a bogus one
+    home = coord / ".codex-home" / "developer"
+    home.mkdir(parents=True)
+    (home / "developer.config.toml").write_text(
+        'model = "gpt-5.5"\napproval_policy = "never"\n', encoding="utf-8")
+    assert cd._codex_role_model(coord, "developer") == "gpt-5.5"
+
+
+def test_codex_role_model_falls_back_to_base_config(tmp_path):
+    coord = tmp_path / "coordination"
+    home = coord / ".codex-home" / "tester"
+    home.mkdir(parents=True)
+    (home / "config.toml").write_text(
+        'model = "gpt-5.5-codex"\n', encoding="utf-8")
+    assert cd._codex_role_model(coord, "tester") == "gpt-5.5-codex"
+
+
+def test_codex_role_model_none_when_absent(tmp_path):
+    coord = tmp_path / "coordination"
+    (coord / ".codex-home" / "reader").mkdir(parents=True)
+    assert cd._codex_role_model(coord, "reader") is None
+
+
+def test_codex_appserver_argv_injects_model():
+    argv = cd._codex_appserver_argv("gpt-5.5")
+    assert "-c" in argv and 'model="gpt-5.5"' in argv
+    # without a model the argv is unchanged (no stray -c model)
+    assert not any("model=" in a for a in cd._codex_appserver_argv())
