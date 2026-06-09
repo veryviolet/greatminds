@@ -123,6 +123,35 @@ def write_hang_report(coord: Path, role_lower: str, lock_age: float,
         "body: |\n  " + body.replace("\n", "\n  ") + "\n"
     )
     p.write_text(text, encoding="utf-8")
+
+
+def _driven_lock_decision(lock_age: float, hb_age: "float | None",
+                          hang_threshold: float,
+                          driven_hang_threshold: float,
+                          reclaim_grace: float,
+                          since_last_report: float) -> str:
+    """Pure classifier for one driven run-lock in the hang sweep.
+    Returns ``"skip"`` | ``"report"`` | ``"reclaim"``.
+
+    - lock younger than the kill bound, or heartbeat fresh within the
+      window → ``"skip"`` (the turn is legitimately running / progressing).
+    - lock present past the kill bound PLUS ``reclaim_grace`` → ``"reclaim"``:
+      the turn's subprocess was hard-killed at the kill bound and its
+      worker's finally has had ample time to release, so a surviving lock is
+      a genuine orphan coordd should unlink so the role can re-drive
+      (issue #11 orphan-lock defense).
+    - else, if no hang report fired within ``driven_hang_threshold`` →
+      ``"report"`` (escalate once to MAINTAINER).
+    - otherwise → ``"skip"`` (already escalated recently)."""
+    if lock_age < driven_hang_threshold:
+        return "skip"
+    if hb_age is not None and hb_age < hang_threshold:
+        return "skip"
+    if lock_age >= driven_hang_threshold + reclaim_grace:
+        return "reclaim"
+    if since_last_report < driven_hang_threshold:
+        return "skip"
+    return "report"
 # Heartbeat-freshness guard for push_to_role keystroke injection.
 # If a role's heartbeat.<role> file is younger than this many seconds,
 # the agent is treated as actively working — coordd refuses to inject
@@ -173,6 +202,15 @@ RETRY_HARD_CAP_SEC  = float(os.environ.get("COORDD_RETRY_HARD_CAP_SEC", "120"))
 RETRY_HARD_MAX      = int(os.environ.get("COORDD_RETRY_HARD_MAX",         "3"))
 DRIVEN_TURN_TIMEOUT_SEC = float(
     os.environ.get("COORDD_DRIVEN_TURN_TIMEOUT_SEC", "1800"))
+# issue #11 orphan-lock defense: a driven turn's subprocess is hard-killed
+# at DRIVEN_TURN_TIMEOUT_SEC and its worker's finally then releases the
+# run-lock. So a lock still present this many seconds PAST the kill bound
+# has no live subprocess behind it — the worker died abnormally (or coordd
+# was wedged) and the lock is a genuine orphan. coordd reclaims it (unlinks)
+# so the role can re-drive, instead of leaving it for manual cleanup. The
+# grace is generous so it can never race a worker still finalizing its kill.
+ORPHAN_RECLAIM_GRACE_SEC = float(
+    os.environ.get("COORDD_ORPHAN_RECLAIM_GRACE_SEC", "300"))
 # Stand auto-deploy retry: a deploy that RAISES before transitioning
 # leaves the stand stuck in `preparing`. coordd re-attempts it periodically
 # and, after DEPLOY_MAX_ATTEMPTS, escalates to MAINTAINER and forces the
@@ -2659,10 +2697,31 @@ def coordd(project_dir: Path | None, project_name: str | None,
                         if lock_age < driven_hang_threshold:
                             continue  # turn within its kill bound — not hung
                         hb_age = heartbeat_age_seconds(coord, role_lower)
-                        if hb_age is not None and hb_age < hang_threshold:
-                            continue  # heartbeat fresh → turn is progressing
-                        if now_ts - last_hang_report.get(role_lower, 0.0) < driven_hang_threshold:
-                            continue  # already escalated recently
+                        action = _driven_lock_decision(
+                            lock_age, hb_age, hang_threshold,
+                            driven_hang_threshold, ORPHAN_RECLAIM_GRACE_SEC,
+                            now_ts - last_hang_report.get(role_lower, 0.0),
+                        )
+                        if action == "skip":
+                            continue
+                        if action == "reclaim":
+                            # issue #11 orphan-lock defense: subprocess is
+                            # certainly dead (past kill bound + grace) yet the
+                            # lock survived → unlink so the role re-drives
+                            # instead of waiting for manual cleanup. A hang
+                            # report already told MAINTAINER earlier.
+                            try:
+                                lk.unlink()
+                            except OSError:
+                                pass
+                            last_hang_report.pop(role_lower, None)
+                            if verbose:
+                                print(f"  hang: role={role_lower} run-lock "
+                                      f"orphaned {lock_age:.0f}s (past kill "
+                                      f"bound + grace) → reclaimed",
+                                      file=sys.stderr)
+                            continue
+                        # action == "report"
                         write_hang_report(coord, role_lower, lock_age,
                                           hb_age, now_ts)
                         last_hang_report[role_lower] = now_ts
