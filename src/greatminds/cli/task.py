@@ -2317,7 +2317,16 @@ def _worktree_hook_post_move(coord: Path, task_id: str,
     except Exception:
         return
     task_kind = data.get("kind")
-    if task_kind not in policy.required_for_task_kinds:
+    # 0380: a review_session task is not a product task-kind (it has no
+    # ``kind``) but CAN own a worktree — ``stand lease`` auto-creates one
+    # lazily for EXPLORER's review_session leases. It must be cleaned up on
+    # archive too, or it orphans. worktree_remove is idempotent, so letting
+    # review_session through the archive branch is safe when no worktree
+    # exists. The verified branch never fires for review_session (they
+    # archive, never verify).
+    is_review_session = data.get("stream") == "review_session"
+    if task_kind not in policy.required_for_task_kinds \
+            and not is_review_session:
         return
     project_dir = coord.parent
     if not (project_dir / ".git").exists():
