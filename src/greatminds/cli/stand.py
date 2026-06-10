@@ -369,7 +369,10 @@ def stand_lease(task_id: str, worktree: "str | None", profile: str,
     # onto the seeded full-deploy preset.
     from greatminds.cli.stand_profile import load_profile
     try:
-        load_profile(coord, profile)
+        # issue #12: validate the way coordd will RESOLVE it at deploy —
+        # worktree copy first (a profile that exists only in the lease
+        # worktree is valid), then the main tree.
+        load_profile(coord, profile, worktree=worktree)
     except GreatMindsError as exc:
         raise GreatMindsError(
             f"--profile {profile!r}: {exc} (available in stand-profiles/: "
@@ -726,7 +729,12 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
     ss.update_stand_state(coord, _read)
 
     profile = cap.get("profile")
-    spec = load_profile(coord, profile)
+    # issue #12: resolve the profile from the active lease's WORKTREE first
+    # (its coordination/stand-profiles/ copy), so a stand-profile fix under
+    # review is the one deployed/validated — not the unchanged main-tree
+    # copy. Falls back to the main tree when the worktree lacks it.
+    lease_worktree = cap.get("worktree")
+    spec = load_profile(coord, profile, worktree=lease_worktree)
     if spec.format != "yaml":
         raise GreatMindsError(
             f"stand deploy: profile {profile!r} is {spec.format!r}; the "
@@ -748,7 +756,11 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
         "coord": str(coord),
         "lease_id": cap.get("lease_id"),
         "profile": profile,
-        "worktree": cap.get("worktree"),
+        # issue #12: record which tree the deployed profile came from so the
+        # deploy evidence (marker + logs) proves the worktree copy ran.
+        "profile_source": spec.source,
+        "profile_path": str(spec.path),
+        "worktree": lease_worktree,
         "host": resolved_host,
         "task_id": cap.get("task"),
         "task": cap.get("task"),
@@ -769,15 +781,17 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
             active["ready_at"] = ss.now_iso()
             ready_cap["holder"] = active.get("holder_role", "")
             ready_cap["task"] = active.get("task", "")
-            ss.record_transition(state, "preparing", "ready", "COORDD",
-                                 lease_id=lid, reason="deploy ok")
+            ss.record_transition(
+                state, "preparing", "ready", "COORDD", lease_id=lid,
+                reason=f"deploy ok (profile {profile!r} from {spec.source})")
 
         ss.update_stand_state(coord, _ready)
         if ready_cap.get("holder"):
             _file_inbox_info(
                 coord, ready_cap["holder"],
                 f"stand lease {lid} ready; "
-                f"task={ready_cap.get('task', '?')}",
+                f"task={ready_cap.get('task', '?')}; "
+                f"profile={profile!r} from {spec.source}",
                 task_ref=ready_cap.get("task", ""))
     else:
         reason = f"deploy rc={rc}: {(log or '').strip()[:400]}"

@@ -54,7 +54,7 @@ def _resolvable_presets(monkeypatch):
     class _Spec:
         format = "yaml"
 
-    def _fake(_coord, name):
+    def _fake(_coord, name, **_kw):
         if name in {"full-deploy", "vite-dev", "smoke-only"}:
             return _Spec()
         raise GreatMindsError(f"profile {name!r} has no file")
