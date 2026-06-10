@@ -278,19 +278,33 @@ def test_coordd_legacy_unit_fallback_when_per_project_missing(env):
 # ---------------------------------------------------------------------------
 
 
+def _launch_calls(env_) -> list[list[str]]:
+    """Find ``greatminds launch --target tmux`` subprocess calls.
+
+    0384: argv[0] is no longer the bare string ``greatminds`` — it is the
+    PATH-independent prefix from ``_greatminds_cmd()`` (an absolute sibling
+    executable path, or ``[sys.executable, "-m", "greatminds.cli.main"]``).
+    Match on the stable ``launch --target tmux`` tail instead.
+    """
+    return [c for c in env_.sub.calls
+            if "launch" in c and "--target" in c and "tmux" in c]
+
+
 def test_tmux_session_missing_calls_launch(env):
     _write_coord_yaml(env.project_dir)
     env.sub.set(("tmux", "has-session"), rc=1)
     _run(env)
-    launches = env.sub.find("greatminds", "launch", "--target", "tmux")
+    launches = _launch_calls(env)
     assert len(launches) == 1
+    # 0384: argv[0] must NOT be the bare ``greatminds`` (PATH-dependent).
+    assert launches[0][0] != "greatminds", launches[0]
 
 
 def test_tmux_session_present_does_not_call_launch(env):
     _write_coord_yaml(env.project_dir)
     env.sub.set(("tmux", "has-session"), rc=0)
     _run(env)
-    assert not env.sub.find("greatminds", "launch")
+    assert not _launch_calls(env)
 
 
 # ---------------------------------------------------------------------------
