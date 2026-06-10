@@ -1468,6 +1468,48 @@ class _CodexAuthError(OSError):
     silent zero-work ``ok``."""
 
 
+def _codex_auth_scan_text(msg: dict) -> str:
+    """0378: return ONLY the error/transport-relevant text of an
+    app-server message for auth-signature scanning — never assistant /
+    tool OUTPUT.
+
+    The earlier detector scanned ``json.dumps(msg)`` of EVERY message,
+    so an ``item/commandexecution/outputdelta`` (command stdout/stderr)
+    or an assistant message that merely *mentions* an auth string —
+    e.g. ARCHITECT-REVIEWER reviewing/testing the auth code, whose
+    output contains ``refresh_token_reused`` / ``token_expired`` /
+    ``401`` / ``auth_failure`` literals — falsely tripped
+    :class:`_CodexAuthError` even though the transport was healthy.
+
+    Scope the scan instead:
+
+    * a JSON-RPC ``error`` response is error-bearing → scan it whole;
+    * ``item/*`` messages are assistant / tool OUTPUT (command output
+      deltas, message text) → NEVER scanned for auth signatures;
+    * other notification events (``codex/event``, ``thread/event``,
+      ``turn/failed`` …) are scanned only on their explicitly
+      error-bearing params fields, not the whole payload.
+    """
+    parts: list[str] = []
+    err = msg.get("error")
+    if err is not None:
+        parts.append(json.dumps(err))
+    method = msg.get("method") or ""
+    # item/* = assistant / tool output. Its payload legitimately carries
+    # auth-related strings when the agent reviews or tests auth code; it
+    # is never an auth failure of THIS transport.
+    if not method.startswith("item/"):
+        params = msg.get("params")
+        if isinstance(params, dict):
+            for key in ("error", "message", "msg", "reason", "stderr"):
+                val = params.get(key)
+                if isinstance(val, str):
+                    parts.append(val)
+                elif val is not None:
+                    parts.append(json.dumps(val))
+    return "\n".join(parts).lower()
+
+
 class _CodexStdioSession:
     """Thin line-delimited JSON-RPC client over a spawned
     ``codex app-server`` stdio process. One session drives exactly one
@@ -1524,8 +1566,10 @@ class _CodexStdioSession:
         """0375: read app-server messages until ``turn/completed`` for
         ``thread_id``; return ``(work_items, transcript)``.
 
-        Raises :class:`_CodexAuthError` on an auth-failure signature
-        anywhere in the stream, and ``OSError`` on a ``turn/failed`` or
+        Raises :class:`_CodexAuthError` on an auth-failure signature in
+        an error-bearing message (0378: command/assistant OUTPUT is not
+        scanned — see :func:`_codex_auth_scan_text`), and ``OSError`` on
+        a ``turn/failed`` or
         an error RESPONSE to the ``turn/start`` request — so an
         auth-broken or failed turn is classified as a failure, not a
         zero-work ``ok``. ``work_items`` counts assistant/tool activity
@@ -1537,10 +1581,15 @@ class _CodexStdioSession:
             msg = self._read_msg(deadline)
             if not isinstance(msg, dict):
                 continue
-            blob = json.dumps(msg).lower()
-            if any(sig in blob for sig in _CODEX_AUTH_SIGNATURES):
+            # 0378: scan ONLY error/transport-relevant text, never
+            # command/assistant output — reviewing or testing auth code
+            # must not be misread as a live auth failure.
+            auth_text = _codex_auth_scan_text(msg)
+            if auth_text and any(
+                    sig in auth_text for sig in _CODEX_AUTH_SIGNATURES):
                 raise _CodexAuthError(
-                    f"codex auth failure during driven turn: {blob[:200]}")
+                    f"codex auth failure during driven turn: "
+                    f"{auth_text[:200]}")
             # An error RESPONSE to the turn/start request → the turn never
             # ran; do not treat the eventual stream as a clean completion.
             if msg.get("id") == turn_req_id and msg.get("error"):
