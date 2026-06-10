@@ -443,6 +443,9 @@ def journal_append(coord: Path, entry: dict[str, Any]) -> None:
 def intent_write(coord: Path, role: str, task_id: str,
                  from_q: str, to_q: str, reason: str) -> Path:
     idir = coord / INTENT_DIR_NAME
+    # GitHub #19 (0370): seed intent/ on the write path so a never-yet-moved
+    # / upgraded-from-<1.6 project does not crash FileNotFoundError on its
+    # first mv. Do NOT remove — pinned by test_task_mv_seeds_lock_intent_dirs.
     idir.mkdir(parents=True, exist_ok=True)
     intent_id = uuid.uuid4().hex
     p = idir / f"{task_id}-{role.lower()}-{intent_id}.json"
@@ -498,6 +501,9 @@ def task_file_lock(coord: Path, task_id: str,
     diagnostic message.
     """
     lock_dir = coord / ".locks"
+    # GitHub #19 (0370): seed .locks/ on the write path so a never-yet-moved
+    # / upgraded-from-<1.6 project does not crash FileNotFoundError on its
+    # first mv. Do NOT remove — pinned by test_task_mv_seeds_lock_intent_dirs.
     lock_dir.mkdir(parents=True, exist_ok=True)
     lock_path = lock_dir / f"{task_id}.lock"
     lock_path.touch(exist_ok=True)
