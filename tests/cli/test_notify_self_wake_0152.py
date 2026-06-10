@@ -57,6 +57,17 @@ def _write_journal(coord: Path, lines: list[dict]) -> None:
     )
 
 
+def _place_task(coord: Path, queue: str, task_id: str) -> None:
+    """GitHub #20: a wake only fires when the task currently RESIDES in
+    the destination queue. Tests that expect a wake must place the task
+    file there."""
+    qdir = coord / queue
+    qdir.mkdir(parents=True, exist_ok=True)
+    (qdir / f"{task_id}.yaml").write_text(
+        f"id: {task_id}\n", encoding="utf-8",
+    )
+
+
 def _run_notify(project: Path, canon: Path):
     return CliRunner().invoke(
         nfj_mod.notify_journal,
@@ -105,6 +116,7 @@ def test_planner_action_still_wakes_other_interested_roles(tmp_path: Path) -> No
     not a global suppression."""
     project, canon = _make_project(tmp_path)
     coord = project / "coordination"
+    _place_task(coord, "feature_dev", "0123-some-task")
     _write_journal(coord, [{
         "t": "2026-05-25T00:00:00Z",
         "actor": "ARCHITECT-PLANNER",
@@ -172,6 +184,7 @@ def test_empty_actor_wakes_all_targets(tmp_path: Path) -> None:
     self to subtract — actor is unknown by design."""
     project, canon = _make_project(tmp_path)
     coord = project / "coordination"
+    _place_task(coord, "feature_plan", "0123-some-task")
     _write_journal(coord, [{
         "t": "2026-05-25T00:00:00Z",
         "actor": "",  # system event
@@ -193,6 +206,7 @@ def test_missing_actor_key_treated_as_system_event(tmp_path: Path) -> None:
     (treated as system event, same as actor='')."""
     project, canon = _make_project(tmp_path)
     coord = project / "coordination"
+    _place_task(coord, "feature_plan", "0123-some-task")
     _write_journal(coord, [{
         "t": "2026-05-25T00:00:00Z",
         # no "actor" key

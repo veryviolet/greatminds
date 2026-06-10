@@ -83,6 +83,45 @@ def claimers_of(schema: dict, queue: str) -> list[str]:
     return out
 
 
+def _id_num(stem: str) -> str:
+    """Leading numeric task id (``0371`` from ``0371-some-slug``)."""
+    m = re.match(r"\d+", stem)
+    return m.group(0) if m else ""
+
+
+def task_resides_in_queue(coord: Path, queue: str, task: str) -> bool:
+    """True if ``task`` currently has a task file in ``queue``.
+
+    GitHub #20: a wake for a *historical* journal transition must not be
+    re-emitted forever once the task has moved on. Before waking the
+    destination-queue owner we confirm the task still LIVES in that
+    destination queue; a task that has since moved out (to feature_blocked
+    / archive) or an empty queue produces zero wakes.
+
+    Matches the journal ``task`` field (which may be a bare id ``0371`` or
+    a full id ``0371-slug``) against the queue's task files (``<id>.yaml``,
+    legacy ``.md``) by exact stem, dash-prefix either way, or shared
+    leading numeric id.
+    """
+    if not task or not queue:
+        return False
+    qdir = coord / queue
+    if not qdir.is_dir():
+        return False
+    task_num = _id_num(task)
+    for f in qdir.iterdir():
+        if not f.is_file():
+            continue
+        if f.name.startswith("_") or f.suffix not in (".yaml", ".yml", ".md"):
+            continue
+        stem = f.stem
+        if stem == task or stem.startswith(f"{task}-") or task.startswith(f"{stem}-"):
+            return True
+        if task_num and _id_num(stem) == task_num:
+            return True
+    return False
+
+
 def find_stand_evidence_targets(coord: Path, stand_task_file: str) -> list[tuple[str, str]]:
     """For a stand_done file, return list of (product_task_id, queue_currently_in).
 
@@ -147,9 +186,16 @@ def determine_wakeups(schema: dict, coord: Path, entry: dict) -> list[tuple[str,
     # `greatminds stand ready` directly to the lease holder; no
     # journal-driven notification chain needed.
 
-    # normal: whoever claims from to_q gets notified
-    for role in claimers_of(schema, to_q):
-        out.append((role, reason or f"new task in {to_q}", task))
+    # normal: whoever claims from to_q gets notified — but ONLY if the
+    # task currently RESIDES in to_q. GitHub #20: a historical transition
+    # (task long since moved to feature_blocked / archive, or the
+    # destination queue now empty) must not re-wake the destination owner
+    # forever, burning driven no-op turns and firing false hung
+    # escalations. The current-location check makes a stale transition a
+    # no-op regardless of how the journal line gets replayed.
+    if task_resides_in_queue(coord, to_q, task):
+        for role in claimers_of(schema, to_q):
+            out.append((role, reason or f"new task in {to_q}", task))
 
     if to_q == "verified":
         # blocked tasks may unblock — wake REVIEWER for wake_check
@@ -177,11 +223,19 @@ def determine_wakeups(schema: dict, coord: Path, entry: dict) -> list[tuple[str,
     return out
 
 
-def write_inbox(coord: Path, to_role: str, task: str, from_q: str, to_q: str, reason: str) -> None:
+def write_inbox(coord: Path, to_role: str, task: str, from_q: str, to_q: str,
+                reason: str, ts_key: str = "") -> None:
     role_dir_name = to_role.lower()
     inbox = coord / "inbox" / role_dir_name
     inbox.mkdir(parents=True, exist_ok=True)
-    fname = f"wake-{int(time.time())}-{task}-{to_q}.md"
+    # GitHub #20 dedupe: key the filename on the TRANSITION timestamp (the
+    # journal entry's ``t``), not wall-clock now. Replaying the same
+    # transition then yields the same filename, so ``path.exists()`` below
+    # suppresses a duplicate wake — each transition is notified at most
+    # once. Wall-clock ``int(time.time())`` produced a fresh filename per
+    # tick, which is exactly what re-emitted historical wakes forever.
+    key = re.sub(r"[^0-9A-Za-z]+", "", ts_key) or str(int(time.time()))
+    fname = f"wake-{key}-{task}-{to_q}.md"
     path = inbox / fname
     if path.exists():
         return
@@ -268,6 +322,7 @@ def notify_journal(project_dir: Path | None, canon_dir: Path | None, once: bool)
                     from_q=entry.get("from") or "",
                     to_q=entry.get("to") or "",
                     reason=reason,
+                    ts_key=str(entry.get("t") or ""),
                 )
             except OSError:
                 continue
