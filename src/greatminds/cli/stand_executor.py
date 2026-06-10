@@ -15,6 +15,7 @@ Emits a clear error if ``ansible-playbook`` is missing on PATH.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -67,6 +68,43 @@ def read_project_env(coord: Path | None) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 # YAML profile execution
 # ---------------------------------------------------------------------------
+
+
+# 0366 / issue #16: ansible exits rc=0 even when a play matched NO hosts
+# (host=None → the play's hosts pattern matches nothing). Such a run
+# executes zero tasks and deploys nothing, yet rc=0 made coordd transition
+# the stand `preparing → ready` — a false ready that silently invalidates
+# every stand_required validation. A vacuous run is converted to this
+# synthetic failure rc so deploy_lease transitions the stand `down`.
+DEPLOY_NO_HOSTS_RC = 113
+
+_NO_HOST_MARKERS = (
+    "no hosts matched",
+    "could not match supplied host pattern",
+)
+
+
+def vacuous_deploy_reason(log: str) -> str | None:
+    """Return a reason string if an ansible run that exited rc=0 actually
+    deployed NOTHING (no hosts matched / the PLAY RECAP lists no host), else
+    None. rc=0 from such a run must NOT count as deploy success (issue #16).
+
+    Only meaningful when ansible output was captured; an empty log yields
+    None (we cannot prove a no-op, so the raw rc stands)."""
+    if not log:
+        return None
+    low = log.lower()
+    for marker in _NO_HOST_MARKERS:
+        if marker in low:
+            return (f"ansible matched no hosts ({marker!r}) — deploy ran "
+                    f"zero tasks, stand was NOT provisioned")
+    # A real deploy's PLAY RECAP lists each host with an ``ok=N`` count;
+    # a recap with no such line means no host ran the play.
+    idx = log.rfind("PLAY RECAP")
+    if idx != -1 and not re.search(r"\bok=\d+", log[idx:]):
+        return ("ansible PLAY RECAP lists no hosts — deploy ran zero tasks, "
+                "stand was NOT provisioned")
+    return None
 
 
 def _ansible_playbook_path() -> str:
@@ -240,13 +278,24 @@ def execute_yaml_profile(
         log = ""
         if capture_output:
             log = (cp.stdout or "") + (cp.stderr or "")
+        rc = cp.returncode
+        # 0366 / issue #16: a vacuous ansible run (no hosts matched, e.g.
+        # host=None) exits rc=0 having deployed nothing. Defensively convert
+        # it to a failure so deploy_lease transitions the stand `down`
+        # instead of falsely `ready`. Only the raw rc==0 case needs this —
+        # a real failure already returns non-zero.
+        if rc == 0:
+            reason = vacuous_deploy_reason(log)
+            if reason is not None:
+                rc = DEPLOY_NO_HOSTS_RC
+                log = f"{log}\n\ngreatminds: deploy failed — {reason}\n"
         # 0286: record marker so stand ready can prove the deploy
         # actually ran. The marker captures whatever rc + log the
-        # subprocess produced (success OR failure).
+        # subprocess produced (success OR failure, incl. the no-hosts
+        # conversion above).
         if coord is not None:
-            _write_deploy_marker(coord, lease_meta,
-                                  rc=cp.returncode, log=log)
-        return (cp.returncode, log)
+            _write_deploy_marker(coord, lease_meta, rc=rc, log=log)
+        return (rc, log)
 
 
 # ---------------------------------------------------------------------------
