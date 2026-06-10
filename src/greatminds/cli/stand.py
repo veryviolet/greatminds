@@ -158,6 +158,43 @@ def _validate_lease_worktree(task_id: str, worktree: str,
         )
 
 
+def _resolve_or_create_lease_worktree(task_id: str, worktree: "str | None",
+                                       project_dir: Path) -> str:
+    """0380: resolve the lease worktree path and ensure it EXISTS, auto-
+    creating the per-task worktree when absent.
+
+    Before 0380 ``stand lease`` REQUIRED an existing ``--worktree`` under
+    ``.worktrees/<seq>[-slug]``. That stranded EXPLORER's review_session
+    leases: review_session tasks get NO per-task worktree on route to
+    review_sessions (worktrees.required_for_task_kinds is product-only), and
+    EXPLORER is forbidden from running raw ``git worktree add``. There was
+    no legal path to a lease.
+
+    Now the worktree is materialized lazily, here, via the sanctioned
+    ``worktree_create`` CLI surface (NOT raw git from the calling role):
+
+    - ``worktree`` omitted → default to the canonical per-task path
+      (``.worktrees/<task_id>``), so a caller need not know/guess it.
+    - the shape is still validated (the main-fleet-tree foot-gun stays
+      rejected — deploying onto the running host self-modifies it).
+    - if the path doesn't exist yet, create the per-task worktree and
+      return the canonical path actually created (off plan.base_commit,
+      else default_branch HEAD — fine for a review_session with no plan).
+
+    Returns the absolute worktree path the lease should record."""
+    from greatminds.cli.worktree import (load_worktree_policy,
+                                          worktree_create)
+    if not worktree:
+        policy = load_worktree_policy(project_dir)
+        worktree = str(policy.worktree_path_for(project_dir, task_id))
+    _validate_lease_worktree(task_id, worktree, project_dir)
+    wt = Path(worktree).resolve(strict=False)
+    if not wt.is_dir():
+        created = worktree_create(project_dir, task_id)
+        return str(created.resolve(strict=False))
+    return str(wt)
+
+
 def _stand_keeper_notification_target(event: str) -> str | None:
     """0291: read ``schema.stand_keeper.notifications.<event>`` so
     SK's auto-inbox-info on lifecycle events stays schema-driven
@@ -287,8 +324,11 @@ def _file_inbox_info(coord: Path, to_role: str, body: str,
 @stand.command(name="lease")
 @click.option("--task", "task_id", required=True,
               help="product-task id this lease serves")
-@click.option("--worktree", required=True,
-              help="path to the worktree SK will deploy from")
+@click.option("--worktree", required=False, default=None,
+              help="path to the worktree coordd will deploy from. 0380: "
+                   "OPTIONAL — defaults to the canonical per-task worktree "
+                   "(.worktrees/<task_id>) and is auto-created if absent, so "
+                   "review_session leases (EXPLORER) need no raw git.")
 @click.option("--profile", required=True,
               help="deploy profile NAME — any profile file in this "
                    "project's stand-profiles/ (the leaser picks it; "
@@ -301,7 +341,7 @@ def _file_inbox_info(coord: Path, to_role: str, body: str,
                    "(YAML) or sees a PREREQUISITES-ONLY notice (MD); "
                    "TESTER does the actual deploy. Overrides the "
                    "profile-level setting.")
-def stand_lease(task_id: str, worktree: str, profile: str,
+def stand_lease(task_id: str, worktree: "str | None", profile: str,
                  ttl_seconds: int | None,
                  deploy_prerequisites_only: bool) -> None:
     """0244 (Phase 2 of 0242): request a lease on the singleton stand.
@@ -342,17 +382,15 @@ def stand_lease(task_id: str, worktree: str, profile: str,
     # would orphan TESTER's lease in preparing/ until SK's whitelist
     # rejected it on the next tick — a confusing failure mode the
     # CLI is now the first line of defense against.
+    # 0380: resolve (default to the canonical per-task path) AND auto-create
+    # the worktree when absent, so review_session leases (EXPLORER) have a
+    # legal path without raw git. The returned path is absolute — GitHub #10
+    # (Bug A): coordd re-resolves the stored string against ITS OWN cwd
+    # (often /home/<user> under systemd-user with no WorkingDirectory=), so a
+    # relative path would be rejected as "unknown worktree location" (rc 126).
     project_dir = find_coord_dir().parent
-    _validate_lease_worktree(task_id, worktree, project_dir)
-
-    # GitHub #10 (Bug A): store an ABSOLUTE worktree path. A relative
-    # ``--worktree`` resolves correctly against the leaser's cwd here,
-    # but coordd later re-resolves the stored string against ITS OWN cwd
-    # (often /home/<user> under systemd-user with no WorkingDirectory=),
-    # so is_deploy_safe rejects it as "unknown worktree location"
-    # (rc 126). Resolve now, while cwd is the leaser's, and persist the
-    # absolute path so the deploy is cwd-independent.
-    worktree = str(Path(worktree).resolve(strict=False))
+    worktree = _resolve_or_create_lease_worktree(task_id, worktree,
+                                                 project_dir)
 
     # Read schema's default ttl.
     if ttl_seconds is None:
