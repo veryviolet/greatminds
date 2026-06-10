@@ -34,6 +34,7 @@ import json
 import os
 import signal
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -44,6 +45,30 @@ from greatminds.cli._colors import err, info
 
 
 VERIFY_WAIT_SEC = 10
+
+
+def _greatminds_cmd() -> list[str]:
+    """Resolve the argv prefix for invoking greatminds subcommands without
+    relying on ambient PATH.
+
+    ``greatminds restart`` is frequently invoked through an explicit venv
+    binary (e.g. ``.venv-coord/bin/greatminds``) in a non-interactive SSH
+    environment whose PATH does NOT include that venv's bin dir. Shelling
+    out to a bare ``greatminds`` then dies with
+    ``FileNotFoundError: 'greatminds'`` — exactly on the recovery path
+    that is supposed to work. Since the top-level CLI itself was already
+    invoked successfully, resolve its sibling executable next to the
+    running interpreter (``sys.executable``'s bin dir); fall back to
+    ``python -m greatminds.cli.main``, which is an absolute interpreter
+    path and never depends on PATH.
+    """
+    try:
+        sibling = Path(sys.executable).resolve().parent / "greatminds"
+        if sibling.is_file() and os.access(sibling, os.X_OK):
+            return [str(sibling)]
+    except (OSError, RuntimeError):
+        pass
+    return [sys.executable, "-m", "greatminds.cli.main"]
 
 
 def _resolve_session_default(project_dir: Path) -> str:
@@ -234,7 +259,7 @@ def _ensure_tmux_session(session: str, project_dir: Path) -> None:
         return
     _log("    session missing, calling greatminds launch --target tmux")
     launched = subprocess.run(
-        ["greatminds", "launch", "--target", "tmux"],
+        [*_greatminds_cmd(), "launch", "--target", "tmux"],
         cwd=str(project_dir),
         capture_output=True, text=True,
     )
