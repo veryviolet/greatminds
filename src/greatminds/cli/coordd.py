@@ -212,6 +212,22 @@ DRIVEN_TURN_TIMEOUT_SEC = float(
 # grace is generous so it can never race a worker still finalizing its kill.
 ORPHAN_RECLAIM_GRACE_SEC = float(
     os.environ.get("COORDD_ORPHAN_RECLAIM_GRACE_SEC", "300"))
+# 0369 (GitHub #18): fail-fast tuning for the driven ``claude -p`` subprocess.
+# The hang's root cause is claude's own API retry defaults — API_TIMEOUT_MS
+# (10 min per attempt) × CLAUDE_CODE_MAX_RETRIES (10) means a rate-limited /
+# overloaded turn silently retries IN-PROCESS for many minutes (observed
+# 12–22 min) while holding driven-<role>.lock, then returns an EMPTY result.
+# coordd already classifies a returned rate_limit/overloaded result and
+# schedules its OWN backoff retry (_note_turn_outcome) — but only once the
+# turn returns. Shrinking claude's in-process timeout + retry count makes the
+# turn return in ~1–2 min so the lock frees and coordd's retry scheduler (with
+# its visible backoff) takes over, instead of the queue starving for the full
+# 30-min DRIVEN_TURN_TIMEOUT_SEC backstop. Both are env-overridable so an
+# operator can widen them without a code change.
+DRIVEN_API_TIMEOUT_MS = os.environ.get(
+    "COORDD_DRIVEN_API_TIMEOUT_MS", "120000")  # 120s per API attempt
+DRIVEN_MAX_RETRIES = os.environ.get(
+    "COORDD_DRIVEN_MAX_RETRIES", "2")
 # Stand auto-deploy retry: a deploy that RAISES before transitioning
 # leaves the stand stuck in `preparing`. coordd re-attempts it periodically
 # and, after DEPLOY_MAX_ATTEMPTS, escalates to MAINTAINER and forces the
@@ -682,8 +698,20 @@ def _driven_subprocess_env(role_lower: str) -> dict[str, str]:
     """Env for a driven-turn subprocess: the daemon's env (which carries
     the operator PATH baked into the unit) plus ``GREATMINDS_ROLE`` so the
     agent's ``greatminds`` CLI resolves the right inbox/queues. 1.6.2: no
-    PATH munging — the unit's Environment=PATH already has the tools."""
-    return {**os.environ, "GREATMINDS_ROLE": role_lower.upper()}
+    PATH munging — the unit's Environment=PATH already has the tools.
+
+    0369 (GitHub #18): also pin claude's fail-fast knobs — ``API_TIMEOUT_MS``
+    and ``CLAUDE_CODE_MAX_RETRIES`` — so a rate-limited/overloaded turn returns
+    in ~1–2 min instead of retrying in-process for many minutes while holding
+    the run-lock. coordd's own retry scheduler then handles the backoff. These
+    win over any inherited values on purpose (driven turns must fail fast); an
+    operator widens them via the COORDD_DRIVEN_* overrides on the daemon."""
+    return {
+        **os.environ,
+        "GREATMINDS_ROLE": role_lower.upper(),
+        "API_TIMEOUT_MS": DRIVEN_API_TIMEOUT_MS,
+        "CLAUDE_CODE_MAX_RETRIES": DRIVEN_MAX_RETRIES,
+    }
 
 
 # 0317: session-reset policy. ``claude --resume`` accumulates
