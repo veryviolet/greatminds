@@ -127,8 +127,10 @@ def test_deploy_lease_goes_down_on_vacuous_run(tmp_path, monkeypatch):
     leave the stand `down`, never `ready`."""
     coord = tmp_path / "coordination"
     _prepare(coord)
-    monkeypatch.setattr("greatminds.cli.stand_profile.load_profile",
-                        lambda _c, p: SimpleNamespace(format="yaml", name=p))
+    monkeypatch.setattr(
+        "greatminds.cli.stand_profile.load_profile",
+        lambda _c, p, **_k: SimpleNamespace(
+            format="yaml", name=p, source="main", path="/x/stand-profiles"))
     # the executor converts the vacuous rc=0 ansible run to a failure rc
     monkeypatch.setattr(
         "greatminds.cli.stand_executor.dispatch_profile",

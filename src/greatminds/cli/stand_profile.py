@@ -75,6 +75,11 @@ class ProfileSpec:
     # dict is kept here so callers can read additional ad-hoc metadata
     # without re-parsing.
     md_frontmatter: dict[str, Any] | None = field(default=None)
+    # issue #12: which tree the profile was resolved from —
+    # ``"lease-worktree"`` (the active lease's worktree copy, so an
+    # under-review stand-profile fix is deployed/validated before merge) or
+    # ``"main"`` (the merged coordination tree). Surfaced in deploy evidence.
+    source: str = "main"
 
 
 # ---------------------------------------------------------------------------
@@ -221,33 +226,56 @@ def profile_paths(coord_dir: Path, profile_name: str) -> tuple[Path, Path]:
     return base.with_suffix(".yaml"), base.with_suffix(".md")
 
 
-def load_profile(coord_dir: Path, profile_name: str) -> ProfileSpec:
+def load_profile(coord_dir: Path, profile_name: str, *,
+                 worktree: "str | Path | None" = None) -> ProfileSpec:
     """Load ``<coord_dir>/stand-profiles/<profile_name>.{yaml,md}``.
 
     YAML wins when both formats are present. Raises
     :class:`GreatMindsError` with both candidate paths in the message
     when neither file exists.
+
+    issue #12: when ``worktree`` is given (the active lease's worktree),
+    that worktree's ``coordination/stand-profiles/`` copy is preferred over
+    the merged main tree — so a stand-profile fix under review is the one
+    actually deployed/validated, instead of silently loading the unchanged
+    main-tree copy. The chosen tree is recorded on ``ProfileSpec.source``.
+    A worktree that lacks the profile (or a relative/bad path) falls back to
+    ``coord_dir`` cleanly. ``profile_name`` is still appended as a single
+    path segment (``profile_paths``), so a name with separators cannot
+    escape either ``stand-profiles/`` dir.
     """
     if not profile_name or not isinstance(profile_name, str):
         raise GreatMindsError(
             "load_profile: profile_name must be a non-empty string",
             exit_code=2,
         )
-    yaml_path, md_path = profile_paths(coord_dir, profile_name)
-    if yaml_path.is_file():
-        return _load_yaml_profile(profile_name, yaml_path)
-    if md_path.is_file():
-        # 1.6.0: MD (prose) profiles are removed — the deploy must be a
-        # declarative ansible playbook run deterministically by coordd,
-        # not LLM-executed prose. Convert the profile to YAML.
-        raise GreatMindsError(
-            f"stand-profile {profile_name!r}: MD/prose profiles were "
-            f"removed in 1.6.0 ({md_path} exists). Convert it to a YAML "
-            f"ansible playbook at {yaml_path} — the deploy is run by "
-            f"coordd, not an LLM.",
-            exit_code=2,
-        )
+    # Search order: lease worktree (if any) first, then the main tree.
+    search: list[tuple[Path, str]] = []
+    if worktree:
+        search.append((Path(worktree) / "coordination", "lease-worktree"))
+    search.append((coord_dir, "main"))
+
+    looked: list[Path] = []
+    for cdir, label in search:
+        yaml_path, md_path = profile_paths(cdir, profile_name)
+        looked.append(yaml_path)
+        if yaml_path.is_file():
+            spec = _load_yaml_profile(profile_name, yaml_path)
+            spec.source = label
+            return spec
+        if md_path.is_file():
+            # 1.6.0: MD (prose) profiles are removed — the deploy must be a
+            # declarative ansible playbook run deterministically by coordd,
+            # not LLM-executed prose. Convert the profile to YAML.
+            raise GreatMindsError(
+                f"stand-profile {profile_name!r}: MD/prose profiles were "
+                f"removed in 1.6.0 ({md_path} exists). Convert it to a YAML "
+                f"ansible playbook at {yaml_path} — the deploy is run by "
+                f"coordd, not an LLM.",
+                exit_code=2,
+            )
     raise GreatMindsError(
-        f"no profile {profile_name!r} found at {yaml_path}",
+        f"no profile {profile_name!r} found at "
+        f"{' or '.join(str(p) for p in looked)}",
         exit_code=2,
     )

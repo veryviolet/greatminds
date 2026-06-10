@@ -27,8 +27,10 @@ def _prepare(coord: Path, profile="full-deploy", lease_id="L1"):
 
 
 def _patch(monkeypatch, *, rc, fmt="yaml"):
-    monkeypatch.setattr("greatminds.cli.stand_profile.load_profile",
-                        lambda _c, p: SimpleNamespace(format=fmt, name=p))
+    monkeypatch.setattr(
+        "greatminds.cli.stand_profile.load_profile",
+        lambda _c, p, **_k: SimpleNamespace(
+            format=fmt, name=p, source="main", path="/x/stand-profiles"))
     monkeypatch.setattr("greatminds.cli.stand_executor.dispatch_profile",
                         lambda spec, meta, **k: (rc, f"log rc={rc}"))
 
@@ -98,7 +100,9 @@ def _patch_capture(monkeypatch, *, rc=0, spec_host=None):
     captured: dict = {}
     monkeypatch.setattr(
         "greatminds.cli.stand_profile.load_profile",
-        lambda _c, p: SimpleNamespace(format="yaml", name=p, host=spec_host))
+        lambda _c, p, **_k: SimpleNamespace(
+            format="yaml", name=p, host=spec_host,
+            source="main", path="/x/stand-profiles"))
 
     def _dispatch(spec, meta, **k):
         captured["meta"] = meta
