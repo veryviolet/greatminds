@@ -19,6 +19,7 @@ lives on PATH; per-project shims are unnecessary.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -306,6 +307,115 @@ def _seed_stand_profiles(coord: Path, canon: Path) -> tuple[int, int]:
         dst.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
         copied += 1
     return (copied, skipped)
+
+
+# 0367 (follow-up to 0366/#16/#17): sha256 of every greatminds-SHIPPED
+# stand-profile version that predates the add_host / stand_nodes host
+# topology (the "host-agnostic deploy" rewrite). These legacy templates
+# target ``hosts: stand`` / ``hosts: "${STAND_HOST}"`` with neither an
+# add_host bootstrap play nor a static inventory, so the host-agnostic
+# executor matches zero hosts and deploys nothing (the vacuous-deploy
+# trap). A ``coordination/stand-profiles/<name>`` whose content hashes to
+# one of these is a PRISTINE seeded copy of a stale template — the
+# operator never edited it — and is therefore SAFE to refresh in place to
+# the current packaged template. Anything NOT in this set is treated as
+# operator-customized and left untouched. Conservative by construction:
+# reseed only ever overwrites bytes greatminds itself once shipped.
+_STALE_SHIPPED_PROFILE_HASHES: dict[str, frozenset[str]] = {
+    "full-deploy.yaml": frozenset({
+        "5311122bc5ecb87e21c8e78ace2697c6d3f752f2416cb602b99f86f2164decc3",
+        "53786e4c3435632d01824d091f02b5f3d3761bc3d75ca9ce1a14c47810ad2868",
+        "6dcef9fe54c3c8d39c8cbb162ad89cc58bf90f17eeb5895f5b9d5dbed64bb5a7",
+        "97c86774284e15038c6a4062097dc4e6900209adabe1005f5f0bc86a7306e9c1",
+        "a9b38887161732aef1fedfffbff3e0c0564358f7f801f4f617b009f1cd25dbce",
+        "aefc89661d2e6b01fb74b1ff4a3c5460ebcc5a63cc4bfa2d7082659e1afadaa8",
+        "bf44b2f97f73e3484de36618a8df936775fa992c88c1e7b961014a59305b80e3",
+        "e0e4db62dad30d3f604f8d31281c371727020e21f5f08b540c813734e3408761",
+        "e84f5c470b1de176515a081fa2cb32cff6309834cad720a1b5278d9c928167f1",
+    }),
+    "smoke-only.yaml": frozenset({
+        "4342d1565f86de3d81569174f315e32f52bc95858a325b0585096637f42f1123",
+        "45f85a0f1d1cabe4cc4257c3a96d55a3dc4234a15f0bd7dd321d6b0364435f0f",
+        "82efeb03acb5462964d6ee8f1da38a27483a42fcbc08fe4a95545bd0cf06f267",
+    }),
+    "vite-dev.yaml": frozenset({
+        "077e70f2905520baf92020e725db34ebc4e9b5723ad22f7cb22f07af68b9eb70",
+        "13db5f9415c9bb237b5a73b07a06c6a6d5023c2957072540ea03abfdf4cfc568",
+        "5077f9ef7fb7a3354d8573835f25f015da69b12368a679eb564ddaa098a4265c",
+        "f7baec9084a195cbc526ff7a3a09ee98a248e88159a78869e2e67b4df7525d88",
+    }),
+}
+
+
+def _sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _profile_uses_add_host(text: str) -> bool:
+    """A stand profile carries the current (post-rewrite) host topology
+    when it registers the stand node(s) via ``add_host`` into the
+    ``stand_nodes`` group. Both markers must be present to count as
+    migrated (a profile that merely mentions one in a comment does not)."""
+    return "add_host" in text and "stand_nodes" in text
+
+
+def reseed_stale_stand_profiles(coord: Path, canon: Path) -> dict[str, list[str]]:
+    """0367: refresh pristine-but-stale seeded stand profiles to the
+    current add_host / STAND_HOST topology, without clobbering
+    operator-customized profiles.
+
+    For each packaged profile name present in
+    ``coord/stand-profiles/``, classify the on-disk copy:
+
+    * ``current``     — already byte-identical to the packaged template,
+                        or already carries the add_host topology
+                        (operator's own migrated variant). Left alone.
+    * ``reseeded``    — content hashes to a known stale SHIPPED version
+                        (pristine seeded copy). The old bytes are backed
+                        up to ``stand-profiles/.backups/<name>`` and the
+                        file is refreshed from the current template.
+    * ``customized``  — looks stale (no add_host) but its content matches
+                        no shipped version: an operator edit. Left in
+                        place and reported so a human can migrate it.
+    * ``missing_template`` — name we know but the canon template is gone
+                        (partial/dev build). Left alone.
+
+    Idempotent: a second run sees ``current`` and does nothing. Returns
+    a dict of name-lists keyed by classification for the caller to log.
+    """
+    result: dict[str, list[str]] = {
+        "reseeded": [], "current": [], "customized": [], "missing_template": [],
+    }
+    target_dir = coord / "stand-profiles"
+    src_dir = canon / "templates" / "stand-profiles"
+    if not target_dir.is_dir():
+        return result
+    backup_dir = target_dir / ".backups"
+    for name, stale_hashes in _STALE_SHIPPED_PROFILE_HASHES.items():
+        dst = target_dir / name
+        if not dst.is_file():
+            continue  # this profile was never seeded here
+        src = src_dir / name
+        if not src.is_file():
+            result["missing_template"].append(name)
+            continue
+        try:
+            on_disk = dst.read_text(encoding="utf-8")
+            template = src.read_text(encoding="utf-8")
+        except OSError as exc:
+            warn(f"    could not read profile {name}: {exc}")
+            continue
+        if on_disk == template or _profile_uses_add_host(on_disk):
+            result["current"].append(name)
+            continue
+        if _sha256(on_disk) in stale_hashes:
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            (backup_dir / name).write_text(on_disk, encoding="utf-8")
+            dst.write_text(template, encoding="utf-8")
+            result["reseeded"].append(name)
+        else:
+            result["customized"].append(name)
+    return result
 
 
 def _load_claude_settings_allow_from_canon(canon: Path) -> list[str]:
