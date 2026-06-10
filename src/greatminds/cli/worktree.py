@@ -139,6 +139,37 @@ def _run_git(cmd: list[str], cwd: Path | None = None,
     return cp
 
 
+def canonical_task_id(project_dir: Path, task_id: str) -> str:
+    """Resolve any task-id form to the FULL canonical task id (0383).
+
+    ``greatminds <cmd> <id>`` accepts either the short seq prefix
+    (``0382``) or the full slug (``0382-full-deploy-...``). The worktree
+    PATH, BRANCH, MERGE, and FINGERPRINT must ALL key off one value, or a
+    short id resolves to ``.worktrees/0382`` / ``task/0382`` while the
+    real worktree created at mv-time lives at ``.worktrees/0382-<slug>``
+    / ``task/0382-<slug>`` — the split behind the recurring 0361/0365/
+    0380 phantom (empty-branch) and empty-merge handoffs. This resolver
+    maps the given id to the task file's stem (its full id) via
+    ``find_task`` so every worktree operation converges on the SAME
+    worktree/branch. Falls back to the given id when no task file is
+    found (e.g. a brand-new task whose file isn't written yet, or a
+    test fixture with no coordination/ tree)."""
+    try:
+        from greatminds.cli.task import find_task
+    except ImportError:
+        return task_id
+    try:
+        located = find_task(project_dir / "coordination", task_id)
+    except Exception:
+        return task_id
+    if located:
+        path, _queue = located
+        stem = path.stem
+        if stem:
+            return stem
+    return task_id
+
+
 def _resolve_base_commit(project_dir: Path, task_id: str,
                          explicit: str | None,
                          default_branch: str = "main") -> str:
@@ -186,6 +217,7 @@ def worktree_create(project_dir: Path, task_id: str,
     created off ``base_commit`` (plan default or explicit override).
     """
     policy = policy or load_worktree_policy(project_dir)
+    task_id = canonical_task_id(project_dir, task_id)  # 0383: full id only
     wt_path = policy.worktree_path_for(project_dir, task_id)
     branch = policy.branch_for(task_id)
 
@@ -223,6 +255,7 @@ def worktree_remove(project_dir: Path, task_id: str,
     didn't exist (idempotent no-op).
     """
     policy = policy or load_worktree_policy(project_dir)
+    task_id = canonical_task_id(project_dir, task_id)  # 0383: full id only
     wt_path = policy.worktree_path_for(project_dir, task_id)
     branch = policy.branch_for(task_id)
     removed = False
@@ -248,6 +281,46 @@ class MergeResult:
     message: str
 
 
+def _commit_worktree_overlay(project_dir: Path, task_id: str,
+                             policy: WorktreePolicy) -> bool:
+    """0383: commit a per-task worktree's uncommitted overlay onto the
+    task branch so the merge has a real git object to bring in.
+
+    Returns True when an overlay was committed, False when the worktree
+    is absent or already clean (nothing to capture). ``task_id`` must
+    already be canonical (the caller resolves it). The commit covers
+    tracked modifications AND new untracked files (``git add -A``), which
+    is exactly the DEVELOPER overlay that ``git merge <branch>`` would
+    otherwise miss. Raises GreatMindsError if the overlay exists but the
+    commit cannot be created — an actionable failure beats a silent
+    empty merge."""
+    wt_path = policy.worktree_path_for(project_dir, task_id)
+    if not (wt_path.is_dir() and (wt_path / ".git").exists()):
+        return False
+    status = _run_git(["status", "--porcelain"], cwd=wt_path, check=False)
+    if status.returncode != 0 or not (status.stdout or "").strip():
+        return False  # clean worktree: nothing uncommitted to capture
+    _run_git(["add", "-A"], cwd=wt_path)
+    commit_cp = _run_git(
+        ["-c", "user.name=greatminds",
+         "-c", "user.email=greatminds@localhost",
+         "commit", "--no-verify",
+         "-m", f"impl({task_id}): worktree overlay captured at merge"],
+        cwd=wt_path, check=False,
+    )
+    if commit_cp.returncode != 0:
+        raise GreatMindsError(
+            f"0383: failed to commit the uncommitted worktree overlay for "
+            f"{task_id} onto {policy.branch_for(task_id)} before merge "
+            f"(exit {commit_cp.returncode}): "
+            f"{(commit_cp.stderr or commit_cp.stdout or '').strip()[:300]}. "
+            f"The implementation would otherwise be silently dropped by an "
+            f"empty merge.",
+            exit_code=4,
+        )
+    return True
+
+
 def worktree_merge(project_dir: Path, task_id: str,
                    summary: str = "",
                    policy: WorktreePolicy | None = None) -> MergeResult:
@@ -258,8 +331,21 @@ def worktree_merge(project_dir: Path, task_id: str,
     hand back to ``conflict_handback_to`` per policy.
     """
     policy = policy or load_worktree_policy(project_dir)
+    task_id = canonical_task_id(project_dir, task_id)  # 0383: full id only
     branch = policy.branch_for(task_id)
     target = policy.default_branch
+    # 0383: capture the per-task worktree's UNCOMMITTED overlay as a real
+    # commit on the task branch before merging. DEVELOPER works
+    # uncommitted by design (the git-commit hook only permits
+    # ARCHITECT-REVIEWER), so without this the task branch sits at
+    # base_commit with no objects and `git merge task/<id>` brings in
+    # NOTHING — the empty/phantom merge that silently dropped 0365/0380's
+    # implementation and forced manual MAINTAINER branch repoints. The
+    # commit runs in the REVIEWER mv-to-verified context (the only path
+    # that reaches a merge); --no-verify skips the permission pre-commit
+    # hook because this is the CLI's own sanctioned merge plumbing, not an
+    # agent-typed commit.
+    _commit_worktree_overlay(project_dir, task_id, policy)
     # 0300 (upstream issue #6): merge direction MUST be
     # ``checkout <target> → merge task/<id>``. Pre-0300 the upstream
     # reporter saw `git log <target>` never advance because the merge
@@ -446,6 +532,7 @@ def cli_path(task_id: str, project_dir: Path | None) -> None:
     """
     pd = project_dir or _default_project_dir()
     policy = load_worktree_policy(pd)
+    task_id = canonical_task_id(pd, task_id)  # 0383: full id, never short
     click.echo(str(policy.worktree_path_for(pd, task_id)))
 
 

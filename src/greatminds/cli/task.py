@@ -2456,13 +2456,35 @@ def append_block(
         # uncommitted overlay so gate_check can decouple tested-state
         # from committed-state. Skip if the caller supplied one
         # explicitly (allows test/operator override).
+        #
+        # 0383: the fingerprint MUST be computed over the PER-TASK
+        # worktree, not over ``coord.parent`` (the main fleet tree). The
+        # main tree carries no task overlay, so every task collapsed to
+        # the same hash (the c474b1e3 collision that produced phantom
+        # handoffs across 0361/0365/0380). Resolve the canonical full-id
+        # worktree and diff THAT; fall back to coord.parent only when no
+        # per-task worktree exists (e.g. non-isolated kinds / fixtures).
         if (kind in ("implementation", "stand_result")
                 and "worktree_fingerprint" not in block):
             try:
                 from greatminds.cli.gate_check import (
                     compute_worktree_fingerprint,
                 )
-                fp = compute_worktree_fingerprint(coord.parent)
+                from greatminds.cli.worktree import (
+                    canonical_task_id,
+                    load_worktree_policy,
+                )
+                project_dir = coord.parent
+                fp_dir = project_dir
+                try:
+                    policy = load_worktree_policy(project_dir)
+                    cid = canonical_task_id(project_dir, task_id)
+                    wt = policy.worktree_path_for(project_dir, cid)
+                    if wt.is_dir() and (wt / ".git").exists():
+                        fp_dir = wt
+                except Exception:
+                    fp_dir = project_dir
+                fp = compute_worktree_fingerprint(fp_dir)
                 if fp is not None:
                     block["worktree_fingerprint"] = fp
             except Exception:

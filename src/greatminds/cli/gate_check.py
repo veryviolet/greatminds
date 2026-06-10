@@ -308,12 +308,14 @@ def get_task_worktree_fingerprint(merged: dict) -> str | None:
 
 
 def compute_worktree_fingerprint(project_dir: Path) -> str | None:
-    """0229: sha256 of ``git diff HEAD`` for ``project_dir``.
+    """0229/0383: sha256 of ``project_dir``'s uncommitted overlay.
 
-    Captures the uncommitted overlay (modified + staged but not
-    committed). Returns None when the project isn't a git repo, when
-    git isn't on PATH, or when the diff is empty (no overlay — caller
-    omits the field).
+    Captures the tracked uncommitted diff (``git diff HEAD``) PLUS the
+    content of untracked new files (0383 — otherwise a new-files-only
+    overlay is invisible and collides). ``project_dir`` must be the
+    PER-TASK worktree, not the overlay-free main tree. Returns None when
+    the project isn't a git repo, when git isn't on PATH, or when the
+    overlay is empty (no changes — caller omits the field).
 
     Empty-diff case returns "clean" string (not None) so the caller
     can distinguish "no overlay computed yet" (None) from "computed
@@ -322,20 +324,46 @@ def compute_worktree_fingerprint(project_dir: Path) -> str | None:
     """
     import hashlib
     import subprocess
-    try:
-        cp = subprocess.run(
-            ["git", "diff", "HEAD"],
-            cwd=str(project_dir),
-            capture_output=True, text=True, timeout=15,
-        )
-    except (OSError, subprocess.TimeoutExpired):
+
+    def _git(args: list[str]) -> subprocess.CompletedProcess | None:
+        try:
+            cp = subprocess.run(
+                ["git", *args], cwd=str(project_dir),
+                capture_output=True, text=True, timeout=15,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        return cp if cp.returncode == 0 else None
+
+    diff_cp = _git(["diff", "HEAD"])
+    if diff_cp is None:
         return None
-    if cp.returncode != 0:
-        return None
-    diff = cp.stdout or ""
-    if not diff.strip():
+    parts = [diff_cp.stdout or ""]
+    # 0383: untracked NEW files are invisible to ``git diff HEAD``, so a
+    # task whose overlay is purely new files (or whose tracked diff happens
+    # to match another's) must still fingerprint uniquely. Fold each
+    # untracked file's path + content into the hash. Without this the
+    # fingerprint collapses to the bare tracked diff and unrelated
+    # worktrees collide (the c474b1e3 collision when the diff was computed
+    # over a clean tree).
+    unt_cp = _git(["ls-files", "--others", "--exclude-standard"])
+    if unt_cp is not None:
+        for rel in sorted((unt_cp.stdout or "").splitlines()):
+            rel = rel.strip()
+            if not rel:
+                continue
+            parts.append(f"\n+++ untracked {rel}\n")
+            try:
+                parts.append(
+                    (project_dir / rel).read_text(
+                        encoding="utf-8", errors="replace")
+                )
+            except OSError:
+                pass
+    blob = "".join(parts)
+    if not blob.strip():
         return "clean"
-    return hashlib.sha256(diff.encode("utf-8")).hexdigest()[:32]
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:32]
 
 
 @click.command(name="gate-check",
