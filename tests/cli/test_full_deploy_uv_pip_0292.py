@@ -37,13 +37,36 @@ def _install_task(play: dict) -> dict:
 
 
 def _cmd_text(task: dict) -> str:
-    """Return the task's ``cmd`` as a single string (collapsing the
+    """Return the task's command as a single string (collapsing the
     YAML block-scalar style ``>`` form into one line for substring
-    matching)."""
-    cmd_block = task.get("ansible.builtin.command") \
-        or task.get("command") or {}
-    cmd = cmd_block.get("cmd") or ""
+    matching).
+
+    0372: the install task now uses ``ansible.builtin.shell`` (free-form
+    string) so the ``dist/greatminds-*.whl`` glob expands; ``command``
+    would leave it literal. Handle both the shell free-form string and
+    the older ``command: {cmd: ...}`` dict shapes."""
+    block = task.get("ansible.builtin.shell")
+    if block is None:
+        block = task.get("ansible.builtin.command") or task.get("command")
+    if isinstance(block, str):
+        cmd = block
+    elif isinstance(block, dict):
+        cmd = block.get("cmd") or ""
+    else:
+        cmd = ""
     return re.sub(r"\s+", " ", cmd).strip()
+
+
+def _chdir(task: dict) -> str | None:
+    """Resolve the task's chdir from either the ``args:`` sibling (shell
+    free-form form) or the module-arg dict (command form)."""
+    args = task.get("args")
+    if isinstance(args, dict) and args.get("chdir"):
+        return args.get("chdir")
+    block = task.get("ansible.builtin.command") or task.get("command")
+    if isinstance(block, dict):
+        return block.get("chdir")
+    return None
 
 
 def test_install_step_uses_uv_pip_not_dot_venv_pip() -> None:
@@ -88,9 +111,7 @@ def test_install_step_keeps_force_reinstall() -> None:
 
 def test_install_step_chdir_unchanged() -> None:
     """The ansible chdir must still point at deploy_path; the rewrite
-    only changed the cmd."""
+    only changed the module (command → shell) and where chdir lives."""
     play = _full_deploy_playbook()
     task = _install_task(play)
-    cmd_block = task.get("ansible.builtin.command") \
-        or task.get("command") or {}
-    assert cmd_block.get("chdir") == "{{ deploy_path }}"
+    assert _chdir(task) == "{{ deploy_path }}"

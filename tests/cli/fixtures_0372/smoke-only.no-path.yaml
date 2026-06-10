@@ -24,13 +24,6 @@
   hosts: stand_nodes
   gather_facts: false
   become: false
-  environment:
-    # uv installs to ~/.local/bin; ansible `command:` runs a non-login,
-    # non-interactive shell that does NOT source ~/.profile, so ~/.local/bin
-    # is not on PATH. Mirror full-deploy's PATH block so any uv-dependent
-    # probe added here resolves uv on freshly seeded fleets. STAND_USER comes
-    # from PROJECT.env (--extra-vars); default matches the canon example user.
-    PATH: "/home/{{ STAND_USER | default('violet') }}/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   vars:
     deploy_path: "/srv/greatminds"
 
