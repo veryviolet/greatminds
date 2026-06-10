@@ -113,6 +113,23 @@ def dep_path_under_coord(coord: Path, dep: str) -> Path | None:
     return None
 
 
+def find_dep_in_queues(coord: Path, dep_id: str,
+                       queues: "set[str] | list[str]") -> list[str]:
+    """Queue dir names (among ``queues``) that actually contain a task file
+    ``<dep_id>.{yaml,md}``. Used to locate a dependency's target task when
+    it is NOT at the queue the dependency path expects — so wake-check can
+    tell a permanently-dead dependency (target sitting in a terminal queue
+    it can never leave) from one that is merely not-created-yet."""
+    found: list[str] = []
+    for q in sorted(queues):
+        qd = coord / q
+        if not qd.is_dir():
+            continue
+        if (qd / f"{dep_id}.yaml").is_file() or (qd / f"{dep_id}.md").is_file():
+            found.append(q)
+    return found
+
+
 def all_blocked_files(coord: Path) -> list[Path]:
     out: list[Path] = []
     d = coord / "feature_blocked"
@@ -239,21 +256,50 @@ def wake_check(project_dir: Path | None, canon_dir: Path | None, quiet: bool) ->
     if not terminal_queues:
         terminal_queues = {"verified", "archive"}
 
+    # Queues to search when a dependency target is not at its expected path
+    # (so a dead dep — target stuck in a different terminal queue — is told
+    # apart from a not-yet-created one). Prefer the schema's queue set; fall
+    # back to whatever queue-like dirs exist under coord/.
+    search_queues: set[str] = set(schema_queues) or {
+        p.name for p in coord.iterdir() if p.is_dir()
+    }
+
     ready: list[tuple[str, str]] = []
     not_ready: list[tuple[str, list[str]]] = []
+    # Permanently-unsatisfiable deps: target task sits in a TERMINAL queue
+    # other than the one the dependency path expects, so it can never reach
+    # the expected queue (issue #15). (tid, [human descriptions]).
+    dead: list[tuple[str, list[str]]] = []
     for tid, deps in task_deps.items():
         if tid in in_cycle:
             continue
         unresolved: list[str] = []
+        dead_for_task: list[str] = []
         for d in deps:
             p = dep_path_under_coord(coord, d)
             if p is None:
-                unresolved.append(f"{d} (missing)")
+                m = DEP_RE.match(d)  # deps here already matched DEP_RE
+                dep_id = m.group("id")
+                exp_q = m.group("queue")
+                terminal_locs = [
+                    q for q in find_dep_in_queues(coord, dep_id, search_queues)
+                    if q in terminal_queues and q != exp_q
+                ]
+                if terminal_locs:
+                    dead_for_task.append(
+                        f"{d} (target in terminal {terminal_locs[0]}/, "
+                        f"can never reach {exp_q}/)")
+                else:
+                    unresolved.append(f"{d} (missing)")
                 continue
             parent = p.parent.name
             if parent not in terminal_queues:
                 unresolved.append(f"{d} (in {parent}, not terminal)")
-        if unresolved:
+        # A dead dep makes the task permanently blocked regardless of any
+        # other unresolved dep — surface it loudly, not as plain "missing".
+        if dead_for_task:
+            dead.append((tid, dead_for_task))
+        elif unresolved:
             not_ready.append((tid, unresolved))
         else:
             ready.append((tid, blocked_meta[tid]["resume_to"]))
@@ -272,6 +318,13 @@ def wake_check(project_dir: Path | None, canon_dir: Path | None, quiet: bool) ->
         info(f"BLOCKED (not yet ready) ({len(not_ready)}):")
         for tid, deps in not_ready:
             info(f"  {tid}: {', '.join(deps)}")
+        click.echo()
+
+    if dead:
+        findings += len(dead)
+        warn(f"DEAD DEPENDENCIES — permanently unsatisfiable ({len(dead)}):")
+        for tid, descs in dead:
+            warn(f"  {tid}: {', '.join(descs)}")
         click.echo()
 
     if cycles:
