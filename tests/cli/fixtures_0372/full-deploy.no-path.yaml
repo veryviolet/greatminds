@@ -37,13 +37,6 @@
   hosts: stand_nodes
   gather_facts: false
   become: false
-  environment:
-    # uv installs to ~/.local/bin; ansible `command:` runs a non-login,
-    # non-interactive shell that does NOT source ~/.profile, so ~/.local/bin
-    # is not on PATH and `uv` is not found. Add it explicitly (regression
-    # vs the pre-1.6 profile, which carried this block). STAND_USER comes
-    # from PROJECT.env (--extra-vars); default matches the canon example user.
-    PATH: "/home/{{ STAND_USER | default('violet') }}/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   vars:
     # Literal defaults; a same-named PROJECT.env extra-var overrides them
     # (extra-vars have highest precedence). NOT `{{ deploy_path | default }}`
@@ -107,15 +100,11 @@
         chdir: "{{ deploy_path }}"
       changed_when: true
 
-    # Must be `shell`, not `command`: the dist/greatminds-*.whl glob is
-    # expanded by the shell. `command` runs no shell, so uv would receive
-    # the literal unexpanded path and fail. Mirrors the remove-stale-wheels
-    # task above (which builds exactly one wheel, so the glob is unambiguous).
     - name: install greatminds into venv (uv pip — uv venv lacks pip)
-      ansible.builtin.shell: >
-        uv pip install --python .venv-coord/bin/python
-        --force-reinstall dist/greatminds-*.whl
-      args:
+      ansible.builtin.command:
+        cmd: >
+          uv pip install --python .venv-coord/bin/python
+          --force-reinstall dist/greatminds-*.whl
         chdir: "{{ deploy_path }}"
       changed_when: true
 

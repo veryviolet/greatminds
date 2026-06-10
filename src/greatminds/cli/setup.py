@@ -332,11 +332,18 @@ _STALE_SHIPPED_PROFILE_HASHES: dict[str, frozenset[str]] = {
         "bf44b2f97f73e3484de36618a8df936775fa992c88c1e7b961014a59305b80e3",
         "e0e4db62dad30d3f604f8d31281c371727020e21f5f08b540c813734e3408761",
         "e84f5c470b1de176515a081fa2cb32cff6309834cad720a1b5278d9c928167f1",
+        # 1.6.x add_host rewrite that DROPPED the uv PATH environment block
+        # (task 0372 regression). Pristine on disk it sniffs as "current"
+        # (it has add_host), so it must be listed here for the stale-hash
+        # check to reseed it to the PATH-restored template.
+        "bb94e88c9c18dc3c6d0c5ffb7d3f4e9c5a9d9412a859369793a9169e78b04f33",
     }),
     "smoke-only.yaml": frozenset({
         "4342d1565f86de3d81569174f315e32f52bc95858a325b0585096637f42f1123",
         "45f85a0f1d1cabe4cc4257c3a96d55a3dc4234a15f0bd7dd321d6b0364435f0f",
         "82efeb03acb5462964d6ee8f1da38a27483a42fcbc08fe4a95545bd0cf06f267",
+        # 1.6.x add_host rewrite without the uv PATH block (task 0372).
+        "50e719ab502fed73b2fc0dd9ac4bad3603202877c09cd5bba1ef4e6c5bf09f86",
     }),
     "vite-dev.yaml": frozenset({
         "077e70f2905520baf92020e725db34ebc4e9b5723ad22f7cb22f07af68b9eb70",
@@ -368,12 +375,15 @@ def reseed_stale_stand_profiles(coord: Path, canon: Path) -> dict[str, list[str]
     ``coord/stand-profiles/``, classify the on-disk copy:
 
     * ``current``     — already byte-identical to the packaged template,
-                        or already carries the add_host topology
-                        (operator's own migrated variant). Left alone.
+                        or carries the add_host topology under a hash that
+                        matches no shipped version (operator's own migrated
+                        variant). Left alone.
     * ``reseeded``    — content hashes to a known stale SHIPPED version
-                        (pristine seeded copy). The old bytes are backed
-                        up to ``stand-profiles/.backups/<name>`` and the
-                        file is refreshed from the current template.
+                        (pristine seeded copy) that is not the current
+                        template — including a shipped add_host variant
+                        that dropped a later template fix. The old bytes
+                        are backed up to ``stand-profiles/.backups/<name>``
+                        and the file is refreshed from the current template.
     * ``customized``  — looks stale (no add_host) but its content matches
                         no shipped version: an operator edit. Left in
                         place and reported so a human can migrate it.
@@ -405,14 +415,21 @@ def reseed_stale_stand_profiles(coord: Path, canon: Path) -> dict[str, list[str]
         except OSError as exc:
             warn(f"    could not read profile {name}: {exc}")
             continue
-        if on_disk == template or _profile_uses_add_host(on_disk):
+        # Order matters: a PRISTINE shipped profile is reseeded even when it
+        # already carries the add_host topology (e.g. the 1.6.x rewrite that
+        # dropped the uv PATH block — task 0372). Only an UNKNOWN-hash
+        # add_host profile (an operator's own migrated variant) counts as
+        # current via the add_host shortcut, so we never clobber operator
+        # edits while still propagating template fixes to seeded copies.
+        if on_disk == template:
             result["current"].append(name)
-            continue
-        if _sha256(on_disk) in stale_hashes:
+        elif _sha256(on_disk) in stale_hashes:
             backup_dir.mkdir(parents=True, exist_ok=True)
             (backup_dir / name).write_text(on_disk, encoding="utf-8")
             dst.write_text(template, encoding="utf-8")
             result["reseeded"].append(name)
+        elif _profile_uses_add_host(on_disk):
+            result["current"].append(name)
         else:
             result["customized"].append(name)
     return result
