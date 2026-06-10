@@ -507,6 +507,23 @@ def _restart_dead_agents(
                     f"event (force-fresh session). Skipping start-agent."
                 )
                 continue
+            # 0385: staged roles (coord.yaml ``mode: staged``, e.g.
+            # LIVE-DEVELOPER) are USER-paced. launch.py pre-types the
+            # start-agent command into the pane but does NOT submit Enter —
+            # the USER starts/stops the live session. So an absent registry
+            # for a staged role is the EXPECTED resting state, not a dead
+            # agent. restart must NOT auto-(re)start it: building
+            # ``_launch_command(..., "staged")`` emits ``--mode staged``,
+            # which start-agent rejects (loop|chat only) → it errors and
+            # leaves the role MISSING. Mirror the driven skip: leave the
+            # pane to the USER. (--reset still cleared session files above.)
+            if window_mode == "staged":
+                _log(
+                    f"    {name} ({role_lc}): staged role — USER-started "
+                    f"(launch pre-types start-agent without Enter); restart "
+                    f"does not auto-launch it. Skipping start-agent."
+                )
+                continue
             # 0308: build + send the full launch_command directly
             # instead of relying on a wrapper-loop's bare-Enter
             # recovery. Pre-0308 the launcher installed a
@@ -589,6 +606,29 @@ def _verify(
                 state = "mid-turn" if _pid_alive(pid) else "idle"
                 click.echo(f"    {role_lc:<22} driven ({state}; "
                            f"coordd-managed)")
+            continue
+        # 0385: staged roles (coord.yaml ``mode: staged``, e.g.
+        # LIVE-DEVELOPER) are USER-paced — launch pre-types start-agent
+        # without Enter and the USER starts/stops the live session. So an
+        # absent registry is the EXPECTED steady state, NOT a failure.
+        # Report it distinctly and NEVER count it toward total/fail.
+        # Pre-0385 a staged role missing from the registry was flagged
+        # MISSING and made restart exit non-zero on an otherwise-healthy
+        # fleet (the avatar 0379 repro). When the USER HAS started the
+        # session, surface its live pid for visibility — still uncounted.
+        if window_mode_by_name.get(name) == "staged":
+            data = _load_registry(registry_dir / f"{role_lc}.json")
+            if data is None:
+                click.echo(f"    {role_lc:<22} staged (USER-started; "
+                           f"not running)")
+            else:
+                try:
+                    pid = int(data.get("pid") or 0)
+                except (TypeError, ValueError):
+                    pid = 0
+                state = "running" if _pid_alive(pid) else "stopped"
+                click.echo(f"    {role_lc:<22} staged ({state}; "
+                           f"USER-paced)")
             continue
         total += 1
         reg_path = registry_dir / f"{role_lc}.json"
