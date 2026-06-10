@@ -1995,32 +1995,53 @@ def _maybe_drive_driven_role(coord: Path, canon_dir: Path,
     return None
 
 
-def _role_has_pending_task(coord: Path, role_meta: dict,
-                           role_lower: str) -> bool:
-    """True if the role has an actionable file waiting: a message in its
-    inbox OR a task in a queue it ``claims_from`` (per schema). Counts
-    ``.yaml`` AND ``.md`` (1.x tasks/messages are yaml), excluding
-    templates / processed markers / dotfiles."""
-    def _actionable(d: Path, *, processed_ok: bool) -> bool:
+def _role_pending_signature(coord: Path, role_meta: dict,
+                            role_lower: str) -> frozenset:
+    """0365: the SET of actionable files (``<dir>/<name>``) that give this
+    driven role pending work — UNPROCESSED messages in its inbox plus tasks
+    in a queue it ``claims_from`` (per schema). Counts ``.yaml`` AND ``.md``
+    (1.x tasks/messages are yaml), excluding templates / processed markers /
+    dotfiles. Empty == the role is idle.
+
+    Returned as a frozenset so it doubles as a change-signature: the
+    periodic reconcile (``_reconcile_driven_backlog`` with a ``seen`` dict)
+    drives a role only when this backlog DIFFERS from the last state it
+    drove — i.e. once per distinct backlog rather than every timer tick.
+    Driven roles run on events / genuine new work, not timer polling.
+
+    A ``processed-`` inbox marker is an ALREADY-handled (acked) message and
+    is NOT pending. Counting it (the old ``_role_has_pending_task``
+    ``processed_ok=True`` inbox check) made a role with only processed
+    markers + empty claim queues "pending" forever, re-driven every
+    reconcile — wasted API spend (the compounding half of this bug)."""
+    names: set[str] = set()
+
+    def _collect(d: Path) -> None:
         if not d.is_dir():
-            return False
+            return
         for f in d.iterdir():
             if not f.is_file() or f.suffix not in (".yaml", ".md"):
                 continue
             n = f.name
             if n.startswith(".") or n.startswith("_TEMPLATE"):
                 continue
-            if not processed_ok and n.startswith("processed-"):
+            if n.startswith("processed-"):
                 continue
-            return True
-        return False
+            names.add(f"{d.name}/{n}")
 
-    if _actionable(coord / "inbox" / role_lower, processed_ok=True):
-        return True
+    _collect(coord / "inbox" / role_lower)
     for q in (role_meta.get("claims_from") or []):
-        if isinstance(q, str) and _actionable(coord / q, processed_ok=False):
-            return True
-    return False
+        if isinstance(q, str):
+            _collect(coord / q)
+    return frozenset(names)
+
+
+def _role_has_pending_task(coord: Path, role_meta: dict,
+                           role_lower: str) -> bool:
+    """True if the role has an actionable file waiting (an UNPROCESSED inbox
+    message or a task in a queue it ``claims_from``). Thin boolean over
+    ``_role_pending_signature`` — processed inbox markers no longer count."""
+    return bool(_role_pending_signature(coord, role_meta, role_lower))
 
 
 def _clear_stale_driven_locks(coord: Path, verbose: bool) -> int:
@@ -2046,6 +2067,14 @@ def _clear_stale_driven_locks(coord: Path, verbose: bool) -> int:
             except OSError:
                 pass
     return cleared
+
+
+# 0365/0374: the one ``_reconcile_dispatch_decision`` skip reason that means
+# "driven, unlocked, but idle backlog" — distinct from the lifecycle / window
+# / run-lock skips. The periodic dedup resets a role's seen-signature ONLY on
+# this reason (a genuinely cleared backlog), never on a lock skip (the role
+# may be mid-drive on the very backlog it recorded).
+_RECONCILE_REASON_NO_PENDING = "skip: no pending work in claim queues"
 
 
 def _reconcile_dispatch_decision(
@@ -2074,19 +2103,36 @@ def _reconcile_dispatch_decision(
     if _driven_run_lock_path(coord, role_lower).is_file():
         return (False, "skip: turn in flight (run-lock held)")
     if not _role_has_pending_task(coord, meta, role_lower):
-        return (False, "skip: no pending work in claim queues")
+        return (False, _RECONCILE_REASON_NO_PENDING)
     return (True, "drive: pending work in an owned claim queue")
 
 
 def _reconcile_driven_backlog(coord: Path, canon_dir: Path,
-                              verbose: bool) -> None:
-    """Startup sweep: coordd is otherwise inotify-reactive, so a task
+                              verbose: bool, *,
+                              seen: dict | None = None,
+                              trigger: str = " (startup-reconcile)") -> None:
+    """Backlog sweep: coordd is otherwise inotify-reactive, so a task
     already sitting in a queue when coordd (re)starts — or whose event
     was consumed by a turn that failed to spawn — would never be driven
-    (no fresh inotify event). On start, drive ONE turn for each DRIVEN
-    role that has pending work in a queue it claims from and is not
-    mid-turn (no run-lock). Makes ``update`` / a daemon restart pick up
-    a hanging task instead of stranding it."""
+    (no fresh inotify event). Drive ONE turn for each DRIVEN role that has
+    pending work in a queue it claims from and is not mid-turn (no
+    run-lock). Makes ``update`` / a daemon restart pick up a hanging task
+    instead of stranding it.
+
+    The per-role drive decision (lifecycle / window / run-lock / pending)
+    stays in ``_reconcile_dispatch_decision`` (0374), with its #22
+    diagnostic reason preserved.
+
+    0365: ``seen`` (the loop's dict, passed only on the PERIODIC path) makes
+    the sweep EVENT-like rather than a timer poll. A role is driven only
+    when its pending backlog (``_role_pending_signature``) DIFFERS from the
+    state last driven; re-driving an UNCHANGED backlog every cycle is pure
+    waste — the role already saw that work and either left it deliberately
+    (re-driven by the next real event, e.g. an ask answer landing in its
+    inbox) or its turn failed (the retry scheduler owns that). When a role's
+    backlog clears, its ``seen`` entry is dropped so an identical backlog
+    later re-drives once. When ``seen is None`` (STARTUP) every pending role
+    is still driven once — drive-once recovery is unchanged."""
     schema_roles = load_schema_roles(canon_dir)
     if not schema_roles:
         return
@@ -2094,6 +2140,7 @@ def _reconcile_driven_backlog(coord: Path, canon_dir: Path,
     for role_upper, meta in schema_roles.items():
         if not isinstance(meta, dict):
             continue
+        role_lower = str(role_upper).lower()
         should, reason = _reconcile_dispatch_decision(
             coord, canon_dir, coord_yaml_doc, role_upper, meta)
         # Diagnostic (#22): log the reconcile decision for DRIVEN roles —
@@ -2106,13 +2153,29 @@ def _reconcile_driven_backlog(coord: Path, canon_dir: Path,
             print(f"coordd: reconcile {role_upper}: {reason}",
                   file=sys.stderr)
         if not should:
+            # 0365: an IDLE driven role (genuinely cleared backlog) drops
+            # its seen entry so an identical backlog later re-drives once.
+            # Only the no-pending skip resets — a lifecycle / window / lock
+            # skip must not, since the role may be mid-drive on the very
+            # backlog recorded in ``seen``.
+            if seen is not None and reason == _RECONCILE_REASON_NO_PENDING:
+                seen.pop(role_lower, None)
             continue
+        # 0365: periodic dedup — drive once per DISTINCT backlog, not every
+        # timer tick. ``should`` guarantees a non-empty signature (0374's
+        # decision already confirmed pending work). ``seen is None`` at
+        # startup skips the dedup → every pending role driven once.
+        sig = _role_pending_signature(coord, meta, role_lower)
+        if seen is not None and seen.get(role_lower) == sig:
+            continue  # already drove this exact backlog — wait for a change
         located = _window_and_tool_for_role(coord_yaml_doc, role_upper)
         try:
             _maybe_drive_driven_role(
                 coord, canon_dir, coord_yaml_doc, located, role_upper,
-                verbose, trigger=" (startup-reconcile)",
+                verbose, trigger=trigger,
             )
+            if seen is not None:
+                seen[role_lower] = sig  # record only on a real drive attempt
         except Exception as exc:  # never let recovery crash startup
             if verbose:
                 print(f"coordd: reconcile dispatch for {role_upper} "
@@ -2955,11 +3018,19 @@ def coordd(project_dir: Path | None, project_name: str | None,
     #      started watching, or whose event was consumed by a failed spawn).
     # Without (1), a daemon restart mid-turn permanently strands the role;
     # without (2), inotify (NEW events only) never picks up a queued task.
+    #
+    # 0365: backlog signatures last driven per role, so the PERIODIC reconcile
+    # drives a role once per distinct backlog state instead of every
+    # RECONCILE_INTERVAL_SEC tick (the timer-polling-idle-driven-roles bug).
+    # Seeded by the startup reconcile so the first periodic tick does not
+    # immediately re-drive what startup just drove.
+    _reconcile_seen: dict = {}
     try:
         _clear_stale_driven_locks(coord, verbose)
         # 0376: cap coordd's own unbounded .turns/ log growth on startup.
         _prune_turn_logs(coord, verbose=verbose)
-        _reconcile_driven_backlog(coord, canon_dir, verbose)
+        _reconcile_driven_backlog(coord, canon_dir, verbose,
+                                  seen=_reconcile_seen)
         # 1.6.0: a lease left `preparing` when coordd (re)started — e.g.
         # killed mid-deploy — must be picked up; coordd re-runs the deploy.
         _maybe_auto_deploy_stand(coord, verbose)
@@ -2979,13 +3050,18 @@ def coordd(project_dir: Path | None, project_name: str | None,
             # 1h") with work still pending in its claim queue would freeze:
             # no new event fires to re-drive it. This periodic sweep re-drives
             # such roles (lock-safe: skips any role mid-turn; a no-op when no
-            # role has pending work). Cheap formal check; only spawns a turn
-            # when there is genuinely stranded work.
+            # role has pending work). 0365: it is NOT a timer poll —
+            # ``_reconcile_seen`` makes it drive a role only when that role's
+            # pending backlog CHANGED since the state last driven, so an idle
+            # role (or one parked on work it deliberately left) is not
+            # re-spawned every cycle (that wasted API spend was the bug).
             _now_r = time.monotonic()
             if _now_r - _last_reconcile >= RECONCILE_INTERVAL_SEC:
                 _last_reconcile = _now_r
                 try:
-                    _reconcile_driven_backlog(coord, canon_dir, verbose)
+                    _reconcile_driven_backlog(
+                        coord, canon_dir, verbose, seen=_reconcile_seen,
+                        trigger=" (periodic-reconcile)")
                     # 0376: keep .turns/ bounded on a long-lived coordd too
                     # (startup-only pruning never fires on a process that
                     # never restarts).
