@@ -1097,12 +1097,34 @@ def _check_gate_for_stand_required(data: dict[str, Any],
                if isinstance(b, dict) and b.get("kind") == "review"]
     if reviews and reviews[-1].get("outcome") == "approved_sprint":
         return None
+    # COORDINATE §9.1 self-referential carve-out: when the latest review
+    # block is an approved review that cites the carve-out AND the latest
+    # tests block carries the documented partial/fail evidence, the
+    # missing gate-pass is caused by the exact limitation this task fixes,
+    # so the standard gate-pass requirement does not apply. The append-time
+    # review validator already enforced the full §9.1 condition before
+    # this approved review block could exist; we re-check it here so the
+    # mv → verified gate stays consistent and forge-proof.
+    if reviews and reviews[-1].get("outcome") == "approved" \
+            and _review_block_cites_carveout(reviews[-1]):
+        latest_tests = next(
+            (b for b in reversed(data.get("blocks") or [])
+             if isinstance(b, dict) and b.get("kind") == "tests"),
+            None,
+        )
+        if _tests_block_self_referential_ok(latest_tests, data):
+            return None
     result = _evaluate_gate_check(data)
     if result == "pass":
         return None
     return (
         f"gate_check_pass_if_stand_required: gate_check returns {result!r} "
-        f"(stand_done evidence missing / wrong commit / result not pass)"
+        f"(stand_done evidence missing / wrong commit / result not pass). "
+        f"For a self-referential fix-for-self blocker, see COORDINATE §9.1: "
+        f"append an approved review citing the carve-out "
+        f"(self_referential_carveout: true + carveout_citation) over an "
+        f"honest partial/fail tests block carrying the three stand_evidence "
+        f"prose subfields."
     )
 
 
@@ -1746,6 +1768,82 @@ def _enforce_tests_functional_probes_per_scope(
                 )
 
 
+# COORDINATE §9.1 — Fix-for-self-blocker carve-out.
+#
+# REVIEWER may approve a self-referential fix-for-self task with honest
+# partial/fail tests evidence when the missing gate-pass is caused by the
+# EXACT verification-infrastructure limitation that THIS task's fix
+# demonstrably removes (a chicken-and-egg blocker: the fix can't be
+# stand-proven green because the thing being fixed is the stand/verify
+# limitation itself). The carve-out is strictly limited and never relaxes
+# the ordinary ``test_result=pass`` requirement for unrelated tasks, nor
+# does it overlap the LIVE-DEVELOPER ``approved_sprint`` path.
+#
+# Per the canon §9.1 text (COORDINATE.md), the carve-out conditions are:
+#   tests block  : plan.stand_required is true, the three stand_evidence
+#                  prose subfields present (reproduction-steps,
+#                  observed-without-fix, observed-with-fix), and lease
+#                  evidence result in {partial, fail}. Canon does NOT
+#                  mandate any dedicated tests-block marker field — an
+#                  honest partial/fail TESTER block IS the eligible shape,
+#                  so existing parked tasks (e.g. 0369/0361, whose
+#                  chicken-and-egg justification lives in the block's
+#                  notes / tester_observations) qualify as-filed.
+#   review block : self_referential_carveout: true + non-empty
+#                  carveout_citation. §9.1 makes the REVIEWER the sole
+#                  authority ("REVIEWER MUST cite this carve-out and the
+#                  tests block's chicken-and-egg explanation in the review
+#                  block"), and only ARCHITECT-REVIEWER may author a review
+#                  block, so this single explicit opt-in is the forge-proof
+#                  gate — an ordinary partial/fail with no such citation is
+#                  still rejected. Requiring an extra TESTER-set marker
+#                  would over-constrain canon and leave already-parked
+#                  honest evidence unapprovable.
+# Both gates (append approved review, and feature_review → verified) share
+# these helpers so the two checks can never diverge.
+_SELF_REF_STAND_EVIDENCE_FIELDS = (
+    "reproduction_steps",
+    "observed_without_fix",
+    "observed_with_fix",
+)
+
+
+def _tests_block_self_referential_ok(tests_block: Any,
+                                     data: dict[str, Any]) -> bool:
+    """True when the latest tests block carries the honest partial/fail
+    evidence shape that §9.1 makes eligible for the carve-out: a
+    stand_required task with the three stand_evidence prose subfields and
+    a partial/fail result. Canon mandates no dedicated marker field on the
+    tests block — the REVIEWER's review-block citation is the opt-in (see
+    _review_block_cites_carveout)."""
+    if not isinstance(tests_block, dict):
+        return False
+    plan = latest_plan(data)
+    if not isinstance(plan, dict) or plan.get("stand_required") is not True:
+        return False
+    if tests_block.get("test_result") not in ("partial", "fail"):
+        return False
+    ev = tests_block.get("stand_evidence")
+    if not isinstance(ev, dict):
+        return False
+    # §9.1 requires the three stand_evidence prose fields (reproduction,
+    # observed-without-fix, observed-with-fix). lease_id/result/commit are
+    # release-flow fields and may legitimately reflect the failing lease.
+    for k in _SELF_REF_STAND_EVIDENCE_FIELDS:
+        if not str(ev.get(k) or "").strip():
+            return False
+    return True
+
+
+def _review_block_cites_carveout(review_block: Any) -> bool:
+    """True when a review block explicitly cites the §9.1 carve-out."""
+    if not isinstance(review_block, dict):
+        return False
+    if review_block.get("self_referential_carveout") is not True:
+        return False
+    return bool(str(review_block.get("carveout_citation") or "").strip())
+
+
 def require_block_cross_state(new_block: dict[str, Any],
                               data: dict[str, Any]) -> None:
     """Cross-block validation at append time.
@@ -1823,9 +1921,25 @@ def require_block_cross_state(new_block: dict[str, Any],
     )
     if latest_tests is not None:
         if latest_tests.get("test_result") != "pass":
+            # COORDINATE §9.1 self-referential carve-out: a fix-for-self
+            # task whose partial/fail evidence is caused by the exact
+            # verification limitation it fixes may be approved when the
+            # tests block documents the chicken-and-egg blocker AND this
+            # review block explicitly cites the carve-out.
+            if (_tests_block_self_referential_ok(latest_tests, data)
+                    and _review_block_cites_carveout(new_block)):
+                return
             raise GreatMindsError(
                 f"cannot approve: latest tests.test_result="
-                f"{latest_tests.get('test_result')!r} (expected 'pass')"
+                f"{latest_tests.get('test_result')!r} (expected 'pass'). "
+                f"COORDINATE §9.1 self-referential carve-out requires the "
+                f"latest tests block to be a stand_required partial/fail "
+                f"block carrying the three stand_evidence prose subfields "
+                f"(reproduction_steps + observed_without_fix + "
+                f"observed_with_fix), AND this review block to set "
+                f"self_referential_carveout: true + a non-empty "
+                f"carveout_citation citing §9.1 and the tests block's "
+                f"chicken-and-egg explanation."
             , exit_code=2)
         return
     if latest_reader is not None:
