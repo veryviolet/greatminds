@@ -337,6 +337,12 @@ _STALE_SHIPPED_PROFILE_HASHES: dict[str, frozenset[str]] = {
         # (it has add_host), so it must be listed here for the stale-hash
         # check to reseed it to the PATH-restored template.
         "bb94e88c9c18dc3c6d0c5ffb7d3f4e9c5a9d9412a859369793a9169e78b04f33",
+        # PATH-restored template that still rsyncs `.git` (no --exclude=.git).
+        # A per-task worktree's .git is a gitdir FILE; a stale destination
+        # .git DIRECTORY makes rsync abort with exit 23 → stand DOWN
+        # (task 0382). Pristine on disk it sniffs as "current" (add_host +
+        # uv PATH), so list it here to reseed to the .git-excluding template.
+        "30469cc65b0cb58e95e590d62746baf4ae18b6dd2ea7aa22ff038c8b089ceb83",
     }),
     "smoke-only.yaml": frozenset({
         "4342d1565f86de3d81569174f315e32f52bc95858a325b0585096637f42f1123",

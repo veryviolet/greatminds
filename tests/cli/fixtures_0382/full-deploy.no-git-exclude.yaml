@@ -71,17 +71,9 @@
       # (no ansible.posix). delegate_to localhost runs rsync on the control
       # node, pushing to the stand node over SSH (its ~/.ssh/config supplies
       # user/key for the bare `{{ inventory_hostname }}` alias).
-      #
-      # --exclude=.git is REQUIRED: a per-task worktree's `.git` is a
-      # `gitdir:` FILE, but a destination from a prior deploy may hold a
-      # stale `.git` DIRECTORY. rsync cannot replace a non-empty dir with a
-      # regular file and aborts with exit 23 ("cannot delete non-empty
-      # directory .git"), bringing the stand DOWN. Deployed stands need no
-      # git metadata, so skip it entirely.
       ansible.builtin.command:
         cmd: >
           rsync -aP
-          --exclude=.git
           --exclude=.venv*
           --exclude=.worktrees
           --exclude=__pycache__
