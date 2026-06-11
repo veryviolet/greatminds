@@ -234,6 +234,78 @@ def collect_agent_status(coord: Path, role: str,
     }
 
 
+# ---------------------------------------------------------------------------
+# 0388: consume the 0387 wedge detection at the resume/readiness boundary.
+#
+# 0387 made ``agent status`` / ``watchdog`` SURFACE a wedged role (alive
+# pid but stuck at a pre-agent / auth prompt). Nothing CONSUMED that
+# signal, so a blocked review_session whose objective needs a live role
+# (e.g. a PLANNER to drive user_feedback → planning) could still be
+# unblocked and resumed against the wedged stand — and rediscover the
+# exact same wedge. These helpers let wake-check (advisory) and the
+# feature_blocked → resume validator (enforcing) hold such a task until
+# the required role is usable, with an actionable reason.
+# ---------------------------------------------------------------------------
+
+def required_live_roles(header: dict[str, Any],
+                        blocked_block: "dict[str, Any] | None") -> list[str]:
+    """Roles a task's objective needs USABLE before it may resume.
+
+    Opt-in: read from the latest blocked block's ``requires_live_roles``
+    (override) else the task header's. Absent / non-list → empty list, so
+    tasks that don't declare the field behave exactly as before (no new
+    holds, no regression). Normalized upper-case, de-duped,
+    order-preserving."""
+    raw: Any = None
+    if blocked_block is not None and blocked_block.get("requires_live_roles") is not None:
+        raw = blocked_block.get("requires_live_roles")
+    elif header.get("requires_live_roles") is not None:
+        raw = header.get("requires_live_roles")
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for r in raw:
+        if not isinstance(r, str):
+            continue
+        u = r.strip().upper()
+        if u and u not in seen:
+            seen.add(u)
+            out.append(u)
+    return out
+
+
+def wedged_required_roles(coord: Path, roles: "list[str]",
+                          *, pane_texts: "dict[str, Any] | None" = None
+                          ) -> list[tuple[str, str]]:
+    """Return ``(role, pane_state)`` for each required role that is
+    DEFINITIVELY wedged (``usable is False`` — alive but at a pre-agent /
+    auth prompt per 0387).
+
+    CONSERVATIVE / fail-open: a role whose usability is True (healthy) or
+    None (not registered / pane not inspectable) is NOT held, and any
+    error inspecting a role is swallowed (an infra hiccup — missing tmux,
+    unreadable registry — must never wedge the FSM). Only an explicit
+    wedge holds the resume.
+
+    ``pane_texts`` injects ``{ROLE_UPPER: text|None}`` for deterministic
+    tests (bypasses live tmux capture)."""
+    wedged: list[tuple[str, str]] = []
+    for role in roles:
+        try:
+            if pane_texts is not None and role in pane_texts:
+                rec = collect_agent_status(coord, role,
+                                           pane_text=pane_texts[role])
+            else:
+                rec = collect_agent_status(coord, role)
+        except Exception:
+            continue
+        if rec.get("usable") is False:
+            wedged.append((rec.get("role") or role,
+                           str(rec.get("pane_state"))))
+    return wedged
+
+
 def _registered_roles(coord: Path) -> list[str]:
     reg_dir = coord / REGISTRY_DIR
     if not reg_dir.is_dir():

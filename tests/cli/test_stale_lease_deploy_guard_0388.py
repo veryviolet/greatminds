@@ -1,0 +1,190 @@
+"""Tests for task 0388: refuse to deploy a STALE lease worktree.
+
+The avatar 0379 regression: a resumed review_session redeployed its old
+base commit and rediscovered the very wedge whose fix had already been
+verified upstream (0387), while the stand still reported "ready".
+
+``stale_verified_deps_for_lease`` (stand.py) detects this: for every
+``verified/<id>`` dependency the leasing task was blocked on, it checks
+whether the dependency's verified review-commit is contained in the lease
+worktree's git history. A commit that exists in the repo but is NOT an
+ancestor of the worktree HEAD means the worktree predates the verified
+fix → stale.
+
+CONSERVATIVE by construction: missing task_id / worktree, a non-git
+worktree, a dependency that isn't in ``verified/`` or has no review
+commit, or a commit git can't resolve all yield ``[]`` (no false stale).
+"""
+from __future__ import annotations
+
+import subprocess
+from pathlib import Path
+
+import yaml
+
+from greatminds.cli import stand as stand_mod
+from greatminds.cli.coordd import REGISTRY_DIR
+
+
+# ---------------------------------------------------------------------------
+# git worktree fixture
+# ---------------------------------------------------------------------------
+
+def _git(repo: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", "-C", str(repo), *args],
+        capture_output=True, text=True, check=True).stdout.strip()
+
+
+def _make_repo(path: Path) -> tuple[str, str]:
+    """Init a repo with two linear commits; return (commit_a, commit_b)
+    where B is the child of A (B contains A, A does not contain B)."""
+    path.mkdir(parents=True)
+    _git(path, "init", "-q")
+    _git(path, "config", "user.email", "t@t.t")
+    _git(path, "config", "user.name", "t")
+    (path / "f.txt").write_text("a\n")
+    _git(path, "add", "f.txt")
+    _git(path, "commit", "-q", "-m", "A")
+    commit_a = _git(path, "rev-parse", "HEAD")
+    (path / "f.txt").write_text("b\n")
+    _git(path, "add", "f.txt")
+    _git(path, "commit", "-q", "-m", "B (verified fix)")
+    commit_b = _git(path, "rev-parse", "HEAD")
+    return commit_a, commit_b
+
+
+def _coord(tmp_path: Path) -> Path:
+    coord = tmp_path / "proj" / "coordination"
+    (coord / REGISTRY_DIR).mkdir(parents=True)
+    (coord / "verified").mkdir(parents=True)
+    (coord / "review_sessions").mkdir(parents=True)
+    return coord
+
+
+def _write_task(coord: Path, queue: str, tid: str, data: dict) -> None:
+    data.setdefault("id", tid)
+    (coord / queue / f"{tid}.yaml").write_text(
+        yaml.safe_dump(data), encoding="utf-8")
+
+
+def _verified_dep(coord: Path, dep_id: str, commit: str | None) -> None:
+    blocks = []
+    if commit is not None:
+        blocks.append({"kind": "review", "outcome": "approved",
+                       "commit": commit})
+    _write_task(coord, "verified", dep_id,
+                {"stream": "product", "blocks": blocks})
+
+
+def _leasing_task(coord: Path, tid: str, dep_refs: list[str]) -> None:
+    _write_task(coord, "review_sessions", tid, {
+        "stream": "product",
+        "blocks": [{"kind": "blocked", "reason": "dep",
+                    "dependencies": dep_refs,
+                    "resume_to": "review_sessions"}],
+    })
+
+
+# ---------------------------------------------------------------------------
+# positive: stale worktree (HEAD predates the verified commit)
+# ---------------------------------------------------------------------------
+
+def test_stale_when_worktree_predates_verified_commit(tmp_path):
+    coord = _coord(tmp_path)
+    wt = tmp_path / "proj" / ".worktrees" / "0379"
+    commit_a, commit_b = _make_repo(wt)
+    # worktree HEAD at A (old base); verified fix is B
+    _git(wt, "checkout", "-q", commit_a)
+    _verified_dep(coord, "0387-fix", commit_b)
+    _leasing_task(coord, "0379-campaign", ["verified/0387-fix.yaml"])
+
+    stale = stand_mod.stale_verified_deps_for_lease(
+        coord, "0379-campaign", str(wt))
+    assert stale == [("0387-fix", commit_b)]
+
+
+def test_fresh_when_worktree_contains_verified_commit(tmp_path):
+    coord = _coord(tmp_path)
+    wt = tmp_path / "proj" / ".worktrees" / "0379"
+    _commit_a, commit_b = _make_repo(wt)
+    # worktree HEAD at B → contains the verified fix → not stale
+    _verified_dep(coord, "0387-fix", commit_b)
+    _leasing_task(coord, "0379-campaign", ["verified/0387-fix.yaml"])
+
+    assert stand_mod.stale_verified_deps_for_lease(
+        coord, "0379-campaign", str(wt)) == []
+
+
+# ---------------------------------------------------------------------------
+# conservative / fail-open cases — must all return []
+# ---------------------------------------------------------------------------
+
+def test_no_task_id_or_worktree_is_not_stale(tmp_path):
+    coord = _coord(tmp_path)
+    assert stand_mod.stale_verified_deps_for_lease(coord, None, "/x") == []
+    assert stand_mod.stale_verified_deps_for_lease(
+        coord, "0379-campaign", None) == []
+
+
+def test_non_git_worktree_is_not_stale(tmp_path):
+    coord = _coord(tmp_path)
+    wt = tmp_path / "proj" / ".worktrees" / "0379"
+    wt.mkdir(parents=True)  # plain dir, no git
+    _verified_dep(coord, "0387-fix", "deadbeef" * 5)
+    _leasing_task(coord, "0379-campaign", ["verified/0387-fix.yaml"])
+    assert stand_mod.stale_verified_deps_for_lease(
+        coord, "0379-campaign", str(wt)) == []
+
+
+def test_dep_not_in_verified_is_ignored(tmp_path):
+    coord = _coord(tmp_path)
+    wt = tmp_path / "proj" / ".worktrees" / "0379"
+    commit_a, _commit_b = _make_repo(wt)
+    _git(wt, "checkout", "-q", commit_a)
+    # dependency points at feature_review/, not verified/ → not checked
+    _leasing_task(coord, "0379-campaign", ["feature_review/0387-fix.yaml"])
+    assert stand_mod.stale_verified_deps_for_lease(
+        coord, "0379-campaign", str(wt)) == []
+
+
+def test_dep_without_review_commit_is_ignored(tmp_path):
+    coord = _coord(tmp_path)
+    wt = tmp_path / "proj" / ".worktrees" / "0379"
+    commit_a, _commit_b = _make_repo(wt)
+    _git(wt, "checkout", "-q", commit_a)
+    _verified_dep(coord, "0387-fix", None)  # no review block / commit
+    _leasing_task(coord, "0379-campaign", ["verified/0387-fix.yaml"])
+    assert stand_mod.stale_verified_deps_for_lease(
+        coord, "0379-campaign", str(wt)) == []
+
+
+def test_unresolvable_commit_is_ignored(tmp_path):
+    coord = _coord(tmp_path)
+    wt = tmp_path / "proj" / ".worktrees" / "0379"
+    _make_repo(wt)
+    # a commit sha that does not exist in this repo → can't test ancestry
+    _verified_dep(coord, "0387-fix", "0" * 40)
+    _leasing_task(coord, "0379-campaign", ["verified/0387-fix.yaml"])
+    assert stand_mod.stale_verified_deps_for_lease(
+        coord, "0379-campaign", str(wt)) == []
+
+
+def test_latest_review_commit_wins(tmp_path):
+    # _verified_dep_commit takes the LAST review block's commit.
+    coord = _coord(tmp_path)
+    wt = tmp_path / "proj" / ".worktrees" / "0379"
+    commit_a, commit_b = _make_repo(wt)
+    _git(wt, "checkout", "-q", commit_a)
+    _write_task(coord, "verified", "0387-fix", {
+        "stream": "product",
+        "blocks": [
+            {"kind": "review", "outcome": "changes_requested",
+             "commit": commit_a},   # earlier (present in wt)
+            {"kind": "review", "outcome": "approved",
+             "commit": commit_b},   # latest (NOT present in wt) → stale
+        ],
+    })
+    _leasing_task(coord, "0379-campaign", ["verified/0387-fix.yaml"])
+    assert stand_mod.stale_verified_deps_for_lease(
+        coord, "0379-campaign", str(wt)) == [("0387-fix", commit_b)]

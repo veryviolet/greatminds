@@ -203,7 +203,11 @@ def wake_check(project_dir: Path | None, canon_dir: Path | None, quiet: bool) ->
             if dep_id in blocked_id_set:
                 edges.append(dep_id)
         task_deps[tid] = deps
-        blocked_meta[tid] = {"resume_to": latest.get("resume_to") or ""}
+        blocked_meta[tid] = {
+            "resume_to": latest.get("resume_to") or "",
+            "header": header,
+            "blocked": latest,
+        }
         graph[tid] = edges
 
     # DFS cycle detection over the blocked-subgraph
@@ -304,6 +308,34 @@ def wake_check(project_dir: Path | None, canon_dir: Path | None, quiet: bool) ->
         else:
             ready.append((tid, blocked_meta[tid]["resume_to"]))
 
+    # 0388: a task whose deps are all satisfied is normally READY TO WAKE,
+    # but if it declares `requires_live_roles` and a required runtime role
+    # is wedged (alive-but-stuck at a codex auth / login-timeout / trust
+    # prompt — 0387), resuming it would just rediscover the same wedge.
+    # Hold those out of READY and surface them loudly so REVIEWER does not
+    # unblock them (the resume validator enforces the same gate at mv).
+    # Conservative + fail-open: tasks without the field, and any inspection
+    # error, leave readiness unchanged.
+    held: list[tuple[str, list[tuple[str, str]]]] = []
+    if ready:
+        try:
+            from greatminds.cli.agent import (
+                required_live_roles, wedged_required_roles,
+            )
+            still_ready: list[tuple[str, str]] = []
+            for tid, resume_to in ready:
+                meta = blocked_meta.get(tid, {})
+                roles = required_live_roles(
+                    meta.get("header") or {}, meta.get("blocked"))
+                wedged = wedged_required_roles(coord, roles) if roles else []
+                if wedged:
+                    held.append((tid, wedged))
+                else:
+                    still_ready.append((tid, resume_to))
+            ready = still_ready
+        except Exception:
+            pass  # fail-open: never hide a ready task on an inspection error
+
     findings = 0
     if ready:
         findings += len(ready)
@@ -313,6 +345,15 @@ def wake_check(project_dir: Path | None, canon_dir: Path | None, quiet: bool) ->
         click.echo()
     elif not quiet:
         info("ready to wake: 0")
+
+    if held:
+        findings += len(held)
+        warn(f"HELD — deps satisfied but required role(s) wedged ({len(held)}):")
+        for tid, wedged in held:
+            detail = ", ".join(f"{r} ({s})" for r, s in wedged)
+            warn(f"  {tid}: {detail} — re-auth/restart the role (or fix the "
+                 f"stale deploy) before resume; `greatminds agent status`")
+        click.echo()
 
     if not_ready and not quiet:
         info(f"BLOCKED (not yet ready) ({len(not_ready)}):")

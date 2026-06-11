@@ -89,6 +89,15 @@ LIST_FIELDS = {
     # a list», blocking TESTER's mv. tester_observations stays
     # scalar — it's a single text blob per probe-run.
     "functional_probes",
+    # 0388: requires_live_roles is the opt-in list of roles a task's
+    # objective needs USABLE before resume (read by
+    # agent.required_live_roles, which only activates on a YAML list).
+    # Without this entry `--field requires_live_roles=[ARCHITECT-PLANNER]`
+    # would coerce to the literal string "[ARCHITECT-PLANNER]" and
+    # required_live_roles() would return [] (fail-open), so the
+    # wake-check HELD section and the feature_blocked resume validator
+    # could never be opted in through the CLI-only FSM mutation rule.
+    "requires_live_roles",
 }
 
 
@@ -1342,6 +1351,35 @@ def _check_all_dependencies_exist(data: dict[str, Any],
             + (" …" if len(missing) > 3 else "")
             + ". Run `greatminds wake-check` for the full picture."
         )
+    # 0388: deps satisfied, but if the task's objective declares
+    # `requires_live_roles`, a resume against a wedged runtime role (alive
+    # pid stuck at a codex auth / login-timeout / trust prompt per 0387)
+    # would just rediscover the same wedge. Hold the resume until the
+    # required role is usable. Opt-in + fail-open: tasks without the field
+    # are unaffected, and any inspection error never blocks the mv.
+    try:
+        from greatminds.cli.agent import (
+            required_live_roles, wedged_required_roles,
+        )
+        roles = required_live_roles(data, blockeds[-1])
+        if roles:
+            wedged = wedged_required_roles(coord, roles)
+            if wedged:
+                detail = ", ".join(f"{r} ({s})" for r, s in wedged)
+                return (
+                    "all_dependencies_exist_per_wake_check: required live "
+                    f"role(s) wedged: {detail}. The task's "
+                    "`requires_live_roles` objective needs a usable agent, "
+                    "but it is alive-but-stuck at a pre-agent / auth prompt "
+                    "(0387). Re-auth / restart the role (or fix the stale "
+                    "deploy), confirm `greatminds agent status` shows it "
+                    "usable, then resume. Run `greatminds wake-check` for "
+                    "the full picture."
+                )
+    except GreatMindsError:
+        raise
+    except Exception:
+        pass  # fail-open: never wedge the FSM on an inspection hiccup
     return None
 
 

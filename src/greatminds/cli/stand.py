@@ -691,6 +691,129 @@ def stand_up(reason: str) -> None:
         click.echo(f"state → free: {reason}")
 
 
+# 0388: a deploy whose lease worktree is missing a verified dependency's
+# code is refused with this rc. Distinct from the executor's rc codes
+# (113 no-hosts, 124 timeout, 126 unsafe) so callers/tests can tell a
+# stale-deployment refusal apart from a real ansible failure. The stand
+# transitions preparing→down with an actionable down_reason; deploy_lease
+# RETURNS this rc (never raises) so coordd records the attempt and does
+# NOT enter the 5× retry loop — the staleness is deterministic and a
+# retry would only re-discover it.
+DEPLOY_STALE_RC = 117
+
+
+def _git_capture(worktree: Path, args: list[str]):
+    """Run ``git -C <worktree> <args>`` read-only; return the
+    CompletedProcess or None when git is unavailable / errors out."""
+    try:
+        return subprocess.run(
+            ["git", "-C", str(worktree), *args],
+            capture_output=True, text=True, timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def _verified_dep_commit(merged: dict) -> str | None:
+    """The verified commit of a dependency task: the latest ``review``
+    block's ``commit`` (what REVIEWER approved and merged to main). That
+    commit becomes reachable from main on merge, so a worktree refreshed
+    off current main contains it; a stale worktree does not. Returns None
+    when no review block carries a commit (can't anchor staleness)."""
+    commit: str | None = None
+    for b in merged.get("blocks") or []:
+        if not isinstance(b, dict) or b.get("kind") != "review":
+            continue
+        c = b.get("commit")
+        if isinstance(c, str) and c.strip():
+            commit = c.strip()
+    return commit
+
+
+def stale_verified_deps_for_lease(
+        coord: Path, task_id: str | None,
+        worktree: str | None) -> list[tuple[str, str]]:
+    """0388: detect a STALE lease worktree — one whose code predates a
+    verified dependency the leasing task was explicitly blocked on.
+
+    Returns ``[(dep_id, dep_commit), ...]`` for every ``verified/<id>``
+    dependency (drawn from the task's ``blocked`` blocks) whose verified
+    review-commit is NOT contained in the lease worktree's git history.
+    Deploying such a worktree runs code missing an already-verified fix —
+    the 0388 wedge (a resumed review_session redeploys its old base and
+    rediscovers the very bug whose fix was verified upstream).
+
+    CONSERVATIVE by construction: returns ``[]`` whenever staleness
+    cannot be positively determined — no task_id / no worktree, a
+    non-git worktree, a dependency that isn't in ``verified/`` or has no
+    review commit, or a commit object git can't resolve. Only a definite
+    "commit exists and is NOT an ancestor of worktree HEAD" is reported,
+    so a healthy refreshed worktree and ordinary fresh leases never trip
+    it."""
+    from greatminds.cli.task import find_task, load_task
+
+    if not task_id or not worktree:
+        return []
+    wt = Path(worktree)
+    # Confirm the worktree is a real git checkout before any ancestry
+    # query — otherwise we cannot determine staleness (→ []).
+    probe = _git_capture(wt, ["rev-parse", "--is-inside-work-tree"])
+    if probe is None or probe.returncode != 0:
+        return []
+
+    found = find_task(coord, task_id)
+    if found is None:
+        return []
+    try:
+        merged = load_task(found[0])
+    except Exception:
+        return []
+
+    # Collect dependency refs from every blocked block on the task.
+    dep_refs: list[str] = []
+    for b in merged.get("blocks") or []:
+        if not isinstance(b, dict) or b.get("kind") != "blocked":
+            continue
+        for d in b.get("dependencies") or []:
+            if isinstance(d, str) and d.strip():
+                dep_refs.append(d.strip())
+
+    stale: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for ref in dep_refs:
+        # Only dependencies satisfied by reaching the terminal verified/
+        # queue carry merged runtime code worth a staleness check.
+        if not ref.startswith("verified/"):
+            continue
+        dep_path = coord / ref
+        if not dep_path.is_file():
+            continue
+        dep_id = Path(ref).stem
+        if dep_id in seen:
+            continue
+        seen.add(dep_id)
+        try:
+            dep_merged = load_task(dep_path)
+        except Exception:
+            continue
+        commit = _verified_dep_commit(dep_merged)
+        if not commit:
+            continue
+        # The commit object must exist in this worktree's repo before an
+        # ancestry test is meaningful; if git can't resolve it, skip.
+        exists = _git_capture(wt, ["cat-file", "-e", f"{commit}^{{commit}}"])
+        if exists is None or exists.returncode != 0:
+            continue
+        anc = _git_capture(
+            wt, ["merge-base", "--is-ancestor", commit, "HEAD"])
+        if anc is None:
+            continue
+        if anc.returncode == 1:          # commit is NOT an ancestor → stale
+            stale.append((dep_id, commit))
+        # returncode 0 → present (ok); any other code → indeterminate, skip
+    return stale
+
+
 def deploy_lease(coord: Path, *, lease_id: str | None = None,
                  ansible_playbook: str | None = None,
                  timeout_seconds: float | None = None) -> tuple[int, str]:
@@ -727,6 +850,47 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
         cap.update(active)
 
     ss.update_stand_state(coord, _read)
+
+    # 0388: refuse to deploy a STALE lease worktree — one missing the
+    # verified-dependency code the leasing task was blocked on. Without
+    # this, a resumed review_session redeploys its old base commit and
+    # rediscovers the very wedge whose fix was already verified upstream,
+    # while the stand still reports "ready". Fail fast (before the ansible
+    # run) and surface an actionable stale-deployment reason instead of
+    # declaring the lease ready. RETURN (not raise) so coordd records the
+    # attempt and skips its retry loop — the staleness is deterministic.
+    stale = stale_verified_deps_for_lease(
+        coord, cap.get("task"), cap.get("worktree"))
+    if stale:
+        names = ", ".join(f"{d} (commit {c[:12]})" for d, c in stale)
+        lid = cap.get("lease_id")
+        holder = cap.get("holder_role")
+        task_ref = cap.get("task") or ""
+        reason = (
+            f"STALE DEPLOYMENT refused: lease worktree {cap.get('worktree')} "
+            f"is missing verified dependency code [{names}] that task "
+            f"{task_ref!r} was blocked on. The stand would run code predating "
+            f"the verified fix and rediscover the resolved issue. Recreate the "
+            f"worktree off current main (greatminds worktree remove --force "
+            f"<id>, then re-create / re-lease) so the deployed code includes "
+            f"the verified dependency."
+        )
+
+        def _down_stale(state):
+            prev = state.get("state") or "preparing"
+            state["down_reason"] = reason
+            state["active_lease"] = None
+            ss.record_transition(state, prev, "down", "COORDD",
+                                 lease_id=lid, reason=reason)
+
+        ss.update_stand_state(coord, _down_stale)
+        # Notify the lease holder (so the resumed session sees the block
+        # instead of silently retrying) and PLANNER (who decides whether
+        # to refresh the worktree or keep the session blocked).
+        for tgt in dict.fromkeys(
+                t for t in (holder, "ARCHITECT-PLANNER") if t):
+            _file_inbox_info(coord, tgt, reason, task_ref=task_ref)
+        return DEPLOY_STALE_RC, reason
 
     profile = cap.get("profile")
     # issue #12: resolve the profile from the active lease's WORKTREE first
