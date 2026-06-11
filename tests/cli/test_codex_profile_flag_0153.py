@@ -1,17 +1,22 @@
-"""Regression tests for task 0153: codex-cli 0.130.0 removed
-``--profile-v2``; build_codex_argv must emit ``--profile`` (which has
-been the canonical flag since codex-cli 0.125 and is the only one
-left in 0.130+).
+"""Regression tests for task 0153, SUPERSEDED by task 0390.
 
-The fix was a mechanical rename in commit 7c30289. These tests pin
-the argv shape so a future refactor can't accidentally re-introduce
-the dropped flag.
+0153 pinned that ``build_codex_argv`` emits ``--profile <role>`` (codex-cli
+0.130 dropped the older ``--profile-v2``). 0390 removes ``--profile`` from
+the paned/interactive Codex launch entirely: ``--profile`` only selects a
+``[profiles.<role>]`` section INSIDE a per-role ``CODEX_HOME``, which is
+exactly the per-role-home-as-auth path that wedged the pane at the Codex
+sign-in UI (the host login lives in the SINGLE machine ``CODEX_HOME``).
+Mirroring the 0375 driven model, the role model now rides a
+``-c model="..."`` override read from the per-role config SOURCE, and
+``CODEX_HOME`` points at the machine home.
 
-REVIEWER iter-2 ask: monkeypatch ``Path.home`` so the per-test stub
-``~/.codex/<role>.config.toml`` writes land in ``tmp_path``, NOT the
-real user's home dir. Iter-1 wrote/unlinked under the actual
-``$HOME/.codex/`` which could clobber the operator's codex profile
-configs when the suite runs on a live host.
+These tests therefore pin the POST-0390 argv shape: ``--profile`` (and the
+long-dead ``--profile-v2``) must NEVER appear; the role model rides
+``-c model=`` when the per-role coordination config declares one.
+
+REVIEWER iter-2 ask (still honoured): monkeypatch ``Path.home`` so any
+legacy ``~/.codex`` lookups land in ``tmp_path``, never the operator's
+real home dir.
 """
 from __future__ import annotations
 
@@ -30,35 +35,43 @@ def _disable_yolo(monkeypatch):
 
 @pytest.fixture
 def fake_home(tmp_path, monkeypatch):
-    """0153 iter-2: redirect ``Path.home()`` to a per-test tmp dir.
-
-    ``build_codex_argv`` resolves the profile config via
-    ``Path.home() / '.codex' / f'{role_lower}.config.toml'``. With
-    this fixture every test reads/writes a fully sandboxed
-    ``~/.codex/`` rooted at ``tmp_path``; the real ``$HOME/.codex/``
-    is never touched.
-    """
+    """Redirect ``Path.home()`` to a per-test tmp dir so no test touches
+    the operator's real ``~/.codex/``."""
     monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
     return tmp_path
 
 
-def _seed_profile_toml(home: Path, role_lower: str) -> Path:
-    """Drop a stub config under the fake home dir."""
-    p = home / ".codex" / f"{role_lower}.config.toml"
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text("# stub config for 0153 test\n", encoding="utf-8")
-    return p
+def _registry_under_project(tmp_path: Path) -> Path:
+    """A ``.agent_registry`` dir whose ``.parent.parent`` is the project
+    root — ``build_codex_argv`` derives ``project_dir`` from
+    ``registry_dir.parent.parent`` to find the per-role config SOURCE."""
+    registry = tmp_path / "project" / "coordination" / ".agent_registry"
+    registry.mkdir(parents=True)
+    return registry
 
 
-def test_codex_argv_emits_profile_not_profile_v2(tmp_path, monkeypatch, fake_home):
-    """0153 contract: ``--profile <role>`` is emitted, not the dropped
-    ``--profile-v2``. Pre-fix the latter would produce ``error:
-    unexpected argument '--profile-v2' found`` from codex-cli 0.130+
-    and stall every fresh start-agent."""
+def _seed_role_model(registry: Path, role_lower: str, model: str) -> Path:
+    """Per-role config SOURCE under ``coordination/.codex-home/<role>`` —
+    declares ``model`` (no auth.json). ``build_codex_argv`` reads this to
+    compose the ``-c model="..."`` override (post-0390)."""
+    project = registry.parent.parent
+    home = project / "coordination" / ".codex-home" / role_lower
+    home.mkdir(parents=True, exist_ok=True)
+    (home / "config.toml").write_text(
+        f'developer_instructions = "ok"\nmodel = "{model}"\n'
+        f'\n[profiles.{role_lower}]\nmodel = "{model}"\n',
+        encoding="utf-8",
+    )
+    return home
+
+
+def test_codex_argv_emits_c_model_not_profile(tmp_path, monkeypatch, fake_home):
+    """Post-0390 contract: the paned argv carries ``-c model="..."`` and
+    NEVER ``--profile`` / ``--profile-v2`` (both select config inside a
+    per-role CODEX_HOME — the per-role-auth path 0390 removes)."""
     monkeypatch.setattr(sa_mod, "discover_codex_session", lambda role, **_kw: "")
-    registry = tmp_path / "registry"
-    registry.mkdir()
-    _seed_profile_toml(fake_home, "developer")
+    registry = _registry_under_project(tmp_path)
+    _seed_role_model(registry, "developer", "gpt-5-codex")
 
     argv = sa_mod.build_codex_argv(
         role="DEVELOPER",
@@ -68,22 +81,18 @@ def test_codex_argv_emits_profile_not_profile_v2(tmp_path, monkeypatch, fake_hom
         prompt="bootstrap prompt",
     )
 
-    assert "--profile" in argv, f"argv must contain --profile; argv={argv}"
-    assert "--profile-v2" not in argv, (
-        "0153 regression: --profile-v2 was removed by codex-cli 0.130 "
-        f"and stalls every fresh launch on current upstream. argv={argv}"
-    )
+    assert "--profile" not in argv, f"0390 removed --profile; argv={argv}"
+    assert "--profile-v2" not in argv, f"argv={argv}"
+    assert "-c" in argv, f"argv must carry the -c model override; argv={argv}"
+    assert 'model="gpt-5-codex"' in argv, f"argv={argv}"
 
 
-def test_codex_argv_profile_followed_by_role_lower(tmp_path, monkeypatch, fake_home):
-    """The flag value is the lowercased role name (``architect-reviewer``
-    not ``ARCHITECT-REVIEWER``). codex looks up
-    ``~/.codex/<role-lower>.config.toml`` by that name; uppercase
-    would fail the file lookup."""
+def test_codex_argv_c_model_value_is_role_model(tmp_path, monkeypatch, fake_home):
+    """The ``-c`` override value is the role's configured model, read from
+    the per-role config SOURCE (lowercased role dir)."""
     monkeypatch.setattr(sa_mod, "discover_codex_session", lambda role, **_kw: "")
-    registry = tmp_path / "registry"
-    registry.mkdir()
-    _seed_profile_toml(fake_home, "architect-reviewer")
+    registry = _registry_under_project(tmp_path)
+    _seed_role_model(registry, "architect-reviewer", "gpt-5")
 
     argv = sa_mod.build_codex_argv(
         role="ARCHITECT-REVIEWER",
@@ -93,21 +102,18 @@ def test_codex_argv_profile_followed_by_role_lower(tmp_path, monkeypatch, fake_h
         prompt="bootstrap",
     )
 
-    i = argv.index("--profile")
-    assert argv[i + 1] == "architect-reviewer"
+    i = argv.index("-c")
+    assert argv[i + 1] == 'model="gpt-5"'
+    assert "--profile" not in argv
 
 
-def test_codex_argv_no_profile_when_no_config_toml(tmp_path, monkeypatch, fake_home):
-    """Negative pin: if ~/.codex/<role>.config.toml is absent, neither
-    --profile nor --profile-v2 is emitted (codex would error on either
-    pointing at a missing file). This is the existing 0043 contract;
-    pin it again so a 0153-style 'rename --profile-v2 to --profile'
-    refactor can't accidentally start emitting --profile unconditionally.
-    """
+def test_codex_argv_no_model_override_when_no_config(tmp_path, monkeypatch, fake_home):
+    """Negative pin: with no per-role config SOURCE declaring a model,
+    neither ``-c model=`` nor ``--profile``/``--profile-v2`` is emitted —
+    codex falls back to its own default model."""
     monkeypatch.setattr(sa_mod, "discover_codex_session", lambda role, **_kw: "")
-    registry = tmp_path / "registry"
-    registry.mkdir()
-    # No stub seeded in fake_home → file genuinely absent.
+    registry = _registry_under_project(tmp_path)
+    # No per-role config seeded → no model declared.
 
     argv = sa_mod.build_codex_argv(
         role="NONEXISTENT-ROLE-0153-TEST",
@@ -119,19 +125,19 @@ def test_codex_argv_no_profile_when_no_config_toml(tmp_path, monkeypatch, fake_h
 
     assert "--profile" not in argv
     assert "--profile-v2" not in argv
+    assert 'model="' not in " ".join(argv)
 
 
-def test_codex_argv_profile_appears_in_resume_branch_too(tmp_path, monkeypatch, fake_home):
-    """When a codex rollout exists (resume branch), the profile flag
-    is still --profile, not --profile-v2. The resume vs fresh branch
-    doesn't change the flag name."""
-    registry = tmp_path / "registry"
-    registry.mkdir()
+def test_codex_argv_c_model_appears_in_resume_branch_too(tmp_path, monkeypatch, fake_home):
+    """When a codex rollout exists (resume branch), the model still rides
+    ``-c model=`` and ``--profile`` is still absent — the resume vs fresh
+    branch doesn't change the auth/model mechanism."""
+    registry = _registry_under_project(tmp_path)
     # Seed an existing rollout id (resume branch).
     (registry / "developer.codex-session-id").write_text(
         "deadbeef-1111-2222-3333-444444444444\n", encoding="utf-8",
     )
-    _seed_profile_toml(fake_home, "developer")
+    _seed_role_model(registry, "developer", "gpt-5-codex")
 
     argv = sa_mod.build_codex_argv(
         role="DEVELOPER",
@@ -142,8 +148,9 @@ def test_codex_argv_profile_appears_in_resume_branch_too(tmp_path, monkeypatch, 
     )
 
     assert "resume" in argv  # we're on the resume branch
-    assert "--profile" in argv
+    assert "--profile" not in argv
     assert "--profile-v2" not in argv
+    assert 'model="gpt-5-codex"' in argv
 
 
 # ---------- source-tree scan: no stale references ----------
