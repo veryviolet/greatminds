@@ -1091,6 +1091,82 @@ def _prune_turn_logs(coord: Path, keep_per_role: int = TURN_LOG_KEEP_PER_ROLE,
     return removed
 
 
+def _finalize_driven_turn(
+    coord: Path, role_lower: str, lock: Path, klass: str, detail: str,
+    verbose: bool, *,
+    record: "callable | None" = None,
+    refire: "callable | None" = None,
+) -> None:
+    """0391: release the driven run-lock and run all post-turn bookkeeping
+    so NO single failure can (a) leave ``driven-<role>.lock`` behind for the
+    next dispatch / hang-sweep to mistake as a live turn, or (b) skip the
+    retry/outcome note that keeps a failed turn's backlog recoverable.
+
+    Every driven-turn exit path funnels through here: clean success, a
+    SIGTERM/rc=143 kill, ``subprocess.TimeoutExpired``, and an exception
+    raised while recording the outcome. The observed 0391 strand was a
+    DEVELOPER turn that timed out / was SIGTERM-killed yet left the run-lock
+    behind with no live subprocess, so the backlog was hidden forever.
+
+    Step order + INDEPENDENT guards (a raise in one step must not skip the
+    rest — earlier code chained these unguarded, so a registry write failing
+    on a full disk skipped ``_note_turn_outcome`` and the retry was never
+    scheduled):
+      1. unlink the run-lock FIRST + unconditionally (issue #11 + 0391).
+      2. ``record`` (registry turn record; claude path only) — guarded.
+      3. enrich the failure detail — guarded, so a raise here cannot skip…
+      4. …``_note_turn_outcome`` (schedules retry/backoff or escalates) —
+         guarded; this is the recoverability-critical step.
+      5. pending re-fire ONLY on a clean turn (``klass == 'ok'``); a failed
+         turn is re-dispatched by the retry scheduler (no double-spawn).
+    """
+    # 1. Lock first, unconditionally. A turn that exited (however it exited)
+    #    must never leave the lock for the next dispatch to read as live.
+    try:
+        lock.unlink()
+    except OSError:
+        pass
+    # 2. Registry turn record (claude path supplies this; codex records its
+    #    thread inside the turn). Guarded — a registry write failure must not
+    #    skip the retry note below.
+    if record is not None:
+        try:
+            record()
+        except Exception as exc:  # noqa: BLE001 — bookkeeping, never crash
+            if verbose:
+                print(f"  0391: {role_lower} turn-record bookkeeping failed: "
+                      f"{exc}", file=sys.stderr)
+    # 3. Enrich the failure detail — guarded so a raise can't skip the note.
+    try:
+        detail = _enrich_failure_detail(detail, coord)
+    except Exception as exc:  # noqa: BLE001
+        if verbose:
+            print(f"  0391: {role_lower} failure-detail enrich failed: "
+                  f"{exc}", file=sys.stderr)
+    # 4. Outcome / retry scheduling — the step that keeps a failed turn
+    #    recoverable. Guarded so even an unexpected raise here is contained.
+    try:
+        _note_turn_outcome(coord, role_lower, klass, detail, verbose)
+    except Exception as exc:  # noqa: BLE001
+        if verbose:
+            print(f"  0391: {role_lower} outcome/retry note failed: "
+                  f"{exc}", file=sys.stderr)
+    # 5. Pending re-fire only on a clean turn.
+    pend = _driven_pending_path(coord, role_lower)
+    if pend.exists():
+        try:
+            pend.unlink()
+        except OSError:
+            pass
+        if klass == "ok" and refire is not None:
+            try:
+                refire()
+            except Exception as exc:  # noqa: BLE001
+                if verbose:
+                    print(f"  0391: {role_lower} pending re-fire failed: "
+                          f"{exc}", file=sys.stderr)
+
+
 def _spawn_driven_turn(
     coord: Path,
     role_lower: str,
@@ -1219,34 +1295,23 @@ def _spawn_driven_turn(
                 print(f"  driven claude turn for {role_lower} failed: "
                       f"{exc}", file=sys.stderr)
         finally:
-            # Release the run-lock FIRST and unconditionally. Anything below
-            # (_record_driven_turn writing the registry, _note_turn_outcome)
-            # can raise on I/O, and a throw there used to skip the unlink —
-            # leaving an orphan lock that coordd's reconcile then treats as a
-            # live turn (so the role never re-drives) and the hang detector
-            # flags as hung. The lock MUST always go on turn exit. (issue #11)
-            try:
-                lock.unlink()
-            except OSError:
-                pass
-            _record_driven_turn(coord / REGISTRY_DIR, role_lower,
-                                reset=reset, new_session_id=new_sid)
-            detail = _enrich_failure_detail(detail, coord)
-            _note_turn_outcome(coord, role_lower, klass, detail, verbose)
-            # Re-fire a mid-turn event ONLY on success; a failed turn is
-            # re-dispatched by the retry scheduler (avoid double-spawn).
-            pend = _driven_pending_path(coord, role_lower)
-            if pend.exists():
-                try:
-                    pend.unlink()
-                except OSError:
-                    pass
-                if klass == "ok":
-                    _spawn_driven_turn(
-                        coord, role_lower, (new_sid or session_id),
-                        pane, session_name, bootstrap_file, verbose,
-                        reg=read_registry(coord / REGISTRY_DIR, role_lower),
-                    )
+            # 0391: every exit path (success, rc=143/SIGTERM, TimeoutExpired,
+            # or a raise while recording the outcome) funnels through
+            # _finalize_driven_turn, which releases the run-lock FIRST +
+            # unconditionally (issue #11) and then runs each bookkeeping step
+            # under its OWN guard — so a registry/I-O failure can no longer
+            # skip _note_turn_outcome (the retry scheduling that keeps a
+            # failed turn's backlog recoverable) or strand an orphan lock.
+            _finalize_driven_turn(
+                coord, role_lower, lock, klass, detail, verbose,
+                record=lambda: _record_driven_turn(
+                    coord / REGISTRY_DIR, role_lower,
+                    reset=reset, new_session_id=new_sid),
+                refire=lambda: _spawn_driven_turn(
+                    coord, role_lower, (new_sid or session_id),
+                    pane, session_name, bootstrap_file, verbose,
+                    reg=read_registry(coord / REGISTRY_DIR, role_lower)),
+            )
 
     import threading
     threading.Thread(target=_worker, daemon=True,
@@ -1919,25 +1984,16 @@ def _spawn_driven_codex_turn(
                     file=sys.stderr,
                 )
         finally:
-            try:
-                lock.unlink()
-            except OSError:
-                pass
-            detail = _enrich_failure_detail(detail, coord)
-            _note_turn_outcome(coord, role_lower, klass, detail, verbose)
-            # Re-fire a mid-turn event ONLY on success; a failed turn is
-            # re-dispatched by the retry scheduler (avoid double-spawn).
-            pend = _driven_pending_path(coord, role_lower)
-            if pend.exists():
-                try:
-                    pend.unlink()
-                except OSError:
-                    pass
-                if klass == "ok":
-                    _spawn_driven_codex_turn(
-                        coord, role_lower, base_instructions, cwd, verbose,
-                        reg=read_registry(coord / REGISTRY_DIR, role_lower),
-                    )
+            # 0391: same exit-path hardening as the claude driver — the
+            # lock is released first/unconditionally and each bookkeeping
+            # step is independently guarded (codex records its thread inside
+            # the turn, so no ``record`` callback here).
+            _finalize_driven_turn(
+                coord, role_lower, lock, klass, detail, verbose,
+                refire=lambda: _spawn_driven_codex_turn(
+                    coord, role_lower, base_instructions, cwd, verbose,
+                    reg=read_registry(coord / REGISTRY_DIR, role_lower)),
+            )
 
     if not run_async:
         _worker()
@@ -3278,6 +3334,22 @@ def coordd(project_dir: Path | None, project_name: str | None,
                             # report already told MAINTAINER earlier.
                             try:
                                 lk.unlink()
+                            except OSError:
+                                pass
+                            # 0391 diagnostic: "stale lock cleared" must be an
+                            # operator-visible artifact, not just verbose
+                            # stderr — write a turn-log record so the reclaim
+                            # is distinguishable from a live/timed-out turn.
+                            try:
+                                _turn_log_path(coord, role_lower).write_text(
+                                    f"=== RUN-LOCK ORPHAN RECLAIMED ===\n"
+                                    f"driven-{role_lower}.lock was held "
+                                    f"{lock_age:.0f}s (past kill bound "
+                                    f"{driven_hang_threshold:.0f}s + grace "
+                                    f"{ORPHAN_RECLAIM_GRACE_SEC:.0f}s) with no "
+                                    f"live subprocess → coordd unlinked it so "
+                                    f"{role_lower.upper()} can re-drive.\n",
+                                    encoding="utf-8")
                             except OSError:
                                 pass
                             last_hang_report.pop(role_lower, None)
