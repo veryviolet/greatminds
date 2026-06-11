@@ -1351,31 +1351,27 @@ def _check_all_dependencies_exist(data: dict[str, Any],
             + (" …" if len(missing) > 3 else "")
             + ". Run `greatminds wake-check` for the full picture."
         )
-    # 0388: deps satisfied, but if the task's objective declares
+    # 0388/0389: deps satisfied, but if the task's objective declares
     # `requires_live_roles`, a resume against a wedged runtime role (alive
     # pid stuck at a codex auth / login-timeout / trust prompt per 0387)
-    # would just rediscover the same wedge. Hold the resume until the
-    # required role is usable. Opt-in + fail-open: tasks without the field
-    # are unaffected, and any inspection error never blocks the mv.
+    # would just rediscover the same wedge. 0389: those roles are evaluated
+    # in the task's declared `requires_live_roles_context` (a remote stand's
+    # coordination project) when present, else locally — so a healthy LOCAL
+    # role can't unblock a remote-targeted campaign, and a declared-but-
+    # unreachable target holds conservatively. Opt-in + fail-open: tasks
+    # without the field are unaffected, and any inspection error never
+    # blocks the mv.
     try:
         from greatminds.cli.agent import (
-            required_live_roles, wedged_required_roles,
+            held_live_roles, describe_live_role_hold,
         )
-        roles = required_live_roles(data, blockeds[-1])
-        if roles:
-            wedged = wedged_required_roles(coord, roles)
-            if wedged:
-                detail = ", ".join(f"{r} ({s})" for r, s in wedged)
-                return (
-                    "all_dependencies_exist_per_wake_check: required live "
-                    f"role(s) wedged: {detail}. The task's "
-                    "`requires_live_roles` objective needs a usable agent, "
-                    "but it is alive-but-stuck at a pre-agent / auth prompt "
-                    "(0387). Re-auth / restart the role (or fix the stale "
-                    "deploy), confirm `greatminds agent status` shows it "
-                    "usable, then resume. Run `greatminds wake-check` for "
-                    "the full picture."
-                )
+        hold = held_live_roles(coord, data, blockeds[-1])
+        if hold.held:
+            return (
+                "all_dependencies_exist_per_wake_check: "
+                + describe_live_role_hold(hold)
+                + " Run `greatminds wake-check` for the full picture."
+            )
     except GreatMindsError:
         raise
     except Exception:

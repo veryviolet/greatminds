@@ -316,20 +316,24 @@ def wake_check(project_dir: Path | None, canon_dir: Path | None, quiet: bool) ->
     # unblock them (the resume validator enforces the same gate at mv).
     # Conservative + fail-open: tasks without the field, and any inspection
     # error, leave readiness unchanged.
-    held: list[tuple[str, list[tuple[str, str]]]] = []
+    # 0389: the required roles are evaluated against the task's declared
+    # `requires_live_roles_context` (a remote stand's coordination project)
+    # when present, else locally — so a healthy LOCAL role can't falsely
+    # mark a remote-targeted campaign READY, and a declared-but-unreachable
+    # target holds conservatively instead of reading READY.
+    held: list[tuple[str, str]] = []
     if ready:
         try:
             from greatminds.cli.agent import (
-                required_live_roles, wedged_required_roles,
+                held_live_roles, describe_live_role_hold,
             )
             still_ready: list[tuple[str, str]] = []
             for tid, resume_to in ready:
                 meta = blocked_meta.get(tid, {})
-                roles = required_live_roles(
-                    meta.get("header") or {}, meta.get("blocked"))
-                wedged = wedged_required_roles(coord, roles) if roles else []
-                if wedged:
-                    held.append((tid, wedged))
+                hold = held_live_roles(
+                    coord, meta.get("header") or {}, meta.get("blocked"))
+                if hold.held:
+                    held.append((tid, describe_live_role_hold(hold)))
                 else:
                     still_ready.append((tid, resume_to))
             ready = still_ready
@@ -348,11 +352,10 @@ def wake_check(project_dir: Path | None, canon_dir: Path | None, quiet: bool) ->
 
     if held:
         findings += len(held)
-        warn(f"HELD — deps satisfied but required role(s) wedged ({len(held)}):")
-        for tid, wedged in held:
-            detail = ", ".join(f"{r} ({s})" for r, s in wedged)
-            warn(f"  {tid}: {detail} — re-auth/restart the role (or fix the "
-                 f"stale deploy) before resume; `greatminds agent status`")
+        warn(f"HELD — deps satisfied but required live role(s) "
+             f"unavailable ({len(held)}):")
+        for tid, reason in held:
+            warn(f"  {tid}: {reason}")
         click.echo()
 
     if not_ready and not quiet:

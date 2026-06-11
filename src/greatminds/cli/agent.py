@@ -39,7 +39,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import click
 
@@ -304,6 +304,139 @@ def wedged_required_roles(coord: Path, roles: "list[str]",
             wedged.append((rec.get("role") or role,
                            str(rec.get("pane_state"))))
     return wedged
+
+
+# ---------------------------------------------------------------------------
+# 0389: evaluate required-live-roles against a REMOTE target context.
+#
+# 0388 holds a resume while a required role is wedged, but it always
+# inspects the LOCAL coordination project. A review_session whose objective
+# targets a remote stand (e.g. avatar /srv/greatminds-stand) was therefore
+# falsely READY whenever the LOCAL role happened to be healthy — the remote
+# planner that actually drives the campaign could still be auth-wedged.
+#
+# These helpers let a blocked task opt into checking its required roles in a
+# DECLARED target context (`requires_live_roles_context`, a coordination dir
+# or a project dir). Opt-in (absent field → unchanged local behaviour) and,
+# for an explicitly-declared-but-unreachable target, CONSERVATIVE: the task
+# holds with an actionable reason rather than silently reading READY.
+# ---------------------------------------------------------------------------
+
+
+class LiveRoleHold(NamedTuple):
+    """Outcome of the required-live-roles resume gate for one task.
+
+    ``held`` is True when the resume / wake must be withheld — either a
+    required role is DEFINITIVELY wedged (``wedged`` non-empty) or a
+    DECLARED remote target context could not be resolved
+    (``context_error`` set, the conservative 0389 branch)."""
+
+    wedged: "list[tuple[str, str]]"   # (role, pane_state) per wedged role
+    context: "str | None"             # declared target context, if any
+    context_error: "str | None"       # set iff a declared context is unreachable
+
+    @property
+    def held(self) -> bool:
+        return bool(self.wedged) or self.context_error is not None
+
+
+def required_live_roles_context(header: dict[str, Any],
+                                blocked_block: "dict[str, Any] | None"
+                                ) -> "str | None":
+    """0389: opt-in target context where required live roles must be
+    evaluated — a coordination dir or a project dir path.
+
+    Read from the latest blocked block (override) else the task header.
+    Absent / non-str / blank → None, meaning «evaluate locally» (the 0388
+    behaviour, unchanged). Lets a review_session whose objective targets a
+    REMOTE stand require its live roles to be checked against THAT stand's
+    coordination project, so a healthy LOCAL role can't falsely unblock a
+    remote-targeted campaign."""
+    val: Any = None
+    if (blocked_block is not None
+            and blocked_block.get("requires_live_roles_context") is not None):
+        val = blocked_block.get("requires_live_roles_context")
+    elif header.get("requires_live_roles_context") is not None:
+        val = header.get("requires_live_roles_context")
+    if not isinstance(val, str):
+        return None
+    val = val.strip()
+    return val or None
+
+
+def resolve_live_roles_coord(context: "str | None", local_coord: Path
+                             ) -> "tuple[Path | None, str | None]":
+    """0389: resolve a declared ``requires_live_roles_context`` to the
+    coordination dir whose agents must be inspected.
+
+    Returns ``(coord, error)``:
+      * context None        → ``(local_coord, None)`` — local behaviour.
+      * context resolvable  → ``(<target coord>, None)``. Accepts either a
+        coordination dir directly or a project dir that contains
+        ``coordination/``; an existing dir without a registry yet still
+        resolves (its agents simply read as not-registered).
+      * context unreachable → ``(None, <reason>)``. DELIBERATELY NOT
+        fail-open: a task that explicitly names a remote target whose
+        coordination project can't be found must HOLD with an actionable
+        message, never silently resume against nothing (an unreachable
+        avatar must not read READY)."""
+    if context is None:
+        return local_coord, None
+    p = Path(context).expanduser()
+    # A project dir (``…/<stand>``) resolves to its ``coordination/`` child;
+    # a coordination dir resolves to itself. Check the project-dir form first
+    # so ``/srv/greatminds-stand`` lands on ``/srv/greatminds-stand/
+    # coordination`` rather than the bare project root.
+    if (p / "coordination").is_dir():
+        return p / "coordination", None
+    if p.is_dir():
+        return p, None
+    return None, (
+        f"target context {context!r} not found / unreachable (looked for "
+        f"{p / 'coordination'}/ and {p}/). Deploy / fix the target stand, "
+        f"confirm its coordination project exists, then retry the resume.")
+
+
+def held_live_roles(local_coord: Path, header: dict[str, Any],
+                    blocked_block: "dict[str, Any] | None",
+                    *, pane_texts: "dict[str, Any] | None" = None
+                    ) -> LiveRoleHold:
+    """0389: single entry point for the required-live-roles resume gate,
+    shared by wake-check (advisory) and the feature_blocked → resume
+    validator (enforcing).
+
+    Resolves the (optional) remote target context, then evaluates the
+    declared ``requires_live_roles`` against that context. No declared roles
+    → never held (opt-in). A declared role list with no context → evaluated
+    against ``local_coord`` (the 0388 behaviour)."""
+    roles = required_live_roles(header, blocked_block)
+    if not roles:
+        return LiveRoleHold([], None, None)
+    context = required_live_roles_context(header, blocked_block)
+    target_coord, ctx_err = resolve_live_roles_coord(context, local_coord)
+    if ctx_err is not None:
+        return LiveRoleHold([], context, ctx_err)
+    assert target_coord is not None  # ctx_err is None ⇒ coord resolved
+    wedged = wedged_required_roles(target_coord, roles, pane_texts=pane_texts)
+    return LiveRoleHold(wedged, context, None)
+
+
+def describe_live_role_hold(hold: LiveRoleHold) -> str:
+    """Actionable one-line reason for a held resume / wake. Names the target
+    context, the role(s), and the observed wedge state (0389: the hold
+    message must name target context + role + observed pane/auth state)."""
+    if hold.context_error is not None:
+        return hold.context_error
+    detail = ", ".join(f"{r} ({s})" for r, s in hold.wedged)
+    where = f" in target context {hold.context}" if hold.context else ""
+    status_hint = (f"`greatminds agent status` (run it in {hold.context})"
+                   if hold.context else "`greatminds agent status`")
+    return (
+        f"required live role(s) wedged{where}: {detail}. The task's "
+        "`requires_live_roles` objective needs a usable agent, but it is "
+        "alive-but-stuck at a pre-agent / auth prompt (0387). Re-auth / "
+        "restart the role (or fix the stale deploy), confirm "
+        f"{status_hint} shows it usable, then resume.")
 
 
 def _registered_roles(coord: Path) -> list[str]:
