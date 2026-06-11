@@ -135,6 +135,34 @@ def watchdog(project_dir: Path | None, canon_dir: Path | None, quiet: bool) -> N
     elif not quiet:
         info("agent pids: all alive")
 
+    # ---- 0387: wedged agents (alive pid but stuck at a pre-agent /
+    # auth prompt — codex sign-in / "Login timed out" / folder-trust).
+    # These pass the dead-pid scan (pid alive, input_sock present) yet
+    # silently ignore every queued wake, so a user_feedback task can
+    # sit untriaged forever while status reads "alive". Surface them in
+    # the operator's recovery sweep so the auth wedge is unambiguous.
+    wedged: list[tuple[str, str]] = []
+    if registry_dir.is_dir():
+        from greatminds.cli.agent import (
+            collect_agent_status, _PANE_WEDGE_STATES,
+        )
+        for f in sorted(registry_dir.glob("*.json")):
+            try:
+                rec = collect_agent_status(coord, f.stem)
+            except Exception:
+                continue
+            if rec.get("alive") and rec.get("pane_state") in _PANE_WEDGE_STATES:
+                wedged.append((rec["role"], rec["pane_state"]))
+    if wedged:
+        findings += len(wedged)
+        warn(f"WEDGED AGENTS ({len(wedged)}):")
+        for role, state in wedged:
+            warn(f"  {role}: alive but {state} — pane at pre-agent prompt "
+                 f"(reauth / restart needed; queued wakes are ignored)")
+        click.echo()
+    elif not quiet:
+        info("agent panes: 0 wedged")
+
     # ---- Stale tasks per queue
     active_threshold = thresholds["task_stale_in_active_queue_seconds"]
     review_threshold = thresholds["task_stale_in_review_queue_seconds"]
