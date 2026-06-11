@@ -46,6 +46,8 @@ from pathlib import Path
 
 import click
 
+from greatminds.cli import codex_auth
+
 try:
     import yaml
 except ImportError:
@@ -1359,14 +1361,12 @@ def _machine_codex_home() -> str:
          ``coordination/.codex-home/<role>`` home (a real machine home
          the daemon was launched with).
       3. ``~/.codex`` (codex's default).
+
+    0390: delegates to :func:`greatminds.cli.codex_auth.machine_codex_home`
+    — the single shared resolver so the driven (coordd) and paned
+    (start_agent) Codex paths cannot drift on auth-home selection.
     """
-    override = os.environ.get("GREATMINDS_CODEX_HOME")
-    if override:
-        return override
-    inherited = os.environ.get("CODEX_HOME")
-    if inherited and ".codex-home" not in inherited:
-        return inherited
-    return os.path.expanduser("~/.codex")
+    return codex_auth.machine_codex_home()
 
 
 def _codex_role_model(coord: Path | None, role_lower: str | None) -> str | None:
@@ -1379,19 +1379,16 @@ def _codex_role_model(coord: Path | None, role_lower: str | None) -> str | None:
     and inject it via a ``-c model=`` argv override, so a driven turn
     keeps its role model while authenticating against the single machine
     login. Returns ``None`` when no model is declared (codex uses its own
-    default)."""
+    default).
+
+    0390: the per-role config read delegates to
+    :func:`greatminds.cli.codex_auth.read_role_codex_model` — the single
+    shared reader so driven and paned Codex stay aligned on model
+    selection."""
     if not coord or not role_lower:
         return None
     home = coord / ".codex-home" / role_lower
-    for name in (f"{role_lower}.config.toml", "config.toml"):
-        try:
-            text = (home / name).read_text(encoding="utf-8")
-        except OSError:
-            continue
-        m = re.search(r'^\s*model\s*=\s*"([^"]+)"', text, re.M)
-        if m:
-            return m.group(1)
-    return None
+    return codex_auth.read_role_codex_model(home, role_lower)
 
 
 def _codex_appserver_env(role_lower: str | None = None,

@@ -101,17 +101,20 @@ def test_codex_home_unset_when_per_role_home_missing(tmp_path: Path, fake_home) 
 # ---------- end-to-end via the click command in dry-run ----------
 
 
-def test_dry_run_emits_profile_flag_for_codex(tmp_path: Path,
-                                              monkeypatch, fake_home) -> None:
-    """The argv composed for codex must still carry ``--profile
-    <role-lower>`` (0153's invariant). 0158 doesn't change the flag,
-    only the file codex reads to satisfy it."""
+def test_dry_run_codex_uses_c_model_not_profile(tmp_path: Path,
+                                                monkeypatch, fake_home) -> None:
+    """0390 supersedes 0158/0153's ``--profile`` invariant: ``--profile``
+    only selects config INSIDE a per-role CODEX_HOME, which is exactly the
+    per-role-auth path that wedged the paned pane at the Codex sign-in UI.
+    The role model now rides a ``-c model="..."`` override and CODEX_HOME
+    points at the SINGLE machine home — so the dry-run argv must carry
+    ``-c model="gpt-5"`` and must NOT carry ``--profile``."""
     project = tmp_path / "project"
     project.mkdir()
     _seed_codex_home(project, "architect-reviewer")
     # start_agent reads project_dir from ``GREATMINDS_PROJECT_DIR`` env
-    # var or cwd; there's no --project-dir flag. Set the env so
-    # build_codex_argv's per-role-home check resolves to the seeded path.
+    # var or cwd; there's no --project-dir flag. Set the env so the
+    # per-role config SOURCE (model) resolves to the seeded path.
     monkeypatch.setenv("GREATMINDS_PROJECT_DIR", str(project))
     monkeypatch.chdir(project)
 
@@ -121,9 +124,10 @@ def test_dry_run_emits_profile_flag_for_codex(tmp_path: Path,
         ["ARCHITECT-REVIEWER", "codex", "--mode", "loop", "--dry-run"],
         catch_exceptions=False,
     )
-    if "--profile" not in result.output:
-        pytest.fail(f"dry-run output missing --profile flag:\n{result.output}")
-    assert "architect-reviewer" in result.output
+    assert "--profile" not in result.output, (
+        f"0390 removed --profile (per-role-auth path); output:\n{result.output}")
+    assert 'model="gpt-5"' in result.output, (
+        f"role model must ride a -c model= override:\n{result.output}")
 
 
 # ---------- legacy fallback + deprecation hint ----------
