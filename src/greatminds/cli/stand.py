@@ -440,10 +440,21 @@ def stand_lease(task_id: str, worktree: "str | None", profile: str,
                 lease_id=new_lease_id,
                 reason=f"lease for {task_id} ({profile})",
             )
-        elif state.get("state") in ("preparing", "ready", "down"):
+        elif state.get("state") in ("preparing", "ready"):
             queue = state.get("queue") or []
             queue.append(lease_obj)
             state["queue"] = queue
+        elif state.get("state") == "down":
+            reason = state.get("down_reason") or "unknown reason"
+            raise GreatMindsError(
+                "stand lease refused: singleton stand is down; no lease "
+                "was queued. Current down_reason: "
+                f"{reason}. Recover the stand first (for stale deployment "
+                "recovery: run the command named in down_reason, then "
+                "`greatminds stand up --reason <recovered>` and re-run "
+                "the lease).",
+                exit_code=2,
+            )
 
     ss.update_stand_state(coord, mutator)
     click.echo(f"lease_id: {new_lease_id}")
@@ -870,10 +881,14 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
             f"STALE DEPLOYMENT refused: lease worktree {cap.get('worktree')} "
             f"is missing verified dependency code [{names}] that task "
             f"{task_ref!r} was blocked on. The stand would run code predating "
-            f"the verified fix and rediscover the resolved issue. Recreate the "
-            f"worktree off current main (greatminds worktree remove --force "
-            f"<id>, then re-create / re-lease) so the deployed code includes "
-            f"the verified dependency."
+            f"the verified fix and rediscover the resolved issue. Refresh the "
+            f"worktree off current main with exactly: "
+            f"`greatminds worktree remove --force <id>` then "
+            f"`greatminds worktree create <id>`; then mark the stand recovered "
+            f"with `greatminds stand up --reason stale-worktree-refreshed` and "
+            f"re-run the lease. `worktree create` refreshes stale "
+            f"review-session branches so the deployed code includes the "
+            f"verified dependency."
         )
 
         def _down_stale(state):

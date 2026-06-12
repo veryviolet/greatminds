@@ -23,6 +23,7 @@ from pathlib import Path
 import yaml
 
 from greatminds.cli import stand as stand_mod
+from greatminds.cli import stand_state as ss
 from greatminds.cli.coordd import REGISTRY_DIR
 
 
@@ -188,3 +189,44 @@ def test_latest_review_commit_wins(tmp_path):
     _leasing_task(coord, "0379-campaign", ["verified/0387-fix.yaml"])
     assert stand_mod.stale_verified_deps_for_lease(
         coord, "0379-campaign", str(wt)) == [("0387-fix", commit_b)]
+
+
+def test_stale_deploy_message_names_truthful_refresh_path(
+        tmp_path, monkeypatch):
+    """0393: STALE DEPLOYMENT down_reason must name the sanctioned
+    command sequence that refreshes review-session branches."""
+    coord = _coord(tmp_path)
+    sent: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        stand_mod, "stale_verified_deps_for_lease",
+        lambda _coord, _task, _worktree: [("0390-auth", "7e976fbd7864")],
+    )
+    monkeypatch.setattr(
+        stand_mod, "_file_inbox_info",
+        lambda coord_, to_role, body, task_ref="": sent.append(
+            (to_role, body, task_ref)
+        ),
+    )
+    ss.update_stand_state(coord, lambda state: state.update({
+        "state": "preparing",
+        "active_lease": {
+            "lease_id": "lease-1",
+            "task": "0379-campaign",
+            "worktree": "/tmp/proj/.worktrees/0379-campaign",
+            "profile": "full-deploy",
+            "holder_role": "EXPLORER",
+        },
+    }))
+
+    rc, log = stand_mod.deploy_lease(coord, lease_id="lease-1")
+
+    assert rc == stand_mod.DEPLOY_STALE_RC
+    assert "greatminds worktree remove --force <id>" in log
+    assert "greatminds worktree create <id>" in log
+    assert "greatminds stand up --reason stale-worktree-refreshed" in log
+    state = ss.read_stand_state(coord)
+    assert state["state"] == "down"
+    assert state["active_lease"] is None
+    assert "worktree create" in state["down_reason"]
+    assert sent and {row[0] for row in sent} == {
+        "EXPLORER", "ARCHITECT-PLANNER"}

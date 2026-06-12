@@ -179,6 +179,40 @@ def test_lease_on_busy_enqueues(tmp_path, monkeypatch) -> None:
     assert state["queue"][0]["task"] == "0099-b"
 
 
+def test_lease_while_down_rejects_instead_of_queuing(
+        tmp_path, monkeypatch) -> None:
+    """0393: a down singleton cannot accept an opaque pending lease.
+
+    The requester must see the current down_reason and recover the stand
+    first (e.g. refresh stale worktree, then stand up), not enqueue a lease
+    that cannot make progress while the stand remains down.
+    """
+    coord = tmp_path / "coordination"
+    coord.mkdir()
+    wt = tmp_path / ".worktrees" / "0099"
+    wt.mkdir(parents=True)
+    ss.update_stand_state(coord, lambda s: s.update({
+        "state": "down",
+        "down_reason": "STALE DEPLOYMENT refused: refresh worktree",
+        "active_lease": None,
+        "queue": [],
+    }))
+
+    result = _invoke(
+        ["lease", "--task", "0099-b", "--worktree", str(wt),
+         "--profile", "full-deploy"],
+        tmp_path, monkeypatch=monkeypatch,
+    )
+
+    assert result.exit_code != 0
+    out = result.output + (str(result.exception) if result.exception else "")
+    assert "stand is down" in out
+    assert "STALE DEPLOYMENT refused" in out
+    state = ss.read_stand_state(coord)
+    assert state["state"] == "down"
+    assert state["queue"] == []
+
+
 # ---------- stand ready (SK-only) + inbox-info ----------
 
 

@@ -42,6 +42,11 @@ def _git(args: list[str], cwd: Path) -> None:
                    capture_output=True, text=True)
 
 
+def _git_out(args: list[str], cwd: Path) -> str:
+    return subprocess.run(["git", *args], cwd=str(cwd), check=True,
+                          capture_output=True, text=True).stdout.strip()
+
+
 def _git_project(tmp_path: Path) -> Path:
     """A real git repo (one commit on ``main``) with a coordination dir and
     a review_session task — enough for worktree_create to resolve a base."""
@@ -70,6 +75,60 @@ def _git_project(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     return project
+
+
+# ---------- stale branch refresh for review_session leases ----------
+
+
+def test_create_refreshes_stale_review_session_branch_to_current_main(
+        tmp_path: Path) -> None:
+    """0393: remove/create remediation must not reuse a stale
+    review_session branch after dependency fixes land on main."""
+    project = _git_project(tmp_path)
+    old_main = _git_out(["rev-parse", "main"], project)
+    (project / "fix.txt").write_text("verified dependency\n",
+                                     encoding="utf-8")
+    _git(["add", "fix.txt"], project)
+    _git(["commit", "-m", "verified dependency fix"], project)
+    new_main = _git_out(["rev-parse", "main"], project)
+    assert old_main != new_main
+
+    branch = f"task/{REVIEW_TASK}"
+    _git(["branch", branch, old_main], project)
+
+    created = wt_mod.worktree_create(project, REVIEW_TASK)
+    assert created.is_dir()
+    assert _git_out(["rev-parse", branch], project) == new_main
+    assert _git_out(["rev-parse", "HEAD"], created) == new_main
+
+
+def test_create_reuses_existing_product_branch_without_refreshing(
+        tmp_path: Path) -> None:
+    """0393 safety: implementation branches are not silently rewritten."""
+    project = _git_project(tmp_path)
+    task_id = "0393-product-branch"
+    product_q = project / "coordination" / "feature_dev"
+    product_q.mkdir(parents=True, exist_ok=True)
+    (product_q / f"{task_id}.yaml").write_text(
+        yaml.safe_dump({"id": task_id, "stream": "product",
+                        "kind": "bugfix", "scope": "backend"}),
+        encoding="utf-8",
+    )
+    old_main = _git_out(["rev-parse", "main"], project)
+    (project / "later.txt").write_text("later main\n", encoding="utf-8")
+    _git(["add", "later.txt"], project)
+    _git(["commit", "-m", "later main"], project)
+    new_main = _git_out(["rev-parse", "main"], project)
+    assert old_main != new_main
+
+    branch = f"task/{task_id}"
+    _git(["branch", branch, old_main], project)
+
+    created = wt_mod.worktree_create(project, task_id)
+    assert created.is_dir()
+    assert _git_out(["rev-parse", branch], project) == old_main
+    assert _git_out(["rev-parse", "HEAD"], created) == old_main
+    assert _git_out(["rev-parse", "main"], project) == new_main
 
 
 # ---------- _resolve_or_create_lease_worktree ----------
