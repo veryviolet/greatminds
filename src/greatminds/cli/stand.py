@@ -242,6 +242,24 @@ def _holder_role() -> str:
     return role
 
 
+STAND_GLOBAL_CONTROL_ROLES = frozenset({"MAINTAINER"})
+
+
+def _require_stand_global_control_role(command: str) -> str:
+    """0395: down/up are global singleton controls, not probe commands."""
+    role = (os.environ.get("GREATMINDS_ROLE") or "OPERATOR").upper()
+    if role not in STAND_GLOBAL_CONTROL_ROLES:
+        allowed = ", ".join(sorted(STAND_GLOBAL_CONTROL_ROLES))
+        raise GreatMindsError(
+            f"stand {command} is restricted to {allowed}; role {role} "
+            "may not mutate global stand availability. Use lease/release "
+            "for holder-scoped lifecycle actions, or ask MAINTAINER for "
+            "infrastructure recovery.",
+            exit_code=3,
+        )
+    return role
+
+
 def _lease_expired(lease: dict) -> bool:
     """0342: True iff the lease is past ``granted_at + ttl_seconds``.
 
@@ -625,10 +643,10 @@ def stand_reclaim(lease_id: str | None) -> None:
 @click.option("--reason", required=True,
               help="operational reason logged in state file")
 def stand_down(reason: str) -> None:
-    """0244: SK-only. Mark the stand DOWN (failed deploy / infra
-    incident). Halts queue processing until `stand up`."""
+    """0395: MAINTAINER-only. Mark the stand DOWN (failed deploy /
+    infra incident). Halts queue processing until `stand up`."""
     from greatminds.cli import stand_state as ss
-    role = (os.environ.get("GREATMINDS_ROLE") or "OPERATOR").upper()
+    role = _require_stand_global_control_role("down")
     coord = find_coord_dir()
 
     captured: dict[str, Any] = {}
@@ -667,10 +685,10 @@ def stand_down(reason: str) -> None:
 @stand.command(name="up")
 @click.option("--reason", required=True, help="resolution note")
 def stand_up(reason: str) -> None:
-    """0244: SK-only. Transition down→free; resumes queue processing
-    on SK's next tick."""
+    """0395: MAINTAINER-only. Transition down→free; resumes queue processing
+    on coordd's next tick."""
     from greatminds.cli import stand_state as ss
-    role = (os.environ.get("GREATMINDS_ROLE") or "OPERATOR").upper()
+    role = _require_stand_global_control_role("up")
     coord = find_coord_dir()
 
     captured: dict[str, Any] = {}

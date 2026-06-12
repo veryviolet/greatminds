@@ -100,7 +100,7 @@ def test_down_clears_active_lease(
     and tripped up SK's later diagnostics."""
     project = _project(tmp_path, monkeypatch, state="preparing",
                         active_lease=_make_active_lease())
-    monkeypatch.setenv("GREATMINDS_ROLE", "STAND-KEEPER")
+    monkeypatch.setenv("GREATMINDS_ROLE", "MAINTAINER")
     runner = CliRunner()
     result = runner.invoke(stand_mod.stand, [
         "down", "--reason", "deploy failed: ansible exit 3",
@@ -120,7 +120,7 @@ def test_down_clears_active_lease_from_ready(
     lease record should still be cleared."""
     project = _project(tmp_path, monkeypatch, state="ready",
                         active_lease=_make_active_lease())
-    monkeypatch.setenv("GREATMINDS_ROLE", "STAND-KEEPER")
+    monkeypatch.setenv("GREATMINDS_ROLE", "MAINTAINER")
     runner = CliRunner()
     runner.invoke(stand_mod.stand,
                    ["down", "--reason", "post-ready infra incident"])
@@ -142,7 +142,7 @@ def test_up_clears_active_lease(
     # state=down + active_lease populated.
     project = _project(tmp_path, monkeypatch, state="down",
                         active_lease=_make_active_lease())
-    monkeypatch.setenv("GREATMINDS_ROLE", "STAND-KEEPER")
+    monkeypatch.setenv("GREATMINDS_ROLE", "MAINTAINER")
     runner = CliRunner()
     result = runner.invoke(stand_mod.stand, [
         "up", "--reason", "infra fixed",

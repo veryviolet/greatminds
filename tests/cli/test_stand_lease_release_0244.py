@@ -10,8 +10,8 @@ API per PLANNER's corrected amendment (info-1779808442):
         → preparing → ready; inbox-info to holder_role
     greatminds stand release --lease-id <id> --result pass|fail|partial
         → ready → free; SK pops next from queue
-    greatminds stand down --reason <text>  (SK-only)
-    greatminds stand up --reason <text>    (SK-only)
+    greatminds stand down --reason <text>  (MAINTAINER-only)
+    greatminds stand up --reason <text>    (MAINTAINER-only)
 
 No prose channel between requester and SK. Information asymmetry
 prevents SK rubber-stamping by input definition.
@@ -392,28 +392,48 @@ def test_release_queued_lease_is_cancellation(tmp_path,
 # ---------- stand down / up ----------
 
 
-def test_down_any_role_allowed(tmp_path, monkeypatch) -> None:
-    """1.6.0: no SK-only guard — any role may mark the stand down
-    (operator-override; coordd marks down automatically on a failed
-    deploy). The actor is recorded as whoever ran it."""
+def test_down_rejects_non_maintainer_before_state_write(
+        tmp_path, monkeypatch) -> None:
+    """0395: EXPLORER/TESTER/etc. cannot mutate global stand state."""
     coord = tmp_path / "coordination"
     coord.mkdir()
+    before = ss.read_stand_state(coord)
     result = _invoke(["down", "--reason", "deploy failed"],
-                     tmp_path, role="DEVELOPER", monkeypatch=monkeypatch)
-    assert result.exit_code == 0, result.output
-    assert ss.read_stand_state(coord)["state"] == "down"
+                     tmp_path, role="EXPLORER", monkeypatch=monkeypatch)
+    assert result.exit_code != 0
+    out = result.output + (str(result.exception) if result.exception else "")
+    assert "MAINTAINER" in out and "EXPLORER" in out
+    assert ss.read_stand_state(coord) == before
 
 
 def test_down_sets_reason_and_state(tmp_path, monkeypatch) -> None:
     coord = tmp_path / "coordination"
     coord.mkdir()
     result = _invoke(["down", "--reason", "docker build failed"],
-                     tmp_path, role="STAND-KEEPER",
+                     tmp_path, role="MAINTAINER",
                      monkeypatch=monkeypatch)
     assert result.exit_code == 0
     state = ss.read_stand_state(coord)
     assert state["state"] == "down"
     assert state["down_reason"] == "docker build failed"
+    assert state["last_state_change_by"] == "MAINTAINER"
+
+
+def test_up_rejects_non_maintainer_before_state_write(
+        tmp_path, monkeypatch) -> None:
+    coord = tmp_path / "coordination"
+    coord.mkdir()
+    ss.update_stand_state(coord, lambda s: s.update({
+        "state": "down", "down_reason": "fix me",
+    }))
+    before = ss.read_stand_state(coord)
+    result = _invoke(["up", "--reason", "fixed"],
+                     tmp_path, role="EXPLORER",
+                     monkeypatch=monkeypatch)
+    assert result.exit_code != 0
+    out = result.output + (str(result.exception) if result.exception else "")
+    assert "MAINTAINER" in out and "EXPLORER" in out
+    assert ss.read_stand_state(coord) == before
 
 
 def test_up_requires_down_state(tmp_path, monkeypatch) -> None:
@@ -421,7 +441,7 @@ def test_up_requires_down_state(tmp_path, monkeypatch) -> None:
     coord = tmp_path / "coordination"
     coord.mkdir()
     result = _invoke(["up", "--reason", "all good"],
-                     tmp_path, role="STAND-KEEPER",
+                     tmp_path, role="MAINTAINER",
                      monkeypatch=monkeypatch)
     assert result.exit_code != 0
 
@@ -433,12 +453,26 @@ def test_up_transitions_down_to_free(tmp_path, monkeypatch) -> None:
         "state": "down", "down_reason": "fix me",
     }))
     result = _invoke(["up", "--reason", "fixed"],
-                     tmp_path, role="STAND-KEEPER",
+                     tmp_path, role="MAINTAINER",
                      monkeypatch=monkeypatch)
     assert result.exit_code == 0
     state = ss.read_stand_state(coord)
     assert state["state"] == "free"
     assert state["down_reason"] is None
+    assert state["last_state_change_by"] == "MAINTAINER"
+
+
+def test_down_up_help_matches_maintainer_gate() -> None:
+    """0395: help text must match the enforced role gate."""
+    runner = CliRunner()
+    down = runner.invoke(stand_mod.stand, ["down", "--help"])
+    up = runner.invoke(stand_mod.stand, ["up", "--help"])
+    assert down.exit_code == 0
+    assert up.exit_code == 0
+    assert "MAINTAINER-only" in down.output
+    assert "MAINTAINER-only" in up.output
+    assert "SK-only" not in down.output
+    assert "SK-only" not in up.output
 
 
 # ---------- concurrent lease race ----------
