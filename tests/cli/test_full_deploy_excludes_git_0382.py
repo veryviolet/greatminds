@@ -32,6 +32,11 @@ def test_template_rsync_excludes_git() -> None:
     ).read_text("utf-8")
     excludes = _rsync_excludes(template)
     assert ".git" in excludes, excludes
+    assert 'rm -rf -- "{{ deploy_path }}/.git"' in template
+    assert (
+        template.index('rm -rf -- "{{ deploy_path }}/.git"')
+        < template.index("rsync -aP")
+    )
     # the prior excludes must survive the change (no behavior regression)
     for keep in (".venv*", ".worktrees", "__pycache__"):
         assert keep in excludes, (keep, excludes)
@@ -45,6 +50,14 @@ def test_prior_template_hash_registered_stale() -> None:
     prior = (FIXTURES / "full-deploy.no-git-exclude.yaml").read_text("utf-8")
     assert (
         setup_mod._sha256(prior)
+        in setup_mod._STALE_SHIPPED_PROFILE_HASHES["full-deploy.yaml"]
+    )
+    # 0394: the 0382-fixed template excluded .git from source but still
+    # left a stale destination .git pointer in place. Existing pristine
+    # copies must reseed to the template that deletes deploy_path/.git
+    # before rsync.
+    assert (
+        "4ca039ad80125011cb331249c3fb9baab086b26c630751f60457575bd91355c0"
         in setup_mod._STALE_SHIPPED_PROFILE_HASHES["full-deploy.yaml"]
     )
     # The fixture is the genuine regression: it rsyncs .git and otherwise

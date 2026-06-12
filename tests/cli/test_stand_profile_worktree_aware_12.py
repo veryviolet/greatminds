@@ -15,6 +15,7 @@ import pytest
 import yaml
 
 from greatminds.cli import stand_profile as sp
+from greatminds.cli import setup as setup_mod
 from greatminds.core.errors import GreatMindsError
 
 
@@ -71,6 +72,109 @@ def test_worktree_without_profile_falls_back_to_main(tmp_path):
 
     assert spec.source == "main"
     assert spec.yaml_data["hosts"] == "main-host"
+
+
+def test_worktree_packaged_template_replaces_stale_main_profile(
+        tmp_path, monkeypatch):
+    """0394: template fixes are deployable before merge when the installed
+    project profile is a pristine stale shipped preset."""
+    main, wt = _layout(tmp_path)
+    _write(main, "full-deploy", _playbook("stale-main-host"))
+    main_yaml = main / sp.STAND_PROFILES_DIRNAME / "full-deploy.yaml"
+    monkeypatch.setitem(
+        setup_mod._STALE_SHIPPED_PROFILE_HASHES,
+        "full-deploy.yaml",
+        frozenset({setup_mod._sha256(main_yaml.read_text("utf-8"))}),
+    )
+    packaged = (
+        wt / "src" / "greatminds" / "data" / "templates" /
+        "stand-profiles"
+    )
+    packaged.mkdir(parents=True)
+    (packaged / "full-deploy.yaml").write_text(
+        yaml.safe_dump(_playbook("worktree-template-host")),
+        encoding="utf-8",
+    )
+
+    spec = sp.load_profile(main, "full-deploy", worktree=wt)
+
+    assert spec.source == "lease-worktree-template"
+    assert spec.yaml_data["hosts"] == "worktree-template-host"
+
+
+def test_worktree_packaged_template_replaces_stale_worktree_profile(
+        tmp_path, monkeypatch):
+    """0394 regression: a task worktree normally contains a copied
+    coordination/stand-profiles/full-deploy.yaml from branch creation. If that
+    copied project profile is the stale shipped preset, it must not mask the
+    fixed packaged template under review."""
+    main, wt = _layout(tmp_path)
+    _write(main, "full-deploy", _playbook("main-host"))
+    _write(wt / "coordination", "full-deploy", _playbook("stale-wt-host"))
+    wt_yaml = wt / "coordination" / sp.STAND_PROFILES_DIRNAME / "full-deploy.yaml"
+    monkeypatch.setitem(
+        setup_mod._STALE_SHIPPED_PROFILE_HASHES,
+        "full-deploy.yaml",
+        frozenset({setup_mod._sha256(wt_yaml.read_text("utf-8"))}),
+    )
+    packaged = (
+        wt / "src" / "greatminds" / "data" / "templates" /
+        "stand-profiles"
+    )
+    packaged.mkdir(parents=True)
+    (packaged / "full-deploy.yaml").write_text(
+        yaml.safe_dump(_playbook("worktree-template-host")),
+        encoding="utf-8",
+    )
+
+    spec = sp.load_profile(main, "full-deploy", worktree=wt)
+
+    assert spec.source == "lease-worktree-template"
+    assert spec.yaml_data["hosts"] == "worktree-template-host"
+
+
+def test_worktree_packaged_template_does_not_override_custom_main(
+        tmp_path):
+    """0394 safety: only known stale shipped profiles are overridden."""
+    main, wt = _layout(tmp_path)
+    _write(main, "full-deploy", _playbook("custom-main-host"))
+    packaged = (
+        wt / "src" / "greatminds" / "data" / "templates" /
+        "stand-profiles"
+    )
+    packaged.mkdir(parents=True)
+    (packaged / "full-deploy.yaml").write_text(
+        yaml.safe_dump(_playbook("worktree-template-host")),
+        encoding="utf-8",
+    )
+
+    spec = sp.load_profile(main, "full-deploy", worktree=wt)
+
+    assert spec.source == "main"
+    assert spec.yaml_data["hosts"] == "custom-main-host"
+
+
+def test_worktree_packaged_template_does_not_override_custom_worktree(
+        tmp_path):
+    """Safety: an explicit non-stale worktree project profile remains an
+    override even when a packaged template exists."""
+    main, wt = _layout(tmp_path)
+    _write(main, "full-deploy", _playbook("main-host"))
+    _write(wt / "coordination", "full-deploy", _playbook("custom-wt-host"))
+    packaged = (
+        wt / "src" / "greatminds" / "data" / "templates" /
+        "stand-profiles"
+    )
+    packaged.mkdir(parents=True)
+    (packaged / "full-deploy.yaml").write_text(
+        yaml.safe_dump(_playbook("worktree-template-host")),
+        encoding="utf-8",
+    )
+
+    spec = sp.load_profile(main, "full-deploy", worktree=wt)
+
+    assert spec.source == "lease-worktree"
+    assert spec.yaml_data["hosts"] == "custom-wt-host"
 
 
 def test_relative_or_bad_worktree_falls_back(tmp_path):

@@ -78,7 +78,10 @@ class ProfileSpec:
     # issue #12: which tree the profile was resolved from —
     # ``"lease-worktree"`` (the active lease's worktree copy, so an
     # under-review stand-profile fix is deployed/validated before merge) or
-    # ``"main"`` (the merged coordination tree). Surfaced in deploy evidence.
+    # ``"main"`` (the merged coordination tree). ``"lease-worktree-template"``
+    # is used when the resolved project profile is a pristine stale shipped
+    # preset and the active worktree carries a newer packaged template.
+    # Surfaced in deploy evidence.
     source: str = "main"
 
 
@@ -226,6 +229,36 @@ def profile_paths(coord_dir: Path, profile_name: str) -> tuple[Path, Path]:
     return base.with_suffix(".yaml"), base.with_suffix(".md")
 
 
+def _packaged_template_path(worktree: str | Path | None,
+                            profile_name: str) -> Path | None:
+    if not worktree:
+        return None
+    p = (Path(worktree) / "src" / "greatminds" / "data" /
+         "templates" / "stand-profiles" / f"{profile_name}.yaml")
+    return p if p.is_file() else None
+
+
+def _is_pristine_stale_shipped_profile(path: Path,
+                                       profile_name: str) -> bool:
+    """True when PATH is a known stale greatminds-shipped preset.
+
+    Used to make stand-profile template fixes deployable before merge without
+    clobbering operator-customized project profiles: the active lease's
+    packaged template may override a project profile only when that profile is
+    byte-for-byte one of the stale shipped hashes that ``setup`` would reseed.
+    """
+    try:
+        from greatminds.cli.setup import (
+            _sha256,
+            _STALE_SHIPPED_PROFILE_HASHES,
+        )
+        text = path.read_text(encoding="utf-8")
+    except Exception:
+        return False
+    stale = _STALE_SHIPPED_PROFILE_HASHES.get(f"{profile_name}.yaml")
+    return bool(stale and _sha256(text) in stale)
+
+
 def load_profile(coord_dir: Path, profile_name: str, *,
                  worktree: "str | Path | None" = None) -> ProfileSpec:
     """Load ``<coord_dir>/stand-profiles/<profile_name>.{yaml,md}``.
@@ -249,7 +282,13 @@ def load_profile(coord_dir: Path, profile_name: str, *,
             "load_profile: profile_name must be a non-empty string",
             exit_code=2,
         )
-    # Search order: lease worktree (if any) first, then the main tree.
+    # Search order:
+    #   1. lease worktree's coordination profile (explicit project override),
+    #      except when that file is itself a pristine known-stale shipped copy;
+    #      in that case the worktree's newer packaged template wins.
+    #   2. lease worktree's packaged template ONLY when main has a known stale
+    #      pristine shipped preset (so under-review template fixes can deploy)
+    #   3. main coordination profile
     search: list[tuple[Path, str]] = []
     if worktree:
         search.append((Path(worktree) / "coordination", "lease-worktree"))
@@ -260,6 +299,14 @@ def load_profile(coord_dir: Path, profile_name: str, *,
         yaml_path, md_path = profile_paths(cdir, profile_name)
         looked.append(yaml_path)
         if yaml_path.is_file():
+            if label == "lease-worktree":
+                packaged = _packaged_template_path(worktree, profile_name)
+                if (packaged is not None
+                        and _is_pristine_stale_shipped_profile(
+                            yaml_path, profile_name)):
+                    spec = _load_yaml_profile(profile_name, packaged)
+                    spec.source = "lease-worktree-template"
+                    return spec
             spec = _load_yaml_profile(profile_name, yaml_path)
             spec.source = label
             return spec
@@ -274,6 +321,15 @@ def load_profile(coord_dir: Path, profile_name: str, *,
                 f"coordd, not an LLM.",
                 exit_code=2,
             )
+        if label == "lease-worktree":
+            main_yaml, _main_md = profile_paths(coord_dir, profile_name)
+            packaged = _packaged_template_path(worktree, profile_name)
+            if (packaged is not None and main_yaml.is_file()
+                    and _is_pristine_stale_shipped_profile(
+                        main_yaml, profile_name)):
+                spec = _load_yaml_profile(profile_name, packaged)
+                spec.source = "lease-worktree-template"
+                return spec
     raise GreatMindsError(
         f"no profile {profile_name!r} found at "
         f"{' or '.join(str(p) for p in looked)}",
