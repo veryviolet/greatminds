@@ -343,6 +343,11 @@ _STALE_SHIPPED_PROFILE_HASHES: dict[str, frozenset[str]] = {
         # (task 0382). Pristine on disk it sniffs as "current" (add_host +
         # uv PATH), so list it here to reseed to the .git-excluding template.
         "30469cc65b0cb58e95e590d62746baf4ae18b6dd2ea7aa22ff038c8b089ceb83",
+        # 0382 template after adding --exclude=.git but before 0394's
+        # pre-sync remote cleanup. Excluding .git stops future copies but
+        # leaves a stale destination `.git` pointer in place forever; reseed
+        # pristine copies to the template that removes deploy_path/.git first.
+        "4ca039ad80125011cb331249c3fb9baab086b26c630751f60457575bd91355c0",
     }),
     "smoke-only.yaml": frozenset({
         "4342d1565f86de3d81569174f315e32f52bc95858a325b0585096637f42f1123",

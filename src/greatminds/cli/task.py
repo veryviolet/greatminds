@@ -630,6 +630,40 @@ def validate_header(data: dict[str, Any]) -> None:
             raise GreatMindsError("scenarios must be a non-empty list", exit_code=2)
 
 
+BROKEN_GIT_EVIDENCE_SENTINEL = "unknown-git-worktree"
+
+
+def _reject_broken_git_evidence_sentinel(block: dict[str, Any]) -> None:
+    """0394: broken git metadata must not become approved evidence.
+
+    Avatar exposed the failure mode: a deployed tree had a stale worktree
+    ``.git`` pointer, agents converted failed ``git rev-parse`` calls into
+    ``unknown-git-worktree``, and tasks reached verified as though commit
+    evidence existed. No-git deployed payloads are acceptable, but this
+    sentinel is not a commit; when a task/review block requires commit
+    evidence, the block must fail with a clear remediation path instead of
+    normalizing the broken checkout.
+    """
+    paths: list[tuple[str, Any]] = [
+        ("base_commit", block.get("base_commit")),
+        ("gate_check_commit", block.get("gate_check_commit")),
+        ("commit", block.get("commit")),
+    ]
+    ev = block.get("stand_evidence")
+    if isinstance(ev, dict):
+        paths.append(("stand_evidence.commit", ev.get("commit")))
+    for field, value in paths:
+        if str(value or "").strip() == BROKEN_GIT_EVIDENCE_SENTINEL:
+            raise GreatMindsError(
+                f"{field}: {BROKEN_GIT_EVIDENCE_SENTINEL!r} is not valid "
+                "commit evidence. The checkout has broken git metadata "
+                "(often a stale worktree .git pointer copied to the stand); "
+                "fix the deploy/git state or record an explicit no-git "
+                "mode in prose, but do not use this sentinel as a commit.",
+                exit_code=2,
+            )
+
+
 def validate_block(stream: str, block: dict[str, Any]) -> None:
     kind = block.get("kind")
     allowed = STREAM_BLOCK_KINDS.get(stream, set())
@@ -721,6 +755,7 @@ def validate_block(stream: str, block: dict[str, Any]) -> None:
         must_str("summary", block.get("summary"))
     elif kind == "triage":
         pass  # only needs by/at/notes
+    _reject_broken_git_evidence_sentinel(block)
 
 
 def validate_task(data: dict[str, Any]) -> None:
