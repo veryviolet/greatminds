@@ -207,6 +207,87 @@ def _resolve_base_commit(project_dir: Path, task_id: str,
     )
 
 
+def _task_stream_and_queue(project_dir: Path,
+                           task_id: str) -> tuple[str | None, str | None]:
+    """Return ``(stream, queue)`` for TASK_ID when it is visible to the FSM.
+
+    Worktree refresh policy is deliberately narrower for ``review_session``
+    tasks: those worktrees are deploy/probe snapshots, not implementer-owned
+    code branches. If an old review-session branch predates newly verified
+    blocker fixes, recreating its checkout must refresh the branch to the
+    selected base instead of reusing stale history. Product implementation
+    branches keep the old behavior (reuse existing branch) to avoid silently
+    discarding implementer commits.
+    """
+    try:
+        from greatminds.cli.task import find_task, load_task
+    except ImportError:
+        return None, None
+    try:
+        located = find_task(project_dir / "coordination", task_id)
+    except Exception:
+        return None, None
+    if not located:
+        return None, None
+    path, queue = located
+    try:
+        doc = load_task(path)
+    except Exception:
+        try:
+            doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except (OSError, yaml.YAMLError):
+            doc = {}
+    stream = doc.get("stream") if isinstance(doc, dict) else None
+    return (stream if isinstance(stream, str) else None,
+            queue if isinstance(queue, str) else None)
+
+
+def _branch_exists(project_dir: Path, branch: str) -> bool:
+    cp = _run_git(["rev-parse", "--verify", "--quiet", branch],
+                  cwd=project_dir, check=False)
+    return cp.returncode == 0
+
+
+def _ensure_review_session_branch_contains_base(
+        project_dir: Path, task_id: str, branch: str,
+        base_commit: str) -> None:
+    """0393: refresh stale review-session branches before worktree add.
+
+    ``git worktree add <path> <existing-branch>`` reuses the branch exactly
+    as-is. That is correct for product implementation branches, but wrong for
+    review sessions after blocker dependencies have been verified on main:
+    removing and recreating the checkout would still deploy the old branch.
+
+    For review_session tasks only, if the existing branch does not contain the
+    selected base commit (normally current main), force the branch name to the
+    base before adding the checkout. No worktree exists at this point, so there
+    are no uncommitted files to overwrite; if git refuses because the branch is
+    checked out elsewhere, surface an actionable error instead of silently
+    reusing stale code.
+    """
+    stream, queue = _task_stream_and_queue(project_dir, task_id)
+    if stream != "review_session" and queue != "review_sessions":
+        return
+    anc = _run_git(["merge-base", "--is-ancestor", base_commit, branch],
+                   cwd=project_dir, check=False)
+    if anc.returncode == 0:
+        return
+    if anc.returncode not in (1,):
+        # Indeterminate (e.g. missing object): fail open for safety.
+        return
+    cp = _run_git(["branch", "-f", branch, base_commit],
+                  cwd=project_dir, check=False)
+    if cp.returncode != 0:
+        raise GreatMindsError(
+            f"worktree create cannot refresh stale review-session branch "
+            f"{branch!r} to {base_commit[:12]} for {task_id}: "
+            f"{cp.stderr.strip()[:300]}. Remove any other checkout of the "
+            "branch, then rerun: greatminds worktree remove --force "
+            f"{task_id} && greatminds worktree create {task_id}",
+            exit_code=2,
+        )
+
+
 def worktree_create(project_dir: Path, task_id: str,
                     base: str | None = None,
                     policy: WorktreePolicy | None = None) -> Path:
@@ -227,19 +308,24 @@ def worktree_create(project_dir: Path, task_id: str,
     base_commit = _resolve_base_commit(project_dir, task_id, base,
                                        policy.default_branch)
     wt_path.parent.mkdir(parents=True, exist_ok=True)
+    branch_exists = _branch_exists(project_dir, branch)
+    if branch_exists:
+        _ensure_review_session_branch_contains_base(
+            project_dir, task_id, branch, base_commit)
     # ``git worktree add -b <branch> <path> <commit>`` creates the
     # branch if absent. If the branch already exists (leftover from
     # a prior aborted create), drop -b and add to the existing branch.
-    cp = _run_git(
-        ["worktree", "add", "-b", branch, str(wt_path), base_commit],
-        cwd=project_dir, check=False,
-    )
-    if cp.returncode != 0 and "already exists" in (cp.stderr or ""):
+    if branch_exists:
         _run_git(
             ["worktree", "add", str(wt_path), branch],
             cwd=project_dir,
         )
-    elif cp.returncode != 0:
+        return wt_path
+    cp = _run_git(
+        ["worktree", "add", "-b", branch, str(wt_path), base_commit],
+        cwd=project_dir, check=False,
+    )
+    if cp.returncode != 0:
         raise GreatMindsError(
             f"git worktree add failed: {cp.stderr.strip()[:300]}"
         )
@@ -269,7 +355,25 @@ def worktree_remove(project_dir: Path, task_id: str,
         removed = True
     # Drop the branch even if the worktree was already gone (best
     # effort: branch may already be deleted or never created).
-    _run_git(["branch", "-D", branch], cwd=project_dir, check=False)
+    branch_rm = _run_git(["branch", "-D", branch],
+                         cwd=project_dir, check=False)
+    if branch_rm.returncode != 0 and force:
+        # A stale administrative git-worktree record can make branch -D
+        # fail even after a force remove. Prune and retry so the sanctioned
+        # "remove --force; create" recovery path does not silently leave the
+        # stale branch that create would otherwise reuse.
+        _run_git(["worktree", "prune"], cwd=project_dir, check=False)
+        branch_rm = _run_git(["branch", "-D", branch],
+                             cwd=project_dir, check=False)
+        if branch_rm.returncode != 0 and _branch_exists(project_dir, branch):
+            raise GreatMindsError(
+                f"worktree remove --force removed {wt_path} but could not "
+                f"delete branch {branch!r}: "
+                f"{branch_rm.stderr.strip()[:300]}. Do not rerun create "
+                "until this branch is cleaned up; otherwise git would reuse "
+                "stale task history.",
+                exit_code=2,
+            )
     return removed
 
 
