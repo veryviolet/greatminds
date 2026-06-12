@@ -1,9 +1,9 @@
 """Tests for task 0291: SK auto-notifies PLANNER inbox on
 ``stand down``.
 
-Pre-0291 SK silently flipped state.yaml to ``down`` and idled;
+Pre-0291 the stand owner silently flipped state.yaml to ``down`` and idled;
 PLANNER had to poll the state file to discover incidents. 0291
-makes the notification automatic: SK files an inbox-info to the
+makes the notification automatic: MAINTAINER files an inbox-info to the
 schema-declared target (``ARCHITECT-PLANNER`` by default) with the
 ``down_reason`` + lease_id.
 """
@@ -39,7 +39,7 @@ def _project(tmp_path: Path, monkeypatch, *,
         yaml.safe_dump(state), encoding="utf-8",
     )
     monkeypatch.setenv("GREATMINDS_PROJECT_DIR", str(project))
-    monkeypatch.setenv("GREATMINDS_ROLE", "STAND-KEEPER")
+    monkeypatch.setenv("GREATMINDS_ROLE", "MAINTAINER")
     monkeypatch.chdir(project)
     return project
 
@@ -77,7 +77,7 @@ def test_helper_returns_none_for_unknown_event() -> None:
 def test_stand_down_files_inbox_info_to_planner(
     tmp_path: Path, monkeypatch,
 ) -> None:
-    """The canonical flow: SK calls ``stand down --reason X`` → an
+    """The canonical flow: MAINTAINER calls ``stand down --reason X`` → an
     inbox info lands under
     ``coordination/inbox/architect-planner/``; body carries the
     reason + lease_id."""

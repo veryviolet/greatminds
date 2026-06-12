@@ -136,7 +136,7 @@ def test_up_with_queue_auto_promotes_head(tmp_path, monkeypatch):
         "queue": [_q_entry("queued1", "0401"), _q_entry("queued2", "0402")],
     }))
     monkeypatch.chdir(coord.parent)
-    res = _run("STAND-KEEPER", ["up", "--reason", "fixed"])
+    res = _run("MAINTAINER", ["up", "--reason", "fixed"])
     assert res.exit_code == 0, res.output
     st = ss.read_stand_state(coord)
     assert st["state"] == "preparing"
@@ -154,7 +154,7 @@ def test_up_with_empty_queue_settles_free(tmp_path, monkeypatch):
         "active_lease": None, "queue": [],
     }))
     monkeypatch.chdir(coord.parent)
-    res = _run("STAND-KEEPER", ["up", "--reason", "fixed"])
+    res = _run("MAINTAINER", ["up", "--reason", "fixed"])
     assert res.exit_code == 0, res.output
     st = ss.read_stand_state(coord)
     assert st["state"] == "free"
