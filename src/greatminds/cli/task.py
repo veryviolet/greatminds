@@ -1536,24 +1536,41 @@ def _check_review_session_terminal(data: dict[str, Any],
     )
 
 
+def _blocked_withdrawn_reason_error(data: dict[str, Any]) -> str | None:
+    blocked = _latest_block_of_kind(data, "blocked")
+    if blocked is None:
+        return "task has no blocked block"
+    reason = str(blocked.get("reason") or "").lower()
+    if any(t in reason for t in _WITHDRAWN_REASON_TOKENS):
+        return None
+    return (
+        f"latest blocked.reason {blocked.get('reason')!r} does not contain "
+        f"a withdrawn-class token ({list(_WITHDRAWN_REASON_TOKENS)})"
+    )
+
+
+def _check_blocked_withdrawn(data: dict[str, Any],
+                             from_q: str, to_q: str) -> str | None:
+    """PLANNER withdrawal path requires a latest withdrawn-class blocked
+    block. The normal blocked-block validator already enforces dependencies
+    and resume_to shape before the task can move to feature_blocked.
+    """
+    err = _blocked_withdrawn_reason_error(data)
+    if err is not None:
+        return f"blocked_block_withdrawn_reason_and_resume_to: {err}"
+    return None
+
+
 def _check_feature_blocked_withdrawn(data: dict[str, Any],
                                      from_q: str, to_q: str) -> str | None:
     """0102 (3): feature_blocked → archive by ARCHITECT-REVIEWER requires
     the latest ``blocked`` block to carry a withdrawn-class reason.
     Without this guard REVIEWER alone can wipe in-flight work."""
-    blocked = _latest_block_of_kind(data, "blocked")
-    if blocked is None:
-        return (
-            "feature_blocked_withdrawn_reason: task has no blocked block "
-            "(unexpected — feature_blocked entry should have one)"
-        )
-    reason = str(blocked.get("reason") or "").lower()
-    if any(t in reason for t in _WITHDRAWN_REASON_TOKENS):
+    err = _blocked_withdrawn_reason_error(data)
+    if err is None:
         return None
     return (
-        f"feature_blocked_withdrawn_reason: latest blocked.reason "
-        f"{blocked.get('reason')!r} does not contain a withdrawn-class "
-        f"token ({list(_WITHDRAWN_REASON_TOKENS)}); refuse to archive "
+        f"feature_blocked_withdrawn_reason: {err}; refuse to archive "
         f"in-flight work"
     )
 
@@ -1653,6 +1670,7 @@ SCHEMA_REQUIRES_VALIDATORS: dict[str, "callable"] = {
     # known resume_to queue). The mv-time validator would be
     # redundant; the field shape is already gated. Documentary.
     "blocked_block_with_dependencies_and_resume_to": _noop_existing,
+    "blocked_block_withdrawn_reason_and_resume_to": _check_blocked_withdrawn,
     # 0225: real validator — feature_blocked → any_resume_to requires
     # every dependency file actually exists at its declared path.
     "all_dependencies_exist_per_wake_check": _check_all_dependencies_exist,
@@ -1731,14 +1749,21 @@ def enforce_schema_requires(data: dict[str, Any], role: str,
 
 
 def role_for_block_kind(role: str, kind: str, queue: str,
-                        data: dict[str, Any]) -> str | None:
+                        data: dict[str, Any],
+                        new_block: dict[str, Any] | None = None) -> str | None:
     """Return ``None`` if role may author this block-kind on this task."""
     if kind == "blocked":
         owner = (queue_meta(queue).get("owner") or "").upper()
         if owner and role == owner:
             return None
+        if role == "ARCHITECT-PLANNER" and new_block is not None:
+            reason = str(new_block.get("reason") or "").lower()
+            if any(t in reason for t in _WITHDRAWN_REASON_TOKENS):
+                return None
         return (f"role {role} is not owner of {queue} "
-                f"(owner: {owner}); only owner may file a blocked block")
+                f"(owner: {owner}); only owner may file a normal blocked "
+                f"block. ARCHITECT-PLANNER may file only a withdrawn-class "
+                f"blocked block for user-requested cancellation.")
     allowed = BLOCK_KIND_ROLES.get(kind)
     if allowed is None:
         return f"block kind {kind!r} has no role whitelist"
@@ -2626,15 +2651,6 @@ def append_block(
             raise GreatMindsError(f"task {task_id} is legacy .md; migrate first", exit_code=2)
         data = load_task(src_path)
 
-        # 0113: role check BEFORE queue-acceptance check. If the caller
-        # is not allowed to produce this block kind regardless, that's
-        # the primary error — saying "block kind X is not acceptable in
-        # queue Y" misleads users who'd never have been allowed anyway.
-        err = role_for_block_kind(role, kind, queue, data)
-        if err is not None:
-            raise GreatMindsError(err, exit_code=3)
-        require_block_acceptable_in_queue(queue, kind)
-
         block: dict[str, Any] = {
             "kind": kind,
             "by": role,
@@ -2651,6 +2667,17 @@ def append_block(
                 block[k] = coerce_value(k, v)
         if body:
             block[body_field_for(kind)] = read_body(body)
+
+        # 0113: role check BEFORE queue-acceptance check. If the caller
+        # is not allowed to produce this block kind regardless, that's
+        # the primary error — saying "block kind X is not acceptable in
+        # queue Y" misleads users who'd never have been allowed anyway.
+        # 2.0 cleanup: build the candidate block first so the narrow
+        # PLANNER withdrawal exception can inspect blocked.reason.
+        err = role_for_block_kind(role, kind, queue, data, block)
+        if err is not None:
+            raise GreatMindsError(err, exit_code=3)
+        require_block_acceptable_in_queue(queue, kind)
 
         # 0229: auto-stamp worktree_fingerprint for blocks where
         # "what was tested" identity matters. Captures the

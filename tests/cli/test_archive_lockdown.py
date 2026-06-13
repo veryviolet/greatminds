@@ -105,3 +105,92 @@ def test_can_role_move_still_allows_reviewer_archive_from_blocked() -> None:
         f"REVIEWER feature_blocked → archive must remain allowed after 0100; "
         f"got error: {err!r}"
     )
+
+
+def _write_feature_dev_task(coord: Path, task_id: str = "0001-cancel-me") -> None:
+    p = coord / "feature_dev" / f"{task_id}.yaml"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(yaml.safe_dump({
+        "id": task_id,
+        "stream": "product",
+        "scope": "backend",
+        "kind": "feature",
+        "reporter": "USER",
+        "opened_at": "2026-06-13T00:00:00Z",
+        "priority": "normal",
+        "title": "Cancel me",
+        "blocks": [
+            {"kind": "triage", "by": "ARCHITECT-PLANNER",
+             "at": "2026-06-13T00:00:00Z", "notes": "ok"},
+            {"kind": "plan", "by": "ARCHITECT-PLANNER",
+             "at": "2026-06-13T00:00:00Z", "base_commit": "deadbeef",
+             "assignee_role": "DEVELOPER", "stand_required": False,
+             "stand_reason": "", "plan_kind": "bugfix", "mode": "A",
+             "ready_for_implementation": True},
+        ],
+    }), encoding="utf-8")
+
+
+def test_planner_can_withdraw_in_lifecycle_task_via_feature_blocked(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """Regression for the owner-deadlock in the documented withdrawal path:
+    PLANNER must be able to park in-lifecycle work when USER cancels it, while
+    REVIEWER remains the terminal archive role."""
+    from greatminds.cli import task as task_mod
+
+    coord = tmp_path / "coordination"
+    (coord / "feature_blocked").mkdir(parents=True)
+    _write_feature_dev_task(coord)
+    monkeypatch.setattr(task_mod, "find_coord_dir", lambda: coord)
+    monkeypatch.setattr(task_mod, "caller_role", lambda: "ARCHITECT-PLANNER")
+
+    task_mod.append_block(
+        task_id="0001-cancel-me",
+        kind="blocked",
+        fields={
+            "blocked_by": "ARCHITECT-PLANNER",
+            "blocked_at": "2026-06-13T00:00:01Z",
+            "reason": "withdrawn by USER; cancelled before implementation",
+            "dependencies": ["archive/9999-never-created.yaml"],
+            "resume_to": "feature_dev",
+        },
+    )
+    from_q = task_mod.move_task(
+        task_id="0001-cancel-me",
+        to_queue="feature_blocked",
+        reason="USER withdrew task",
+    )
+
+    assert from_q == "feature_dev"
+    assert (coord / "feature_blocked" / "0001-cancel-me.yaml").is_file()
+    assert not (coord / "feature_dev" / "0001-cancel-me.yaml").exists()
+
+
+def test_planner_cannot_file_normal_dependency_blocked_block(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """The PLANNER exception is cancellation-only, not a second owner path for
+    ordinary dependency parking."""
+    from greatminds.cli import task as task_mod
+    from greatminds.core.errors import GreatMindsError
+
+    coord = tmp_path / "coordination"
+    _write_feature_dev_task(coord)
+    monkeypatch.setattr(task_mod, "find_coord_dir", lambda: coord)
+    monkeypatch.setattr(task_mod, "caller_role", lambda: "ARCHITECT-PLANNER")
+
+    with pytest.raises(GreatMindsError) as excinfo:
+        task_mod.append_block(
+            task_id="0001-cancel-me",
+            kind="blocked",
+            fields={
+                "blocked_by": "ARCHITECT-PLANNER",
+                "blocked_at": "2026-06-13T00:00:01Z",
+                "reason": "waiting on upstream dependency",
+                "dependencies": ["feature_dev/0002-dep.yaml"],
+                "resume_to": "feature_dev",
+            },
+        )
+
+    assert "withdrawn-class" in str(excinfo.value)

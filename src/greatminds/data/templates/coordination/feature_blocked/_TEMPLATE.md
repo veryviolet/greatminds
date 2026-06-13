@@ -1,9 +1,17 @@
 # feature_blocked block snippet
 
-Append before moving the task INTO `feature_blocked/`. The current owner (the
-role that decided it cannot make progress) is responsible for writing this
-block, then performing the mv. After parking, the task is owned by
-ARCHITECT-REVIEWER for wake-up via greatminds wake-check.
+Append before moving the task INTO `feature_blocked/`.
+
+For ordinary dependency parking, the current owner (the role that decided it
+cannot make progress) writes this block and performs the mv.
+
+For USER-requested cancellation, ARCHITECT-PLANNER may write this block only
+when `reason` contains a withdrawn-class token: `withdrawn`, `abandoned`, or
+`obsoleted`. ARCHITECT-REVIEWER remains the only role that can archive the
+parked task.
+
+After parking, the task is owned by ARCHITECT-REVIEWER for wake-up via
+greatminds wake-check.
 
 Format for `dependencies` is strict: each entry must be `<queue>/<task-id>.md`
 where `<queue>` is one of the queues listed in schema.yaml and `<task-id>` is

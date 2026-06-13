@@ -677,6 +677,13 @@ transitions:
     to: feature_blocked
     by: current_owner
     requires: [blocked_block_with_dependencies_and_resume_to]
+  # User-requested cancellation / withdrawal path. PLANNER may park
+  # in-lifecycle work only with a withdrawn-class blocked.reason; REVIEWER
+  # remains the only role that can archive it from feature_blocked.
+  - from: any_active_queue
+    to: feature_blocked
+    by: ARCHITECT-PLANNER
+    requires: [blocked_block_withdrawn_reason_and_resume_to]
   - from: feature_blocked
     to: any_resume_to_queue
     by: ARCHITECT-REVIEWER
