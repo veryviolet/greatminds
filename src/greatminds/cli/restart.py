@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import signal
 import subprocess
 import sys
@@ -572,11 +573,17 @@ def _restart_dead_agents(
             # Clear the bash line first (defense against partial
             # text left by a crashed agent).
             _tmux("send-keys", "-t", f"{session}:{name}", "C-u")
-            # Re-source PROJECT.env so a resurrected agent sees fleet
-            # variables even if the pane's shell was reset since launch
-            # (mirrors launch.py step 2.5; no-op when the file is absent).
+            # Re-source private tool auth/session env and PROJECT.env so a
+            # resurrected agent sees the same env as a freshly launched pane
+            # and the driven daemon.
+            agent_env = (
+                Path.home() / ".config" / "greatminds" / "agent-env"
+                / f"{session}.env"
+            )
             _tmux("send-keys", "-t", f"{session}:{name}",
-                  "set -a; [ -f coordination/PROJECT.env ] && "
+                  f"set -a; [ -f {shlex.quote(str(agent_env))} ] && "
+                  f". {shlex.quote(str(agent_env))}; "
+                  "[ -f coordination/PROJECT.env ] && "
                   ". coordination/PROJECT.env; set +a", "Enter")
             cp = _tmux(
                 "send-keys", "-t", f"{session}:{name}",

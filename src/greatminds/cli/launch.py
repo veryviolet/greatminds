@@ -33,6 +33,7 @@ detection (useful when no marker files describe the env).
 from __future__ import annotations
 
 import json
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -298,16 +299,21 @@ def _emit_tmux(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
         if setup.activation:
             _tmux("send-keys", "-t", f"{session}:{name}",
                   setup.activation, "Enter")
-        # 2.5. Source PROJECT.env into the window so the interactive agent
-        # (and any shell command it runs) sees every fleet variable as a
-        # real environment variable — the same single source the daemon
-        # injects into driven agents via systemd EnvironmentFile. `set -a`
-        # exports each assignment; the `[ -f ]` guard makes it a no-op when
-        # the fleet has no PROJECT.env yet. Windows open with -c project_dir
-        # so the relative path resolves.
+        # 2.5. Source the captured machine auth/session env and PROJECT.env
+        # into the window so interactive panes and driven daemon turns see
+        # the same runtime inputs. PROJECT.env is fleet config; agent-env is
+        # private per-session tool auth captured by `greatminds daemon`.
+        # Windows open with -c project_dir so the relative PROJECT.env path
+        # resolves.
         if role:
+            agent_env = (
+                Path.home() / ".config" / "greatminds" / "agent-env"
+                / f"{session}.env"
+            )
             _tmux("send-keys", "-t", f"{session}:{name}",
-                  "set -a; [ -f coordination/PROJECT.env ] && "
+                  f"set -a; [ -f {shlex.quote(str(agent_env))} ] && "
+                  f". {shlex.quote(str(agent_env))}; "
+                  "[ -f coordination/PROJECT.env ] && "
                   ". coordination/PROJECT.env; set +a", "Enter")
         # 3. 0308: emit the launch_command directly + Enter. Pre-0308
         # we installed a wrapper-loop bash one-liner that printed

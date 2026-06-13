@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -40,6 +41,7 @@ from greatminds.cli._colors import err, info, ok, warn
 
 REGISTRY_DIR = Path.home() / ".config" / "greatminds"
 REGISTRY_PATH = REGISTRY_DIR / "projects.json"
+AGENT_ENV_DIR = REGISTRY_DIR / "agent-env"
 SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
 TEMPLATE_UNIT_NAME = "greatminds-daemon@.service"
 LEGACY_UNIT_NAME = "coordd.service"
@@ -47,6 +49,28 @@ LEGACY_UNIT_NAME = "coordd.service"
 # fleet's driven codex worker threads. Installed + enabled only when the
 # project's coord.yaml has codex roles with schema lifecycle == driven.
 APPSERVER_TEMPLATE_UNIT_NAME = "greatminds-appserver@.service"
+
+AGENT_ENV_NAMES = {
+    # Claude direct / proxy / model-router auth.
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANTHROPIC_BASE_URL",
+    # Claude Code alternate providers.
+    "CLAUDE_CONFIG_DIR",
+    "CLAUDE_CODE_OAUTH_TOKEN",
+    "CLAUDE_CODE_USE_BEDROCK",
+    "CLAUDE_CODE_USE_VERTEX",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+    "AWS_PROFILE",
+    "AWS_REGION",
+    "AWS_DEFAULT_REGION",
+    "AWS_BEARER_TOKEN_BEDROCK",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    "ANTHROPIC_VERTEX_PROJECT_ID",
+    "CLOUD_ML_REGION",
+}
 
 
 def _resolved_greatminds_exec() -> str:
@@ -326,22 +350,66 @@ def _project_dropin_dir(name: str) -> Path:
     return SYSTEMD_USER_DIR / f"{_instance_unit(name)}.d"
 
 
+def _agent_env_file(name: str) -> Path:
+    return AGENT_ENV_DIR / f"{name}.env"
+
+
+def _selected_agent_env() -> dict[str, str]:
+    return {
+        k: v for k, v in os.environ.items()
+        if k in AGENT_ENV_NAMES and v
+    }
+
+
+def capture_agent_env(name: str) -> bool:
+    """Persist tool auth/session env from the invoking user shell.
+
+    systemd user services do not inherit the interactive shell that made
+    ``claude -p`` or provider-backed Claude work. The project-level
+    ``PROJECT.env`` remains the fleet config source; this private per-session
+    file carries only machine auth/session variables for agent tools.
+
+    If the current shell has none of the allowlisted variables, leave any
+    existing file untouched. That keeps a bare SSH maintenance command from
+    erasing auth captured earlier from a real operator shell.
+    """
+    env = _selected_agent_env()
+    if not env:
+        return False
+    AGENT_ENV_DIR.mkdir(parents=True, exist_ok=True)
+    target = _agent_env_file(name)
+    body = "".join(f"{k}={shlex.quote(v)}\n" for k, v in sorted(env.items()))
+    old = target.read_text(encoding="utf-8") if target.is_file() else None
+    if old == body:
+        return False
+    fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(body)
+    try:
+        target.chmod(0o600)
+    except OSError:
+        pass
+    return True
+
+
 def install_project_dropin(name: str, project_dir: Path) -> bool:
     """Per-instance drop-in giving the daemon — and every driven agent it
     spawns, which inherit its process env — the fleet's ``PROJECT.env`` as a
     systemd ``EnvironmentFile``. This is the single, clean injection point:
-    one file → coordd + all driven turns see every PROJECT.env var as a real
-    environment variable. The shared template can't carry it (the coord path
-    is per-project), so it lives in the instance drop-in.
+    coordd + all driven turns see PROJECT.env and the private captured
+    machine auth/session env as real environment variables. The shared
+    template can't carry either path, so they live in the instance drop-in.
 
     The leading ``-`` makes the file optional: a fleet with no PROJECT.env
     yet (or before setup writes it) simply gets no extra env, no failure.
     Returns True when the drop-in was written/changed.
     """
     env_file = project_dir / "coordination" / "PROJECT.env"
+    agent_env_file = _agent_env_file(name)
     body = (
         "[Service]\n"
         f"EnvironmentFile=-{env_file}\n"
+        f"EnvironmentFile=-{agent_env_file}\n"
     )
     d = _project_dropin_dir(name)
     d.mkdir(parents=True, exist_ok=True)
@@ -574,6 +642,7 @@ def install_cmd(name: str | None, project_dir: Path | None) -> None:
 
     wrote_unit = install_template_unit()
     register_project(resolved, pd)
+    captured_env = capture_agent_env(resolved)
     # Wire the fleet's PROJECT.env into the daemon (and every driven agent
     # it spawns) as a systemd EnvironmentFile — the single clean injection.
     wrote_dropin = install_project_dropin(resolved, pd)
@@ -587,6 +656,9 @@ def install_cmd(name: str | None, project_dir: Path | None) -> None:
     if wrote_dropin:
         ok("PROJECT.env wired into daemon env "
            f"(EnvironmentFile=-{pd / 'coordination' / 'PROJECT.env'})")
+    if captured_env:
+        ok("agent auth/session env captured for daemon "
+           f"(0600 {_agent_env_file(resolved)})")
     ok(f"project '{resolved}' registered → {pd}")
 
     # 0307: enable the per-project instance unit so it lives under
@@ -711,7 +783,10 @@ def _project_options(fn):
 @daemon.command("start", short_help="start the daemon for a project")
 @_project_options
 def start_cmd(project: str | None, project_dir: Path | None) -> None:
-    _run_verb("start", _resolve_project_name(project, project_dir))
+    name = _resolve_project_name(project, project_dir)
+    if capture_agent_env(name):
+        info("agent auth/session env refreshed before daemon start")
+    _run_verb("start", name)
 
 
 @daemon.command("stop", short_help="stop the daemon for a project")
@@ -741,6 +816,7 @@ def _refresh_units_before_restart(name: str,
             changed = True
         if has_driven_codex_roles(pd) and install_appserver_unit():
             changed = True
+    capture_agent_env(name)
     if changed:
         _systemctl("daemon-reload")
     return changed
