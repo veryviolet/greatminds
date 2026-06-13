@@ -2337,6 +2337,58 @@ def move_task(*, task_id: str, to_queue: str, reason: str | None = None) -> str:
         return _do_move(coord, role, task_id, to_queue, reason or "")
 
 
+def _withdrawn_reason(reason: str) -> str:
+    text = (reason or "").strip()
+    if not text:
+        raise GreatMindsError("--reason is required for task withdraw",
+                              exit_code=2)
+    if any(tok in text.lower() for tok in _WITHDRAWN_REASON_TOKENS):
+        return text
+    return f"withdrawn: {text}"
+
+
+def withdraw_task(*, task_id: str, reason: str) -> str:
+    """Park an in-lifecycle task for user-requested cancellation.
+
+    This is a convenience wrapper over the normal FSM operations: append a
+    withdrawn-class ``blocked`` block, then move to ``feature_blocked``.
+    REVIEWER remains the only terminal archive role.
+    """
+    coord = find_coord_dir()
+    role = caller_role()
+    found = find_task(coord, task_id)
+    if found is None:
+        raise GreatMindsError(f"task {task_id} not found")
+    _src_path, from_q = found
+    if _is_terminal_queue(from_q):
+        raise GreatMindsError(
+            f"task {task_id} is already terminal in {from_q}; cannot withdraw",
+            exit_code=3,
+        )
+    if from_q == "feature_blocked":
+        raise GreatMindsError(
+            f"task {task_id} is already in feature_blocked",
+            exit_code=3,
+        )
+    reason_text = _withdrawn_reason(reason)
+    append_block(
+        task_id=task_id,
+        kind="blocked",
+        fields={
+            "blocked_by": role,
+            "blocked_at": now_iso(),
+            "reason": reason_text,
+            "dependencies": ["archive/0000-withdrawn-sentinel.yaml"],
+            "resume_to": from_q,
+        },
+    )
+    return move_task(
+        task_id=task_id,
+        to_queue="feature_blocked",
+        reason=reason_text,
+    )
+
+
 def _role_can_reach_target(role: str, to_q: str) -> tuple[bool, list[str]]:
     """0113: does this role have ANY authorized schema row landing in
     ``to_q`` (any from_q)?
@@ -2869,6 +2921,15 @@ def task_new(stream, title, reporter, priority, kind, scope,
 def task_mv(task_id, to_queue, reason) -> None:
     from_q = move_task(task_id=task_id, to_queue=to_queue, reason=reason)
     click.echo(f"moved {task_id}: {from_q} → {to_queue}")
+
+
+@task.command(name="withdraw")
+@click.argument("task_id", metavar="ID")
+@click.option("--reason", required=True,
+              help="why the task is being withdrawn / cancelled")
+def task_withdraw(task_id, reason) -> None:
+    from_q = withdraw_task(task_id=task_id, reason=reason)
+    click.echo(f"withdrew {task_id}: {from_q} → feature_blocked")
 
 
 @task.command(name="append-block")

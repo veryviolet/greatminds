@@ -245,11 +245,11 @@ script:
 For each ready-to-wake task, `ARCHITECT-REVIEWER` appends a wake-up note and
 moves the task to `resume_to`.
 
-User-requested cancellation is a separate path: `ARCHITECT-PLANNER` may append
-a `blocked` block only when `reason` contains a withdrawn-class token
-(`withdrawn`, `abandoned`, or `obsoleted`) and then move the task to
-`feature_blocked/`. `ARCHITECT-REVIEWER` is still the only role that can move
-that parked task to `archive/`.
+User-requested cancellation is a separate path: `ARCHITECT-PLANNER` runs
+`greatminds task withdraw <task-id> --reason "<why>"`. Internally this appends
+a withdrawn-class `blocked` block and moves the task to `feature_blocked/`.
+`ARCHITECT-REVIEWER` is still the only role that can move that parked task to
+`archive/`.
 
 ---
 

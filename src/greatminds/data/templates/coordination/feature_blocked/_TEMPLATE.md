@@ -5,10 +5,10 @@ Append before moving the task INTO `feature_blocked/`.
 For ordinary dependency parking, the current owner (the role that decided it
 cannot make progress) writes this block and performs the mv.
 
-For USER-requested cancellation, ARCHITECT-PLANNER may write this block only
-when `reason` contains a withdrawn-class token: `withdrawn`, `abandoned`, or
-`obsoleted`. ARCHITECT-REVIEWER remains the only role that can archive the
-parked task.
+For USER-requested cancellation, ARCHITECT-PLANNER should run
+`greatminds task withdraw <task-id> --reason "<why>"`. That command writes a
+withdrawn-class block and moves the task here. ARCHITECT-REVIEWER remains the
+only role that can archive the parked task.
 
 After parking, the task is owned by ARCHITECT-REVIEWER for wake-up via
 greatminds wake-check.

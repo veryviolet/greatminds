@@ -194,3 +194,28 @@ def test_planner_cannot_file_normal_dependency_blocked_block(
         )
 
     assert "withdrawn-class" in str(excinfo.value)
+
+
+def test_task_withdraw_helper_builds_canonical_block(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    from greatminds.cli import task as task_mod
+
+    coord = tmp_path / "coordination"
+    (coord / "feature_blocked").mkdir(parents=True)
+    _write_feature_dev_task(coord)
+    monkeypatch.setattr(task_mod, "find_coord_dir", lambda: coord)
+    monkeypatch.setattr(task_mod, "caller_role", lambda: "ARCHITECT-PLANNER")
+
+    from_q = task_mod.withdraw_task(
+        task_id="0001-cancel-me",
+        reason="USER cancelled this duplicate",
+    )
+
+    assert from_q == "feature_dev"
+    data = task_mod.load_task(
+        coord / "feature_blocked" / "0001-cancel-me.yaml")
+    blocked = [b for b in data["blocks"] if b["kind"] == "blocked"][-1]
+    assert blocked["reason"].startswith("withdrawn:")
+    assert blocked["dependencies"] == ["archive/0000-withdrawn-sentinel.yaml"]
+    assert blocked["resume_to"] == "feature_dev"
