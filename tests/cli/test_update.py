@@ -23,7 +23,7 @@ from greatminds.cli import update as upd
 @pytest.fixture
 def fake_pypi(monkeypatch):
     """Mock PyPI fetch to return a configurable latest version."""
-    state = {"latest": "1.99.0"}
+    state = {"latest": "2.99.0"}
 
     def fake_fetch():
         if state["latest"] is None:
@@ -78,11 +78,11 @@ def _invoke(args: list[str]):
 
 
 def test_check_when_newer_pypi_version_available(fake_pypi):
-    fake_pypi["latest"] = "1.99.0"
+    fake_pypi["latest"] = "2.99.0"
     result = _invoke(["--check"])
     assert result.exit_code == 0, result.output
     assert "current: greatminds" in result.output
-    assert "latest on PyPI: 1.99.0" in result.output
+    assert "latest on PyPI: 2.99.0" in result.output
     assert "would upgrade" in result.output
 
 
@@ -94,7 +94,7 @@ def test_check_already_up_to_date(fake_pypi):
 
 
 def test_dry_run_is_alias_of_check(fake_pypi):
-    fake_pypi["latest"] = "1.99.0"
+    fake_pypi["latest"] = "2.99.0"
     a = _invoke(["--check"])
     b = _invoke(["--dry-run"])
     # Both report the would-be upgrade.
@@ -126,7 +126,7 @@ def test_check_major_bump_with_flag_proceeds(fake_pypi):
 def test_full_update_calls_pip_then_self_replaces(fake_pypi, fake_subprocess,
                                                     fake_execv,
                                                     monkeypatch):
-    fake_pypi["latest"] = "1.99.0"
+    fake_pypi["latest"] = "2.99.0"
 
     # 0299: stub the env detector to ``venv`` so the legacy pip
     # path is exercised here. The new env branching (uv/poetry/pixi
@@ -153,7 +153,7 @@ def test_full_update_calls_pip_then_self_replaces(fake_pypi, fake_subprocess,
     )
     # The upgrade subprocess is faked (no real install), so stub the
     # post-upgrade verify to report the upgrade landed → self-replace fires.
-    monkeypatch.setattr(upd, "_installed_version_fresh", lambda: "1.99.0")
+    monkeypatch.setattr(upd, "_installed_version_fresh", lambda: "2.99.0")
 
     with pytest.raises(fake_execv.sentinel):
         # The fake execv raises; we let the exception escape so the test

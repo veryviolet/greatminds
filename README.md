@@ -46,7 +46,7 @@ starts in chat or loop mode according to that file.
 - **Queues**: [`feature_inbox/`, `feature_plan/`, `feature_dev/`, `verified/`](https://veryviolet.github.io/greatminds/concepts/queues/) - task state is its directory.
 - **Roles**: [`ARCHITECT-PLANNER`, `DEVELOPER`, `TESTER`, and others](https://veryviolet.github.io/greatminds/concepts/roles/) - each role owns queues and a heartbeat file.
 - **Scenarios A/B/C**: [standard pipeline, intensive review, and UI rapid iteration](https://veryviolet.github.io/greatminds/concepts/scenarios/).
-- **Stand gate**: [stand-required tasks](https://veryviolet.github.io/greatminds/concepts/stand-gate/) need `STAND-KEEPER` evidence before review.
+- **Stand gate**: [stand-required tasks](https://veryviolet.github.io/greatminds/concepts/stand-gate/) need lease-backed live-stand evidence before review.
 - **Inbox**: [per-role mailbox](https://veryviolet.github.io/greatminds/concepts/inbox/) for `ask`, `info`, and `wake` messages without moving tasks.
 
 ## Documentation

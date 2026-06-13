@@ -4,6 +4,31 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 2.0.0 — 2026-06-13
+
+### Changed
+
+- **Clean v2 FSM/autonomy baseline.** Driven roles now expose retry/backoff
+  state on disk, restore retry state after coordd restart, fail fast on missing
+  Codex auth, surface low-disk blockers, and keep stuck-turn evidence visible
+  to watchdog/dashboard.
+- **Stand architecture is stricter.** `stand lease` and the deploy executor
+  now reject plain/no-git directories under `.worktrees/`; leases must deploy
+  from real source checkouts, not deployed payloads or stale debris.
+- **Operator visibility improved.** `greatminds dashboard --logs` shows the
+  latest driven-agent turn log tails in the same read-only status view.
+- **Evidence/docs contract realigned.** Packaged role prompts, templates,
+  README, stand docs, schema comments, and setup warnings now describe the
+  current lease-backed YAML/ansible stand model instead of the retired
+  `stand_done` / `STAND-KEEPER` workflow.
+
+### Verified
+
+- Full local CLI suite: `1518 passed, 1 skipped`.
+- Avatar validation matrix on a fresh toy git project: setup, normal FSM
+  intake/plan/test path, auto-created lease worktree, gate-check pass from
+  lease-backed evidence, dashboard log tails, and no-git worktree rejection.
+
 ## 1.6.11 — 2026-06-09
 
 ### Fixed (driven-FSM autonomy batch — operational merge, USER-authorized path 2; self-referential infra, avatar-validated)
