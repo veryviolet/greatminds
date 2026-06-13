@@ -127,6 +127,45 @@ def _agent_state(rec: dict[str, Any], mode: str, lifecycle: str,
     return "dead"
 
 
+def _latest_turn_log(coord: Path, role_lower: str) -> Path | None:
+    """Newest coordd turn log for ROLE, or None.
+
+    Dashboard is operator-facing, so best-effort filesystem evidence is
+    better than a bare "running" label. A held run-lock with no recent turn
+    log is exactly the situation that made the live fleet look healthier
+    than it was.
+    """
+    d = coord / ".turns"
+    if not d.is_dir():
+        return None
+    try:
+        logs = sorted(d.glob(f"{role_lower}-*.log"),
+                      key=lambda p: p.stat().st_mtime)
+    except OSError:
+        return None
+    return logs[-1] if logs else None
+
+
+def _driven_lock_meta(lock: Path) -> dict[str, Any]:
+    """Best-effort JSON metadata from a driven run-lock.
+
+    New locks are JSON; old locks are empty marker files. Empty/malformed
+    metadata must not break the dashboard.
+    """
+    try:
+        text = lock.read_text(encoding="utf-8").strip()
+    except OSError:
+        return {}
+    if not text:
+        return {}
+    try:
+        import json
+        data = json.loads(text)
+    except (ValueError, TypeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 def _agent_doing(rec: dict[str, Any], mode: str, lifecycle: str,
                  driven_turn: bool, fresh_sec: float,
                  claimed: list[str], stand_holder: str = "",
@@ -167,7 +206,8 @@ def collect_agents(coord: Path, coord_yaml: dict | None, canon_dir: Path,
                    stand: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     from greatminds.cli.agent import collect_agent_status
     from greatminds.cli.coordd import (
-        PUSH_FRESH_GUARD_SEC, _driven_run_lock_path, _lifecycle_for_role,
+        PUSH_FRESH_GUARD_SEC, _driven_pending_path, _driven_run_lock_path,
+        _hang_threshold_seconds, _lifecycle_for_role,
     )
 
     rows: list[dict[str, Any]] = []
@@ -177,27 +217,57 @@ def collect_agents(coord: Path, coord_yaml: dict | None, canon_dir: Path,
         lifecycle = _lifecycle_for_role(canon_dir, role) or ""
         lock = _driven_run_lock_path(coord, role.lower())
         hb_age = rec.get("heartbeat_age")
-        # The run-lock IS the authoritative "turn in flight" marker: coordd
-        # holds it for the turn's duration and clears stale locks on
-        # startup (1.5.15), so while coordd is alive a present lock means a
-        # real running turn. A driven claude turn has no persistent
-        # registered pid / heartbeat, so do NOT gate on those — that hid a
-        # genuinely-running turn as "idle".
         driven_turn = lifecycle == "driven" and lock.is_file()
+        turn_age: float | None = None
+        stale_turn = False
+        pending = False
+        recent_log = False
+        lock_meta: dict[str, Any] = {}
         claimed = tasks_by_owner.get(role, [])
-        # A driven turn does NOT refresh a heartbeat, so the HB column would
-        # show a misleading stale age while the turn runs ("running · 8m" reads
-        # as a hang). When a turn is in flight, show its DURATION instead (the
-        # run-lock's age) prefixed with ⟳ — the real "how long active" signal,
-        # which also surfaces a genuinely hung turn (e.g. ⟳31m).
         if driven_turn:
+            lock_meta = _driven_lock_meta(lock)
             try:
                 turn_age = time.time() - lock.stat().st_mtime
                 hb_display = "⟳" + _fmt_age(turn_age)
             except OSError:
                 hb_display = _fmt_age(hb_age)
+            threshold = _hang_threshold_seconds(canon_dir)
+            stale_turn = bool(turn_age is not None and turn_age >= threshold)
+            pending = _driven_pending_path(coord, role.lower()).is_file()
+            latest = _latest_turn_log(coord, role.lower())
+            meta_log = lock_meta.get("log_path")
+            if isinstance(meta_log, str) and meta_log:
+                latest = Path(meta_log)
+            if latest is not None:
+                try:
+                    recent_log = latest.stat().st_mtime >= lock.stat().st_mtime
+                except OSError:
+                    recent_log = False
         else:
             hb_display = _fmt_age(hb_age)
+        state = _agent_state(rec, entry["mode"], lifecycle, driven_turn)
+        if stale_turn:
+            state = "stuck"
+        doing = _agent_doing(rec, entry["mode"], lifecycle,
+                             driven_turn, PUSH_FRESH_GUARD_SEC, claimed,
+                             stand_holder=(stand or {}).get("holder") or "",
+                             stand_task=(stand or {}).get("task") or "",
+                             role=role)
+        if stale_turn:
+            bits = [doing.replace("running turn", "stuck turn", 1)]
+            if turn_age is not None:
+                bits.append(f"lock {_fmt_age(turn_age)}")
+            driver = lock_meta.get("driver")
+            if isinstance(driver, str) and driver:
+                bits.append(driver)
+            log_path = lock_meta.get("log_path")
+            if isinstance(log_path, str) and log_path:
+                bits.append(f"log:{Path(log_path).name}")
+            if pending:
+                bits.append("pending")
+            if not recent_log:
+                bits.append("no turn log")
+            doing = " · ".join(bits)
         rows.append({
             "role": role,
             "tool": entry["tool"] or (rec.get("tool") or "—"),
@@ -205,13 +275,9 @@ def collect_agents(coord: Path, coord_yaml: dict | None, canon_dir: Path,
             "mode": entry["mode"],
             "alive": rec["alive"],
             "registered": rec["registered"],
-            "state": _agent_state(rec, entry["mode"], lifecycle, driven_turn),
+            "state": state,
             "heartbeat": hb_display,
-            "doing": _agent_doing(rec, entry["mode"], lifecycle,
-                                  driven_turn, PUSH_FRESH_GUARD_SEC, claimed,
-                                  stand_holder=(stand or {}).get("holder") or "",
-                                  stand_task=(stand or {}).get("task") or "",
-                                  role=role),
+            "doing": doing,
         })
     return rows
 
@@ -311,6 +377,7 @@ def _render_agents(rows: list[dict[str, Any]], width: int, color: bool) -> list[
     glyph = {
         "alive":   ("●", "alive"),
         "running": ("●", "alive"),
+        "stuck":   ("!", "dead"),
         "idle":    ("◦", "idle"),    # driven, between turns — normal
         "staged":  ("◌", "staged"),
         "dead":    ("○", "dead"),

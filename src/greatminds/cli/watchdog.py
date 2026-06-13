@@ -60,6 +60,20 @@ def fmt_age(seconds: float) -> str:
     return f"{seconds / 86400:.1f}d"
 
 
+def _read_json_file(path: Path) -> dict:
+    try:
+        text = path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return {}
+    if not text:
+        return {}
+    try:
+        data = json.loads(text)
+    except (ValueError, TypeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 @click.command(
     short_help="report orphan intents / dead pids / stale tasks / orphan worktrees",
     help=__doc__,
@@ -162,6 +176,59 @@ def watchdog(project_dir: Path | None, canon_dir: Path | None, quiet: bool) -> N
         click.echo()
     elif not quiet:
         info("agent panes: 0 wedged")
+
+    # ---- Stuck driven turns
+    #
+    # coordd owns active hang escalation, but watchdog is the operator's
+    # read-only sweep. A stale driven lock with pending marker / no fresh log
+    # must be visible here too, otherwise the dashboard can say "running" and
+    # the external audit says "all clear" while a queue is actually blocked.
+    hang_threshold = ((schema.get("heartbeat") or {})
+                      .get("hang_threshold_seconds") or 300)
+    try:
+        hang_threshold = float(hang_threshold)
+    except (TypeError, ValueError):
+        hang_threshold = 300.0
+    stuck_turns: list[tuple[str, float, dict, bool, bool]] = []
+    locks_dir = coord / ".locks"
+    if locks_dir.is_dir():
+        for f in sorted(locks_dir.glob("driven-*.lock")):
+            age = now - f.stat().st_mtime
+            if age <= hang_threshold:
+                continue
+            role = f.name[len("driven-"):-len(".lock")]
+            meta = _read_json_file(f)
+            pending = (locks_dir / f"driven-{role}.pending").is_file()
+            log_ok = False
+            log_path = meta.get("log_path")
+            if isinstance(log_path, str) and log_path:
+                try:
+                    log_ok = Path(log_path).stat().st_mtime >= f.stat().st_mtime
+                except OSError:
+                    log_ok = False
+            stuck_turns.append((role, age, meta, pending, log_ok))
+
+    if stuck_turns:
+        findings += len(stuck_turns)
+        warn(f"STUCK DRIVEN TURNS ({len(stuck_turns)}, "
+             f"threshold {fmt_age(hang_threshold)}):")
+        for role, age, meta, pending, log_ok in stuck_turns:
+            driver = meta.get("driver") or "unknown-driver"
+            log_path = meta.get("log_path")
+            log_name = Path(log_path).name if isinstance(log_path, str) and log_path else "no-log"
+            bits = [
+                f"{role}: lock {fmt_age(age)} old",
+                f"driver={driver}",
+                f"log={log_name}",
+            ]
+            if pending:
+                bits.append("pending")
+            if not log_ok:
+                bits.append("no fresh turn log")
+            warn("  " + " · ".join(bits))
+        click.echo()
+    elif not quiet:
+        info("driven turns: 0 stuck")
 
     # ---- Stale tasks per queue
     active_threshold = thresholds["task_stale_in_active_queue_seconds"]

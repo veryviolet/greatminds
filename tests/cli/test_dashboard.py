@@ -8,6 +8,8 @@ collect_tasks / collect_stand end-to-end.
 from __future__ import annotations
 
 import json
+import os
+import time
 from pathlib import Path
 
 import pytest
@@ -40,9 +42,8 @@ def _rec(alive, age):
 
 
 def test_collect_agents_held_lock_is_running(tmp_path, monkeypatch):
-    """A driven role with its run-lock held reads as `running` even with
-    no live pid / heartbeat (a driven claude turn has neither). coordd
-    clears stale locks on startup, so a present lock = a real turn."""
+    """A fresh driven run-lock reads as `running` even with no live pid /
+    heartbeat; driven turns have no persistent role process."""
     coord = tmp_path / "coordination"
     (coord / ".locks").mkdir(parents=True)
     (coord / ".locks" / "driven-tester.lock").write_text("")
@@ -61,6 +62,44 @@ def test_collect_agents_held_lock_is_running(tmp_path, monkeypatch):
                              {"TESTER": ["0001-verify"]})
     assert rows[0]["state"] == "running"
     assert rows[0]["doing"].startswith("running turn")
+
+
+def test_collect_agents_stale_lock_is_stuck_with_evidence(tmp_path, monkeypatch):
+    """A stale run-lock is not healthy work. Surface it as stuck, including
+    pending/no-log evidence, instead of the old misleading `running turn`."""
+    coord = tmp_path / "coordination"
+    (coord / ".locks").mkdir(parents=True)
+    lock = coord / ".locks" / "driven-developer.lock"
+    log_path = coord / ".turns" / "developer-20260613T000000Z.log"
+    lock.write_text(json.dumps({
+        "role": "DEVELOPER",
+        "driver": "codex",
+        "log_path": str(log_path),
+    }))
+    old = time.time() - 400
+    os.utime(lock, (old, old))
+    (coord / ".locks" / "driven-developer.pending").write_text("")
+
+    from greatminds.cli import agent as agent_mod
+    from greatminds.cli import coordd as cd
+    monkeypatch.setattr(db, "_fleet_roster",
+                        lambda _y: [{"role": "DEVELOPER", "tool": "codex",
+                                     "mode": "driven"}])
+    monkeypatch.setattr(agent_mod, "collect_agent_status",
+                        lambda _c, _r: {"alive": False, "registered": True,
+                                        "heartbeat_age": None, "tool": "codex"})
+    monkeypatch.setattr(cd, "_lifecycle_for_role", lambda _c, _r: "driven")
+    monkeypatch.setattr(cd, "_hang_threshold_seconds", lambda _c: 300.0)
+
+    rows = db.collect_agents(coord, {"session": "x"}, tmp_path / "canon",
+                             {"DEVELOPER": ["0396-no-git"]})
+    assert rows[0]["state"] == "stuck"
+    assert "stuck turn" in rows[0]["doing"]
+    assert "0396-no-git" in rows[0]["doing"]
+    assert "codex" in rows[0]["doing"]
+    assert "log:developer-20260613T000000Z.log" in rows[0]["doing"]
+    assert "pending" in rows[0]["doing"]
+    assert "no turn log" in rows[0]["doing"]
 
 
 def test_doing_driven_turn_wins():

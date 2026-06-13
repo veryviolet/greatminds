@@ -261,6 +261,22 @@ def test_transport_seam_leaves_lock_held(tmp_path: Path) -> None:
     assert cd._driven_run_lock_path(coord, "explorer").exists()
 
 
+def test_codex_lock_contains_metadata_while_held(tmp_path: Path) -> None:
+    coord = _coord(tmp_path)
+    transport, _ = _transport({})
+    cd._spawn_driven_codex_turn(
+        coord, "explorer", None, "/proj", False,
+        transport=transport, reg={"thread_id": "th_x"},
+    )
+    lock = cd._driven_run_lock_path(coord, "explorer")
+    meta = json.loads(lock.read_text(encoding="utf-8"))
+    assert meta["role"] == "EXPLORER"
+    assert meta["driver"] == "codex"
+    assert meta["thread_id"] == "th_x"
+    assert meta["log_path"].endswith(".log")
+    assert isinstance(meta["coordd_pid"], int)
+
+
 def test_async_path_releases_lock_after_turn(
     tmp_path: Path, monkeypatch,
 ) -> None:

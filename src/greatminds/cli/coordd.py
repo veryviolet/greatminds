@@ -629,6 +629,42 @@ def _driven_run_lock_path(coord: Path, role_lower: str) -> Path:
     return coord / ".locks" / f"driven-{role_lower}.lock"
 
 
+def _write_driven_run_lock(
+    lock: Path,
+    role_lower: str,
+    *,
+    driver: str,
+    log_path: str | None = None,
+    thread_id: str | None = None,
+    session_id: str | None = None,
+) -> None:
+    """Write operator-visible metadata into the driven run-lock.
+
+    Older locks were empty files, so the dashboard/watchdog could only infer
+    "running" from mtime. Keep the same path/presence contract, but make new
+    locks self-describing. Best-effort: lock presence remains the invariant.
+    """
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    meta = {
+        "role": role_lower.upper(),
+        "driver": driver,
+        "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "started_at_epoch": time.time(),
+        "coordd_pid": os.getpid(),
+    }
+    if log_path:
+        meta["log_path"] = log_path
+    if thread_id:
+        meta["thread_id"] = thread_id
+    if session_id:
+        meta["session_id"] = session_id
+    try:
+        lock.write_text(json.dumps(meta, sort_keys=True) + "\n",
+                        encoding="utf-8")
+    except OSError:
+        lock.touch()
+
+
 def _turn_log_path(coord: Path, role_lower: str) -> Path:
     """Per-turn output log: ``<coord>/.turns/<role>-<ISO>.log``.
 
@@ -1222,7 +1258,8 @@ def _spawn_driven_turn(
     # run-lock assertions, then release (no real subprocess / thread).
     if spawn is not None:
         try:
-            lock.touch()
+            _write_driven_run_lock(lock, role_lower, driver="claude",
+                                   session_id=session_id)
             spawn(argv)
             _record_driven_turn(coord / REGISTRY_DIR, role_lower, reset=reset)
             return (True, f"driven turn spawned for {role_lower}"
@@ -1242,8 +1279,10 @@ def _spawn_driven_turn(
     # ``--output-format json`` makes claude emit a single result object
     # carrying ``session_id``, which we record so the next ``--resume``
     # turn continues the same session.
-    lock.touch()
     run_argv = argv + ["--output-format", "json"]
+    turn_log = _turn_log_path(coord, role_lower)
+    _write_driven_run_lock(lock, role_lower, driver="claude",
+                           log_path=str(turn_log), session_id=session_id)
 
     def _worker() -> None:
         new_sid: str | None = None
@@ -1261,7 +1300,7 @@ def _spawn_driven_turn(
                 timeout=DRIVEN_TURN_TIMEOUT_SEC,
             )
             try:
-                _turn_log_path(coord, role_lower).write_text(
+                turn_log.write_text(
                     f"$ {' '.join(run_argv)}\n\n"
                     f"=== stdout ===\n{proc.stdout}\n"
                     f"=== stderr ===\n{proc.stderr}\n"
@@ -1282,7 +1321,7 @@ def _spawn_driven_turn(
             klass = "timeout"
             detail = f"turn exceeded {DRIVEN_TURN_TIMEOUT_SEC:.0f}s"
             try:
-                _turn_log_path(coord, role_lower).write_text(
+                turn_log.write_text(
                     f"$ {' '.join(run_argv)}\n\n=== TIMEOUT after "
                     f"{DRIVEN_TURN_TIMEOUT_SEC:.0f}s ===\n", encoding="utf-8")
             except OSError:
@@ -1712,6 +1751,7 @@ def _drive_codex_turn_stdio(
     coord: Path, role_lower: str, thread_id: str,
     base_instructions: str | None, cwd: str | None, verbose: bool,
     *, turn_timeout: float = 1800.0, handshake_timeout: float = 60.0,
+    turn_log_path: Path | None = None,
 ) -> str:
     """0321-iter3: drive ONE codex turn over a fresh ``codex app-server``
     stdio process. Blocking — intended to run in a daemon thread (or
@@ -1731,6 +1771,7 @@ def _drive_codex_turn_stdio(
     import time as _time
     argv = _codex_appserver_argv(_codex_role_model(coord, role_lower))
     codex_home = _machine_codex_home()
+    turn_log = turn_log_path or _turn_log_path(coord, role_lower)
     try:
         proc = _sp.Popen(
             argv, stdin=_sp.PIPE, stdout=_sp.PIPE, stderr=_sp.DEVNULL,
@@ -1788,7 +1829,7 @@ def _drive_codex_turn_stdio(
         # codexHome (machine home, not a per-role auth copy) + whether the
         # turn did non-zero work — the avatar-gate evidence (#14/#21/#22).
         try:
-            _turn_log_path(coord, role_lower).write_text(
+            turn_log.write_text(
                 f"codex app-server turn for {role_lower}\n"
                 f"thread_id: {thread_id}\n"
                 f"codex_home: {codex_home}\n"
@@ -1812,7 +1853,7 @@ def _drive_codex_turn_stdio(
     except _CodexAuthError as exc:
         # 0375: record a clear auth-failure outcome (NOT a zero-work ok).
         try:
-            _turn_log_path(coord, role_lower).write_text(
+            turn_log.write_text(
                 f"codex app-server turn for {role_lower}\n"
                 f"thread_id: {thread_id}\n"
                 f"codex_home: {codex_home}\n"
@@ -1910,8 +1951,10 @@ def _spawn_driven_codex_turn(
             )
         return (False, "run-lock held; pending set")
 
-    lock.touch()
     thread_id = _codex_thread_id(reg)
+    turn_log = _turn_log_path(coord, role_lower)
+    _write_driven_run_lock(lock, role_lower, driver="codex",
+                           log_path=str(turn_log), thread_id=thread_id)
 
     # Test seam: drive the request sequence synchronously through the
     # injected transport (no real codex process). Leave the lock held
@@ -1950,7 +1993,7 @@ def _spawn_driven_codex_turn(
         try:
             _drive_codex_turn_stdio(
                 coord, role_lower, thread_id, base_instructions, cwd,
-                verbose)
+                verbose, turn_log_path=turn_log)
         except _CodexAuthError as exc:
             # 0375: a Codex auth failure is NOT a retryable transport
             # blip and NEVER a zero-work ok — surface it loudly so the

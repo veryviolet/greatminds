@@ -10,6 +10,7 @@ event mid-turn → pending → re-fire after).
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -64,6 +65,26 @@ def test_spawn_acquires_lock_and_calls_spawn(tmp_path: Path) -> None:
     assert ok is True
     assert len(spawned) == 1
     assert spawned[0][:2] == ["claude", "--resume"]
+
+
+def test_spawn_lock_contains_metadata_while_held(tmp_path: Path) -> None:
+    coord = _coord(tmp_path)
+    seen: dict = {}
+
+    def _spawn(_argv):
+        lock = cd._driven_run_lock_path(coord, "developer")
+        seen.update(json.loads(lock.read_text(encoding="utf-8")))
+
+    ok, diag = cd._spawn_driven_turn(
+        coord, "developer", "sess-1", "dev", "test-session",
+        None, verbose=False, spawn=_spawn,
+    )
+    assert ok is True, diag
+    assert seen["role"] == "DEVELOPER"
+    assert seen["driver"] == "claude"
+    assert seen["session_id"] == "sess-1"
+    assert isinstance(seen["coordd_pid"], int)
+    assert "started_at" in seen
 
 
 def test_spawn_run_lock_blocks_second_turn(tmp_path: Path) -> None:

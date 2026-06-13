@@ -34,6 +34,18 @@ def _setup_project(tmp_path: Path) -> Path:
         capture_output=True, text=True,
     )
     assert cp.returncode == 0, f"setup failed: {cp.stderr}"
+    subprocess.run(["git", "init", "-b", "main"], cwd=str(tmp_path),
+                   capture_output=True, text=True, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"],
+                   cwd=str(tmp_path), capture_output=True, text=True,
+                   check=True)
+    subprocess.run(["git", "config", "user.name", "Test"],
+                   cwd=str(tmp_path), capture_output=True, text=True,
+                   check=True)
+    subprocess.run(["git", "add", "."], cwd=str(tmp_path),
+                   capture_output=True, text=True, check=True)
+    subprocess.run(["git", "commit", "-m", "initial"], cwd=str(tmp_path),
+                   capture_output=True, text=True, check=True)
     return tmp_path
 
 
@@ -46,6 +58,13 @@ def _gm(project_dir: Path, *argv: str,
         [sys.executable, "-m", "greatminds.cli.main", *argv],
         capture_output=True, text=True, env=env,
     )
+
+
+def _head(project_dir: Path) -> str:
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=str(project_dir), capture_output=True, text=True, check=True,
+    ).stdout.strip()
 
 
 def _new_user_feedback_task(proj: Path, title: str) -> str:
@@ -72,7 +91,7 @@ def test_plan_routes_user_feedback_through_feature_inbox(tmp_path: Path):
     cp = _gm(proj, "plan", tid,
              "--scope", "backend",
              "--assignee-role", "DEVELOPER",
-             "--base-commit", "abc123def456abc123def456abc123def456abcd",
+             "--base-commit", _head(proj),
              "--plan-kind", "full",
              "--mode", "A",
              "--stand-required", "false",
@@ -119,7 +138,7 @@ def test_plan_from_feature_inbox_still_one_hop(tmp_path: Path):
     cp = _gm(proj, "plan", tid,
              "--scope", "backend",
              "--assignee-role", "DEVELOPER",
-             "--base-commit", "abc123def456abc123def456abc123def456abcd",
+             "--base-commit", _head(proj),
              "--plan-kind", "full",
              "--mode", "A",
              "--stand-required", "false",

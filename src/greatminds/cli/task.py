@@ -2451,11 +2451,20 @@ def _worktree_hook_pre_move(coord: Path, role: str, task_id: str,
     if task_kind not in policy.required_for_task_kinds:
         return
     project_dir = coord.parent
-    # Skip cleanly on non-git projects (greenfield setup, test
-    # fixtures). Hooks are no-ops when the project isn't yet under
-    # version control — running `git init` is an operator decision.
-    if not (project_dir / ".git").exists():
-        return
+    # Required implementation work must have a legal git/worktree surface
+    # before it reaches an implementer queue. A no-git project may be a
+    # validation-only/deployed payload, but it cannot accept backend/UI code
+    # work that schema says must happen in a per-task worktree.
+    if to_q in _IMPLEMENTER_QUEUES and not (project_dir / ".git").exists():
+        raise GreatMindsError(
+            f"0185: worktree create for {task_id} failed: project "
+            f"{project_dir} is not a git repository, so required "
+            "per-task worktree isolation cannot be created. Initialize or "
+            "point Greatminds at a source git checkout before routing "
+            f"task.kind={task_kind!r} to {to_q}; no-git deploy payloads "
+            "are validation-only for implementation tasks.",
+            exit_code=4,
+        )
 
     if to_q in _IMPLEMENTER_QUEUES:
         # Idempotent: returns the existing path on re-entry.

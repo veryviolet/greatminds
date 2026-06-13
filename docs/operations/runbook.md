@@ -127,3 +127,33 @@ The holder, not `STAND-KEEPER`, releases the lease after product probes:
 greatminds stand release --lease-id LEASE_ID --result pass
 ```
 
+## Stuck Driven Turns
+
+Driven roles do not keep a persistent agent process. `coordd` creates one turn
+per event and holds `coordination/.locks/driven-<role>.lock` for the duration
+of that turn. New lock files contain JSON metadata such as `role`, `driver`,
+`started_at`, `coordd_pid`, and `log_path`.
+
+Use:
+
+```bash
+greatminds dashboard --once
+greatminds watchdog
+```
+
+If the dashboard shows `stuck` or watchdog reports `STUCK DRIVEN TURNS`, treat
+the turn as an infrastructure incident, not normal implementation progress.
+Inspect the named `log_path`, the matching `.pending` marker, and coordd logs.
+Do not assume a task is being worked just because a driven lock exists.
+
+## No-Git Deploy Payloads
+
+A deployed payload without `.git` is valid only as a validation target. It is
+not a legal source checkout for backend/UI implementation work that requires
+per-task worktrees.
+
+If a required code task is routed toward an implementer queue and the project
+root is not a git repository, `greatminds task mv` must fail before the task
+reaches the implementer. Recover by pointing Greatminds at a real source git
+checkout or initializing the intended source project, then rerun the route.
+Do not reintroduce stale `.git` pointers into deployed payload directories.
