@@ -4,6 +4,27 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 2.0.3 — 2026-06-13
+
+### Fixed
+
+- Review-session stand leases now refuse stale worktrees that predate any
+  currently verified product review commit, not only commits listed in explicit
+  blocked dependencies. This prevents final EXPLORER/full-deploy validation from
+  reporting `ready` for an integrated tree that is missing later verified
+  product work.
+
+## 2.0.2 — 2026-06-13
+
+### Fixed
+
+- Shipped `full-deploy`, `smoke-only`, and `vite-dev` stand profiles now treat
+  `STAND_HOST=localhost`, `127.0.0.1`, and `::1` as local ansible targets.
+  `full-deploy` and `vite-dev` also use a local rsync destination for those
+  loopback stands instead of forcing `localhost:/path` over SSH. This fixes
+  fresh user toy stands failing with `Host key verification failed` before any
+  product validation can run.
+
 ## 2.0.1 — 2026-06-13
 
 ### Fixed

@@ -42,6 +42,12 @@ def _deploy_play(name: str) -> dict:
     return data[-1]
 
 
+def _register_play(name: str) -> dict:
+    data = yaml.safe_load(_template_text(name))
+    assert isinstance(data, list) and data
+    return data[0]
+
+
 # ---------- shipped templates carry the PATH block ----------
 
 
@@ -81,6 +87,47 @@ def test_path_block_present_in_raw_template_text() -> None:
     round-tripping and is greppable for downstream tooling."""
     for name in ("full-deploy.yaml", "smoke-only.yaml"):
         assert _LOCAL_BIN in _template_text(name), name
+
+
+# ---------- loopback hosts must not require SSH ----------
+
+
+def test_loopback_hosts_use_local_ansible_connection() -> None:
+    """A user-path toy stand commonly sets STAND_HOST=localhost.
+    The shipped profiles must not make ansible SSH to localhost, because
+    fresh hosts can fail on known_hosts before any product probe runs."""
+    for name in ("full-deploy.yaml", "smoke-only.yaml", "vite-dev.yaml"):
+        tasks = _register_play(name).get("tasks") or []
+        add_host = next(t for t in tasks if "ansible.builtin.add_host" in t)
+        args = add_host["ansible.builtin.add_host"]
+        expr = args.get("ansible_connection", "")
+        assert "local" in expr
+        assert "localhost" in expr
+        assert "127.0.0.1" in expr
+        assert "::1" in expr
+
+
+def test_full_deploy_has_local_rsync_without_ssh_target() -> None:
+    """When ansible_connection=local, rsync must copy to deploy_path as a
+    local filesystem path, not to ``localhost:deploy_path`` over SSH."""
+    tasks = _deploy_play("full-deploy.yaml").get("tasks") or []
+    local_sync = next(
+        t for t in tasks if t.get("name") == "sync worktree to local deploy_path"
+    )
+    cmd = local_sync["ansible.builtin.command"]["cmd"]
+    assert "{{ inventory_hostname }}:" not in cmd
+    assert "{{ deploy_path }}/" in cmd
+    assert local_sync.get("when") == "(ansible_connection | default('ssh')) == 'local'"
+
+
+def test_full_deploy_remote_rsync_still_uses_ssh_target() -> None:
+    tasks = _deploy_play("full-deploy.yaml").get("tasks") or []
+    remote_sync = next(
+        t for t in tasks if t.get("name") == "sync worktree to deploy_path over ssh"
+    )
+    cmd = remote_sync["ansible.builtin.command"]["cmd"]
+    assert "{{ inventory_hostname }}:{{ deploy_path }}/" in cmd
+    assert remote_sync.get("when") == "(ansible_connection | default('ssh')) != 'local'"
 
 
 # ---------- install task must expand the wheel glob via a shell ----------

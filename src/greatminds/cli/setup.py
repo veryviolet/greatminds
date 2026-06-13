@@ -348,6 +348,10 @@ _STALE_SHIPPED_PROFILE_HASHES: dict[str, frozenset[str]] = {
         # leaves a stale destination `.git` pointer in place forever; reseed
         # pristine copies to the template that removes deploy_path/.git first.
         "4ca039ad80125011cb331249c3fb9baab086b26c630751f60457575bd91355c0",
+        # 2.0.1 template before local-loopback hosts were registered with
+        # ansible_connection=local and before local rsync avoided the
+        # localhost SSH known_hosts trap.
+        "551f9f76a83fb53f9318ab0f5684ad740012236cb64cb5a10cdbc56c69f669ea",
     }),
     "smoke-only.yaml": frozenset({
         "4342d1565f86de3d81569174f315e32f52bc95858a325b0585096637f42f1123",
@@ -355,12 +359,18 @@ _STALE_SHIPPED_PROFILE_HASHES: dict[str, frozenset[str]] = {
         "82efeb03acb5462964d6ee8f1da38a27483a42fcbc08fe4a95545bd0cf06f267",
         # 1.6.x add_host rewrite without the uv PATH block (task 0372).
         "50e719ab502fed73b2fc0dd9ac4bad3603202877c09cd5bba1ef4e6c5bf09f86",
+        # 2.0.1 template before local-loopback hosts were registered with
+        # ansible_connection=local.
+        "69adde1c838155dc0455790d59eef7556be78ac54892959541a78a5c0f9c3ff0",
     }),
     "vite-dev.yaml": frozenset({
         "077e70f2905520baf92020e725db34ebc4e9b5723ad22f7cb22f07af68b9eb70",
         "13db5f9415c9bb237b5a73b07a06c6a6d5023c2957072540ea03abfdf4cfc568",
         "5077f9ef7fb7a3354d8573835f25f015da69b12368a679eb564ddaa098a4265c",
         "f7baec9084a195cbc526ff7a3a09ee98a248e88159a78869e2e67b4df7525d88",
+        # 2.0.1 template before local-loopback hosts were registered with
+        # ansible_connection=local and local rsync avoided SSH.
+        "a94e77a9c4ae4a766bbc5e98e6960f2369af46ca018372f9149a205037bff64a",
     }),
 }
 

@@ -28,6 +28,9 @@
       ansible.builtin.add_host:
         name: "{{ item }}"
         groups: stand_nodes
+        ansible_connection: >-
+          {{ 'local' if item in ['localhost', '127.0.0.1', '::1']
+             else 'ssh' }}
       loop: >-
         {{ (STAND_HOST | default('localhost')).split(',')
            | map('trim') | reject('equalto', '') | list }}
@@ -78,7 +81,7 @@
         cmd: rm -rf -- "{{ deploy_path }}/.git"
       changed_when: true
 
-    - name: sync worktree to deploy_path
+    - name: sync worktree to deploy_path over ssh
       # Plain rsync via command so the playbook needs only ansible-core
       # (no ansible.posix). delegate_to localhost runs rsync on the control
       # node, pushing to the stand node over SSH (its ~/.ssh/config supplies
@@ -100,6 +103,24 @@
           {{ worktree }}/
           {{ inventory_hostname }}:{{ deploy_path }}/
       delegate_to: localhost
+      when: (ansible_connection | default('ssh')) != 'local'
+      changed_when: true
+
+    - name: sync worktree to local deploy_path
+      # For STAND_HOST=localhost / loopback the stand is the control node.
+      # Do not force rsync through SSH; fresh hosts may not have localhost in
+      # known_hosts, and a local copy is the ansible-native topology.
+      ansible.builtin.command:
+        cmd: >
+          rsync -aP
+          --exclude=.git
+          --exclude=.venv*
+          --exclude=.worktrees
+          --exclude=__pycache__
+          {{ worktree }}/
+          {{ deploy_path }}/
+      delegate_to: localhost
+      when: (ansible_connection | default('ssh')) == 'local'
       changed_when: true
 
     - name: ensure uv is on PATH

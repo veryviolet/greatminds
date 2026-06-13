@@ -786,11 +786,17 @@ def stale_verified_deps_for_lease(
     """0388: detect a STALE lease worktree — one whose code predates a
     verified dependency the leasing task was explicitly blocked on.
 
-    Returns ``[(dep_id, dep_commit), ...]`` for every ``verified/<id>``
-    dependency (drawn from the task's ``blocked`` blocks) whose verified
-    review-commit is NOT contained in the lease worktree's git history.
-    Deploying such a worktree runs code missing an already-verified fix —
-    the 0388 wedge (a resumed review_session redeploys its old base and
+    Returns ``[(dep_id, dep_commit), ...]`` for every verified review
+    commit that the lease worktree is missing. For ordinary product tasks,
+    the checked set is intentionally narrow: only ``verified/<id>``
+    dependencies drawn from the task's ``blocked`` blocks. For
+    ``review_session`` tasks, the checked set is broader: every product
+    task currently in ``verified/``. A final EXPLORER review-session
+    lease is an integrated-system probe; after product drain it must not
+    deploy a worktree predating later verified product commits.
+
+    Deploying a stale worktree runs code missing an already-verified fix
+    — the 0388 wedge (a resumed review_session redeploys its old base and
     rediscovers the very bug whose fix was verified upstream).
 
     CONSERVATIVE by construction: returns ``[]`` whenever staleness
@@ -827,6 +833,25 @@ def stale_verified_deps_for_lease(
         for d in b.get("dependencies") or []:
             if isinstance(d, str) and d.strip():
                 dep_refs.append(d.strip())
+
+    # Review sessions are integrated black-box probes. They may be created
+    # before later product tasks reach verified; by the time EXPLORER leases
+    # the stand after a product drain, their worktree must include every
+    # verified product review commit, not only the fixes they were explicitly
+    # blocked on earlier.
+    if merged.get("stream") == "review_session":
+        verified_dir = coord / "verified"
+        try:
+            for p in sorted(verified_dir.glob("*.yaml")):
+                try:
+                    dep = load_task(p)
+                except Exception:
+                    continue
+                if dep.get("stream") == "review_session":
+                    continue
+                dep_refs.append(f"verified/{p.name}")
+        except OSError:
+            pass
 
     stale: list[tuple[str, str]] = []
     seen: set[str] = set()

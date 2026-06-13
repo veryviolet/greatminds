@@ -191,6 +191,49 @@ def test_latest_review_commit_wins(tmp_path):
         coord, "0379-campaign", str(wt)) == [("0387-fix", commit_b)]
 
 
+def test_review_session_checks_all_verified_product_commits(tmp_path):
+    """1008 regression: a final EXPLORER review-session lease can be
+    created before later product work reaches verified. After product
+    drain, deploying that old review-session worktree must be refused
+    even when the review_session has no explicit blocked dependency on
+    the later verified task."""
+    coord = _coord(tmp_path)
+    wt = tmp_path / "proj" / ".worktrees" / "1004-review"
+    commit_a, commit_b = _make_repo(wt)
+    _git(wt, "checkout", "-q", commit_a)
+    _verified_dep(coord, "1001-safe-divide", commit_b)
+    _write_task(coord, "review_sessions", "1004-review", {
+        "stream": "review_session",
+        "kind": "review_session",
+        "blocks": [
+            {"kind": "session_iteration", "summary": "no explicit deps"},
+        ],
+    })
+
+    assert stand_mod.stale_verified_deps_for_lease(
+        coord, "1004-review", str(wt)) == [("1001-safe-divide", commit_b)]
+
+
+def test_product_task_does_not_check_unrelated_verified_commits(tmp_path):
+    """The broad all-verified check is review_session-only. Product task
+    leases keep the narrower explicit-dependency behavior so unrelated
+    verified work does not block their stand validation."""
+    coord = _coord(tmp_path)
+    wt = tmp_path / "proj" / ".worktrees" / "1001-product"
+    commit_a, commit_b = _make_repo(wt)
+    _git(wt, "checkout", "-q", commit_a)
+    _verified_dep(coord, "1000-unrelated", commit_b)
+    _write_task(coord, "review_sessions", "1001-product", {
+        "stream": "product",
+        "blocks": [
+            {"kind": "blocked", "dependencies": [], "resume_to": "feature_test"},
+        ],
+    })
+
+    assert stand_mod.stale_verified_deps_for_lease(
+        coord, "1001-product", str(wt)) == []
+
+
 def test_stale_deploy_message_names_truthful_refresh_path(
         tmp_path, monkeypatch):
     """0393: STALE DEPLOYMENT down_reason must name the sanctioned
