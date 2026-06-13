@@ -166,6 +166,40 @@ def _driven_lock_meta(lock: Path) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
+def _driven_retry_meta(path: Path) -> dict[str, Any]:
+    """Best-effort JSON metadata from a driven retry/backoff status file."""
+    try:
+        text = path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return {}
+    if not text:
+        return {}
+    try:
+        import json
+        data = json.loads(text)
+    except (ValueError, TypeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _retry_doing(meta: dict[str, Any], now: float) -> str:
+    klass = meta.get("klass") or "error"
+    attempts = meta.get("attempts") or 0
+    detail = meta.get("detail")
+    if meta.get("escalated"):
+        text = f"retry stopped · {klass} attempt {attempts}"
+    else:
+        try:
+            remaining = float(meta.get("next_at_epoch") or 0.0) - now
+        except (TypeError, ValueError):
+            remaining = 0.0
+        wait = "due now" if remaining <= 0 else f"in {_fmt_age(remaining)}"
+        text = f"backoff · {klass} attempt {attempts} · {wait}"
+    if isinstance(detail, str) and detail.strip():
+        text += f" · {_clip(detail.strip(), 80)}"
+    return text
+
+
 def _agent_doing(rec: dict[str, Any], mode: str, lifecycle: str,
                  driven_turn: bool, fresh_sec: float,
                  claimed: list[str], stand_holder: str = "",
@@ -206,16 +240,18 @@ def collect_agents(coord: Path, coord_yaml: dict | None, canon_dir: Path,
                    stand: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     from greatminds.cli.agent import collect_agent_status
     from greatminds.cli.coordd import (
-        PUSH_FRESH_GUARD_SEC, _driven_pending_path, _driven_run_lock_path,
-        _hang_threshold_seconds, _lifecycle_for_role,
+        PUSH_FRESH_GUARD_SEC, _driven_pending_path, _driven_retry_path,
+        _driven_run_lock_path, _hang_threshold_seconds, _lifecycle_for_role,
     )
 
     rows: list[dict[str, Any]] = []
+    now = time.time()
     for entry in _fleet_roster(coord_yaml):
         role = entry["role"]
         rec = collect_agent_status(coord, role)
         lifecycle = _lifecycle_for_role(canon_dir, role) or ""
         lock = _driven_run_lock_path(coord, role.lower())
+        retry_meta = _driven_retry_meta(_driven_retry_path(coord, role.lower()))
         hb_age = rec.get("heartbeat_age")
         driven_turn = lifecycle == "driven" and lock.is_file()
         turn_age: float | None = None
@@ -248,6 +284,8 @@ def collect_agents(coord: Path, coord_yaml: dict | None, canon_dir: Path,
         state = _agent_state(rec, entry["mode"], lifecycle, driven_turn)
         if stale_turn:
             state = "stuck"
+        elif lifecycle == "driven" and retry_meta:
+            state = "failed" if retry_meta.get("escalated") else "backoff"
         doing = _agent_doing(rec, entry["mode"], lifecycle,
                              driven_turn, PUSH_FRESH_GUARD_SEC, claimed,
                              stand_holder=(stand or {}).get("holder") or "",
@@ -268,6 +306,8 @@ def collect_agents(coord: Path, coord_yaml: dict | None, canon_dir: Path,
             if not recent_log:
                 bits.append("no turn log")
             doing = " · ".join(bits)
+        elif lifecycle == "driven" and retry_meta:
+            doing = _retry_doing(retry_meta, now)
         rows.append({
             "role": role,
             "tool": entry["tool"] or (rec.get("tool") or "—"),

@@ -102,6 +102,63 @@ def test_collect_agents_stale_lock_is_stuck_with_evidence(tmp_path, monkeypatch)
     assert "no turn log" in rows[0]["doing"]
 
 
+def test_collect_agents_retry_backoff_is_visible(tmp_path, monkeypatch):
+    coord = tmp_path / "coordination"
+    (coord / ".locks").mkdir(parents=True)
+    (coord / ".locks" / "driven-tester.retry.json").write_text(json.dumps({
+        "role": "TESTER",
+        "klass": "rate_limit",
+        "attempts": 4,
+        "next_at_epoch": time.time() + 120,
+        "escalated": False,
+        "detail": "429 temporarily limiting requests",
+    }))
+
+    from greatminds.cli import agent as agent_mod
+    from greatminds.cli import coordd as cd
+    monkeypatch.setattr(db, "_fleet_roster",
+                        lambda _y: [{"role": "TESTER", "tool": "codex",
+                                     "mode": "driven"}])
+    monkeypatch.setattr(agent_mod, "collect_agent_status",
+                        lambda _c, _r: {"alive": False, "registered": True,
+                                        "heartbeat_age": None, "tool": "codex"})
+    monkeypatch.setattr(cd, "_lifecycle_for_role", lambda _c, _r: "driven")
+
+    rows = db.collect_agents(coord, {"session": "x"}, tmp_path / "canon", {})
+    assert rows[0]["state"] == "backoff"
+    assert "backoff" in rows[0]["doing"]
+    assert "rate_limit attempt 4" in rows[0]["doing"]
+    assert "429 temporarily limiting requests" in rows[0]["doing"]
+
+
+def test_collect_agents_escalated_retry_is_failed(tmp_path, monkeypatch):
+    coord = tmp_path / "coordination"
+    (coord / ".locks").mkdir(parents=True)
+    (coord / ".locks" / "driven-developer.retry.json").write_text(json.dumps({
+        "role": "DEVELOPER",
+        "klass": "timeout",
+        "attempts": 3,
+        "next_at_epoch": 0,
+        "escalated": True,
+        "detail": "turn timed out",
+    }))
+
+    from greatminds.cli import agent as agent_mod
+    from greatminds.cli import coordd as cd
+    monkeypatch.setattr(db, "_fleet_roster",
+                        lambda _y: [{"role": "DEVELOPER", "tool": "claude",
+                                     "mode": "driven"}])
+    monkeypatch.setattr(agent_mod, "collect_agent_status",
+                        lambda _c, _r: {"alive": False, "registered": True,
+                                        "heartbeat_age": None, "tool": "claude"})
+    monkeypatch.setattr(cd, "_lifecycle_for_role", lambda _c, _r: "driven")
+
+    rows = db.collect_agents(coord, {"session": "x"}, tmp_path / "canon", {})
+    assert rows[0]["state"] == "failed"
+    assert "retry stopped" in rows[0]["doing"]
+    assert "timeout attempt 3" in rows[0]["doing"]
+
+
 def test_doing_driven_turn_wins():
     d = db._agent_doing(_rec(True, 5), "driven", "driven",
                         driven_turn=True, fresh_sec=60, claimed=["0042"])

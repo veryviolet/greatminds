@@ -146,6 +146,21 @@ the turn as an infrastructure incident, not normal implementation progress.
 Inspect the named `log_path`, the matching `.pending` marker, and coordd logs.
 Do not assume a task is being worked just because a driven lock exists.
 
+## Driven Retry Backoff
+
+When a driven turn exits with a rate-limit, timeout, or execution error,
+`coordd` records retry state in
+`coordination/.locks/driven-<role>.retry.json`. The live scheduler uses this
+state to re-drive the role after backoff and restores it after a coordd
+restart. `greatminds dashboard --once` shows these roles as `backoff` or
+`failed`; `greatminds watchdog` reports them under `DRIVEN RETRIES`.
+
+`backoff` means no turn is running because coordd is intentionally waiting for
+the next retry time. `failed` means bounded hard retries were exhausted and
+auto-retry stopped after escalation. Inspect the retry detail and the latest
+`.turns/<role>-*.log`; clear the root cause, then trigger a real queue/inbox
+event so the role gets a fresh attempt.
+
 ## No-Git Deploy Payloads
 
 A deployed payload without `.git` is valid only as a validation target. It is

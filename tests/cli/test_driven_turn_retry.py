@@ -73,11 +73,14 @@ def test_retry_delay_hard_first_and_cap():
 
 
 def test_ok_clears_state(tmp_path):
+    (tmp_path / ".locks").mkdir()
+    cd._driven_retry_path(tmp_path, "developer").write_text("{}")
     cd._DRIVEN_RETRY["developer"] = {"attempts": 2, "klass": "error",
                                      "next_at": 0.0, "escalated": False,
                                      "notified": False}
     cd._note_turn_outcome(tmp_path, "developer", "ok", "", False)
     assert "developer" not in cd._DRIVEN_RETRY
+    assert not cd._driven_retry_path(tmp_path, "developer").exists()
 
 
 def test_rate_limit_schedules_and_never_escalates(tmp_path, monkeypatch):
@@ -91,6 +94,11 @@ def test_rate_limit_schedules_and_never_escalates(tmp_path, monkeypatch):
     assert st["escalated"] is False
     assert st["attempts"] == 8
     assert st["next_at"] > 0
+    status = json.loads(
+        cd._driven_retry_path(tmp_path, "developer").read_text())
+    assert status["klass"] == "rate_limit"
+    assert status["attempts"] == 8
+    assert status["next_at_epoch"] > 0
 
 
 def test_hard_error_escalates_and_stops(tmp_path, monkeypatch):
@@ -104,6 +112,9 @@ def test_hard_error_escalates_and_stops(tmp_path, monkeypatch):
     assert last["escalated"] is True
     assert calls and calls[-1][0] == "tester"
     assert cd._DRIVEN_RETRY["tester"]["escalated"] is True
+    status = json.loads(cd._driven_retry_path(tmp_path, "tester").read_text())
+    assert status["escalated"] is True
+    assert status["detail"] == "boom"
 
 
 def test_class_change_resets_attempts(tmp_path, monkeypatch):
@@ -171,6 +182,7 @@ def test_process_due_retries_skips_when_lock_held(tmp_path, monkeypatch):
 def test_event_dispatch_clears_retry_state(tmp_path, monkeypatch):
     """A real (non-retry) dispatch clears prior backoff/escalation."""
     coord = _coord(tmp_path)
+    cd._driven_retry_path(coord, "developer").write_text("{}")
     cd._DRIVEN_RETRY["developer"] = {"attempts": 3, "klass": "error",
                                      "next_at": 1.0, "escalated": True,
                                      "notified": False}
@@ -182,3 +194,25 @@ def test_event_dispatch_clears_retry_state(tmp_path, monkeypatch):
                                 ("", "unknown-tool"), "DEVELOPER", False,
                                 trigger=" (startup-reconcile)")
     assert "developer" not in cd._DRIVEN_RETRY
+    assert not cd._driven_retry_path(coord, "developer").exists()
+
+
+def test_process_due_retries_restores_persisted_retry(tmp_path, monkeypatch):
+    coord = _coord(tmp_path)
+    cd._driven_retry_path(coord, "developer").write_text(json.dumps({
+        "role": "DEVELOPER",
+        "klass": "rate_limit",
+        "attempts": 2,
+        "next_at_epoch": 1.0,
+        "escalated": False,
+        "notified": False,
+    }))
+    monkeypatch.setattr(cd, "_read_coord_yaml", lambda p: {"windows": []})
+    monkeypatch.setattr(cd, "_window_and_tool_for_role",
+                        lambda d, r: ("", "claude"))
+    driven = []
+    monkeypatch.setattr(cd, "_maybe_drive_driven_role",
+                        lambda *a, **k: driven.append(a[4]))
+    cd._process_due_retries(coord, tmp_path, False)
+    assert "DEVELOPER" in driven
+    assert cd._DRIVEN_RETRY["developer"]["klass"] == "rate_limit"

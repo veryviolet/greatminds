@@ -230,6 +230,43 @@ def watchdog(project_dir: Path | None, canon_dir: Path | None, quiet: bool) -> N
     elif not quiet:
         info("driven turns: 0 stuck")
 
+    # ---- Driven retry/backoff state
+    #
+    # Failed driven turns are retried by coordd after backoff. The scheduler's
+    # in-memory state is mirrored to .locks so watchdog can explain "nothing is
+    # running" as either a planned retry wait or a stopped/escalated failure.
+    retry_rows: list[tuple[str, dict]] = []
+    if locks_dir.is_dir():
+        for f in sorted(locks_dir.glob("driven-*.retry.json")):
+            role = f.name[len("driven-"):-len(".retry.json")]
+            meta = _read_json_file(f)
+            if meta:
+                retry_rows.append((role, meta))
+
+    if retry_rows:
+        findings += len(retry_rows)
+        warn(f"DRIVEN RETRIES ({len(retry_rows)}):")
+        for role, meta in retry_rows:
+            klass = meta.get("klass") or "error"
+            attempts = meta.get("attempts") or 0
+            bits = [f"{role}: {klass} attempt {attempts}"]
+            if meta.get("escalated"):
+                bits.append("auto-retry stopped")
+            else:
+                try:
+                    remaining = float(meta.get("next_at_epoch") or 0.0) - now
+                except (TypeError, ValueError):
+                    remaining = 0.0
+                bits.append("due now" if remaining <= 0
+                            else f"next in {fmt_age(remaining)}")
+            detail = meta.get("detail")
+            if isinstance(detail, str) and detail.strip():
+                bits.append(detail.strip()[:120])
+            warn("  " + " · ".join(bits))
+        click.echo()
+    elif not quiet:
+        info("driven retries: 0")
+
     # ---- Stale tasks per queue
     active_threshold = thresholds["task_stale_in_active_queue_seconds"]
     review_threshold = thresholds["task_stale_in_review_queue_seconds"]

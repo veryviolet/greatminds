@@ -683,6 +683,91 @@ def _driven_pending_path(coord: Path, role_lower: str) -> Path:
     return coord / ".locks" / f"driven-{role_lower}.pending"
 
 
+def _driven_retry_path(coord: Path, role_lower: str) -> Path:
+    """Operator-visible retry/backoff state for a driven role.
+
+    The scheduler's live timing uses monotonic time in ``_DRIVEN_RETRY``.
+    Dashboard/watchdog and coordd restarts need wall-clock state, so each
+    scheduled retry is mirrored here as JSON.
+    """
+    return coord / ".locks" / f"driven-{role_lower}.retry.json"
+
+
+def _remove_driven_retry_status(coord: Path, role_lower: str) -> None:
+    try:
+        _driven_retry_path(coord, role_lower).unlink()
+    except OSError:
+        pass
+
+
+def _write_driven_retry_status(
+    coord: Path,
+    role_lower: str,
+    state: dict,
+    detail: str,
+) -> None:
+    path = _driven_retry_path(coord, role_lower)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "role": role_lower.upper(),
+        "klass": state.get("klass"),
+        "attempts": int(state.get("attempts") or 0),
+        "escalated": bool(state.get("escalated")),
+        "notified": bool(state.get("notified")),
+        "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "updated_at_epoch": time.time(),
+        "next_at_epoch": state.get("next_at_epoch") or 0.0,
+        "detail": (detail or "")[:500],
+    }
+    try:
+        path.write_text(json.dumps(payload, sort_keys=True) + "\n",
+                        encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _read_driven_retry_status(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _load_persisted_retry_states(coord: Path) -> None:
+    """Restore due/backoff retry state after coordd restart.
+
+    Escalated rows stay on disk for visibility but are not inserted back into
+    the live scheduler, because auto-retry intentionally stopped.
+    """
+    locks = coord / ".locks"
+    if not locks.is_dir():
+        return
+    now_epoch = time.time()
+    now_mono = time.monotonic()
+    with _RETRY_LOCK:
+        for path in sorted(locks.glob("driven-*.retry.json")):
+            role_lower = path.name[len("driven-"):-len(".retry.json")]
+            if role_lower in _DRIVEN_RETRY:
+                continue
+            data = _read_driven_retry_status(path)
+            if not data or data.get("escalated"):
+                continue
+            klass = data.get("klass")
+            if klass not in {"rate_limit", "error", "timeout"}:
+                continue
+            attempts = int(data.get("attempts") or 0)
+            next_at_epoch = float(data.get("next_at_epoch") or now_epoch)
+            _DRIVEN_RETRY[role_lower] = {
+                "attempts": attempts,
+                "klass": klass,
+                "next_at": now_mono + max(0.0, next_at_epoch - now_epoch),
+                "next_at_epoch": next_at_epoch,
+                "escalated": False,
+                "notified": bool(data.get("notified")),
+            }
+
+
 def _build_driven_claude_argv(
     session_id: str,
     bootstrap_file: str | None,
@@ -916,15 +1001,20 @@ def _note_turn_outcome(coord: Path, role_lower: str, klass: str,
     with _RETRY_LOCK:
         if klass == "ok":
             _DRIVEN_RETRY.pop(role_lower, None)
+            _remove_driven_retry_status(coord, role_lower)
             return None
         st = _DRIVEN_RETRY.get(role_lower)
         if st is None or st.get("klass") != klass:
             st = {"attempts": 0, "klass": klass, "next_at": 0.0,
-                  "escalated": False, "notified": False}
+                  "next_at_epoch": 0.0, "escalated": False,
+                  "notified": False}
             _DRIVEN_RETRY[role_lower] = st
         st["attempts"] += 1
+        st["next_at_epoch"] = 0.0
         if klass == "rate_limit":
-            st["next_at"] = now + _retry_delay(klass, st["attempts"])
+            delay = _retry_delay(klass, st["attempts"])
+            st["next_at"] = now + delay
+            st["next_at_epoch"] = time.time() + delay
             do_notify = (st["attempts"] == RETRY_RL_NOTIFY_AT
                          and not st["notified"])
             if do_notify:
@@ -933,8 +1023,11 @@ def _note_turn_outcome(coord: Path, role_lower: str, klass: str,
             if st["attempts"] >= RETRY_HARD_MAX:
                 st["escalated"] = True
             else:
-                st["next_at"] = now + _retry_delay(klass, st["attempts"])
+                delay = _retry_delay(klass, st["attempts"])
+                st["next_at"] = now + delay
+                st["next_at_epoch"] = time.time() + delay
         snap = dict(st)
+    _write_driven_retry_status(coord, role_lower, snap, detail)
     if klass != "rate_limit" and snap.get("escalated"):
         _escalate_to_maintainer(coord, role_lower, klass,
                                 snap["attempts"], detail)
@@ -949,17 +1042,20 @@ def _note_turn_outcome(coord: Path, role_lower: str, klass: str,
     return snap
 
 
-def _clear_retry_state(role_lower: str) -> None:
+def _clear_retry_state(role_lower: str, coord: Path | None = None) -> None:
     """A real event (queue move / inbox) drove the role — drop any
     backoff/escalation so it gets a fresh chance."""
     with _RETRY_LOCK:
         _DRIVEN_RETRY.pop(role_lower, None)
+    if coord is not None:
+        _remove_driven_retry_status(coord, role_lower)
 
 
 def _process_due_retries(coord: Path, canon_dir: Path, verbose: bool) -> None:
     """Main-loop step: re-dispatch driven roles whose retry backoff is due.
     Targeted (only roles whose last turn failed), not a blanket sweep;
     escalated roles are skipped until a real event clears them."""
+    _load_persisted_retry_states(coord)
     now = time.monotonic()
     due: list[str] = []
     with _RETRY_LOCK:
@@ -2079,7 +2175,7 @@ def _maybe_drive_driven_role(coord: Path, canon_dir: Path,
         # A REAL event (queue move / inbox / reconcile) drives the role —
         # clear any prior-failure backoff/escalation so genuinely new work
         # gets a clean chance (the retry path passes trigger=" (retry)").
-        _clear_retry_state(role.lower())
+        _clear_retry_state(role.lower(), coord)
     if tool == "claude":
         reg = read_registry(coord / REGISTRY_DIR, role.lower())
         session_id = (reg or {}).get("session_id") or ""
