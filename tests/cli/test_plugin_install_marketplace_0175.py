@@ -82,11 +82,13 @@ def fake_claude_cli(monkeypatch):
     """Record every subprocess.run call for claude plugin commands.
     Returns the call list."""
     calls: list[list[str]] = []
+    monkeypatch.setattr(setup_mod, "_resolve_claude_binary",
+                        lambda: "/fake/bin/claude")
 
     def fake_run(cmd, *_a, **_kw):
         calls.append(list(cmd))
         # ``claude plugin list`` returns empty (no existing plugins).
-        if cmd[:3] == ["claude", "plugin", "list"]:
+        if cmd[1:3] == ["plugin", "list"]:
             return subprocess.CompletedProcess(list(cmd), 0, "", "")
         return subprocess.CompletedProcess(list(cmd), 0, "", "")
 
@@ -122,6 +124,8 @@ def test_install_claude_plugins_skips_already_installed(monkeypatch) -> None:
     0203-iter-2 it now classifies as ``preserved-prior`` (pre-
     campaign)."""
     calls: list[list[str]] = []
+    monkeypatch.setattr(setup_mod, "_resolve_claude_binary",
+                        lambda: "/fake/bin/claude")
 
     def fake_run(cmd, *_a, **_kw):
         calls.append(list(cmd))
@@ -152,6 +156,9 @@ def test_install_claude_plugins_continues_after_per_plugin_failure(monkeypatch) 
     ``claude plugin install postman`` fails (upstream renamed it,
     etc.), the loop continues to ``sentry`` and reports the failure
     count."""
+    monkeypatch.setattr(setup_mod, "_resolve_claude_binary",
+                        lambda: "/fake/bin/claude")
+
     def fake_run(cmd, *_a, **_kw):
         if cmd[1:3] == ["plugin", "list"]:
             return subprocess.CompletedProcess(list(cmd), 0, "", "")
