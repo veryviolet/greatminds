@@ -1240,10 +1240,43 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#wake-stand-keeper" class="md-nav__link">
+  <a href="#inspect-stand-lease-deploy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Wake STAND-KEEPER
+        Inspect Stand Lease Deploy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stuck-driven-turns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stuck Driven Turns
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#driven-retry-backoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Driven Retry Backoff
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#no-git-deploy-payloads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        No-Git Deploy Payloads
       
     </span>
   </a>
@@ -1535,10 +1568,43 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#wake-stand-keeper" class="md-nav__link">
+  <a href="#inspect-stand-lease-deploy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Wake STAND-KEEPER
+        Inspect Stand Lease Deploy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stuck-driven-turns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stuck Driven Turns
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#driven-retry-backoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Driven Retry Backoff
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#no-git-deploy-payloads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        No-Git Deploy Payloads
       
     </span>
   </a>
@@ -1636,22 +1702,56 @@ needed to unblock the fleet. Keep it narrow:</p>
 recreate or repair <code>.venv-coord</code>, reinstall the intended package version, then
 restart the daemon and agents from that venv. Avoid <code>uv run</code> during recovery;
 call the target venv's <code>greatminds</code> binary directly.</p>
-<h2 id="wake-stand-keeper">Wake STAND-KEEPER<a class="headerlink" href="#wake-stand-keeper" title="Permanent link">&para;</a></h2>
+<h2 id="inspect-stand-lease-deploy">Inspect Stand Lease Deploy<a class="headerlink" href="#inspect-stand-lease-deploy" title="Permanent link">&para;</a></h2>
 <p>Stand work is lease-backed. A holder requests a lease with:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>lease<span class="w"> </span>--task<span class="w"> </span>TASK_ID<span class="w"> </span>--worktree<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>greatminds<span class="w"> </span>worktree<span class="w"> </span>path<span class="w"> </span>TASK_ID<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span>--profile<span class="w"> </span>full-deploy
 </code></pre></div>
-<p><code>coordd</code> wakes <code>STAND-KEEPER</code> on stand-state changes. If the lease stays in
-<code>preparing</code>, inspect:</p>
+<p><code>coordd</code> handles stand-state changes and deploys the active lease profile. If
+the lease stays in <code>preparing</code>, inspect:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>status
-greatminds<span class="w"> </span>agent<span class="w"> </span>status<span class="w"> </span>STAND-KEEPER
 greatminds<span class="w"> </span>watchdog
 </code></pre></div>
-<p>If the stand is down, <code>STAND-KEEPER</code> recovers it and runs:</p>
+<p>If the stand is down after an infrastructure fix, an operator with global
+stand control runs:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>up<span class="w"> </span>--reason<span class="w"> </span><span class="s2">&quot;recovered ...&quot;</span>
 </code></pre></div>
-<p>The holder, not <code>STAND-KEEPER</code>, releases the lease after product probes:</p>
+<p>The holder releases the lease after product probes:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>release<span class="w"> </span>--lease-id<span class="w"> </span>LEASE_ID<span class="w"> </span>--result<span class="w"> </span>pass
 </code></pre></div>
+<h2 id="stuck-driven-turns">Stuck Driven Turns<a class="headerlink" href="#stuck-driven-turns" title="Permanent link">&para;</a></h2>
+<p>Driven roles do not keep a persistent agent process. <code>coordd</code> creates one turn
+per event and holds <code>coordination/.locks/driven-&lt;role&gt;.lock</code> for the duration
+of that turn. New lock files contain JSON metadata such as <code>role</code>, <code>driver</code>,
+<code>started_at</code>, <code>coordd_pid</code>, and <code>log_path</code>.</p>
+<p>Use:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>dashboard<span class="w"> </span>--once
+greatminds<span class="w"> </span>watchdog
+</code></pre></div>
+<p>If the dashboard shows <code>stuck</code> or watchdog reports <code>STUCK DRIVEN TURNS</code>, treat
+the turn as an infrastructure incident, not normal implementation progress.
+Inspect the named <code>log_path</code>, the matching <code>.pending</code> marker, and coordd logs.
+Do not assume a task is being worked just because a driven lock exists.</p>
+<h2 id="driven-retry-backoff">Driven Retry Backoff<a class="headerlink" href="#driven-retry-backoff" title="Permanent link">&para;</a></h2>
+<p>When a driven turn exits with a rate-limit, timeout, or execution error,
+<code>coordd</code> records retry state in
+<code>coordination/.locks/driven-&lt;role&gt;.retry.json</code>. The live scheduler uses this
+state to re-drive the role after backoff and restores it after a coordd
+restart. <code>greatminds dashboard --once</code> shows these roles as <code>backoff</code> or
+<code>failed</code>; <code>greatminds watchdog</code> reports them under <code>DRIVEN RETRIES</code>.</p>
+<p><code>backoff</code> means no turn is running because coordd is intentionally waiting for
+the next retry time. <code>failed</code> means bounded hard retries were exhausted and
+auto-retry stopped after escalation. Inspect the retry detail and the latest
+<code>.turns/&lt;role&gt;-*.log</code>; clear the root cause, then trigger a real queue/inbox
+event so the role gets a fresh attempt.</p>
+<h2 id="no-git-deploy-payloads">No-Git Deploy Payloads<a class="headerlink" href="#no-git-deploy-payloads" title="Permanent link">&para;</a></h2>
+<p>A deployed payload without <code>.git</code> is valid only as a validation target. It is
+not a legal source checkout for backend/UI implementation work that requires
+per-task worktrees.</p>
+<p>If a required code task is routed toward an implementer queue and the project
+root is not a git repository, <code>greatminds task mv</code> must fail before the task
+reaches the implementer. Recover by pointing Greatminds at a real source git
+checkout or initializing the intended source project, then rerun the route.
+Do not reintroduce stale <code>.git</code> pointers into deployed payload directories.</p>
 
 
 

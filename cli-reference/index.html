@@ -2393,6 +2393,7 @@ task pipeline, agent launcher.</p>
 </code></pre></div>
 <p><strong>Options:</strong></p>
 <div class="highlight"><pre><span></span><code>  --json      emit a machine-readable JSON array (cat replacement).
+  --no-pane   skip tmux pane inspection (0387 auth-wedge detection).
   -h, --help  Show this message and exit.
 </code></pre></div>
 <h3 id="greatminds-check-git-permission">greatminds check-git-permission<a class="headerlink" href="#greatminds-check-git-permission" title="Permanent link">&para;</a></h3>
@@ -2575,6 +2576,10 @@ survive-logout behavior.</p>
 <div class="highlight"><pre><span></span><code>  --interval FLOAT      refresh interval in seconds.  [default: 2.0]
   --once                print a single frame and exit (no clear, no loop).
   --color / --no-color  ANSI color. Default: auto (on when stdout is a TTY).
+  --logs / --no-logs    include latest driven-agent turn log tails.  [default:
+                        no-logs]
+  --log-lines INTEGER   lines to show per driven-agent log when --logs is set.
+                        [default: 8]
   -h, --help            Show this message and exit.
 </code></pre></div>
 <h3 id="greatminds-gate-check">greatminds gate-check<a class="headerlink" href="#greatminds-gate-check" title="Permanent link">&para;</a></h3>

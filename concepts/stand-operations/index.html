@@ -1569,7 +1569,7 @@ the source of truth; do not inspect or edit <code>state.yaml</code> directly.</p
 </tr>
 <tr>
 <td><code>preparing</code></td>
-<td><code>STAND-KEEPER</code> is deploying or restarting the stand for the active lease.</td>
+<td><code>coordd</code> is deploying or restarting the stand for the active lease.</td>
 </tr>
 <tr>
 <td><code>ready</code></td>
@@ -1598,30 +1598,31 @@ leases wait in FIFO order in the same state file.</p>
 <p>If the stand is <code>free</code>, the lease becomes active and the state moves to
 <code>preparing</code>. If another lease is active, the new lease is appended to the FIFO
 queue. The command prints the <code>lease_id</code>; the requester must keep that token.</p>
-<p><code>STAND-KEEPER</code> watches <code>coordination/.stand/state.yaml</code> and runs:</p>
+<p><code>coordd</code> watches <code>coordination/.stand/state.yaml</code> and runs the active lease
+profile. Operators can inspect progress with:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>status
 </code></pre></div>
-<p>When state is <code>preparing</code>, <code>STAND-KEEPER</code> deploys from the lease worktree using
-the lease profile. On success:</p>
+<p>When state is <code>preparing</code>, <code>coordd</code> deploys from the lease worktree using the
+lease profile. On success it records a deploy marker and transitions the
+stand to ready, equivalent to:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>ready<span class="w"> </span>--lease-id<span class="w"> </span>&lt;lease-id&gt;
 </code></pre></div>
 <p>That moves the state to <code>ready</code> and files an inbox-info message to the holder:
-<code>stand lease &lt;lease-id&gt; ready; task=&lt;task-id&gt;</code>. <code>STAND-KEEPER</code> may only mark a
-lease ready after the configured stand profile has run and left its deploy
-marker.</p>
+<code>stand lease &lt;lease-id&gt; ready; task=&lt;task-id&gt;</code>. The ready transition is valid
+only after the configured stand profile has run and left its deploy marker.</p>
 <p>The holder, usually <code>TESTER</code> or <code>EXPLORER</code>, then runs its own probes against
 the prepared stand and releases the lease:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>release<span class="w"> </span>--lease-id<span class="w"> </span>&lt;lease-id&gt;<span class="w"> </span>--result<span class="w"> </span>pass<span class="p">|</span>fail<span class="p">|</span>partial
 </code></pre></div>
 <p>Only the lease holder can release an active lease. Releasing moves the stand
-back to <code>free</code>; <code>STAND-KEEPER</code> handles the next queued lease on a later tick.</p>
+back to <code>free</code>; <code>coordd</code> promotes the next queued lease on a later tick.</p>
 <h2 id="ttl-and-recovery">TTL And Recovery<a class="headerlink" href="#ttl-and-recovery" title="Permanent link">&para;</a></h2>
 <p>Leases have a default TTL from <code>schema.yaml</code> (<code>stand.resource.lease</code>), currently
 four hours, with a warning window before automatic release. The TTL is a
 safety valve for abandoned leases; it is not a substitute for explicitly
 releasing a lease after probes finish.</p>
 <p>If deployment fails or the stand has an infrastructure incident,
-<code>STAND-KEEPER</code> runs:</p>
+the operator or maintainer runs:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>down<span class="w"> </span>--reason<span class="w"> </span><span class="s2">&quot;&lt;operational reason&gt;&quot;</span>
 </code></pre></div>
 <p><code>down</code> pauses queue processing. After recovery:</p>
@@ -1629,7 +1630,7 @@ releasing a lease after probes finish.</p>
 </code></pre></div>
 <p>That returns the stand to <code>free</code> so queued work can resume.</p>
 <h2 id="evidence-boundary">Evidence Boundary<a class="headerlink" href="#evidence-boundary" title="Permanent link">&para;</a></h2>
-<p><code>STAND-KEEPER</code> only proves infrastructure readiness: process status, health
+<p>The coordd deploy step only proves infrastructure readiness: process status, health
 endpoint availability, remote reachability, GPU availability when requested,
 and equivalent bring-up checks. It does not run product acceptance tests.</p>
 <p>Functional verification belongs to the lease holder. For stand-required tasks,

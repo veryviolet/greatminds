@@ -1480,7 +1480,7 @@
 <h1 id="e2e-testing">E2E Testing<a class="headerlink" href="#e2e-testing" title="Permanent link">&para;</a></h1>
 <p>For stand-required work, the test path has two evidence streams:</p>
 <ol>
-<li>Stand readiness from <code>STAND-KEEPER</code>, recorded through the lease state.</li>
+<li>Stand readiness from the coordd lease deploy, recorded through the lease state.</li>
 <li>Product verification from <code>TESTER</code>, recorded in the task's <code>tests</code> block.</li>
 </ol>
 <p>The tester runs the appropriate checks, then runs:</p>
@@ -1495,9 +1495,9 @@ missing or failing gate keeps the task out of final review.</p>
 <p>If tests fail, <code>TESTER</code> records the failure and returns the task to the
 implementation queue. If the task is blocked on a named dependency, the owner
 parks it in <code>feature_blocked/</code> with a blocked block.</p>
-<p><code>STAND-KEEPER</code> does not run product acceptance tests. It deploys or recovers
-the stand, marks the lease ready, and leaves functional probes to TESTER or
-EXPLORER.</p>
+<p>The coordd deploy path does not run product acceptance tests. It deploys or
+recovers the stand, marks the lease ready after deploy evidence exists, and
+leaves functional probes to TESTER or EXPLORER.</p>
 
 
 

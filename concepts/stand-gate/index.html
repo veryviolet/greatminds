@@ -1416,9 +1416,9 @@ with:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">stand_required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <span class="nt">stand_reason</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;why</span><span class="nv"> </span><span class="s">live</span><span class="nv"> </span><span class="s">evidence</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">needed&quot;</span>
 </code></pre></div>
-<p>Stand access now uses the lease workflow described in
+<p>Stand access uses the lease workflow described in
 <a href="../stand-operations/">Stand Operations</a>. <code>TESTER</code> requests a lease, waits for
-<code>STAND-KEEPER</code> to mark it ready, probes the deployed stand, records
+coordd's deploy path to mark it ready, probes the deployed stand, records
 lease-based <code>stand_evidence</code> in the product task's <code>tests</code> block, and runs:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>gate-check<span class="w"> </span>TASK_ID
 </code></pre></div>

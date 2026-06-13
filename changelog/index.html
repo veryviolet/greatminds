@@ -1408,6 +1408,30 @@
 <p>All notable changes to <strong>greatminds</strong> are documented here. Format follows
 <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a> loosely; versions
 follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
+<h2 id="200-2026-06-13">2.0.0 — 2026-06-13<a class="headerlink" href="#200-2026-06-13" title="Permanent link">&para;</a></h2>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Clean v2 FSM/autonomy baseline.</strong> Driven roles now expose retry/backoff
+  state on disk, restore retry state after coordd restart, fail fast on missing
+  Codex auth, surface low-disk blockers, and keep stuck-turn evidence visible
+  to watchdog/dashboard.</li>
+<li><strong>Stand architecture is stricter.</strong> <code>stand lease</code> and the deploy executor
+  now reject plain/no-git directories under <code>.worktrees/</code>; leases must deploy
+  from real source checkouts, not deployed payloads or stale debris.</li>
+<li><strong>Operator visibility improved.</strong> <code>greatminds dashboard --logs</code> shows the
+  latest driven-agent turn log tails in the same read-only status view.</li>
+<li><strong>Evidence/docs contract realigned.</strong> Packaged role prompts, templates,
+  README, stand docs, schema comments, and setup warnings now describe the
+  current lease-backed YAML/ansible stand model instead of the retired
+  <code>stand_done</code> / <code>STAND-KEEPER</code> workflow.</li>
+</ul>
+<h3 id="verified">Verified<a class="headerlink" href="#verified" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Full local CLI suite: <code>1518 passed, 1 skipped</code>.</li>
+<li>Avatar validation matrix on a fresh toy git project: setup, normal FSM
+  intake/plan/test path, auto-created lease worktree, gate-check pass from
+  lease-backed evidence, dashboard log tails, and no-git worktree rejection.</li>
+</ul>
 <h2 id="1611-2026-06-09">1.6.11 — 2026-06-09<a class="headerlink" href="#1611-2026-06-09" title="Permanent link">&para;</a></h2>
 <h3 id="fixed-driven-fsm-autonomy-batch-operational-merge-user-authorized-path-2-self-referential-infra-avatar-validated">Fixed (driven-FSM autonomy batch — operational merge, USER-authorized path 2; self-referential infra, avatar-validated)<a class="headerlink" href="#fixed-driven-fsm-autonomy-batch-operational-merge-user-authorized-path-2-self-referential-infra-avatar-validated" title="Permanent link">&para;</a></h3>
 <ul>
@@ -1452,7 +1476,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
 </ul>
 <h2 id="167-2026-06-05">1.6.7 — 2026-06-05<a class="headerlink" href="#167-2026-06-05" title="Permanent link">&para;</a></h2>
 <p>Host-agnostic stand deploys + autonomous backlog recovery.</p>
-<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>greatminds no longer owns host topology.</strong> <code>execute_yaml_profile</code> hands
   the WHOLE <code>coordination/PROJECT.env</code> (plus lease meta) to ansible as
@@ -1785,7 +1809,7 @@ FSM path, and a read-only PROJECT.md surface.</p>
   agents to read PROJECT.md, but it lives under <code>coordination/</code> and the
   mutations-via-CLI rule left no sanctioned CLI to obtain it.</li>
 </ul>
-<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
+<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>bootstrap.md now insists on reading the contract IN FULL.</strong> The old
   wording ("YOUR contract is <code>roles.&lt;ROLE&gt;</code>") let agents — codex
@@ -1934,7 +1958,7 @@ implement, advance the FSM).</p>
   UI-DEVELOPER FAST chat variant; scenario C is now LIVE-DEVELOPER. Ships
   a <code>vite-dev</code> stand-profile example (backend + Vite HMR).</li>
 </ul>
-<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
+<h3 id="changed_3">Changed<a class="headerlink" href="#changed_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Single static bootstrap.</strong> An agent's whole instruction surface is
   now <code>COORDINATE.md</code> (philosophy) + <code>schema.yaml</code> (machine contract +
@@ -2137,7 +2161,7 @@ documentation refresh.</p>
   singleton lock.</p>
 </li>
 </ul>
-<h3 id="changed_3">Changed<a class="headerlink" href="#changed_3" title="Permanent link">&para;</a></h3>
+<h3 id="changed_4">Changed<a class="headerlink" href="#changed_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0326 unify <code>greatminds task</code> subcommand id intake (DOD2).</strong>
@@ -2359,7 +2383,7 @@ prose + public mkdocs site mirror the model.</p>
   workers run driven; ARCHITECT-REVIEWER stays non-driven for now.</p>
 </li>
 </ul>
-<h3 id="changed_4">Changed<a class="headerlink" href="#changed_4" title="Permanent link">&para;</a></h3>
+<h3 id="changed_5">Changed<a class="headerlink" href="#changed_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0325 canon docs for the reactive-fleet lifecycle model (Phase 4).</strong>
   <code>COORDINATE.md</code> §2.1 (new) carries the lifecycle vocabulary + the
