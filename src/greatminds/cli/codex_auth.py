@@ -105,11 +105,12 @@ def machine_codex_auth_error(home: str, role: str) -> str:
     )
     return (
         f"codex auth missing for role {role}: no auth.json in the effective "
-        f"machine Codex home {home}. Paned/driven Codex roles authenticate "
+        f"machine Codex home {home}. Recover by logging in against the "
+        f"machine home:\n    {login_hint}\n"
+        f"Paned/driven Codex roles authenticate "
         f"against this ONE machine login; the per-role "
         f"coordination/.codex-home/<role> dirs are config/profile sources "
         f"ONLY and are NOT login targets (no auth.json is copied there). "
-        f"Recover by logging in against the machine home:\n    {login_hint}\n"
         f"(or set GREATMINDS_CODEX_HOME to the machine home that owns "
         f"auth.json)."
     )

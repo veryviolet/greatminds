@@ -203,6 +203,10 @@ def test_drive_turn_records_machine_home_and_nonzero_work(
 def test_worker_classifies_auth_failure_as_error_with_auth_detail(
         tmp_path, monkeypatch):
     coord = _coord(tmp_path)
+    machine = tmp_path / "machine-codex"
+    machine.mkdir()
+    (machine / "auth.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("GREATMINDS_CODEX_HOME", str(machine))
 
     def _boom(*a, **k):
         raise cd._CodexAuthError("token_expired during driven turn")

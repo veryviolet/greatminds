@@ -2047,6 +2047,29 @@ def _spawn_driven_codex_turn(
             )
         return (False, "run-lock held; pending set")
 
+    machine_home = _machine_codex_home()
+    if transport is None and not codex_auth.machine_codex_auth_present(machine_home):
+        detail = codex_auth.machine_codex_auth_error(
+            machine_home, role_lower.upper())
+        try:
+            _turn_log_path(coord, role_lower).write_text(
+                f"codex app-server turn for {role_lower}\n"
+                f"codex_home: {machine_home}\n"
+                f"status: auth_missing\n"
+                f"detail: {detail}\n",
+                encoding="utf-8",
+            )
+        except OSError:
+            pass
+        _note_turn_outcome(coord, role_lower, "error", detail, verbose)
+        if verbose:
+            print(
+                f"  0390: codex turn for {role_lower} not spawned: "
+                f"machine auth missing in {machine_home}",
+                file=sys.stderr,
+            )
+        return (False, "codex auth missing; retry/backoff recorded")
+
     thread_id = _codex_thread_id(reg)
     turn_log = _turn_log_path(coord, role_lower)
     _write_driven_run_lock(lock, role_lower, driver="codex",

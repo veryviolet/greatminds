@@ -249,6 +249,37 @@ def test_run_lock_blocks_second_turn(tmp_path: Path) -> None:
     assert "pending" in diag.lower()
 
 
+def test_real_codex_path_missing_machine_auth_fails_fast(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """Missing machine auth is a preflight failure, not a vague app-server
+    transport failure after spawning Codex."""
+    coord = _coord(tmp_path)
+    machine = tmp_path / "machine-codex"
+    machine.mkdir()
+    monkeypatch.setenv("GREATMINDS_CODEX_HOME", str(machine))
+    monkeypatch.setattr(
+        cd, "_drive_codex_turn_stdio",
+        lambda *a, **k: pytest.fail("codex app-server must not spawn"),
+    )
+
+    ok, diag = cd._spawn_driven_codex_turn(
+        coord, "explorer", "CONTRACT", "/proj", False,
+        reg=None, run_async=False,
+    )
+
+    assert ok is False
+    assert "auth missing" in diag
+    assert not cd._driven_run_lock_path(coord, "explorer").exists()
+    retry = json.loads(cd._driven_retry_path(coord, "explorer").read_text())
+    assert retry["klass"] == "error"
+    assert str(machine) in retry["detail"]
+    assert "codex login" in retry["detail"]
+    logs = list((coord / ".turns").glob("explorer-*.log"))
+    assert logs
+    assert "status: auth_missing" in logs[0].read_text(encoding="utf-8")
+
+
 def test_transport_seam_leaves_lock_held(tmp_path: Path) -> None:
     """The transport seam leaves the run-lock held (run-lock
     observability); the async path releases it on turn/completed."""
@@ -283,6 +314,10 @@ def test_async_path_releases_lock_after_turn(
     """The real (run_async=False here for determinism) path runs the
     stdio turn then RELEASES the run-lock so the next event can drive."""
     coord = _coord(tmp_path)
+    machine = tmp_path / "machine-codex"
+    machine.mkdir()
+    (machine / "auth.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("GREATMINDS_CODEX_HOME", str(machine))
     monkeypatch.setattr(
         cd, "_codex_appserver_argv",
         lambda *a, **k: [sys.executable, "-c", _FAKE_APPSERVER])
