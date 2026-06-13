@@ -90,6 +90,38 @@ def _resolved_greatminds_exec() -> str:
     return f"{sys.executable} -m greatminds.cli.main"
 
 
+def _resolve_tool_exec(tool: str) -> str | None:
+    """Resolve a user-installed tool from non-login and login-shell paths."""
+    found = shutil.which(tool)
+    if found:
+        return str(Path(found))
+    try:
+        cp = subprocess.run(
+            ["bash", "-lc", f"command -v {shlex.quote(tool)} 2>/dev/null"],
+            capture_output=True, text=True, timeout=10,
+        )
+        for line in reversed((cp.stdout or "").splitlines()):
+            cand = line.strip()
+            if cand and Path(cand).exists():
+                return cand
+    except Exception:  # noqa: BLE001
+        pass
+    home = Path.home()
+    candidates = [
+        home / ".local" / "bin" / tool,
+        home / ".npm-global" / "bin" / tool,
+        Path("/usr/local/bin") / tool,
+        Path("/usr/bin") / tool,
+    ]
+    nvm = home / ".nvm" / "versions" / "node"
+    if nvm.is_dir():
+        candidates.extend(sorted(nvm.glob(f"*/bin/{tool}"), reverse=True))
+    for cand in candidates:
+        if cand.exists() and os.access(cand, os.X_OK):
+            return str(cand)
+    return None
+
+
 def _resolved_codex_exec() -> str | None:
     """0320: resolve the codex binary for the app-server unit's ExecStart.
 
@@ -101,7 +133,7 @@ def _resolved_codex_exec() -> str | None:
     codex is not installed — the caller then skips the app-server unit
     (a fleet with no codex binary cannot host codex driven roles).
     """
-    found = shutil.which("codex")
+    found = _resolve_tool_exec("codex")
     return str(Path(found).resolve()) if found else None
 
 
@@ -116,7 +148,7 @@ def _resolved_node_exec() -> str | None:
     node explicitly (``<node> <codex.js> …``) so the env-node shebang is
     bypassed. Returns None when node is not on the install-time PATH —
     the caller then skips the app-server unit."""
-    found = shutil.which("node")
+    found = _resolve_tool_exec("node")
     return str(Path(found).resolve()) if found else None
 
 

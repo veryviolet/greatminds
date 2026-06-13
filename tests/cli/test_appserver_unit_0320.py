@@ -90,6 +90,29 @@ def test_appserver_unit_body_none_when_node_absent(monkeypatch) -> None:
     assert daemon_mod._appserver_unit_body() is None
 
 
+def test_tool_resolver_finds_user_local_bin_when_path_is_bare(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """Avatar/non-login SSH: codex/node may live in ~/.local/bin while the
+    invoking shell PATH is bare. App-server install must still find them."""
+    home = tmp_path / "home"
+    bin_dir = home / ".local" / "bin"
+    bin_dir.mkdir(parents=True)
+    codex = bin_dir / "codex"
+    codex.write_text("#!/bin/sh\n", encoding="utf-8")
+    codex.chmod(0o755)
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    monkeypatch.setattr(Path, "home", lambda: home)
+    monkeypatch.setattr(
+        daemon_mod.subprocess,
+        "run",
+        lambda *a, **kw: subprocess.CompletedProcess(
+            args=a[0], returncode=1, stdout="", stderr=""),
+    )
+
+    assert daemon_mod._resolve_tool_exec("codex") == str(codex)
+
+
 def test_install_appserver_unit_writes_and_is_idempotent(
     tmp_path: Path, monkeypatch,
 ) -> None:
