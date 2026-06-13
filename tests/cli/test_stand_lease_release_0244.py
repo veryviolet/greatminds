@@ -42,6 +42,12 @@ def _invoke(args: list[str], cwd: Path, role: str = "TESTER",
     return CliRunner().invoke(stand_mod.stand, args)
 
 
+def _git_worktree(path: Path) -> Path:
+    path.mkdir(parents=True, exist_ok=True)
+    (path / ".git").write_text("gitdir: /tmp/fake\n", encoding="utf-8")
+    return path
+
+
 @pytest.fixture(autouse=True)
 def _resolvable_presets(monkeypatch):
     """The lease validates ``--profile`` by RESOLVING it (a real file in
@@ -87,7 +93,7 @@ def test_lease_on_free_transitions_to_preparing(tmp_path, monkeypatch) -> None:
     coord.mkdir()
     # 0271: worktree must be project_dir/.worktrees/<seq>[-slug].
     wt = tmp_path / ".worktrees" / "0099"
-    wt.mkdir(parents=True)
+    _git_worktree(wt)
     result = _invoke(
         ["lease", "--task", "0099-test",
          "--worktree", str(wt), "--profile", "full-deploy"],
@@ -129,7 +135,7 @@ def test_lease_returns_unique_lease_ids(tmp_path, monkeypatch) -> None:
     coord.mkdir()
     # 0271: per-task worktree convention; both tasks share seq=0099.
     wt = tmp_path / ".worktrees" / "0099"
-    wt.mkdir(parents=True)
+    _git_worktree(wt)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GREATMINDS_ROLE", "TESTER")
     runner = CliRunner()
@@ -156,7 +162,7 @@ def test_lease_on_busy_enqueues(tmp_path, monkeypatch) -> None:
     coord.mkdir()
     # 0271: both tasks share seq=0099 → same worktree path is valid.
     wt = tmp_path / ".worktrees" / "0099"
-    wt.mkdir(parents=True)
+    _git_worktree(wt)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GREATMINDS_ROLE", "TESTER")
     runner = CliRunner()
@@ -190,7 +196,7 @@ def test_lease_while_down_rejects_instead_of_queuing(
     coord = tmp_path / "coordination"
     coord.mkdir()
     wt = tmp_path / ".worktrees" / "0099"
-    wt.mkdir(parents=True)
+    _git_worktree(wt)
     ss.update_stand_state(coord, lambda s: s.update({
         "state": "down",
         "down_reason": "STALE DEPLOYMENT refused: refresh worktree",
@@ -487,7 +493,7 @@ def test_concurrent_lease_calls_serialize_via_fcntl(tmp_path) -> None:
     coord.mkdir()
     # 0271: per-task worktree convention; both tasks share seq=0099.
     wt = tmp_path / ".worktrees" / "0099"
-    wt.mkdir(parents=True)
+    _git_worktree(wt)
     monkeypatch_env = {"GREATMINDS_ROLE": "TESTER"}
 
     def fire_lease(task: str, profile: str) -> None:
@@ -529,7 +535,7 @@ def test_lease_release_recorded_in_history(tmp_path, monkeypatch) -> None:
     coord.mkdir()
     # 0271: per-task worktree convention.
     wt = tmp_path / ".worktrees" / "0099"
-    wt.mkdir(parents=True)
+    _git_worktree(wt)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GREATMINDS_ROLE", "TESTER")
     runner = CliRunner()

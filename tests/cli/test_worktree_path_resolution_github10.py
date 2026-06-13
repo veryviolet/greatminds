@@ -138,7 +138,9 @@ def _project_with_state(tmp_path: Path) -> Path:
         yaml.safe_dump([{"name": "p", "hosts": "localhost", "tasks": []}]),
         encoding="utf-8",
     )
-    (project / ".worktrees" / SEQ).mkdir(parents=True)
+    wt = project / ".worktrees" / SEQ
+    wt.mkdir(parents=True)
+    (wt / ".git").write_text("gitdir: /tmp/fake\n", encoding="utf-8")
     return project
 
 

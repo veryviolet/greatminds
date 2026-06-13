@@ -50,8 +50,9 @@ def test_isolated_worktree_always_safe(tmp_path: Path) -> None:
     with localhost target — because the worktree is isolated from
     the running fleet checkout."""
     project = tmp_path / "proj"
-    (project / ".worktrees" / "0285").mkdir(parents=True)
     wt = project / ".worktrees" / "0285"
+    wt.mkdir(parents=True)
+    (wt / ".git").write_text("gitdir: /tmp/fake\n", encoding="utf-8")
 
     for host in ("avatar", "", "localhost", "127.0.0.1", None):
         safe, reason = se.is_deploy_safe(wt, host, project)
@@ -132,7 +133,9 @@ def _project(tmp_path: Path, monkeypatch) -> Path:
     (project / "coordination" / ".stand" / "state.yaml").write_text(
         yaml.safe_dump(state), encoding="utf-8",
     )
-    (project / ".worktrees" / "0285").mkdir(parents=True)
+    wt = project / ".worktrees" / "0285"
+    wt.mkdir(parents=True)
+    (wt / ".git").write_text("gitdir: /tmp/fake\n", encoding="utf-8")
     monkeypatch.setenv("GREATMINDS_PROJECT_DIR", str(project))
     monkeypatch.setenv("GREATMINDS_ROLE", "TESTER")
     monkeypatch.chdir(project)

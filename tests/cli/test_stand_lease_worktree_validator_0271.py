@@ -215,15 +215,37 @@ def test_stand_lease_cli_rejects_main_tree(tmp_path: Path) -> None:
     )
 
 
+def test_stand_lease_cli_rejects_existing_nongit_worktree(
+    tmp_path: Path,
+) -> None:
+    """A directory under .worktrees is not enough; leases deploy source
+    git worktrees, not no-git deployed payload directories."""
+    project = _project_with_state(tmp_path)
+    wt = project / ".worktrees" / SEQ
+    wt.mkdir(parents=True)
+
+    cp = _run_lease(project,
+                    "--task", TASK_ID,
+                    "--worktree", str(wt),
+                    "--profile", "full-deploy")
+
+    assert cp.returncode != 0
+    err = cp.stdout + cp.stderr
+    assert "not a git worktree" in err
+    assert "no-git deployed payloads" in err
+
+
 def test_stand_lease_cli_accepts_correct_worktree(tmp_path: Path) -> None:
     """A valid ``.worktrees/<seq>`` path must allow the lease command
     to reach its mutator and write state.yaml. The lease_id is the
     LAST line of stdout per the doc-string contract."""
     project = _project_with_state(tmp_path)
-    (project / ".worktrees" / SEQ).mkdir(parents=True)
+    wt = project / ".worktrees" / SEQ
+    wt.mkdir(parents=True)
+    (wt / ".git").write_text("gitdir: /tmp/fake\n", encoding="utf-8")
     cp = _run_lease(project,
                     "--task", TASK_ID,
-                    "--worktree", str(project / ".worktrees" / SEQ),
+                    "--worktree", str(wt),
                     "--profile", "full-deploy")
     assert cp.returncode == 0, (
         f"0271: CLI must accept a valid worktree. "

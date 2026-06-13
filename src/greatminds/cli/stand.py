@@ -192,6 +192,15 @@ def _resolve_or_create_lease_worktree(task_id: str, worktree: "str | None",
     if not wt.is_dir():
         created = worktree_create(project_dir, task_id)
         return str(created.resolve(strict=False))
+    if not (wt / ".git").exists():
+        raise GreatMindsError(
+            f"stand lease --worktree {wt} exists but is not a git worktree "
+            "(missing .git file/dir). Stand leases deploy source checkouts "
+            "under .worktrees/<task>, not no-git deployed payloads. Remove "
+            "the bad directory and rerun the lease so Greatminds can create "
+            "a real per-task worktree.",
+            exit_code=2,
+        )
     return str(wt)
 
 
@@ -378,6 +387,18 @@ def stand_lease(task_id: str, worktree: "str | None", profile: str,
 
     holder = _holder_role()
     coord = find_coord_dir()
+    current_state = ss.read_stand_state(coord)
+    if current_state.get("state") == "down":
+        reason = current_state.get("down_reason") or "unknown reason"
+        raise GreatMindsError(
+            "stand lease refused: singleton stand is down; no lease "
+            "was queued. Current down_reason: "
+            f"{reason}. Recover the stand first (for stale deployment "
+            "recovery: run the command named in down_reason, then "
+            "`greatminds stand up --reason <recovered>` and re-run "
+            "the lease).",
+            exit_code=2,
+        )
     # The leaser names ANY profile that exists in this project's
     # stand-profiles/ dir — each fleet ships its own (e.g. mlgpu2 /
     # orange) alongside the seeded presets (full-deploy / vite-dev /

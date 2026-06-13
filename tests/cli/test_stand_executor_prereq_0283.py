@@ -171,7 +171,9 @@ def _project(tmp_path: Path, monkeypatch) -> Path:
     monkeypatch.setenv("GREATMINDS_ROLE", "TESTER")
     monkeypatch.chdir(project)
     # Worktree path the validator accepts.
-    (project / ".worktrees" / "0283").mkdir(parents=True)
+    wt = project / ".worktrees" / "0283"
+    wt.mkdir(parents=True)
+    (wt / ".git").write_text("gitdir: /tmp/fake\n", encoding="utf-8")
     return project
 
 
