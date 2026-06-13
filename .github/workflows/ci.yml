@@ -53,9 +53,9 @@ jobs:
           data = files("greatminds.data")
           for needed in [
               "schema.yaml",
-              "command_START.yaml",
               "COORDINATE.md",
-              "roles/DEVELOPER.md",
+              "bootstrap.md",
+              "codex/profiles/developer.config.toml",
               "plugins/coordination-protocol/.claude-plugin/plugin.json",
               "mcp/canon.json",
               "templates/PROJECT.md.template",
