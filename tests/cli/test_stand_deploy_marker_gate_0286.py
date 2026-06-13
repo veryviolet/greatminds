@@ -32,7 +32,9 @@ from greatminds.cli.stand_profile import ProfileSpec
 def _coord(tmp_path: Path) -> Path:
     coord = tmp_path / "proj" / "coordination"
     (coord / ".stand").mkdir(parents=True)
-    (tmp_path / "proj" / ".worktrees" / "0286").mkdir(parents=True)
+    wt = tmp_path / "proj" / ".worktrees" / "0286"
+    wt.mkdir(parents=True)
+    (wt / ".git").write_text("gitdir: /tmp/fake\n", encoding="utf-8")
     return coord
 
 
@@ -114,6 +116,34 @@ def test_yaml_refuses_when_unsafe_writes_marker(
     text = marker.read_text(encoding="utf-8")
     assert "rc=126" in text
     assert "is_deploy_safe" in text
+
+
+def test_yaml_refuses_nongit_worktree_writes_marker(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """Executor is the lower trust boundary for old/corrupt state.yaml:
+    a no-git directory under .worktrees must not reach ansible."""
+    coord = _coord(tmp_path)
+    project = tmp_path / "proj"
+    spec = _yaml_spec(tmp_path)
+    wt = project / ".worktrees" / "nongit-0286"
+    wt.mkdir(parents=True)
+    lease = _lease(coord, project, worktree_subdir="nongit-0286")
+
+    monkeypatch.setattr(se.subprocess, "run",
+                         lambda *a, **k: pytest.fail(
+                             "no-git worktree must NOT reach subprocess"))
+    monkeypatch.setattr(se.shutil, "which",
+                         lambda _: "/fake/bin/ansible-playbook")
+
+    rc, log = se.execute_yaml_profile(spec, lease)
+    assert rc == 126
+    assert "not a git worktree" in log
+    assert "no-git payload" in log
+    marker = se.deploy_marker_path(coord, "lease-0286")
+    text = marker.read_text(encoding="utf-8")
+    assert "rc=126" in text
+    assert "not a git worktree" in text
 
 
 def test_yaml_safe_deploy_runs_subprocess_and_writes_marker(

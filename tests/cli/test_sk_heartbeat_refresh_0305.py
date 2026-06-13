@@ -38,7 +38,9 @@ def _yaml_spec(tmp_path: Path) -> ProfileSpec:
 def _coord(tmp_path: Path) -> Path:
     coord = tmp_path / "proj" / "coordination"
     (coord / ".stand").mkdir(parents=True)
-    (tmp_path / "proj" / ".worktrees" / "0305").mkdir(parents=True)
+    wt = tmp_path / "proj" / ".worktrees" / "0305"
+    wt.mkdir(parents=True)
+    (wt / ".git").write_text("gitdir: /tmp/fake\n", encoding="utf-8")
     return coord
 
 

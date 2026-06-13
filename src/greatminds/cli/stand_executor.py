@@ -453,9 +453,11 @@ def is_deploy_safe(
     suitable for ``stand down`` / setup logs / test assertions.
 
     Rules:
-      - Worktree resolves under ``<project_dir>/.worktrees/<seq>/`` →
-        ALWAYS safe (0271 isolation guarantee covers self-modify
-        regardless of host).
+      - Worktree resolves under ``<project_dir>/.worktrees/<seq>/`` and has
+        a ``.git`` file/dir → safe (0271 isolation guarantee covers
+        self-modify regardless of host). A plain directory under
+        ``.worktrees`` is refused: it is a deployed/no-git payload or stale
+        debris, not a source checkout.
       - Worktree IS the project_dir itself (main fleet tree):
           * host empty / localhost / loopback → self-modify trap.
             Refuse: deploying onto the running host's own checkout
@@ -473,11 +475,18 @@ def is_deploy_safe(
     project_resolved = Path(project_dir).resolve(strict=False)
     host_norm = (host or "").strip().lower()
 
-    # .worktrees/<seq>/ — always safe (0271 enforces the layout at
-    # lease-acquire time, so reaching here means an isolated branch).
+    # .worktrees/<seq>/ — safe only when it is still a git worktree. Lease
+    # acquire enforces this for new state, but executor is the lower trust
+    # boundary for old/corrupt state.yaml entries.
     worktrees_root = project_resolved / ".worktrees"
     try:
         if worktrees_root in wt.parents or wt.parent == worktrees_root:
+            if not (wt / ".git").exists():
+                return False, (
+                    f"worktree path {wt} is under .worktrees/ but is not "
+                    "a git worktree (missing .git file/dir); refusing to "
+                    "deploy a no-git payload or stale directory"
+                )
             return True, "isolated worktree under .worktrees/"
     except OSError:
         pass
