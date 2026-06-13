@@ -146,6 +146,17 @@ def _latest_turn_log(coord: Path, role_lower: str) -> Path | None:
     return logs[-1] if logs else None
 
 
+def _tail_text(path: Path, line_count: int) -> list[str]:
+    """Best-effort tail for small operator logs."""
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return []
+    if line_count <= 0:
+        return []
+    return lines[-line_count:]
+
+
 def _driven_lock_meta(lock: Path) -> dict[str, Any]:
     """Best-effort JSON metadata from a driven run-lock.
 
@@ -372,7 +383,48 @@ def collect_stand(coord: Path) -> dict[str, Any]:
     }
 
 
-def collect_snapshot(coord: Path) -> dict[str, Any]:
+def collect_driven_logs(
+    coord: Path,
+    coord_yaml: dict | None,
+    *,
+    lines_per_role: int = 8,
+) -> list[dict[str, Any]]:
+    """Latest driven turn log tails, one entry per role with a log.
+
+    Driven roles do not have persistent panes, so ``coordination/.turns`` is
+    the user-facing evidence of what they just did. This collector is read-only
+    and intentionally partial: it shows the newest log tail per driven role
+    without turning the dashboard into a full log viewer.
+    """
+    rows: list[dict[str, Any]] = []
+    for entry in _fleet_roster(coord_yaml):
+        role = entry["role"]
+        mode = entry.get("mode") or ""
+        if mode != "driven":
+            continue
+        path = _latest_turn_log(coord, role.lower())
+        if path is None:
+            continue
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            continue
+        rows.append({
+            "role": role,
+            "path": str(path),
+            "name": path.name,
+            "age": _fmt_age(time.time() - mtime),
+            "lines": _tail_text(path, lines_per_role),
+        })
+    return rows
+
+
+def collect_snapshot(
+    coord: Path,
+    *,
+    include_logs: bool = False,
+    log_lines: int = 8,
+) -> dict[str, Any]:
     coord_yaml = _read_coord_yaml_safe(coord)
     try:
         canon_dir = find_canon_dir()
@@ -383,12 +435,16 @@ def collect_snapshot(coord: Path) -> dict[str, Any]:
     for t in tasks:
         by_owner.setdefault(t["owner"], []).append(t["id"])
     stand = collect_stand(coord)
-    return {
+    snap = {
         "session": (coord_yaml or {}).get("session") or "greatminds",
         "agents": collect_agents(coord, coord_yaml, canon_dir, by_owner, stand),
         "tasks": tasks,
         "stand": stand,
     }
+    if include_logs:
+        snap["driven_logs"] = collect_driven_logs(
+            coord, coord_yaml, lines_per_role=log_lines)
+    return snap
 
 
 def _read_coord_yaml_safe(coord: Path) -> dict | None:
@@ -481,6 +537,25 @@ def _render_stand(st: dict[str, Any], width: int, color: bool) -> list[str]:
     return out
 
 
+def _render_driven_logs(rows: list[dict[str, Any]], width: int,
+                        color: bool) -> list[str]:
+    out = [_paint("DRIVEN LOGS", "head", color)]
+    if not rows:
+        out.append(_paint("  no driven turn logs", "dead", color))
+        return out
+    for row in rows:
+        out.append(_clip(
+            f"{row['role']} · {row['name']} · {row['age']}", width))
+        lines = row.get("lines") or []
+        if not lines:
+            out.append(_paint("  (empty)", "dead", color))
+            continue
+        for line in lines:
+            clean = " ".join(str(line).split())
+            out.append(_clip(f"  {clean}", width))
+    return out
+
+
 def render_dashboard(snapshot: dict[str, Any], width: int = 100,
                      now_str: str = "", color: bool = False) -> str:
     width = max(40, width)
@@ -493,6 +568,9 @@ def render_dashboard(snapshot: dict[str, Any], width: int = 100,
     lines += _render_tasks(snapshot["tasks"], width, color)
     lines.append(_rule(width, color))
     lines += _render_stand(snapshot["stand"], width, color)
+    if "driven_logs" in snapshot:
+        lines.append(_rule(width, color))
+        lines += _render_driven_logs(snapshot["driven_logs"], width, color)
     return "\n".join(lines) + "\n"
 
 
@@ -518,15 +596,21 @@ def _term_width(default: int = 100) -> int:
               help="print a single frame and exit (no clear, no loop).")
 @click.option("--color/--no-color", "color", default=None,
               help="ANSI color. Default: auto (on when stdout is a TTY).")
-def dashboard(interval: float, once: bool, color: bool | None) -> None:
+@click.option("--logs/--no-logs", "logs", default=False, show_default=True,
+              help="include latest driven-agent turn log tails.")
+@click.option("--log-lines", type=int, default=8, show_default=True,
+              help="lines to show per driven-agent log when --logs is set.")
+def dashboard(interval: float, once: bool, color: bool | None,
+              logs: bool, log_lines: int) -> None:
     coord = find_coord_dir()
     use_color = sys.stdout.isatty() if color is None else color
 
     def frame() -> str:
         now_str = time.strftime("%H:%M:%S")
         width = _term_width()
-        return render_dashboard(collect_snapshot(coord), width, now_str,
-                                use_color)
+        return render_dashboard(
+            collect_snapshot(coord, include_logs=logs, log_lines=log_lines),
+            width, now_str, use_color)
 
     if once:
         click.echo(frame(), nl=False)

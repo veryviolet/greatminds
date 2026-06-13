@@ -222,6 +222,53 @@ def test_render_has_all_three_sections():
     assert "ARCHITECT-PLANNER" in out
 
 
+def test_collect_driven_logs_reads_latest_tail(tmp_path, monkeypatch):
+    coord = tmp_path / "coordination"
+    turns = coord / ".turns"
+    turns.mkdir(parents=True)
+    old = turns / "tester-20260613T010000Z.log"
+    new = turns / "tester-20260613T020000Z.log"
+    old.write_text("old\n", encoding="utf-8")
+    new.write_text("one\ntwo\nthree\n", encoding="utf-8")
+    os.utime(old, (time.time() - 200, time.time() - 200))
+    os.utime(new, (time.time() - 20, time.time() - 20))
+    monkeypatch.setattr(db, "_fleet_roster",
+                        lambda _y: [{"role": "TESTER", "tool": "codex",
+                                     "mode": "driven"}])
+
+    rows = db.collect_driven_logs(coord, {"session": "x"}, lines_per_role=2)
+
+    assert len(rows) == 1
+    assert rows[0]["role"] == "TESTER"
+    assert rows[0]["name"] == new.name
+    assert rows[0]["lines"] == ["two", "three"]
+
+
+def test_render_dashboard_includes_driven_logs_when_present():
+    snap = _snapshot()
+    snap["driven_logs"] = [{
+        "role": "TESTER",
+        "path": "/tmp/coordination/.turns/tester.log",
+        "name": "tester.log",
+        "age": "fresh",
+        "lines": ["status: ok", "finished"],
+    }]
+
+    out = db.render_dashboard(snap, width=120)
+
+    assert "DRIVEN LOGS" in out
+    assert "TESTER · tester.log · fresh" in out
+    assert "status: ok" in out
+
+
+def test_render_dashboard_empty_driven_logs_section():
+    snap = _snapshot()
+    snap["driven_logs"] = []
+    out = db.render_dashboard(snap, width=120)
+    assert "DRIVEN LOGS" in out
+    assert "no driven turn logs" in out
+
+
 def test_render_no_color_has_no_ansi():
     out = db.render_dashboard(_snapshot(), width=100, color=False)
     assert "\033[" not in out
@@ -368,3 +415,20 @@ def test_collect_snapshot_shape(tmp_path):
     assert set(snap) >= {"session", "agents", "tasks", "stand"}
     assert isinstance(snap["agents"], list)
     assert isinstance(snap["tasks"], list)
+
+
+def test_collect_snapshot_can_include_driven_logs(tmp_path, monkeypatch):
+    coord = _mk_coord(tmp_path)
+    (coord / ".turns").mkdir()
+    (coord / ".turns" / "tester-20260613T000000Z.log").write_text(
+        "hello\n", encoding="utf-8")
+    monkeypatch.setattr(db, "_read_coord_yaml_safe",
+                        lambda _c: {"session": "x"})
+    monkeypatch.setattr(db, "_fleet_roster",
+                        lambda _y: [{"role": "TESTER", "tool": "codex",
+                                     "mode": "driven"}])
+
+    snap = db.collect_snapshot(coord, include_logs=True, log_lines=1)
+
+    assert "driven_logs" in snap
+    assert snap["driven_logs"][0]["lines"] == ["hello"]
