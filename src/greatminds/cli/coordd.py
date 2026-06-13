@@ -1162,6 +1162,13 @@ def _note_low_disk_blocker(coord: Path, role_lower: str, diag: str,
             encoding="utf-8")
     except OSError:
         pass
+    _write_driven_retry_status(coord, role_lower, {
+        "klass": "low_disk",
+        "attempts": 0,
+        "next_at_epoch": 0.0,
+        "escalated": True,
+        "notified": False,
+    }, diag)
     now = time.monotonic()
     with _RETRY_LOCK:
         due = (now - _LOW_DISK_LAST_NOTIFY["at"]) >= LOW_DISK_RENOTIFY_SEC

@@ -13,6 +13,7 @@ token_expired (looks like an auth bug, not a disk bug). 0376 adds:
 """
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
@@ -99,6 +100,21 @@ def test_maybe_drive_blocks_spawn_when_disk_low(monkeypatch, tmp_path):
     assert result is False
     assert spawned == []          # turn NOT spawned
     assert len(notes) == 1        # blocker surfaced
+
+
+def test_low_disk_blocker_writes_operator_visible_status(tmp_path):
+    coord = tmp_path / "coordination"
+    (coord / ".turns").mkdir(parents=True)
+    (coord / ".locks").mkdir(parents=True)
+
+    cd._note_low_disk_blocker(
+        coord, "developer", "LOW DISK / ENOSPC risk", verbose=False)
+
+    status = json.loads(
+        cd._driven_retry_path(coord, "developer").read_text())
+    assert status["klass"] == "low_disk"
+    assert status["escalated"] is True
+    assert "ENOSPC" in status["detail"]
 
 
 def test_maybe_drive_spawns_when_disk_ok(monkeypatch, tmp_path):
