@@ -91,6 +91,47 @@ def test_setup_check_runs_and_logs_version_when_present(
     assert "2.17.4" in out
 
 
+def test_setup_check_finds_ansible_next_to_active_python(
+    monkeypatch, tmp_path: Path, capsys,
+) -> None:
+    """Avatar/uv regression: invoking ``/venv/bin/greatminds`` by absolute
+    path does not imply ``/venv/bin`` is on PATH. The setup check must still
+    find the hard dependency installed beside the active Python. ``uv venv``
+    makes ``venv/bin/python`` a symlink, so the raw parent must be checked
+    before the resolved interpreter parent."""
+    bindir = tmp_path / "venv" / "bin"
+    bindir.mkdir(parents=True)
+    realdir = tmp_path / "uv-python" / "bin"
+    realdir.mkdir(parents=True)
+    real_py = realdir / "python"
+    real_py.write_text("#!/bin/sh\n", encoding="utf-8")
+    real_py.chmod(0o755)
+    py = bindir / "python"
+    py.symlink_to(real_py)
+    ansible = bindir / "ansible-playbook"
+    ansible.write_text("#!/bin/sh\n", encoding="utf-8")
+    ansible.chmod(0o755)
+
+    monkeypatch.setattr(setup_mod.sys, "executable", str(py))
+    monkeypatch.setattr(setup_mod.shutil, "which", lambda _name: None)
+
+    seen: list[list[str]] = []
+
+    def fake_run(cmd, **kwargs):
+        seen.append(list(cmd))
+        return subprocess.CompletedProcess(
+            args=cmd, returncode=0,
+            stdout="ansible [core 2.17.14]\n", stderr="",
+        )
+
+    monkeypatch.setattr(setup_mod.subprocess, "run", fake_run)
+
+    setup_mod._check_ansible_playbook_available()
+    out = capsys.readouterr().out + capsys.readouterr().err
+    assert seen and seen[0][0] == str(ansible)
+    assert "2.17.14" in out
+
+
 def test_setup_check_warns_when_ansible_missing(
     monkeypatch, capsys,
 ) -> None:
@@ -98,6 +139,8 @@ def test_setup_check_warns_when_ansible_missing(
     pointing at the YAML-profile failure mode + ``pip show
     ansible-core`` diagnostic. Setup itself does NOT raise so the
     operator can repair the venv after bootstrap."""
+    monkeypatch.setattr(setup_mod, "_sibling_executable",
+                        lambda _name: None)
     monkeypatch.setattr(setup_mod.shutil, "which", lambda _name: None)
     setup_mod._check_ansible_playbook_available()
     err = capsys.readouterr().err
@@ -112,6 +155,8 @@ def test_setup_check_warns_when_version_subprocess_fails(
     """Binary present but ``--version`` non-zero / hangs → warn that
     the YAML profile path may be flaky. The binary itself still
     resolves so we don't claim it's missing."""
+    monkeypatch.setattr(setup_mod, "_sibling_executable",
+                        lambda _name: None)
     monkeypatch.setattr(
         setup_mod.shutil, "which",
         lambda _name: "/fake/bin/ansible-playbook",
@@ -134,6 +179,8 @@ def test_setup_check_warns_on_subprocess_timeout(
 ) -> None:
     """Defensive: a hung ``--version`` (TimeoutExpired) must NOT
     propagate; the check warns and returns."""
+    monkeypatch.setattr(setup_mod, "_sibling_executable",
+                        lambda _name: None)
     monkeypatch.setattr(
         setup_mod.shutil, "which",
         lambda _name: "/fake/bin/ansible-playbook",

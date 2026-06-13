@@ -1608,14 +1608,16 @@ def _check_ansible_playbook_available() -> None:
     aborting setup so an operator can still bootstrap docs/config and then
     repair the venv before running stand leases.
     """
-    found = shutil.which("ansible-playbook")
+    found = _sibling_executable("ansible-playbook") \
+        or shutil.which("ansible-playbook")
     if not found:
         warn(
-            "  ansible-playbook NOT on PATH — YAML stand-profile "
-            "execution (Phase C) will fail. ansible-core is declared "
-            "as a hard dep; if you just ran `pip install greatminds`, "
-            "verify the venv: `pip show ansible-core` should list it. "
-            "Install or repair ansible-core before running stand leases."
+            "  ansible-playbook not found next to the active Python or "
+            "on PATH — YAML stand-profile execution (Phase C) will fail. "
+            "ansible-core is declared as a hard dep; if you just ran "
+            "`pip install greatminds`, verify the venv: "
+            "`pip show ansible-core` should list it. Install or repair "
+            "ansible-core before running stand leases."
         )
         return
 
@@ -1636,6 +1638,15 @@ def _check_ansible_playbook_available() -> None:
         f"  ansible-playbook present at {found} but --version "
         "failed; YAML profile execution may be flaky."
     )
+
+
+def _sibling_executable(name: str) -> str | None:
+    """Resolve a console script installed beside the active Python."""
+    for base in (Path(sys.executable).parent, Path(sys.executable).resolve().parent):
+        candidate = base / name
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return None
 
 
 if __name__ == "__main__":

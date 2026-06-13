@@ -100,6 +100,7 @@ def test_full_deploy_yaml_cycle_dispatches_to_ansible(
     (coord / "PROJECT.env").write_text(
         "STAND_HOST=avatar\n", encoding="utf-8")
 
+    monkeypatch.setattr(se, "_sibling_ansible_playbook", lambda: None)
     monkeypatch.setattr(se.shutil, "which",
                          lambda _name: "/fake/bin/ansible-playbook")
     captured: dict = {}

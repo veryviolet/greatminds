@@ -18,6 +18,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -107,20 +108,40 @@ def vacuous_deploy_reason(log: str) -> str | None:
     return None
 
 
+def _sibling_ansible_playbook() -> str | None:
+    """Return ansible-playbook next to the active Python, if present.
+
+    ``uv pip install --python /x/venv/bin/python greatminds`` installs both
+    the ``greatminds`` and ``ansible-playbook`` console scripts into
+    ``/x/venv/bin``. Operators and systemd units may invoke
+    ``/x/venv/bin/greatminds`` by absolute path without putting that bin dir
+    on PATH, so PATH-only resolution misses a valid hard dependency.
+    """
+    for base in (Path(sys.executable).parent, Path(sys.executable).resolve().parent):
+        candidate = base / "ansible-playbook"
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return None
+
+
 def _ansible_playbook_path() -> str:
-    """Resolve ``ansible-playbook`` on PATH or raise.
+    """Resolve ``ansible-playbook`` from this venv or PATH, or raise.
 
     Phase D will install ansible-core as a hard dependency; until
     then the inline check turns a confusing ``FileNotFoundError``
     deep inside subprocess into a clear actionable message.
     """
+    sibling = _sibling_ansible_playbook()
+    if sibling:
+        return sibling
     found = shutil.which("ansible-playbook")
     if not found:
         raise GreatMindsError(
-            "ansible-playbook not on PATH — install ansible-core "
-            "(pipx install ansible-core or `uv pip install "
-            "ansible-core`). Phase D / task 0276 makes this a hard "
-            "dependency; until then it's a one-line operator install.",
+            "ansible-playbook not found next to the active Python and "
+            "not on PATH — install ansible-core (pipx install ansible-core "
+            "or `uv pip install ansible-core`). Phase D / task 0276 makes "
+            "this a hard dependency; until then it's a one-line operator "
+            "install.",
             exit_code=2,
         )
     return found

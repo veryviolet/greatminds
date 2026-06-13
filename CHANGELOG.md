@@ -4,6 +4,21 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 2.0.1 — 2026-06-13
+
+### Fixed
+
+- `setup` and `stand deploy` now resolve `ansible-playbook` beside the active
+  venv Python before falling back to `PATH`. This fixes uv-created venvs where
+  `greatminds` is invoked by absolute path and `venv/bin` is not in `PATH`,
+  even though `ansible-core` is correctly installed as a hard dependency.
+
+### Verified
+
+- Fresh patched wheel install plus local-control avatar campaign: task
+  lifecycle to `verified`, lease-backed ansible deploy to `ssh avatar`, remote
+  payload probe, and stand release back to `free`.
+
 ## 2.0.0 — 2026-06-13
 
 ### Changed

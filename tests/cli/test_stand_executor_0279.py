@@ -81,6 +81,7 @@ def _lease(host: str = "avatar",
 def test_ansible_playbook_path_missing_raises(monkeypatch) -> None:
     """No ``ansible-playbook`` on PATH → actionable error pointing
     at Phase D + the one-line install recipe."""
+    monkeypatch.setattr(se, "_sibling_ansible_playbook", lambda: None)
     monkeypatch.setattr(se.shutil, "which", lambda _name: None)
     with pytest.raises(GreatMindsError) as exc:
         se._ansible_playbook_path()
@@ -90,9 +91,37 @@ def test_ansible_playbook_path_missing_raises(monkeypatch) -> None:
 
 
 def test_ansible_playbook_path_returns_resolved(monkeypatch) -> None:
+    monkeypatch.setattr(se, "_sibling_ansible_playbook", lambda: None)
     monkeypatch.setattr(se.shutil, "which",
                          lambda _name: "/fake/bin/ansible-playbook")
     assert se._ansible_playbook_path() == "/fake/bin/ansible-playbook"
+
+
+def test_ansible_playbook_path_prefers_active_python_sibling(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    """Avatar/uv regression: absolute venv ``greatminds`` launch with the
+    venv bin absent from PATH still has ``ansible-playbook`` beside
+    ``sys.executable``. ``uv venv`` symlinks ``venv/bin/python`` to a shared
+    interpreter, so resolving the symlink before checking siblings misses the
+    venv's console scripts."""
+    bindir = tmp_path / "venv" / "bin"
+    bindir.mkdir(parents=True)
+    realdir = tmp_path / "uv-python" / "bin"
+    realdir.mkdir(parents=True)
+    real_py = realdir / "python"
+    real_py.write_text("#!/bin/sh\n", encoding="utf-8")
+    real_py.chmod(0o755)
+    py = bindir / "python"
+    py.symlink_to(real_py)
+    ansible = bindir / "ansible-playbook"
+    ansible.write_text("#!/bin/sh\n", encoding="utf-8")
+    ansible.chmod(0o755)
+
+    monkeypatch.setattr(se.sys, "executable", str(py))
+    monkeypatch.setattr(se.shutil, "which", lambda _name: None)
+
+    assert se._ansible_playbook_path() == str(ansible)
 
 
 # ---------- inventory / extra-vars synthesis ----------
@@ -150,6 +179,7 @@ def test_execute_yaml_builds_expected_argv(tmp_path: Path,
             args=cmd, returncode=0, stdout="ok\n", stderr="")
 
     monkeypatch.setattr(se.subprocess, "run", fake_run)
+    monkeypatch.setattr(se, "_sibling_ansible_playbook", lambda: None)
     monkeypatch.setattr(se.shutil, "which",
                          lambda _name: "/fake/bin/ansible-playbook")
     # Safety gate is covered by 0285; here we exercise argv wiring.
@@ -200,6 +230,7 @@ def test_execute_yaml_passes_prereq_tag_when_flag_set(
 def test_execute_yaml_propagates_nonzero_exit(tmp_path: Path,
                                                  monkeypatch) -> None:
     spec = _yaml_spec(tmp_path)
+    monkeypatch.setattr(se, "_sibling_ansible_playbook", lambda: None)
     monkeypatch.setattr(se.shutil, "which",
                          lambda _name: "/fake/bin/ansible-playbook")
     monkeypatch.setattr(
@@ -253,6 +284,7 @@ def test_execute_yaml_rejects_non_yaml_format(tmp_path: Path,
 def test_dispatch_routes_yaml_to_ansible(tmp_path: Path,
                                             monkeypatch) -> None:
     spec = _yaml_spec(tmp_path)
+    monkeypatch.setattr(se, "_sibling_ansible_playbook", lambda: None)
     monkeypatch.setattr(se.shutil, "which",
                          lambda _name: "/fake/bin/ansible-playbook")
     seen: list = []
