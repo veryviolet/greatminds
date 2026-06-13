@@ -36,6 +36,7 @@ import fcntl
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import uuid
@@ -2676,6 +2677,58 @@ def _enforce_worktree_isolation_for_block(
     )
 
 
+def _enforce_implementation_files_exist_or_are_changed(
+    kind: str,
+    block: dict[str, Any],
+    coord: Path,
+) -> None:
+    """Reject implementation evidence that names files with no filesystem
+    or git-status footprint.
+
+    This is deliberately narrower than "must be modified": a legitimate
+    implementation can delete a tracked file, or a role can touch an existing
+    file then end up with equivalent content. But a newly claimed file that
+    neither exists nor appears in git status is phantom evidence and must not
+    advance the FSM.
+    """
+    if kind != "implementation":
+        return
+    files = block.get("files") or []
+    if not isinstance(files, list):
+        return
+    project_dir = coord.parent
+    missing: list[str] = []
+    for rel in files:
+        if not isinstance(rel, str) or not rel.strip():
+            continue
+        rel_path = Path(rel)
+        if rel_path.is_absolute() or ".." in rel_path.parts:
+            missing.append(rel)
+            continue
+        abs_path = project_dir / rel_path
+        if abs_path.exists():
+            continue
+        try:
+            cp = subprocess.run(
+                ["git", "status", "--porcelain", "--", str(rel_path)],
+                cwd=project_dir,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if cp.returncode == 0 and (cp.stdout or "").strip():
+                continue
+        except Exception:  # noqa: BLE001
+            pass
+        missing.append(rel)
+    if missing:
+        raise GreatMindsError(
+            "implementation.files contains path(s) with no filesystem or "
+            f"git-status evidence: {', '.join(missing)}",
+            exit_code=2,
+        )
+
+
 def append_block(
     *,
     task_id: str,
@@ -2771,6 +2824,7 @@ def append_block(
                 pass  # best-effort; never block the append
 
         validate_block(data.get("stream") or "product", block)
+        _enforce_implementation_files_exist_or_are_changed(kind, block, coord)
         # 0303: refuse implementation / tests blocks when the caller's
         # cwd is not the per-task worktree. Pre-0303 implementers
         # could silently edit main while filing the block (upstream
