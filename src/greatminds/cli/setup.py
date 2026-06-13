@@ -1590,8 +1590,8 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     # 0280 (0276 Phase D): sanity check ansible-playbook is on PATH.
     # ansible-core is now a hard dependency (pyproject.toml) so a
     # successful pip install should provide it; this check surfaces
-    # broken installs early. Warn-only — YAML stand profiles need
-    # it; MD profiles still work without.
+    # broken installs early. Warn-only so an operator can still bootstrap
+    # docs/config, but stand deploys will fail until ansible is available.
     _check_ansible_playbook_available()
 
     ok("\ndone.")
@@ -1604,10 +1604,9 @@ def setup(project_dir: Path | None, force: bool, lang: str,
 def _check_ansible_playbook_available() -> None:
     """0280: warn (not error) if ``ansible-playbook`` is absent.
 
-    YAML stand-profiles (Phase C / cli/stand_executor.py) require it;
-    MD-format profiles continue to work without ansible. We emit a
-    visible warning instead of aborting setup so an operator without
-    ansible can still bootstrap a fleet for MD-only workflows.
+    YAML stand-profiles require it. We emit a visible warning instead of
+    aborting setup so an operator can still bootstrap docs/config and then
+    repair the venv before running stand leases.
     """
     found = shutil.which("ansible-playbook")
     if not found:
@@ -1616,7 +1615,7 @@ def _check_ansible_playbook_available() -> None:
             "execution (Phase C) will fail. ansible-core is declared "
             "as a hard dep; if you just ran `pip install greatminds`, "
             "verify the venv: `pip show ansible-core` should list it. "
-            "MD-format profiles still work without ansible."
+            "Install or repair ansible-core before running stand leases."
         )
         return
 

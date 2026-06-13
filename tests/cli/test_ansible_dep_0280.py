@@ -96,14 +96,14 @@ def test_setup_check_warns_when_ansible_missing(
 ) -> None:
     """No ``ansible-playbook`` on PATH → setup emits a warning
     pointing at the YAML-profile failure mode + ``pip show
-    ansible-core`` diagnostic. Setup itself does NOT raise — MD
-    profiles still work."""
+    ansible-core`` diagnostic. Setup itself does NOT raise so the
+    operator can repair the venv after bootstrap."""
     monkeypatch.setattr(setup_mod.shutil, "which", lambda _name: None)
     setup_mod._check_ansible_playbook_available()
     err = capsys.readouterr().err
     assert "ansible-playbook" in err
     assert "ansible-core" in err
-    assert "MD" in err or "md" in err  # mention the fall-back path
+    assert "stand leases" in err
 
 
 def test_setup_check_warns_when_version_subprocess_fails(
