@@ -17,8 +17,6 @@ Product roles:
 - `ARCHITECT-REVIEWER`: final review, blocked-task wake-up, commit policy.
   Lifecycle: `driven`.
 - `EXPLORER`: live exploratory review and bug filing. Lifecycle: `driven`.
-- `STAND-KEEPER`: stand lease readiness, deployment, and recovery. Lifecycle:
-  `driven`.
 
 System and entry roles:
 

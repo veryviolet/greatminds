@@ -36,7 +36,7 @@ Background; reuse pattern from <verified/Y.md>".
 - `<path>`: description.
 
 ## Verification / handoff
-- <tests/docs build/stand request expected>
-- If `stand_required: true`, specify the expected `stand_requests/` /
-  `stand_done/` evidence (with matching `evidence_for: [<this-task-id>]`)
+- <tests/docs build/live-stand evidence expected>
+- If `stand_required: true`, specify the expected lease profile and the
+  exact `tests.stand_evidence` before/after behavior TESTER must record
   before TESTER/READER may pass.

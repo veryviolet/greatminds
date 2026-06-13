@@ -290,29 +290,26 @@ it as part of the deploy.
 
 Ownership and usage:
 
-- Stand profiles live at `coordination/stand-profiles/<name>.{yaml,md}`.
+- Stand profiles live at `coordination/stand-profiles/<name>.yaml`.
 - USER and DEVELOPER write or update profiles when adding new deploy
   scenarios.
 - coordd uses a profile only when the active lease carries
   `profile=<name>`, loading it with `load_profile(coord, lease.profile)`.
-- YAML and MD profile files are both supported; the author chooses the
-  format that best fits the scenario.
+- Only YAML/ansible profiles are executable. Older MD/prose profiles are
+  invalid for current deploys.
 
 Convention:
 
-- File name: `<profile-name>.yaml` or `<profile-name>.md`,
+- File name: `<profile-name>.yaml`,
   where `<profile-name>` is the `lease.profile` enum value
-  (e.g. `full-deploy.yaml`, `vite-dev.md`, `smoke-only.yaml`).
+  (e.g. `full-deploy.yaml`, `vite-dev.yaml`, `smoke-only.yaml`).
 - YAML files use a subset of ansible-playbook syntax (machine-runnable
-  by SK) — required fields `name`, `hosts`, `tasks`; optional `vars`,
+  by coordd's deploy path) — required fields `name`, `hosts`, `tasks`; optional `vars`,
   `handlers`, `gather_facts`.
-- MD files are free-form prose; SK injects the file contents into its
-  next-tick prompt and writes the Bash needed to work the recipe.
-- If both formats exist for the same profile name, YAML wins.
-- The lease's `deploy_prerequisites_only` metadata flag tells SK to
-  execute only tasks tagged `prerequisite` for YAML, or only the
-  prerequisite section for MD. This is used when TESTER must verify the
-  deployment pipeline itself after SK prepares only the host prerequisites.
+- The lease's `deploy_prerequisites_only` metadata flag tells the deploy
+  path to execute only tasks tagged `prerequisite`. This is used when TESTER
+  must verify the deployment pipeline itself after only the host prerequisites
+  are prepared.
 
 Schema source-of-truth: `schema.stand_profile`. The runtime loader and
 validator read profiles from there.
@@ -329,7 +326,7 @@ gate. So "just deploy the stand" and "test the stand" are the SAME FSM
 path — a `verify_only` task — differing only in the verification DEPTH:
 
 - **deploy-only** ("разверни стенд по профилю X"): the bar is readiness —
-  SK deploys the profile and TESTER confirms the stand came up healthy
+  coordd deploys the profile and TESTER confirms the stand came up healthy
   (ssh / docker / health GET). No functional probes required.
 - **behavioural test** ("проверь, что работает X"): the bar adds
   `functional_probes` + `tester_observations` — TESTER exercises the
@@ -399,8 +396,8 @@ record:
 - `tests.functional_probes` — list of commands TESTER ran AGAINST
   the prepared stand (curl, psql, UI clicks per scope).
 - `tests.stand_evidence.tester_observations` — TESTER's verbatim
-  probe output, DISTINCT from SK's `observed_with_fix`. Verbatim
-  copies of SK's text are rejected at the CLI level (rubber-stamp
+  probe output, DISTINCT from deploy/readiness `observed_with_fix`. Verbatim
+  copies of readiness text are rejected at the CLI level (rubber-stamp
   guard).
 Scopes `docs` and `research` are exempt: READER review and audit
 findings cover those.

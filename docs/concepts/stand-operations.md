@@ -21,7 +21,7 @@ The stand has four states:
 | State | Meaning |
 | --- | --- |
 | `free` | No active lease. The next lease can be granted immediately. |
-| `preparing` | `STAND-KEEPER` is deploying or restarting the stand for the active lease. |
+| `preparing` | `coordd` is deploying or restarting the stand for the active lease. |
 | `ready` | The stand is ready for the lease holder to run probes. |
 | `down` | Stand operation is paused because deploy or infrastructure recovery is needed. |
 
@@ -51,23 +51,24 @@ If the stand is `free`, the lease becomes active and the state moves to
 `preparing`. If another lease is active, the new lease is appended to the FIFO
 queue. The command prints the `lease_id`; the requester must keep that token.
 
-`STAND-KEEPER` watches `coordination/.stand/state.yaml` and runs:
+`coordd` watches `coordination/.stand/state.yaml` and runs the active lease
+profile. Operators can inspect progress with:
 
 ```bash
 greatminds stand status
 ```
 
-When state is `preparing`, `STAND-KEEPER` deploys from the lease worktree using
-the lease profile. On success:
+When state is `preparing`, `coordd` deploys from the lease worktree using the
+lease profile. On success it records a deploy marker and transitions the
+stand to ready, equivalent to:
 
 ```bash
 greatminds stand ready --lease-id <lease-id>
 ```
 
 That moves the state to `ready` and files an inbox-info message to the holder:
-`stand lease <lease-id> ready; task=<task-id>`. `STAND-KEEPER` may only mark a
-lease ready after the configured stand profile has run and left its deploy
-marker.
+`stand lease <lease-id> ready; task=<task-id>`. The ready transition is valid
+only after the configured stand profile has run and left its deploy marker.
 
 The holder, usually `TESTER` or `EXPLORER`, then runs its own probes against
 the prepared stand and releases the lease:
@@ -77,7 +78,7 @@ greatminds stand release --lease-id <lease-id> --result pass|fail|partial
 ```
 
 Only the lease holder can release an active lease. Releasing moves the stand
-back to `free`; `STAND-KEEPER` handles the next queued lease on a later tick.
+back to `free`; `coordd` promotes the next queued lease on a later tick.
 
 ## TTL And Recovery
 
@@ -87,7 +88,7 @@ safety valve for abandoned leases; it is not a substitute for explicitly
 releasing a lease after probes finish.
 
 If deployment fails or the stand has an infrastructure incident,
-`STAND-KEEPER` runs:
+the operator or maintainer runs:
 
 ```bash
 greatminds stand down --reason "<operational reason>"
@@ -103,7 +104,7 @@ That returns the stand to `free` so queued work can resume.
 
 ## Evidence Boundary
 
-`STAND-KEEPER` only proves infrastructure readiness: process status, health
+The coordd deploy step only proves infrastructure readiness: process status, health
 endpoint availability, remote reachability, GPU availability when requested,
 and equivalent bring-up checks. It does not run product acceptance tests.
 

@@ -8,9 +8,9 @@ stand_required: true
 stand_reason: "why live evidence is needed"
 ```
 
-Stand access now uses the lease workflow described in
+Stand access uses the lease workflow described in
 [Stand Operations](stand-operations.md). `TESTER` requests a lease, waits for
-`STAND-KEEPER` to mark it ready, probes the deployed stand, records
+coordd's deploy path to mark it ready, probes the deployed stand, records
 lease-based `stand_evidence` in the product task's `tests` block, and runs:
 
 ```bash

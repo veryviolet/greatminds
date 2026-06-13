@@ -98,7 +98,7 @@ recreate or repair `.venv-coord`, reinstall the intended package version, then
 restart the daemon and agents from that venv. Avoid `uv run` during recovery;
 call the target venv's `greatminds` binary directly.
 
-## Wake STAND-KEEPER
+## Inspect Stand Lease Deploy
 
 Stand work is lease-backed. A holder requests a lease with:
 
@@ -106,22 +106,22 @@ Stand work is lease-backed. A holder requests a lease with:
 greatminds stand lease --task TASK_ID --worktree "$(greatminds worktree path TASK_ID)" --profile full-deploy
 ```
 
-`coordd` wakes `STAND-KEEPER` on stand-state changes. If the lease stays in
-`preparing`, inspect:
+`coordd` handles stand-state changes and deploys the active lease profile. If
+the lease stays in `preparing`, inspect:
 
 ```bash
 greatminds stand status
-greatminds agent status STAND-KEEPER
 greatminds watchdog
 ```
 
-If the stand is down, `STAND-KEEPER` recovers it and runs:
+If the stand is down after an infrastructure fix, an operator with global
+stand control runs:
 
 ```bash
 greatminds stand up --reason "recovered ..."
 ```
 
-The holder, not `STAND-KEEPER`, releases the lease after product probes:
+The holder releases the lease after product probes:
 
 ```bash
 greatminds stand release --lease-id LEASE_ID --result pass

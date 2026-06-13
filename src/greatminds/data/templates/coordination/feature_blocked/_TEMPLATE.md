@@ -29,7 +29,7 @@ blocked:
   reason: <short concrete reason this task cannot progress>
   dependencies:
     - verified/<seq>-<slug>.md
-    - stand_done/<seq>-<slug>.md
+    - feature_test/<seq>-<slug>.md
   resume_to: feature_dev | feature_ui_dev | feature_docs | feature_test | feature_docs_review | feature_review
 ---
 

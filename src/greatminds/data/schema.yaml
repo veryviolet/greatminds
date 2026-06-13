@@ -59,24 +59,24 @@ glossary:
     archive: "Duplicate, abandoned, superseded, or triaged-away product work."
     user_feedback: "Product feedback awaiting PLANNER triage."
     review_sessions: "Scenario-B review sessions; EXPLORER iterates live-stand exploration and files bugs to feature_inbox."
-    .stand: "Singleton stand resource state.yaml + lease bookkeeping; coordd watches it and runs the deploy itself on lease lifecycle events (1.6.0: no STAND-KEEPER role)."
+    .stand: "Singleton stand resource state.yaml + lease bookkeeping; coordd watches it and runs the deploy itself on lease lifecycle events (1.6.0: retired stand deploy role)."
   stand_profiles:
     full-deploy: "Full backend deployment on the target hosts with service health checks; scenarios A and B."
     vite-dev: "Backend deployed plus a Vite UI dev server with HMR (UI changes reload, no per-change redeploy); scenario C."
     smoke-only: "Fast reachability + CLI-responds probe — no rsync, no install. Warmup leases and post-deploy liveness checks."
   stand_probes:
-    # STAND-KEEPER readiness checks (allowed) — GET / observe only.
+    # Deploy/readiness checks (allowed) — GET / observe only.
     docker_ps: "Container liveness via docker ps / docker compose ps."
     http_health_get_200: "GET the health endpoint and require HTTP 200 — the one allowed status check."
     ssh_reachable: "SSH reachability of the stand host plus a remote docker ps."
     gpu_check: "GPU availability via nvidia-smi, when the profile requests it."
     endpoint_presence: "Presence of an endpoint / bundle / bootstrap artifact — existence only, never exercising it."
     get_only_route_status: "GET-only HTTP status on routes (e.g. 200 on SPA paths); no POST, no body validation."
-    # Forbidden for STAND-KEEPER — TESTER / EXPLORER territory.
-    any_post: "ANY POST to the product API — zero exceptions (auth, bootstrap, login, business endpoints all included). SK is GET / observe only."
+    # Forbidden for deploy/readiness — TESTER / EXPLORER territory.
+    any_post: "ANY POST to the product API — zero exceptions (auth, bootstrap, login, business endpoints all included). Readiness is GET / observe only."
     response_body_validation: "Checking response body shape / fields / counts / status beyond the one allowed health 200."
     acceptance_criteria: "Running acceptance / regression criteria (layer-1 pass, AC checks, dedup re-POST, error paths)."
-    followup_bug_filing: "Filing follow-up bugs / product gaps from SK's own checks — triage is ARCHITECT-PLANNER's (note observations only)."
+    followup_bug_filing: "Filing follow-up bugs / product gaps from readiness checks — triage is ARCHITECT-PLANNER's (note observations only)."
     e2e_browser_flow: "Full end-to-end browser / Playwright product flows."
     regression_scenario: "Regression scenarios that EXPLORER would run."
     gate_check: "greatminds gate-check — TESTER-only; reads TESTER's tests-block lease evidence."
@@ -161,7 +161,7 @@ queues:
     kind: active
   # .stand is a state-kind watch path, NOT a claim-from queue. coordd
   # watches state.yaml and runs the deploy itself on a `preparing` lease
-  # (1.6.0: no STAND-KEEPER role — see coordd._maybe_auto_deploy_stand).
+  # (1.6.0: the old stand deploy role is retired; see coordd._maybe_auto_deploy_stand).
   .stand:
     writers: [TESTER, ARCHITECT-PLANNER, MAINTAINER, LIVE-DEVELOPER, EXPLORER, ARCHITECT-REVIEWER]
     kind: state
@@ -235,7 +235,7 @@ roles:
         # verified. Without this a scope:release task parks forever in
         # feature_plan with no route and no close path.
         - decompose_scope_release_umbrella_into_subtasks_then_archive_umbrella
-      # stand_down classifiers — PLANNER reads SK's auto-notification
+      # stand_down classifiers — PLANNER reads coordd's auto-notification
       # and routes the fix per the down_reason signature.
       on_stand_down_yaml_playbook_error:
         - read_down_reason_from_inbox_info
@@ -319,7 +319,7 @@ roles:
     # Interactive, USER-paced: works a single task live with the USER on
     # a leased stand. As the lease HOLDER it may deploy to its own stand
     # during the session (deploy_to_own_leased_stand_during_session) —
-    # the only relaxation of STAND-KEEPER's deploy exclusivity, scoped to
+    # the only relaxation of centralized deploy ownership, scoped to
     # an active interactive lease. On USER "ok" it hands to feature_review
     # as a sprint task (REVIEWER does a no-regression review, outcome
     # approved_sprint; TESTER is skipped — the USER was the live validator).
@@ -899,16 +899,17 @@ git_permissions:
 # ---------------------------------------------------------------------------
 # Tests block — required-field validation for stand_required tasks
 #
-# When plan.stand_required is true, the tests block MUST contain a
-# stand_evidence mapping with the three subfields below. Enforced by
-# validate_block in cli/task.py.
+# When plan.stand_required is true, the appended tests block MUST contain a
+# stand_evidence mapping with the subfields below. Enforced by
+# require_block_cross_state in cli/task.py at append-block time and rechecked
+# by gate-check during feature_test → feature_review / feature_review →
+# verified transitions.
 # ---------------------------------------------------------------------------
-# Systemic commit-drift fix. STAND-KEEPER deploys the EXACT commit the
-# requesting task's impl.base_commit names, not whatever main HEAD
-# happens to be at SK-run time. The deploy resolves the target commit
-# from the lease's task impl.base_commit and checks it out on each
-# host before the rsync/compose flow; after evidence records, SK
-# optionally reverts the host to main (post_stand_main_revert).
+# Systemic commit-drift fix. The lease deploy path uses the active lease's
+# source worktree / task evidence, not whatever main HEAD happens to be at
+# deploy time. gate-check compares tests.stand_evidence.commit with the
+# task's implementation/plan commit, and compares worktree_fingerprint when
+# both sides carry one.
 #
 # Pairs with worktree_fingerprint: the committed-state identity covers
 # what was deployed, the uncommitted-overlay identity covers the
@@ -973,7 +974,7 @@ stand:
     state_file: .stand/state.yaml       # under coordination/
     # Profile enum the lease CLI validates ``--profile`` against — the
     # single source of truth for the accepted set. Token definitions
-    # live in glossary.stand_profiles; SK's deploy playbook per value
+    # live in glossary.stand_profiles; deploy playbooks per value
     # lives in PROJECT.md; canon presets ship in templates/stand-profiles/.
     profiles_allowed: [full-deploy, vite-dev, smoke-only]
 
@@ -996,10 +997,10 @@ tests_block_validation:
       - commit
     required_when: plan.stand_required
   # TESTER must run own functional probes against the
-  # prepared stand. STAND-KEEPER's observed_with_fix is infra-
+  # prepared stand. Deploy/readiness observed_with_fix is infra-
   # readiness only (UP, version, /health 200). TESTER's
   # functional_probes + tester_observations are TESTER's own
-  # behavior verification, distinct from SK's infra check.
+  # behavior verification, distinct from readiness checks.
   required_for_scopes:
     backend:
       - functional_probes
@@ -1287,7 +1288,7 @@ claude_settings:
   permissions:
     allow:
       # Broad default: allow ALL Bash for every project. Driven /
-      # headless agents (TESTER stand probes, STAND-KEEPER deploys —
+      # headless agents (TESTER stand probes, coordd deploys —
       # sudo/docker/compose/rsync, MAINTAINER recovery) repeatedly
       # stalled because a needed command wasn't in a narrow allow-list
       # and a headless turn can't answer a permission prompt. These are
@@ -1304,7 +1305,7 @@ claude_settings:
       - "Bash(git checkout:*)"
       - "Bash(git branch:*)"
       # REVIEWER's rollback path (verified → revert) needs git
-      # revert; TESTER's stand probe needs ssh/scp; STAND-KEEPER's
+      # revert; TESTER's stand probe needs ssh/scp; coordd's
       # deploy uses rsync. Without these allow rules they had to be
       # typed manually with the `!` prefix on every invocation.
       - "Bash(git revert:*)"
@@ -1348,11 +1349,10 @@ claude_settings:
       - "Bash(kill:*)"
       - "Bash(systemctl --user:*)"
 
-# Stand profile files. STAND-KEEPER reads a profile file matching
-# ``lease.profile`` (the enum from
-# stand.resource.profiles_allowed) from a canonical directory at
-# lease-grant time and executes it as part of the deploy. Two
-# dialects supported on disk:
+# Stand profile files. coordd reads the YAML profile matching
+# ``lease.profile`` (the enum from stand.resource.profiles_allowed) from the
+# project coordination directory at deploy time and executes it as part of the
+# lease deploy.
 #
 #   * ``yaml`` — a subset of ansible-playbook syntax, run by coordd's
 #     deterministic deploy engine (1.6.0: the only dialect; MD/prose
@@ -1368,17 +1368,14 @@ stand_profile:
   yaml_dialect: ansible_playbook
   yaml_required_fields: [name, hosts, tasks]
   yaml_optional_fields: [vars, handlers, gather_facts]
-  # Opt-out flag carried on lease metadata so SK runs only the
+  # Opt-out flag carried on lease metadata so the deploy path runs only the
   # "prerequisites" subset of the profile (used by warmup leases
   # that prepare the stand for the real probe).
   deploy_prerequisites_only_flag: deploy_prerequisites_only
 
-# STAND-KEEPER lifecycle notifications. SK files inbox-info
-# automatically on these events so PLANNER (or another role) doesn't
-# need to poll state.yaml. Keep the map small — only events PLANNER
-# must react to. ARCHITECT-PLANNER is the canonical target for
-# ``on_down`` because PLANNER is the one who decides between "SK
-# fixes it" and "USER escalation".
+# Legacy key name for stand lifecycle notifications. coordd files inbox-info
+# automatically on these events so PLANNER (or another role) does not need to
+# poll state.yaml. Keep the map small — only events PLANNER must react to.
 stand_keeper:
   notifications:
     on_down: ARCHITECT-PLANNER
