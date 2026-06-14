@@ -4,6 +4,15 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 2.0.12 — 2026-06-14
+
+### Fixed
+
+- `greatminds setup` no longer installs a role-gating git pre-commit hook.
+  Fresh projects now keep normal operator-mode `git commit` behavior; the
+  `greatminds check-git-permission` command remains available only as an
+  explicit diagnostic.
+
 ## 2.0.11 — 2026-06-14
 
 ### Fixed

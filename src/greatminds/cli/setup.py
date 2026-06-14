@@ -1291,57 +1291,6 @@ def _install_codex_pretrust(project_dir: Path) -> str:
     return "written"
 
 
-def _install_git_pre_commit_hook(project_dir: Path) -> str:
-    """Write .git/hooks/pre-commit that invokes
-    ``greatminds check-git-permission commit`` so only roles listed in
-    schema.git_permissions.commit can produce a successful commit.
-
-    Returns a status string ("written" / "existing" / "skipped: <reason>").
-    Idempotent: never overwrites an existing hook (preserves user
-    customizations); never installs if .git/ is absent.
-    Task 0091 item 2.
-    """
-    git_dir = project_dir / ".git"
-    if not git_dir.is_dir():
-        info("  git pre-commit hook: skipped (no .git/ in project)")
-        return "skipped: no .git/"
-    hooks_dir = git_dir / "hooks"
-    try:
-        hooks_dir.mkdir(parents=True, exist_ok=True)
-    except OSError as exc:
-        warn(f"  git pre-commit hook: skipped: hooks dir unwritable ({exc})")
-        return f"skipped: {exc}"
-    hook_path = hooks_dir / "pre-commit"
-    if hook_path.exists():
-        info("  git pre-commit hook: existing (not overwritten)")
-        return "existing"
-    # Pin to the interpreter that ran setup (sys.executable). Git's
-    # pre-commit hook runs with a sanitized PATH that often lacks the
-    # project .venv/bin, so a bare `greatminds` resolves to nothing
-    # and the hook errors out for the wrong reason (everyone refused,
-    # not just non-allowed roles). Using the absolute python with
-    # `-m greatminds.cli.main` guarantees the same install that ran
-    # setup is invoked, independent of PATH.
-    import shlex
-    python_path = shlex.quote(sys.executable)
-    body = (
-        "#!/usr/bin/env bash\n"
-        "# Installed by `greatminds setup` (task 0091 item 2).\n"
-        "# Refuses commits when $GREATMINDS_ROLE is not in\n"
-        "# schema.yaml `git_permissions.commit` allow-list.\n"
-        f"exec {python_path} -m greatminds.cli.main "
-        "check-git-permission commit\n"
-    )
-    try:
-        hook_path.write_text(body, encoding="utf-8")
-        hook_path.chmod(0o755)
-    except OSError as exc:
-        warn(f"  git pre-commit hook: skipped: write failed ({exc})")
-        return f"skipped: {exc}"
-    info(f"  git pre-commit hook: written ({hook_path})")
-    return "written"
-
-
 @click.command(short_help="bootstrap a project (create queues + copy canon docs)",
                help=__doc__)
 @click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
@@ -1612,12 +1561,6 @@ def setup(project_dir: Path | None, force: bool, lang: str,
             f"{plugins_failed} failed"
             f"{failed_suffix} (see schema.yaml plugins:)"
         )
-
-    # Git pre-commit hook (task 0091 item 2) — installs only if a
-    # .git/ directory exists in the project root (gracefully no-ops on
-    # non-git projects). Idempotent: if a hook already exists at the
-    # path, we don't overwrite (preserves user customizations).
-    _install_git_pre_commit_hook(project_dir)
 
     # Pre-trust install (task 0076) — opt-in. Adds ONE entry for this
     # project's abs path into ~/.claude.json and ~/.codex/config.toml so

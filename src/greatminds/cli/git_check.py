@@ -1,8 +1,8 @@
-"""greatminds check-git-permission — gate `git commit` / `git push` by role.
+"""greatminds check-git-permission — check git verb permissions by role.
 
-Installed by ``greatminds setup`` as a pre-commit hook. Reads
-``schema.yaml`` ``git_permissions`` and refuses if ``$GREATMINDS_ROLE``
-is not in the allowed list for the given verb.
+Reads ``schema.yaml`` ``git_permissions`` and refuses if
+``$GREATMINDS_ROLE`` is not in the allowed list for the given verb. This is an
+explicit diagnostic command; ``greatminds setup`` does not install git hooks.
 
 Usage::
 

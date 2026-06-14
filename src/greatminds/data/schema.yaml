@@ -876,12 +876,11 @@ inbox:
 # ---------------------------------------------------------------------------
 # Git permissions
 #
-# Closed set of roles that may run `git commit` / `git push` in this
-# project. Enforced by a pre-commit hook (installed by `greatminds setup`)
-# that calls `greatminds check-git-permission commit` and exits non-zero
-# when $GREATMINDS_ROLE is not in the allowed list. Forbidden verbs are
-# `git` subcommands the project never wants any agent to use (force
-# operations, history rewrites).
+# Closed set of roles for the optional `greatminds check-git-permission`
+# diagnostic command. `greatminds setup` does not install git hooks; normal
+# operator-mode commits remain ordinary git commits. Forbidden verbs are `git`
+# subcommands the project never wants any agent to use (force operations,
+# history rewrites).
 # ---------------------------------------------------------------------------
 git_permissions:
   commit: [ARCHITECT-REVIEWER]
