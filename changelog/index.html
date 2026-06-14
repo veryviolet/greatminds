@@ -1408,8 +1408,18 @@
 <p>All notable changes to <strong>greatminds</strong> are documented here. Format follows
 <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a> loosely; versions
 follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
-<h2 id="203-2026-06-13">2.0.3 — 2026-06-13<a class="headerlink" href="#203-2026-06-13" title="Permanent link">&para;</a></h2>
+<h2 id="2011-2026-06-14">2.0.11 — 2026-06-14<a class="headerlink" href="#2011-2026-06-14" title="Permanent link">&para;</a></h2>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Added <code>greatminds daemon doctor</code> to run a daemon-equivalent headless Claude
+  probe for driven-Claude fleets. The command now surfaces missing captured
+  agent env files and Claude 401/auth failures directly instead of leaving the
+  operator to infer them from stuck turns or <code>.turns</code> logs.</li>
+<li><code>daemon install</code>, <code>start</code>, and <code>restart</code> now warn when a driven-Claude fleet
+  has no captured Claude/provider auth env available for the daemon runtime.</li>
+</ul>
+<h2 id="203-2026-06-13">2.0.3 — 2026-06-13<a class="headerlink" href="#203-2026-06-13" title="Permanent link">&para;</a></h2>
+<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Review-session stand leases now refuse stale worktrees that predate any
   currently verified product review commit, not only commits listed in explicit
@@ -1418,7 +1428,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
   product work.</li>
 </ul>
 <h2 id="202-2026-06-13">2.0.2 — 2026-06-13<a class="headerlink" href="#202-2026-06-13" title="Permanent link">&para;</a></h2>
-<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Shipped <code>full-deploy</code>, <code>smoke-only</code>, and <code>vite-dev</code> stand profiles now treat
   <code>STAND_HOST=localhost</code>, <code>127.0.0.1</code>, and <code>::1</code> as local ansible targets.
@@ -1428,7 +1438,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
   product validation can run.</li>
 </ul>
 <h2 id="201-2026-06-13">2.0.1 — 2026-06-13<a class="headerlink" href="#201-2026-06-13" title="Permanent link">&para;</a></h2>
-<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>setup</code> and <code>stand deploy</code> now resolve <code>ansible-playbook</code> beside the active
   venv Python before falling back to <code>PATH</code>. This fixes uv-created venvs where
@@ -1482,7 +1492,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
 </ul>
 <p>These three unblock real (non-vacuous) stand deploys; the remaining release-gated batch (#11/#12/#13/#14/#18 etc.) is live-validated against this release post-upgrade.</p>
 <h2 id="169-2026-06-05">1.6.9 — 2026-06-05<a class="headerlink" href="#169-2026-06-05" title="Permanent link">&para;</a></h2>
-<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_4">Fixed<a class="headerlink" href="#fixed_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Driven run-lock leaked on the claude <code>-p</code> path (issue #11).</strong> In the
   claude driven worker's <code>finally</code>, <code>_record_driven_turn</code> (registry write)
@@ -1495,7 +1505,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
   correct codex worker). Regression test added.</li>
 </ul>
 <h2 id="168-2026-06-05">1.6.8 — 2026-06-05<a class="headerlink" href="#168-2026-06-05" title="Permanent link">&para;</a></h2>
-<h3 id="fixed_4">Fixed<a class="headerlink" href="#fixed_4" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_5">Fixed<a class="headerlink" href="#fixed_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Dashboard agent table alignment.</strong> The STATE column rendered the state
   string padded to 7 while the header reserved 12, so longer states collided
@@ -1528,7 +1538,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
   source it at launch / restart. One source, visible to ansible + the daemon</li>
 <li>all agents.</li>
 </ul>
-<h3 id="fixed_5">Fixed<a class="headerlink" href="#fixed_5" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_6">Fixed<a class="headerlink" href="#fixed_6" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Autonomy: the daemon recovers stuck pipelines.</strong> The startup backlog
   reconcile is now also periodic (<code>RECONCILE_INTERVAL_SEC</code>, 90s): a driven
@@ -1538,7 +1548,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
   interrupted) so it acts on failures now, not on its next hourly self-loop.</li>
 </ul>
 <h2 id="166-2026-06-05">1.6.6 — 2026-06-05<a class="headerlink" href="#166-2026-06-05" title="Permanent link">&para;</a></h2>
-<h3 id="fixed_6">Fixed<a class="headerlink" href="#fixed_6" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_7">Fixed<a class="headerlink" href="#fixed_7" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Canon stand-profile templates no longer self-reference / build an
   empty-user rsync dest.</strong> <code>deploy_path: "{{ deploy_path | default(...) }}"</code>
@@ -1552,7 +1562,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
 </ul>
 <h2 id="165-2026-06-05">1.6.5 — 2026-06-05<a class="headerlink" href="#165-2026-06-05" title="Permanent link">&para;</a></h2>
 <p>Fix: the deploy forced privilege escalation, overriding the playbook.</p>
-<h3 id="fixed_7">Fixed<a class="headerlink" href="#fixed_7" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_8">Fixed<a class="headerlink" href="#fixed_8" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>The executor no longer forces <code>ansible_become=true</code>.</strong> The synthesized
   inventory pinned <code>ansible_become=true</code> by default, which OVERRODE a
@@ -1564,7 +1574,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
 </ul>
 <h2 id="164-2026-06-05">1.6.4 — 2026-06-05<a class="headerlink" href="#164-2026-06-05" title="Permanent link">&para;</a></h2>
 <p>Fix: the YAML stand deploy never reached its target host.</p>
-<h3 id="fixed_8">Fixed<a class="headerlink" href="#fixed_8" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_9">Fixed<a class="headerlink" href="#fixed_9" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>The deploy resolves its host from PROJECT.env via the profile.</strong> The
   YAML executor never read <code>PROJECT.env</code> and never <code>${KEY}</code>-substituted
@@ -1586,7 +1596,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
 <h2 id="163-2026-06-05">1.6.3 — 2026-06-05<a class="headerlink" href="#163-2026-06-05" title="Permanent link">&para;</a></h2>
 <p>Fix the stand-deploy freeze, the daemon's polluted PATH, and document the
 inbox-read protocol structurally.</p>
-<h3 id="fixed_9">Fixed<a class="headerlink" href="#fixed_9" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_10">Fixed<a class="headerlink" href="#fixed_10" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>coordd retries a stand deploy stuck in <code>preparing</code>.</strong> A deploy that
   RAISED before transitioning (vs an ansible rc!=0, which already goes
@@ -1611,7 +1621,7 @@ inbox-read protocol structurally.</p>
 <h2 id="162-2026-06-05">1.6.2 — 2026-06-05<a class="headerlink" href="#162-2026-06-05" title="Permanent link">&para;</a></h2>
 <p>Make the driven deploy/dispatch model survive failures, and let the leaser
 pick the real stand profile.</p>
-<h3 id="fixed_10">Fixed<a class="headerlink" href="#fixed_10" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_11">Fixed<a class="headerlink" href="#fixed_11" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>The lease names ANY real profile (no hardcoded enum).</strong> <code>stand lease
   --profile X</code> is validated by resolving an actual playbook file in the
@@ -1656,7 +1666,7 @@ pick the real stand profile.</p>
 </ul>
 <h2 id="1515-2026-06-04">1.5.15 — 2026-06-04<a class="headerlink" href="#1515-2026-06-04" title="Permanent link">&para;</a></h2>
 <p>Fix: a stale driven run-lock permanently stranded a role.</p>
-<h3 id="fixed_11">Fixed<a class="headerlink" href="#fixed_11" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_12">Fixed<a class="headerlink" href="#fixed_12" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>coordd clears stale driven run-locks on startup.</strong> A driven turn
   runs as a coordd-managed subprocess, so NO run-lock survives a coordd
@@ -1672,7 +1682,7 @@ pick the real stand profile.</p>
 <p>Fix: driven claude roles never ran under the daemon; the dashboard
 contradicted itself on driven roles; a daemon restart stranded a queued
 task.</p>
-<h3 id="fixed_12">Fixed<a class="headerlink" href="#fixed_12" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_13">Fixed<a class="headerlink" href="#fixed_13" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Driven turns spawn the tool by its REAL absolute path.</strong> coordd runs
   as a systemd-user daemon with a minimal PATH (no <code>~/.local/bin</code>), so a
@@ -1712,7 +1722,7 @@ task.</p>
 <h2 id="1513-2026-06-04">1.5.13 — 2026-06-04<a class="headerlink" href="#1513-2026-06-04" title="Permanent link">&para;</a></h2>
 <p>Fix: <code>update</code> could report success without actually upgrading (and needed
 two runs to converge) when a foreign virtualenv was on PATH.</p>
-<h3 id="fixed_13">Fixed<a class="headerlink" href="#fixed_13" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_14">Fixed<a class="headerlink" href="#fixed_14" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>update</code> resolves its own binary from the running venv, not PATH.</strong>
   The self-replace used <code>shutil.which("greatminds")</code>, which is PATH-first
@@ -1733,7 +1743,7 @@ two runs to converge) when a foreign virtualenv was on PATH.</p>
 </ul>
 <h2 id="1512-2026-06-04">1.5.12 — 2026-06-04<a class="headerlink" href="#1512-2026-06-04" title="Permanent link">&para;</a></h2>
 <p>Fix: a plain restart silently destroyed driven-agent sessions.</p>
-<h3 id="fixed_14">Fixed<a class="headerlink" href="#fixed_14" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_15">Fixed<a class="headerlink" href="#fixed_15" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Default <code>greatminds restart</code> preserves session continuity.</strong> For a
   dead agent it did <code>reg_path.unlink()</code> on <code>&lt;role&gt;.json</code> — but the
@@ -1761,7 +1771,7 @@ two runs to converge) when a foreign virtualenv was on PATH.</p>
 </ul>
 <h2 id="1510-2026-06-04">1.5.10 — 2026-06-04<a class="headerlink" href="#1510-2026-06-04" title="Permanent link">&para;</a></h2>
 <p>Fix: <code>update</code> skipped the migration when the package was already current.</p>
-<h3 id="fixed_15">Fixed<a class="headerlink" href="#fixed_15" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_16">Fixed<a class="headerlink" href="#fixed_16" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>greatminds update</code> reconciles config even when the package is up to
   date.</strong> 1.5.9 added the project-config migration to <code>update</code>, but only
@@ -1777,7 +1787,7 @@ two runs to converge) when a foreign virtualenv was on PATH.</p>
 <h2 id="159-2026-06-04">1.5.9 — 2026-06-04<a class="headerlink" href="#159-2026-06-04" title="Permanent link">&para;</a></h2>
 <p>Make the fleet's working branch cleanly project-configurable, and make
 <code>upgrade</code> migrate the whole project (not just the package).</p>
-<h3 id="fixed_16">Fixed<a class="headerlink" href="#fixed_16" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_17">Fixed<a class="headerlink" href="#fixed_17" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>worktrees.default_branch</code> is now per-project configurable via
   <code>coord.yaml</code>.</strong> 1.5.8 added the setting but <code>load_worktree_policy</code> read
@@ -1857,7 +1867,7 @@ FSM path, and a read-only PROJECT.md surface.</p>
 </ul>
 <h2 id="156-2026-06-04">1.5.6 — 2026-06-04<a class="headerlink" href="#156-2026-06-04" title="Permanent link">&para;</a></h2>
 <p>Fix: MAINTAINER tick cadence + runtime files leaking into git.</p>
-<h3 id="fixed_17">Fixed<a class="headerlink" href="#fixed_17" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_18">Fixed<a class="headerlink" href="#fixed_18" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>MAINTAINER self-loop cadence is pinned to 1 hour in canon.</strong> The
   1.5.0 refactor dropped the per-role docs (where the hourly recovery
@@ -1878,7 +1888,7 @@ FSM path, and a read-only PROJECT.md surface.</p>
 </ul>
 <h2 id="155-2026-06-04">1.5.5 — 2026-06-04<a class="headerlink" href="#155-2026-06-04" title="Permanent link">&para;</a></h2>
 <p>Fix: <code>greatminds setup</code> never created the <code>feature_live</code> queue.</p>
-<h3 id="fixed_18">Fixed<a class="headerlink" href="#fixed_18" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_19">Fixed<a class="headerlink" href="#fixed_19" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>setup</code> now creates the <code>feature_live</code> queue.</strong> <code>feature_live</code> was
   added to <code>schema.queues</code> with the LIVE-DEVELOPER role in 1.5.0, but the
@@ -1904,7 +1914,7 @@ FSM path, and a read-only PROJECT.md surface.</p>
   <code>--color/--no-color</code> (auto-detects a TTY). The <code>dashboard</code> coord.yaml
   window (<code>mode: dashboard</code>) now auto-runs it on <code>greatminds launch</code>.</li>
 </ul>
-<h3 id="fixed_19">Fixed<a class="headerlink" href="#fixed_19" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_20">Fixed<a class="headerlink" href="#fixed_20" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>tmux status line is configured on launch.</strong> A fresh host without the
   operator's <code>~/.tmux.conf</code> got tmux's default <code>status-left-length</code> of
@@ -1918,7 +1928,7 @@ FSM path, and a read-only PROJECT.md surface.</p>
 </ul>
 <h2 id="153-2026-06-04">1.5.3 — 2026-06-04<a class="headerlink" href="#153-2026-06-04" title="Permanent link">&para;</a></h2>
 <p>Patch: waking an idle codex/cursor TUI quit the agent (Ctrl-C to the shell).</p>
-<h3 id="fixed_20">Fixed<a class="headerlink" href="#fixed_20" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_21">Fixed<a class="headerlink" href="#fixed_21" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>The event-wake SIGINT no longer kills interactive codex TUIs.</strong> The
   wake primitive (<code>_send_enter.press_enter</code>, and the parallel
@@ -1940,7 +1950,7 @@ FSM path, and a read-only PROJECT.md surface.</p>
 <h2 id="152-2026-06-04">1.5.2 — 2026-06-04<a class="headerlink" href="#152-2026-06-04" title="Permanent link">&para;</a></h2>
 <p>Patch: the documented task-withdraw path was broken — a withdrawn task
 could never be archived.</p>
-<h3 id="fixed_21">Fixed<a class="headerlink" href="#fixed_21" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_22">Fixed<a class="headerlink" href="#fixed_22" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>feature_blocked → archive</code> (withdraw) no longer collides with the
   resume wildcard.</strong> <code>transitions_for</code> resolved <code>any_resume_to_queue</code>
@@ -1959,7 +1969,7 @@ could never be archived.</p>
 </ul>
 <h2 id="151-2026-06-03">1.5.1 — 2026-06-03<a class="headerlink" href="#151-2026-06-03" title="Permanent link">&para;</a></h2>
 <p>Patch: two issues surfaced operating the 1.5.0 fleet live.</p>
-<h3 id="fixed_22">Fixed<a class="headerlink" href="#fixed_22" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_23">Fixed<a class="headerlink" href="#fixed_23" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>greatminds agent status</code> accepts multiple roles.</strong> It was
   single-role-only; a freshly-restarted PLANNER ran
@@ -2017,7 +2027,7 @@ implement, advance the FSM).</p>
 <h2 id="142-2026-06-02">1.4.2 — 2026-06-02<a class="headerlink" href="#142-2026-06-02" title="Permanent link">&para;</a></h2>
 <p>Patch release: SAFETY + the recovery-chain fixes the on-stand
 validation surfaced after 1.4.1 shipped.</p>
-<h3 id="fixed_23">Fixed<a class="headerlink" href="#fixed_23" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_24">Fixed<a class="headerlink" href="#fixed_24" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0349 SAFETY: EXPLORER host-destructive actions must target the
@@ -2112,7 +2122,7 @@ validation surfaced after 1.4.1 shipped.</p>
 the 0336 stand-anchor. Until this patch lands on the fleet, EXPLORER's
 seeded codex profile keeps injecting a stale web-only boundary that
 overrides the canon and blocks on-stand validation.</p>
-<h3 id="fixed_24">Fixed<a class="headerlink" href="#fixed_24" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_25">Fixed<a class="headerlink" href="#fixed_25" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0344 EXPLORER codex profile carries the 0336 stand-anchor.</strong> The
   shipped <code>src/greatminds/data/codex/profiles/explorer.config.toml</code>
@@ -2280,7 +2290,7 @@ documentation refresh.</p>
   <code>greatminds stand lease</code> / <code>stand release</code>.</p>
 </li>
 </ul>
-<h3 id="fixed_25">Fixed<a class="headerlink" href="#fixed_25" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_26">Fixed<a class="headerlink" href="#fixed_26" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0341 coordd watches <code>.stand</code> up front so lifecycle changes wake
@@ -2478,7 +2488,7 @@ and the launch/restart wrapper-loop removal.</p>
   (nonzero exit propagates because enable is the whole point).</p>
 </li>
 </ul>
-<h3 id="fixed_26">Fixed<a class="headerlink" href="#fixed_26" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_27">Fixed<a class="headerlink" href="#fixed_27" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0300 worktree_merge pulls origin/main before merging task
@@ -2529,7 +2539,7 @@ and the launch/restart wrapper-loop removal.</p>
 <p>Fixes two operator-facing bugs in <code>greatminds update</code> so the command
 works correctly on projects managed by uv / poetry / pipenv and stops
 resurrecting torn-down fleet sessions.</p>
-<h3 id="fixed_27">Fixed<a class="headerlink" href="#fixed_27" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_28">Fixed<a class="headerlink" href="#fixed_28" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0299 update branches by <code>detect_env_setup</code> + skips fleet restart
   when tmux session absent.</strong> <code>update</code> used to call pip even when the
@@ -2552,7 +2562,7 @@ resurrecting torn-down fleet sessions.</p>
 <p>Critical fix for the chat-mode UserPromptSubmit deadlock that
 shipped across the 1.3.x line. Operators on existing projects should
 upgrade promptly.</p>
-<h3 id="fixed_28">Fixed<a class="headerlink" href="#fixed_28" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_29">Fixed<a class="headerlink" href="#fixed_29" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0298 stop-decide <code>user-prompt-submit</code> phase no longer emits
   <code>decision: block</code>.</strong> <code>greatminds stop-decide</code> returned the same
@@ -2634,7 +2644,7 @@ be leased.</p>
   rejection.</p>
 </li>
 </ul>
-<h3 id="fixed_29">Fixed<a class="headerlink" href="#fixed_29" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_30">Fixed<a class="headerlink" href="#fixed_30" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0292 <code>full-deploy.yaml</code> install step uses <code>uv pip</code>.</strong> <code>uv venv</code>
@@ -2669,7 +2679,7 @@ contradictions across the stand transitions.</p>
   role list</code> CLI surface the rendered contract. Existing
   <code>roles/*.md</code> prose remains; doc-shrinkage follow-up deferred.</li>
 </ul>
-<h3 id="fixed_30">Fixed<a class="headerlink" href="#fixed_30" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_31">Fixed<a class="headerlink" href="#fixed_31" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0289 stand release/down/up nullify <code>active_lease</code>.</strong> Pre-fix
   <code>stand down</code> left the triggering lease set, and <code>stand up</code> did
@@ -2683,7 +2693,7 @@ contradictions across the stand transitions.</p>
 <h2 id="134-2026-05-27">1.3.4 — 2026-05-27<a class="headerlink" href="#134-2026-05-27" title="Permanent link">&para;</a></h2>
 <p>Followup patch tightening the SK runtime gate so the stand-profile
 dispatch contract is actually enforced.</p>
-<h3 id="fixed_31">Fixed<a class="headerlink" href="#fixed_31" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_32">Fixed<a class="headerlink" href="#fixed_32" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0286 three-layer deploy lock.</strong> SK could still mark state=ready
   without invoking ansible-playbook because the <code>is_deploy_safe</code>
@@ -2762,7 +2772,7 @@ fix that unblocks Phase H avatar verification.</p>
   Lease-level override wins over spec value.</p>
 </li>
 </ul>
-<h3 id="fixed_32">Fixed<a class="headerlink" href="#fixed_32" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_33">Fixed<a class="headerlink" href="#fixed_33" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0285 SK deploy-bypass closed — <code>is_deploy_safe</code> classifier.</strong> SK
   was refusing every deploy that touched the main fleet tree, even
@@ -2781,7 +2791,7 @@ fix that unblocks Phase H avatar verification.</p>
 emergency wake fix. Five verified tasks merged on local main; all
 empirically validated via real avatar SSH stand probes (no shape-only
 evidence).</p>
-<h3 id="fixed_33">Fixed<a class="headerlink" href="#fixed_33" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_34">Fixed<a class="headerlink" href="#fixed_34" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0258 — complete BREAKING removal of stand-stream runtime.</strong>
@@ -2855,7 +2865,7 @@ input_sock channel + leaf SIGINT; end-to-end probe (filed
 feature_inbox/9999.yaml → coordd inotify → press_enter →
 input_sock → SIGINT to PLANNER's own Bash subprocess exit 130)
 confirms the full chain.</p>
-<h3 id="fixed_34">Fixed<a class="headerlink" href="#fixed_34" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_35">Fixed<a class="headerlink" href="#fixed_35" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0259 coordd inotify wake uses <code>input_sock</code> via <code>press_enter</code>.</strong>
   Pre-0259, coordd's chat-mode wake (<code>tmux_send_keys_wake</code>) sent
@@ -2965,7 +2975,7 @@ in a single step.</p>
 <p>Bug-fix release. Three regressions found in 1.1.0 real-world use, plus a
 critical wake-up channel regression introduced silently by the 1.0.0
 umbrella-console-script migration. No new features.</p>
-<h3 id="fixed_35">Fixed<a class="headerlink" href="#fixed_35" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_36">Fixed<a class="headerlink" href="#fixed_36" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>task append-block --body-file</code> option missing.</strong> Dropped during the
   argparse→click conversion. The plan orchestrator and several agent
@@ -3112,7 +3122,7 @@ plan → dev) confirmed against a fresh project: 7+ journal
 transitions, schema validation rejects malformed blocks, role
 permissions enforced.</p>
 <h2 id="011-2026-05-20">0.1.1 — 2026-05-20<a class="headerlink" href="#011-2026-05-20" title="Permanent link">&para;</a></h2>
-<h3 id="fixed_36">Fixed<a class="headerlink" href="#fixed_36" title="Permanent link">&para;</a></h3>
+<h3 id="fixed_37">Fixed<a class="headerlink" href="#fixed_37" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>greatminds-coord-launch</code> and <code>greatminds-coord-tmux</code> now find a
   sibling <code>greatminds-start-agent</code> in the same venv via
