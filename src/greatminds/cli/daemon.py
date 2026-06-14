@@ -30,6 +30,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import click
@@ -424,6 +425,80 @@ def capture_agent_env(name: str) -> bool:
     return True
 
 
+def _parse_env_file(path: Path) -> dict[str, str]:
+    """Parse the simple KEY=VALUE files greatminds writes for systemd.
+
+    PROJECT.env may be edited by users, so this is deliberately forgiving:
+    unknown lines are ignored and shell-style quoting is accepted.
+    """
+    env: dict[str, str] = {}
+    if not path.is_file():
+        return env
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return env
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        try:
+            parts = shlex.split(line, comments=True, posix=True)
+        except ValueError:
+            parts = [line]
+        for part in parts:
+            if "=" not in part:
+                continue
+            key, val = part.split("=", 1)
+            if key:
+                env[key] = val
+    return env
+
+
+def _daemon_candidate_env(name: str, project_dir: Path) -> dict[str, str]:
+    """Environment a daemon-started driven subprocess should see.
+
+    Mirrors the systemd drop-in order: current process env, then
+    coordination/PROJECT.env, then the private captured agent env.
+    """
+    env = dict(os.environ)
+    env.update(_parse_env_file(project_dir / "coordination" / "PROJECT.env"))
+    env.update(_parse_env_file(_agent_env_file(name)))
+    return env
+
+
+def has_driven_claude_roles(project_dir: Path) -> bool:
+    lifecycles = _schema_lifecycles(project_dir)
+    for p in (project_dir / "coord.yaml",
+              project_dir / "coordination" / "coord.yaml"):
+        doc = _safe_yaml(p)
+        if not doc:
+            continue
+        for win in (doc.get("windows") or []):
+            if not isinstance(win, dict):
+                continue
+            if (win.get("tool") or "").lower() != "claude":
+                continue
+            role = (win.get("role") or "").upper()
+            if role and lifecycles.get(role) == "driven":
+                return True
+        return False
+    return False
+
+
+def _warn_missing_agent_env_for_claude(name: str, project_dir: Path) -> None:
+    if not has_driven_claude_roles(project_dir):
+        return
+    if _selected_agent_env() or _agent_env_file(name).is_file():
+        return
+    warn(
+        "no Claude/provider auth env captured for this driven-Claude fleet; "
+        "if `claude -p` only works in a specific interactive shell, run "
+        "`greatminds daemon start` from that shell or check "
+        "`greatminds daemon doctor` before relying on driven Claude turns."
+    )
+
+
 def install_project_dropin(name: str, project_dir: Path) -> bool:
     """Per-instance drop-in giving the daemon — and every driven agent it
     spawns, which inherit its process env — the fleet's ``PROJECT.env`` as a
@@ -675,6 +750,7 @@ def install_cmd(name: str | None, project_dir: Path | None) -> None:
     wrote_unit = install_template_unit()
     register_project(resolved, pd)
     captured_env = capture_agent_env(resolved)
+    _warn_missing_agent_env_for_claude(resolved, pd)
     # Wire the fleet's PROJECT.env into the daemon (and every driven agent
     # it spawns) as a systemd EnvironmentFile — the single clean injection.
     wrote_dropin = install_project_dropin(resolved, pd)
@@ -818,6 +894,9 @@ def start_cmd(project: str | None, project_dir: Path | None) -> None:
     name = _resolve_project_name(project, project_dir)
     if capture_agent_env(name):
         info("agent auth/session env refreshed before daemon start")
+    pd = project_dir.resolve() if project_dir else lookup_project_dir(name)
+    if pd is not None:
+        _warn_missing_agent_env_for_claude(name, pd)
     _run_verb("start", name)
 
 
@@ -863,7 +942,96 @@ def restart_cmd(project: str | None, project_dir: Path | None) -> None:
     # systemd's bare PATH (which cannot exec claude / codex / ansible).
     if _refresh_units_before_restart(name, project_dir):
         info("daemon units refreshed (PATH re-baked) before restart")
+    pd = project_dir.resolve() if project_dir else lookup_project_dir(name)
+    if pd is not None:
+        _warn_missing_agent_env_for_claude(name, pd)
     _run_verb("restart", name)
+
+
+def _claude_headless_probe(name: str, project_dir: Path,
+                           timeout_sec: float) -> tuple[bool, str]:
+    env = _daemon_candidate_env(name, project_dir)
+    argv = [
+        "claude", "-p",
+        "Reply with OK only. This is a greatminds daemon doctor probe.",
+        "--strict-mcp-config",
+        "--permission-mode", "auto",
+        "--output-format", "json",
+    ]
+    started = time.monotonic()
+    try:
+        cp = subprocess.run(
+            argv, cwd=str(project_dir), env=env,
+            capture_output=True, text=True, timeout=timeout_sec,
+        )
+    except FileNotFoundError:
+        return False, "`claude` is not on the daemon PATH"
+    except subprocess.TimeoutExpired:
+        return False, f"`claude -p` did not finish within {timeout_sec:.0f}s"
+
+    elapsed = time.monotonic() - started
+    stdout = cp.stdout or ""
+    stderr = cp.stderr or ""
+    try:
+        obj = json.loads(stdout)
+    except (ValueError, TypeError):
+        obj = None
+    if isinstance(obj, dict) and obj.get("is_error"):
+        status = obj.get("api_error_status")
+        result = str(obj.get("result") or "").strip()
+        if status in (401, 403) or "auth" in result.lower():
+            return (
+                False,
+                f"Claude auth failed in daemon-equivalent env "
+                f"(status={status}, rc={cp.returncode}, {elapsed:.1f}s): "
+                f"{result[:240]}",
+            )
+        return (
+            False,
+            f"Claude returned an error in daemon-equivalent env "
+            f"(status={status}, rc={cp.returncode}, {elapsed:.1f}s): "
+            f"{result[:240]}",
+        )
+    if cp.returncode != 0:
+        detail = (stderr or stdout).strip().replace("\n", " ")
+        return (
+            False,
+            f"`claude -p` exited rc={cp.returncode} in daemon-equivalent env: "
+            f"{detail[:240]}",
+        )
+    return True, f"Claude headless probe succeeded in {elapsed:.1f}s"
+
+
+@daemon.command("doctor", short_help="check daemon agent runtime env")
+@_project_options
+@click.option("--timeout-sec", type=float, default=60.0, show_default=True,
+              help="headless Claude probe timeout")
+def doctor_cmd(project: str | None, project_dir: Path | None,
+               timeout_sec: float) -> None:
+    """Check whether daemon-driven agent tools work in daemon-equivalent env."""
+    name = _resolve_project_name(project, project_dir)
+    pd = project_dir.resolve() if project_dir else lookup_project_dir(name)
+    if pd is None:
+        err(f"project '{name}' is not registered; pass --project-dir")
+        raise click.exceptions.Exit(2)
+
+    click.echo(f"project: {name}")
+    click.echo(f"root: {pd}")
+    agent_env = _agent_env_file(name)
+    if agent_env.is_file():
+        ok(f"agent env file present: {agent_env}")
+    else:
+        warn(f"agent env file missing: {agent_env}")
+    if has_driven_claude_roles(pd):
+        ok("driven Claude roles detected")
+        ok_probe, detail = _claude_headless_probe(name, pd, timeout_sec)
+        if ok_probe:
+            ok(detail)
+        else:
+            err(detail)
+            raise click.exceptions.Exit(1)
+    else:
+        info("no driven Claude roles detected")
 
 
 @daemon.command("status", short_help="show daemon status for a project")

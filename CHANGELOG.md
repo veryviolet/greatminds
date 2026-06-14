@@ -4,6 +4,17 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 2.0.11 — 2026-06-14
+
+### Fixed
+
+- Added `greatminds daemon doctor` to run a daemon-equivalent headless Claude
+  probe for driven-Claude fleets. The command now surfaces missing captured
+  agent env files and Claude 401/auth failures directly instead of leaving the
+  operator to infer them from stuck turns or `.turns` logs.
+- `daemon install`, `start`, and `restart` now warn when a driven-Claude fleet
+  has no captured Claude/provider auth env available for the daemon runtime.
+
 ## 2.0.3 — 2026-06-13
 
 ### Fixed

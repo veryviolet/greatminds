@@ -6,7 +6,9 @@ PROJECT.env as real environment variables.
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
+import subprocess
 
 from greatminds.cli import daemon as dm
 
@@ -93,3 +95,79 @@ def test_capture_agent_env_empty_shell_preserves_existing_file(
 
     assert dm.capture_agent_env("toy") is False
     assert target.read_text(encoding="utf-8") == "ANTHROPIC_API_KEY=old\n"
+
+
+def test_daemon_candidate_env_layers_project_then_agent_env(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    monkeypatch.setattr(dm, "AGENT_ENV_DIR",
+                        tmp_path / "greatminds" / "agent-env")
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "from-shell")
+    project = tmp_path / "proj"
+    (project / "coordination").mkdir(parents=True)
+    (project / "coordination" / "PROJECT.env").write_text(
+        "ANTHROPIC_BASE_URL=from-project\n"
+        "PROJECT_ONLY='two words'\n",
+        encoding="utf-8",
+    )
+    target = tmp_path / "greatminds" / "agent-env" / "toy.env"
+    target.parent.mkdir(parents=True)
+    target.write_text(
+        "ANTHROPIC_BASE_URL=from-agent\n"
+        "CLAUDE_CODE_OAUTH_TOKEN='secret token'\n",
+        encoding="utf-8",
+    )
+
+    env = dm._daemon_candidate_env("toy", project)
+
+    assert env["ANTHROPIC_BASE_URL"] == "from-agent"
+    assert env["PROJECT_ONLY"] == "two words"
+    assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "secret token"
+
+
+def test_has_driven_claude_roles_detects_only_schema_driven_roles(
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "proj"
+    (project / "coordination").mkdir(parents=True)
+    (project / "coord.yaml").write_text(
+        "windows:\n"
+        "  - role: DEVELOPER\n"
+        "    tool: claude\n",
+        encoding="utf-8",
+    )
+    (project / "coordination" / "schema.yaml").write_text(
+        "roles:\n"
+        "  DEVELOPER:\n"
+        "    lifecycle: driven\n",
+        encoding="utf-8",
+    )
+
+    assert dm.has_driven_claude_roles(project) is True
+
+
+def test_claude_headless_probe_reports_auth_failure(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    project = tmp_path / "proj"
+    project.mkdir()
+
+    def fake_run(argv, **kwargs):
+        assert argv[:2] == ["claude", "-p"]
+        return subprocess.CompletedProcess(
+            argv, 1,
+            stdout=json.dumps({
+                "is_error": True,
+                "api_error_status": 401,
+                "result": "Failed to authenticate. API Error: 401",
+            }),
+            stderr="",
+        )
+
+    monkeypatch.setattr(dm.subprocess, "run", fake_run)
+
+    ok, detail = dm._claude_headless_probe("toy", project, 5)
+
+    assert ok is False
+    assert "Claude auth failed" in detail
+    assert "status=401" in detail
