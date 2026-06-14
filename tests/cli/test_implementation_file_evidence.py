@@ -38,13 +38,59 @@ def test_implementation_file_evidence_rejects_phantom_path(
         )
 
     assert "README.md" in str(exc.value)
-    assert "no filesystem or git-status evidence" in str(exc.value)
+    assert "no git-status evidence" in str(exc.value)
 
 
-def test_implementation_file_evidence_allows_existing_path(
+def test_implementation_file_evidence_rejects_unchanged_tracked_path(
     tmp_path: Path,
 ) -> None:
     coord = _coord(tmp_path)
+    (tmp_path / "README.md").write_text("docs\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "seed"], cwd=tmp_path, check=True)
+    block = {"files": ["README.md"]}
+
+    with pytest.raises(GreatMindsError) as exc:
+        task_mod._enforce_implementation_files_exist_or_are_changed(
+            "implementation", block, coord
+        )
+
+    assert "README.md" in str(exc.value)
+    assert "no git-status evidence" in str(exc.value)
+
+
+def test_implementation_file_evidence_allows_modified_tracked_path(
+    tmp_path: Path,
+) -> None:
+    coord = _coord(tmp_path)
+    (tmp_path / "README.md").write_text("docs\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "seed"], cwd=tmp_path, check=True)
+    (tmp_path / "README.md").write_text("docs\nusage\n", encoding="utf-8")
+    block = {"files": ["README.md"]}
+
+    task_mod._enforce_implementation_files_exist_or_are_changed(
+        "implementation", block, coord
+    )
+
+
+def test_implementation_file_evidence_allows_untracked_path(
+    tmp_path: Path,
+) -> None:
+    coord = _coord(tmp_path)
+    (tmp_path / "README.md").write_text("docs\n", encoding="utf-8")
+    block = {"files": ["README.md"]}
+
+    task_mod._enforce_implementation_files_exist_or_are_changed(
+        "implementation", block, coord
+    )
+
+
+def test_implementation_file_evidence_allows_existing_path_outside_git(
+    tmp_path: Path,
+) -> None:
+    coord = tmp_path / "coordination"
+    coord.mkdir()
     (tmp_path / "README.md").write_text("docs\n", encoding="utf-8")
     block = {"files": ["README.md"]}
 

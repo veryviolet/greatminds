@@ -2682,14 +2682,14 @@ def _enforce_implementation_files_exist_or_are_changed(
     block: dict[str, Any],
     coord: Path,
 ) -> None:
-    """Reject implementation evidence that names files with no filesystem
-    or git-status footprint.
+    """Reject implementation evidence that names files with no git/status
+    footprint.
 
-    This is deliberately narrower than "must be modified": a legitimate
-    implementation can delete a tracked file, or a role can touch an existing
-    file then end up with equivalent content. But a newly claimed file that
-    neither exists nor appears in git status is phantom evidence and must not
-    advance the FSM.
+    In a git project, an implementation block must name paths that appear in
+    ``git status --porcelain`` (modified, added, deleted, etc.). Merely naming
+    an already-tracked unchanged file is phantom evidence: the FSM would move
+    forward while the product tree did not change. Outside git, fall back to
+    existence so non-git toy projects still get a basic sanity check.
     """
     if kind != "implementation":
         return
@@ -2697,6 +2697,18 @@ def _enforce_implementation_files_exist_or_are_changed(
     if not isinstance(files, list):
         return
     project_dir = coord.parent
+    in_git = False
+    try:
+        cp = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        in_git = cp.returncode == 0 and cp.stdout.strip() == "true"
+    except Exception:  # noqa: BLE001
+        in_git = False
     missing: list[str] = []
     for rel in files:
         if not isinstance(rel, str) or not rel.strip():
@@ -2706,7 +2718,7 @@ def _enforce_implementation_files_exist_or_are_changed(
             missing.append(rel)
             continue
         abs_path = project_dir / rel_path
-        if abs_path.exists():
+        if not in_git and abs_path.exists():
             continue
         try:
             cp = subprocess.run(
@@ -2722,9 +2734,10 @@ def _enforce_implementation_files_exist_or_are_changed(
             pass
         missing.append(rel)
     if missing:
+        evidence = "git-status" if in_git else "filesystem or git-status"
         raise GreatMindsError(
-            "implementation.files contains path(s) with no filesystem or "
-            f"git-status evidence: {', '.join(missing)}",
+            "implementation.files contains path(s) with no "
+            f"{evidence} evidence: {', '.join(missing)}",
             exit_code=2,
         )
 
