@@ -511,6 +511,22 @@ def _claude_oauth_credential_diagnostic(env: dict[str, str]) -> str | None:
     return None
 
 
+def _drop_stale_claude_snapshot_env(env: dict[str, str]) -> dict[str, str]:
+    out = dict(env)
+    host_auth_name = out.get("CLAUDE_CODE_HOST_AUTH_ENV_VAR")
+    for name in (
+        "CLAUDE_CODE_OAUTH_TOKEN",
+        "CLAUDE_BRIDGE_OAUTH_TOKEN",
+        "CLAUDE_CODE_HOST_AUTH_ENV_VAR",
+        "CLAUDE_CODE_SDK_HAS_HOST_AUTH_REFRESH",
+        "CLAUDE_CODE_HOST_AUTH_REFRESH_TIMEOUT_MS",
+    ):
+        out.pop(name, None)
+    if host_auth_name:
+        out.pop(host_auth_name, None)
+    return out
+
+
 def has_driven_claude_roles(project_dir: Path) -> bool:
     lifecycles = _schema_lifecycles(project_dir)
     for p in (project_dir / "coord.yaml",
@@ -994,15 +1010,17 @@ def restart_cmd(project: str | None, project_dir: Path | None) -> None:
 
 def _claude_headless_probe(name: str, project_dir: Path,
                            timeout_sec: float) -> tuple[bool, str]:
-    env = _daemon_candidate_env(name, project_dir)
+    env = _drop_stale_claude_snapshot_env(
+        _daemon_candidate_env(name, project_dir))
     credential_diag = _claude_oauth_credential_diagnostic(env)
-    argv = [
+    claude_argv = [
         "claude", "-p",
         "Reply with OK only. This is a greatminds daemon doctor probe.",
         "--strict-mcp-config",
         "--permission-mode", "auto",
         "--output-format", "json",
     ]
+    argv = ["bash", "-lc", shlex.join(claude_argv)]
     started = time.monotonic()
     try:
         cp = subprocess.run(

@@ -43,6 +43,17 @@ def test_build_driven_argv_includes_bootstrap_when_present() -> None:
     assert argv[idx + 1] == "/coord/.bootstrap/developer.md"
 
 
+def test_login_shell_argv_preserves_quoted_claude_command() -> None:
+    argv = cd._login_shell_argv([
+        "claude", "-p", "continue your tick",
+        "--append-system-prompt-file", "/tmp/role file.md",
+    ])
+
+    assert argv[:2] == ["bash", "-lc"]
+    assert "claude -p 'continue your tick'" in argv[2]
+    assert "'/tmp/role file.md'" in argv[2]
+
+
 # ---------- run-lock semantics ----------
 
 

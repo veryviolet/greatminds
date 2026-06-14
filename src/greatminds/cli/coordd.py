@@ -36,6 +36,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import shutil
 import signal
 import subprocess
@@ -824,6 +825,35 @@ def _build_driven_claude_argv(
     return argv
 
 
+def _login_shell_argv(argv: list[str]) -> list[str]:
+    """Run agent tools through the user's login shell.
+
+    A systemd user daemon and ``ssh host "cmd"`` do not automatically read the
+    same startup files as ``ssh host`` followed by an interactive command. For
+    Claude Code, that difference matters: PATH/toolchain/auth helpers commonly
+    live in ``~/.profile`` / shell init. Re-enter the login-shell context for
+    each driven turn instead of relying on a stale daemon-start env snapshot.
+    """
+    return ["bash", "-lc", shlex.join(argv)]
+
+
+def _drop_stale_claude_snapshot_env(env: dict[str, str]) -> dict[str, str]:
+    """Avoid letting old captured Claude OAuth env override fresh login state."""
+    out = dict(env)
+    host_auth_name = out.get("CLAUDE_CODE_HOST_AUTH_ENV_VAR")
+    for name in (
+        "CLAUDE_CODE_OAUTH_TOKEN",
+        "CLAUDE_BRIDGE_OAUTH_TOKEN",
+        "CLAUDE_CODE_HOST_AUTH_ENV_VAR",
+        "CLAUDE_CODE_SDK_HAS_HOST_AUTH_REFRESH",
+        "CLAUDE_CODE_HOST_AUTH_REFRESH_TIMEOUT_MS",
+    ):
+        out.pop(name, None)
+    if host_auth_name:
+        out.pop(host_auth_name, None)
+    return out
+
+
 
 def _driven_subprocess_env(role_lower: str) -> dict[str, str]:
     """Env for a driven-turn subprocess: the daemon's env (which carries
@@ -837,12 +867,13 @@ def _driven_subprocess_env(role_lower: str) -> dict[str, str]:
     the run-lock. coordd's own retry scheduler then handles the backoff. These
     win over any inherited values on purpose (driven turns must fail fast); an
     operator widens them via the COORDD_DRIVEN_* overrides on the daemon."""
-    return {
+    env = {
         **os.environ,
         "GREATMINDS_ROLE": role_lower.upper(),
         "API_TIMEOUT_MS": DRIVEN_API_TIMEOUT_MS,
         "CLAUDE_CODE_MAX_RETRIES": DRIVEN_MAX_RETRIES,
     }
+    return _drop_stale_claude_snapshot_env(env)
 
 
 # 0317: session-reset policy. ``claude --resume`` accumulates
@@ -1425,8 +1456,9 @@ def _spawn_driven_turn(
             except OSError:
                 pass
 
-    # Production: run ``claude -p`` as a coordd-managed subprocess in a
-    # daemon thread. The run-lock is held for the FULL turn duration
+    # Production: run ``claude -p`` via the user's login shell as a
+    # coordd-managed subprocess in a daemon thread. The run-lock is held for
+    # the FULL turn duration
     # (released on process exit) so coordd serializes per-role turns and
     # can detect a hung turn (lock held + heartbeat not advancing).
     # Driven roles have NO tmux pane — stdout/stderr is captured to
@@ -1434,7 +1466,7 @@ def _spawn_driven_turn(
     # ``--output-format json`` makes claude emit a single result object
     # carrying ``session_id``, which we record so the next ``--resume``
     # turn continues the same session.
-    run_argv = argv + ["--output-format", "json"]
+    run_argv = _login_shell_argv(argv + ["--output-format", "json"])
     turn_log = _turn_log_path(coord, role_lower)
     _write_driven_run_lock(lock, role_lower, driver="claude",
                            log_path=str(turn_log), session_id=session_id)

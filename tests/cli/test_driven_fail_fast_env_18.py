@@ -51,3 +51,22 @@ def test_fail_fast_overrides_inherited_env(monkeypatch) -> None:
     env = cd._driven_subprocess_env("tester")
     assert env["API_TIMEOUT_MS"] == cd.DRIVEN_API_TIMEOUT_MS
     assert env["CLAUDE_CODE_MAX_RETRIES"] == cd.DRIVEN_MAX_RETRIES
+
+
+def test_env_drops_stale_claude_snapshot_oauth(monkeypatch) -> None:
+    """Captured OAuth env can outlive the user's real Claude login state.
+    Driven Claude re-enters the login shell each turn, so stale snapshot auth
+    must not override fresh shell/filesystem auth."""
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "old-oauth")
+    monkeypatch.setenv("CLAUDE_BRIDGE_OAUTH_TOKEN", "old-bridge")
+    monkeypatch.setenv("CLAUDE_CODE_HOST_AUTH_ENV_VAR", "HOST_AUTH")
+    monkeypatch.setenv("HOST_AUTH", "old-host-auth")
+
+    env = cd._driven_subprocess_env("developer")
+
+    assert "CLAUDE_CODE_OAUTH_TOKEN" not in env
+    assert "CLAUDE_BRIDGE_OAUTH_TOKEN" not in env
+    assert "CLAUDE_CODE_HOST_AUTH_ENV_VAR" not in env
+    assert "HOST_AUTH" not in env
+    assert env["GREATMINDS_ROLE"] == "DEVELOPER"
+    assert env["CLAUDE_CODE_MAX_RETRIES"] == cd.DRIVEN_MAX_RETRIES

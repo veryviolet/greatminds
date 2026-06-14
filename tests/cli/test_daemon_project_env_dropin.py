@@ -170,7 +170,9 @@ def test_claude_headless_probe_reports_auth_failure(
     project.mkdir()
 
     def fake_run(argv, **kwargs):
-        assert argv[:2] == ["claude", "-p"]
+        assert argv[:2] == ["bash", "-lc"]
+        assert "claude -p" in argv[2]
+        assert "--output-format json" in argv[2]
         return subprocess.CompletedProcess(
             argv, 1,
             stdout=json.dumps({
@@ -188,6 +190,41 @@ def test_claude_headless_probe_reports_auth_failure(
     assert ok is False
     assert "Claude auth failed" in detail
     assert "status=401" in detail
+
+
+def test_claude_headless_probe_drops_stale_snapshot_oauth(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    project = tmp_path / "proj"
+    project.mkdir()
+    monkeypatch.setattr(dm, "AGENT_ENV_DIR",
+                        tmp_path / "greatminds" / "agent-env")
+    target = tmp_path / "greatminds" / "agent-env" / "toy.env"
+    target.parent.mkdir(parents=True)
+    target.write_text(
+        "CLAUDE_CODE_OAUTH_TOKEN=old\n"
+        "CLAUDE_CODE_HOST_AUTH_ENV_VAR=HOST_AUTH\n"
+        "HOST_AUTH=old-host\n",
+        encoding="utf-8",
+    )
+
+    def fake_run(argv, **kwargs):
+        env = kwargs["env"]
+        assert "CLAUDE_CODE_OAUTH_TOKEN" not in env
+        assert "CLAUDE_CODE_HOST_AUTH_ENV_VAR" not in env
+        assert "HOST_AUTH" not in env
+        return subprocess.CompletedProcess(
+            argv, 0,
+            stdout=json.dumps({"is_error": False, "result": "OK"}),
+            stderr="",
+        )
+
+    monkeypatch.setattr(dm.subprocess, "run", fake_run)
+
+    ok, detail = dm._claude_headless_probe("toy", project, 5)
+
+    assert ok is True
+    assert "succeeded" in detail
 
 
 def test_claude_headless_probe_reports_expired_oauth_without_refresh(
