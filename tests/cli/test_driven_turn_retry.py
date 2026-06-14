@@ -42,6 +42,18 @@ def test_classify_529_overloaded_is_rate_limit():
     assert cd._classify_turn_outcome(0, out) == "rate_limit"
 
 
+def test_classify_401_is_auth():
+    out = json.dumps({"is_error": True, "api_error_status": 401,
+                      "result": "Invalid authentication credentials"})
+    assert cd._classify_turn_outcome(0, out) == "auth"
+
+
+def test_classify_403_unauthorized_text_is_auth():
+    out = json.dumps({"is_error": True, "api_error_status": 403,
+                      "result": "Unauthorized"})
+    assert cd._classify_turn_outcome(0, out) == "auth"
+
+
 def test_classify_execution_error_is_error():
     out = json.dumps({"is_error": True, "subtype": "error_during_execution",
                       "result": "boom"})
@@ -115,6 +127,23 @@ def test_hard_error_escalates_and_stops(tmp_path, monkeypatch):
     status = json.loads(cd._driven_retry_path(tmp_path, "tester").read_text())
     assert status["escalated"] is True
     assert status["detail"] == "boom"
+
+
+def test_auth_escalates_immediately_without_retry(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(cd, "_escalate_to_maintainer",
+                        lambda c, r, k, a, d: calls.append((r, k, a, d)))
+    snap = cd._note_turn_outcome(tmp_path, "reader", "auth",
+                                 "AUTH: invalid credentials", False)
+    assert snap["klass"] == "auth"
+    assert snap["attempts"] == 1
+    assert snap["escalated"] is True
+    assert snap["next_at_epoch"] == 0.0
+    assert calls == [("reader", "auth", 1, "AUTH: invalid credentials")]
+    status = json.loads(cd._driven_retry_path(tmp_path, "reader").read_text())
+    assert status["klass"] == "auth"
+    assert status["escalated"] is True
+    assert status["next_at_epoch"] == 0.0
 
 
 def test_class_change_resets_attempts(tmp_path, monkeypatch):

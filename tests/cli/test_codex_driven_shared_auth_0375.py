@@ -200,7 +200,7 @@ def test_drive_turn_records_machine_home_and_nonzero_work(
 # ---------- worker classification of an auth failure ----------
 
 
-def test_worker_classifies_auth_failure_as_error_with_auth_detail(
+def test_worker_classifies_auth_failure_as_auth_with_auth_detail(
         tmp_path, monkeypatch):
     coord = _coord(tmp_path)
     machine = tmp_path / "machine-codex"
@@ -222,8 +222,8 @@ def test_worker_classifies_auth_failure_as_error_with_auth_detail(
         coord, "explorer", "CONTRACT", str(tmp_path), False,
         reg=None, run_async=False)
     assert ok is True
-    assert captured["klass"] == "error", \
-        "auth failure must NOT be a silent ok"
+    assert captured["klass"] == "auth", \
+        "auth failure must NOT be a silent ok or retryable error"
     assert "AUTH" in captured["detail"]
     assert not cd._driven_run_lock_path(coord, "explorer").exists(), \
         "the run-lock must be released after a failed turn"

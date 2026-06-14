@@ -197,6 +197,9 @@ INTENT_ORPHAN_MIN_AGE_DEFAULT = 300.0
 # nothing to do). Rate-limit (429/529) retries effectively forever with
 # exponential backoff; other errors retry RETRY_HARD_MAX times then the
 # role is escalated to MAINTAINER and auto-retry stops until a real event.
+# Authentication failures stop immediately: retrying cannot repair an
+# expired/missing external-tool session and only makes the dashboard look
+# busy while no work can happen.
 RETRY_RL_BASE_SEC   = float(os.environ.get("COORDD_RETRY_RL_BASE_SEC",   "30"))
 RETRY_RL_CAP_SEC    = float(os.environ.get("COORDD_RETRY_RL_CAP_SEC",   "300"))
 RETRY_RL_NOTIFY_AT  = int(os.environ.get("COORDD_RETRY_RL_NOTIFY_AT",     "20"))
@@ -914,7 +917,7 @@ _DRIVEN_RETRY: dict[str, dict] = {}
 
 def _classify_turn_outcome(rc, stdout, *, timed_out: bool = False) -> str:
     """Classify a finished driven turn: ``ok`` | ``rate_limit`` |
-    ``error`` | ``timeout``. claude emits a JSON result object
+    ``auth`` | ``error`` | ``timeout``. claude emits a JSON result object
     (``--output-format json``) carrying ``is_error`` / ``api_error_status``;
     a non-zero rc with no parseable success JSON is a hard error. When
     unsure we return ``error`` (bounded retry + escalate) — never a silent
@@ -930,6 +933,10 @@ def _classify_turn_outcome(rc, stdout, *, timed_out: bool = False) -> str:
     if isinstance(obj, dict) and obj.get("is_error"):
         status = obj.get("api_error_status")
         blob = f"{obj.get('result', '')} {status}".lower()
+        if status in (401, 403) or "invalid authentication credentials" in blob \
+                or ("authentication" in blob and "failed" in blob) \
+                or "not logged in" in blob or "unauthorized" in blob:
+            return "auth"
         if status in (429, 529) or "rate limit" in blob \
                 or "rate-limit" in blob or "overloaded" in blob \
                 or "temporarily limiting" in blob:
@@ -996,7 +1003,9 @@ def _note_turn_outcome(coord: Path, role_lower: str, klass: str,
     """Update per-role retry state from a finished turn. ``ok`` clears the
     state. ``rate_limit`` schedules a backoff retry (and notifies once if
     it persists). ``error``/``timeout`` schedules a bounded retry, then
-    escalates + stops. Returns a snapshot of the state (or None on ok)."""
+    escalates + stops. ``auth`` escalates immediately because no retry can
+    fix an unusable external-tool session. Returns a snapshot of the state
+    (or None on ok)."""
     now = time.monotonic()
     with _RETRY_LOCK:
         if klass == "ok":
@@ -1011,7 +1020,11 @@ def _note_turn_outcome(coord: Path, role_lower: str, klass: str,
             _DRIVEN_RETRY[role_lower] = st
         st["attempts"] += 1
         st["next_at_epoch"] = 0.0
-        if klass == "rate_limit":
+        if klass == "auth":
+            st["escalated"] = True
+            st["next_at"] = 0.0
+            st["next_at_epoch"] = 0.0
+        elif klass == "rate_limit":
             delay = _retry_delay(klass, st["attempts"])
             st["next_at"] = now + delay
             st["next_at_epoch"] = time.time() + delay
@@ -2068,7 +2081,7 @@ def _spawn_driven_codex_turn(
             )
         except OSError:
             pass
-        _note_turn_outcome(coord, role_lower, "error", detail, verbose)
+        _note_turn_outcome(coord, role_lower, "auth", detail, verbose)
         if verbose:
             print(
                 f"  0390: codex turn for {role_lower} not spawned: "
@@ -2125,7 +2138,7 @@ def _spawn_driven_codex_turn(
             # blip and NEVER a zero-work ok — surface it loudly so the
             # escalation tells MAINTAINER to run `codex login` on the
             # machine $HOME/.codex (per-role auth copies are gone).
-            klass = "error"
+            klass = "auth"
             detail = f"AUTH: {exc}"[:300]
             if verbose:
                 print(

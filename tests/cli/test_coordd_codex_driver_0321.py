@@ -272,7 +272,7 @@ def test_real_codex_path_missing_machine_auth_fails_fast(
     assert "auth missing" in diag
     assert not cd._driven_run_lock_path(coord, "explorer").exists()
     retry = json.loads(cd._driven_retry_path(coord, "explorer").read_text())
-    assert retry["klass"] == "error"
+    assert retry["klass"] == "auth"
     assert str(machine) in retry["detail"]
     assert "codex login" in retry["detail"]
     logs = list((coord / ".turns").glob("explorer-*.log"))
