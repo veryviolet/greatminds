@@ -2419,10 +2419,10 @@ task pipeline, agent launcher.</p>
   -h, --help  Show this message and exit.
 </code></pre></div>
 <h3 id="greatminds-check-git-permission">greatminds check-git-permission<a class="headerlink" href="#greatminds-check-git-permission" title="Permanent link">&para;</a></h3>
-<p>greatminds check-git-permission — gate <code>git commit</code> / <code>git push</code> by role.</p>
-<p>Installed by <code>greatminds setup</code> as a pre-commit hook. Reads
-<code>schema.yaml</code> <code>git_permissions</code> and refuses if <code>$GREATMINDS_ROLE</code>
-is not in the allowed list for the given verb.</p>
+<p>greatminds check-git-permission — check git verb permissions by role.</p>
+<p>Reads <code>schema.yaml</code> <code>git_permissions</code> and refuses if
+<code>$GREATMINDS_ROLE</code> is not in the allowed list for the given verb. This is an
+explicit diagnostic command; <code>greatminds setup</code> does not install git hooks.</p>
 <p>Usage::</p>
 <pre><code>greatminds check-git-permission commit
 greatminds check-git-permission push

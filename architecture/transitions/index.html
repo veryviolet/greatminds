@@ -2300,12 +2300,11 @@ task needs another amendment or review cycle.</p>
 <span class="c1"># ---------------------------------------------------------------------------</span>
 <span class="c1"># Git permissions</span>
 <span class="c1">#</span>
-<span class="c1"># Closed set of roles that may run `git commit` / `git push` in this</span>
-<span class="c1"># project. Enforced by a pre-commit hook (installed by `greatminds setup`)</span>
-<span class="c1"># that calls `greatminds check-git-permission commit` and exits non-zero</span>
-<span class="c1"># when $GREATMINDS_ROLE is not in the allowed list. Forbidden verbs are</span>
-<span class="c1"># `git` subcommands the project never wants any agent to use (force</span>
-<span class="c1"># operations, history rewrites).</span>
+<span class="c1"># Closed set of roles for the optional `greatminds check-git-permission`</span>
+<span class="c1"># diagnostic command. `greatminds setup` does not install git hooks; normal</span>
+<span class="c1"># operator-mode commits remain ordinary git commits. Forbidden verbs are `git`</span>
+<span class="c1"># subcommands the project never wants any agent to use (force operations,</span>
+<span class="c1"># history rewrites).</span>
 <span class="c1"># ---------------------------------------------------------------------------</span>
 <span class="nt">git_permissions</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">commit</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">ARCHITECT-REVIEWER</span><span class="p p-Indicator">]</span>
