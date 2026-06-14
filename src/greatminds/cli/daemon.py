@@ -59,6 +59,10 @@ AGENT_ENV_NAMES = {
     # Claude Code alternate providers.
     "CLAUDE_CONFIG_DIR",
     "CLAUDE_CODE_OAUTH_TOKEN",
+    "CLAUDE_CODE_HOST_AUTH_ENV_VAR",
+    "CLAUDE_CODE_SDK_HAS_HOST_AUTH_REFRESH",
+    "CLAUDE_CODE_HOST_AUTH_REFRESH_TIMEOUT_MS",
+    "CLAUDE_BRIDGE_OAUTH_TOKEN",
     "CLAUDE_CODE_USE_BEDROCK",
     "CLAUDE_CODE_USE_VERTEX",
     "AWS_ACCESS_KEY_ID",
@@ -388,10 +392,16 @@ def _agent_env_file(name: str) -> Path:
 
 
 def _selected_agent_env() -> dict[str, str]:
-    return {
+    env = {
         k: v for k, v in os.environ.items()
         if k in AGENT_ENV_NAMES and v
     }
+    host_auth_name = env.get("CLAUDE_CODE_HOST_AUTH_ENV_VAR")
+    if host_auth_name and host_auth_name in os.environ:
+        host_auth_value = os.environ.get(host_auth_name)
+        if host_auth_value:
+            env[host_auth_name] = host_auth_value
+    return env
 
 
 def capture_agent_env(name: str) -> bool:
@@ -465,6 +475,40 @@ def _daemon_candidate_env(name: str, project_dir: Path) -> dict[str, str]:
     env.update(_parse_env_file(project_dir / "coordination" / "PROJECT.env"))
     env.update(_parse_env_file(_agent_env_file(name)))
     return env
+
+
+def _claude_oauth_credential_diagnostic(env: dict[str, str]) -> str | None:
+    """Return a concise diagnostic for Claude Code OAuth credential state."""
+    config_dir = env.get("CLAUDE_CONFIG_DIR")
+    root = Path(config_dir).expanduser() if config_dir else Path.home() / ".claude"
+    path = root / ".credentials.json"
+    if not path.is_file():
+        return f"Claude credentials file missing: {path}"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError) as exc:
+        return f"Claude credentials file unreadable: {path} ({exc})"
+    oauth = data.get("claudeAiOauth") if isinstance(data, dict) else None
+    if not isinstance(oauth, dict):
+        return f"Claude credentials file has no claudeAiOauth block: {path}"
+    expires_at = oauth.get("expiresAt")
+    refresh_len = len(oauth.get("refreshToken") or "")
+    access_len = len(oauth.get("accessToken") or "")
+    expired = False
+    if isinstance(expires_at, (int, float)) and not isinstance(expires_at, bool):
+        expired = int(expires_at) <= int(time.time() * 1000)
+    if expired and refresh_len == 0:
+        return (
+            "Claude OAuth credentials are expired and have no refresh token "
+            f"({path}); run `claude setup-token` or `claude auth login` as the "
+            "same OS user, then restart the greatminds daemon."
+        )
+    if access_len == 0:
+        return (
+            f"Claude OAuth credentials have no access token ({path}); run "
+            "`claude setup-token` or `claude auth login` as the same OS user."
+        )
+    return None
 
 
 def has_driven_claude_roles(project_dir: Path) -> bool:
@@ -951,6 +995,7 @@ def restart_cmd(project: str | None, project_dir: Path | None) -> None:
 def _claude_headless_probe(name: str, project_dir: Path,
                            timeout_sec: float) -> tuple[bool, str]:
     env = _daemon_candidate_env(name, project_dir)
+    credential_diag = _claude_oauth_credential_diagnostic(env)
     argv = [
         "claude", "-p",
         "Reply with OK only. This is a greatminds daemon doctor probe.",
@@ -980,11 +1025,12 @@ def _claude_headless_probe(name: str, project_dir: Path,
         status = obj.get("api_error_status")
         result = str(obj.get("result") or "").strip()
         if status in (401, 403) or "auth" in result.lower():
+            suffix = f" {credential_diag}" if credential_diag else ""
             return (
                 False,
                 f"Claude auth failed in daemon-equivalent env "
                 f"(status={status}, rc={cp.returncode}, {elapsed:.1f}s): "
-                f"{result[:240]}",
+                f"{result[:240]}.{suffix}",
             )
         return (
             False,

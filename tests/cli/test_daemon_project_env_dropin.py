@@ -80,6 +80,23 @@ def test_capture_agent_env_writes_private_allowlisted_env(
     assert target.stat().st_mode & 0o777 == 0o600
 
 
+def test_capture_agent_env_follows_claude_host_auth_pointer(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    monkeypatch.setattr(dm, "REGISTRY_DIR", tmp_path / "greatminds")
+    monkeypatch.setattr(dm, "AGENT_ENV_DIR",
+                        tmp_path / "greatminds" / "agent-env")
+    monkeypatch.setenv("CLAUDE_CODE_HOST_AUTH_ENV_VAR", "HOST_AUTH_TOKEN")
+    monkeypatch.setenv("HOST_AUTH_TOKEN", "secret host token")
+
+    assert dm.capture_agent_env("toy") is True
+
+    body = (tmp_path / "greatminds" / "agent-env" / "toy.env").read_text(
+        encoding="utf-8")
+    assert "CLAUDE_CODE_HOST_AUTH_ENV_VAR=HOST_AUTH_TOKEN" in body
+    assert "HOST_AUTH_TOKEN='secret host token'" in body
+
+
 def test_capture_agent_env_empty_shell_preserves_existing_file(
     tmp_path: Path, monkeypatch,
 ) -> None:
@@ -171,3 +188,39 @@ def test_claude_headless_probe_reports_auth_failure(
     assert ok is False
     assert "Claude auth failed" in detail
     assert "status=401" in detail
+
+
+def test_claude_headless_probe_reports_expired_oauth_without_refresh(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    project = tmp_path / "proj"
+    project.mkdir()
+    claude_dir = tmp_path / "claude"
+    claude_dir.mkdir()
+    (claude_dir / ".credentials.json").write_text(json.dumps({
+        "claudeAiOauth": {
+            "accessToken": "expired",
+            "refreshToken": "",
+            "expiresAt": 1,
+        }
+    }), encoding="utf-8")
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(claude_dir))
+
+    def fake_run(argv, **kwargs):
+        return subprocess.CompletedProcess(
+            argv, 1,
+            stdout=json.dumps({
+                "is_error": True,
+                "api_error_status": 401,
+                "result": "Failed to authenticate. API Error: 401",
+            }),
+            stderr="",
+        )
+
+    monkeypatch.setattr(dm.subprocess, "run", fake_run)
+
+    ok, detail = dm._claude_headless_probe("toy", project, 5)
+
+    assert ok is False
+    assert "expired and have no refresh token" in detail
+    assert "claude setup-token" in detail
