@@ -71,6 +71,41 @@ def test_fresh_setup_generates_coord_yaml_with_basename_session(tmp_path):
     assert doc["project_dir"] == str(project_dir)
 
 
+def test_fresh_setup_keeps_greatminds_canon_under_coordination(tmp_path):
+    project_dir = tmp_path / "clean-root"
+    project_dir.mkdir()
+    result = _invoke(["--project-dir", str(project_dir)])
+    assert result.exit_code == 0, result.output
+
+    assert not (project_dir / "schema.yaml").exists()
+    assert not (project_dir / "COORDINATE.md").exists()
+    assert (project_dir / "coordination" / "schema.yaml").is_file()
+    assert (project_dir / "coordination" / "COORDINATE.md").is_file()
+    assert (project_dir / "coordination" / "bootstrap.md").is_file()
+
+
+def test_setup_relocates_legacy_root_canon_files(tmp_path):
+    project_dir = tmp_path / "legacy-root"
+    project_dir.mkdir()
+    (project_dir / "schema.yaml").write_text(
+        "version: 999\ncustom: true\n", encoding="utf-8")
+    (project_dir / "COORDINATE.md").write_text(
+        "legacy coordinate notes\n", encoding="utf-8")
+
+    result = _invoke(["--project-dir", str(project_dir)])
+    assert result.exit_code == 0, result.output
+
+    coord = project_dir / "coordination"
+    assert not (project_dir / "schema.yaml").exists()
+    assert not (project_dir / "COORDINATE.md").exists()
+    assert (coord / "schema.yaml").is_file()
+    assert (coord / "COORDINATE.md").is_file()
+    assert (coord / ".backups" / "schema.yaml.root-legacy.bak").read_text(
+        encoding="utf-8") == "version: 999\ncustom: true\n"
+    assert (coord / ".backups" / "COORDINATE.md.root-legacy.bak").read_text(
+        encoding="utf-8") == "legacy coordinate notes\n"
+
+
 def test_explicit_session_flag_overrides_default(tmp_path):
     project_dir = tmp_path / "foo"
     project_dir.mkdir()

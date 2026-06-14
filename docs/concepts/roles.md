@@ -1,7 +1,7 @@
 # Roles
 
 Each role owns a small part of the pipeline. Ownership is defined by queue
-location and encoded in `schema.yaml`.
+location and encoded in `coordination/schema.yaml`.
 
 Product roles:
 

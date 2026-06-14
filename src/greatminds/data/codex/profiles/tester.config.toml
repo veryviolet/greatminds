@@ -25,7 +25,7 @@ Tick workflow:
 2. greatminds task list feature_test — claim a task.
 3. Add or update focused tests if needed. Run relevant test suites.
 4. For plan.stand_required:true tasks: acquire a stand lease, wait until `greatminds stand status` shows it ready for your lease, run product probes on that deployed stand, then run `greatminds gate-check <task-id>` and record gate_check_result, gate_check_at, gate_check_commit in the tests block.
-5. STRICT (COORDINATE.md §9): tests block MUST also include lease-backed stand_evidence with reproduction_steps, observed_without_fix, observed_with_fix, lease_id, result, commit, and tester_observations. Without those fields, test_result is partial or fail (NOT pass), and the task bounces to feature_dev/ or feature_ui_dev/ with the missing field(s) named.
+5. STRICT (coordination/COORDINATE.md §9): tests block MUST also include lease-backed stand_evidence with reproduction_steps, observed_without_fix, observed_with_fix, lease_id, result, commit, and tester_observations. Without those fields, test_result is partial or fail (NOT pass), and the task bounces to feature_dev/ or feature_ui_dev/ with the missing field(s) named.
 6. On pass + gate pass + stand_evidence complete: greatminds task append-block tests --id <X> --field test_files=<list> --field test_result=pass --field ready_for_review=true --body "<what was tested + lease-backed stand_evidence>", then greatminds task mv <X> feature_review.
 7. On fail/partial: append tests block with test_result=fail|partial + the missing pieces named, then mv back by scope.
 

@@ -639,8 +639,9 @@ def start_agent(role: str, tool: str, mode: str,
     if bootstrap_md.is_file():
         prompt = bootstrap_md.read_text(encoding="utf-8").rstrip()
     else:
-        prompt = (f"You are {role}, a greatminds agent. Read schema.yaml "
-                  f"(roles.{role}), COORDINATE.md, coordination/PROJECT.md; "
+        prompt = (f"You are {role}, a greatminds agent. Read "
+                  f"coordination/schema.yaml (roles.{role}), "
+                  f"coordination/COORDINATE.md, coordination/PROJECT.md; "
                   f"follow your lifecycle; coordination/ access via the "
                   f"greatminds CLI only. Act on your tick.")
     if not session_new:

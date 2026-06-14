@@ -17,7 +17,7 @@ tools, windows, or launch modes.
 During setup, greatminds writes or extends
 `.claude/settings.local.json`. New files include the Stop hook,
 `autoMode.allow: ["$defaults"]`, and the canonical
-`permissions.allow` entries from `schema.yaml` under
+`permissions.allow` entries from `coordination/schema.yaml` under
 `claude_settings.permissions.allow`.
 
 Those allow rules let unattended Claude roles perform the git operations they
@@ -34,7 +34,8 @@ custom hooks and `autoMode` untouched.
 ## Claude marketplace plugins
 
 During setup, greatminds installs curated Claude marketplace plugins for each
-Claude-hosted role from `schema.yaml` under `plugins.claude_marketplace`.
+Claude-hosted role from `coordination/schema.yaml` under
+`plugins.claude_marketplace`.
 For example, the shipped schema can assign plugins such as `playwright`,
 `sentry`, `postman`, or `sourcegraph` to the roles that use them.
 
@@ -61,7 +62,7 @@ installed it earlier in the same setup run. Failed installs include the plugin
 name in the summary, and setup also prints the first stderr line from the
 underlying `claude plugin install` command.
 
-To change the curated set for a project, edit `schema.yaml`:
+To change the curated set for a project, edit `coordination/schema.yaml`:
 
 ```yaml
 plugins:

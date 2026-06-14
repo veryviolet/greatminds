@@ -537,8 +537,8 @@ def _schema_lifecycles(project_dir: Path) -> dict[str, str]:
     """Read ``roles[<ROLE>].lifecycle`` from the project's schema.yaml
     (preferred) or the packaged canon schema (fallback). Role keys are
     upper-cased for case-insensitive matching against coord.yaml roles."""
-    for p in (project_dir / "schema.yaml",
-              project_dir / "coordination" / "schema.yaml"):
+    for p in (project_dir / "coordination" / "schema.yaml",
+              project_dir / "schema.yaml"):
         doc = _safe_yaml(p)
         if doc:
             break

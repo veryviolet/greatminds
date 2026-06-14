@@ -373,8 +373,8 @@ roles:
       - claim_outside_feature_test
       # TESTER's only execution surface is SSH probes against the
       # DEPLOYED stand — never a local test run. `uv run`/`uv run
-      # --active` from a worktree syncs it into the active fleet venv
-      # (.venv-coord), dangling its editable .pth on worktree prune →
+      # --active` from a worktree syncs it into the active fleet environment,
+      # dangling its editable .pth on worktree prune →
       # fleet-wide ModuleNotFoundError. Evidence is stand-probe only.
       - run_local_tests
       - uv_run_or_active_against_fleet_venv

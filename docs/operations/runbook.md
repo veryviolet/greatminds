@@ -39,20 +39,20 @@ greatminds journal tail
 If a CLI result conflicts with a remembered state or a directory listing, trust
 the CLI.
 
-## Fleet Launch And Venvs
+## Fleet Launch And Environments
 
-Launch the fleet through the fixed coordination environment:
+Launch the fleet through the environment where greatminds is installed:
 
 ```bash
-./.venv-coord/bin/greatminds daemon start
-./.venv-coord/bin/greatminds launch --target tmux
+greatminds daemon start
+greatminds launch --target tmux
 ```
 
-The fleet venv is intentionally stable. It runs the daemon and live agents.
-The editable development venv is for changing and testing greatminds itself.
-Do not launch a long-running fleet with `uv run`; `uv run --active` can write
-editable paths from a task worktree into the active fleet venv and leave broken
-`.pth` files after the worktree is removed.
+Use a stable install for long-running fleets: pipx, `uv tool`, or a normal
+project venv. The editable development venv is for changing and testing
+greatminds itself. Do not launch a long-running fleet with `uv run`;
+`uv run --active` can write editable paths from a task worktree into the active
+environment and leave broken `.pth` files after the worktree is removed.
 
 When developing greatminds locally, use an isolated development venv:
 
@@ -66,9 +66,9 @@ uv pip install --python .venv/bin/python -e '.[docs]'
 After upgrading the package used by the fleet, refresh the running processes:
 
 ```bash
-./.venv-coord/bin/greatminds update
-./.venv-coord/bin/greatminds restart --bootstrap
-./.venv-coord/bin/greatminds agent status
+greatminds update
+greatminds restart --bootstrap
+greatminds agent status
 ```
 
 ## Court Fix
@@ -93,10 +93,10 @@ If agents fail to import `greatminds`, check which venv the live processes use:
 greatminds agent status
 ```
 
-If the fleet venv contains stale editable paths from a deleted worktree,
-recreate or repair `.venv-coord`, reinstall the intended package version, then
-restart the daemon and agents from that venv. Avoid `uv run` during recovery;
-call the target venv's `greatminds` binary directly.
+If the fleet environment contains stale editable paths from a deleted worktree,
+recreate or repair that environment, reinstall the intended package version,
+then restart the daemon and agents from it. Avoid `uv run` during recovery;
+call the target environment's `greatminds` binary directly.
 
 ## Inspect Stand Lease Deploy
 

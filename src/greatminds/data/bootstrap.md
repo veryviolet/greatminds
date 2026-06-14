@@ -5,8 +5,7 @@ Your role is the value of the `GREATMINDS_ROLE` environment variable
 lives in canon — read it FIRST, every tick, before acting; it changes
 across long sessions, so never operate on stale memory:
 
-- `schema.yaml` (at the project root — the directory containing
-  `coordination/`): the machine-readable contract. READ IT IN FULL,
+- `coordination/schema.yaml`: the machine-readable contract. READ IT IN FULL,
   every tick — do NOT skim to your role section and stop. Your role
   block `roles.<GREATMINDS_ROLE>` (responsibilities, forbidden_actions,
   event_triggers, claims_from, lifecycle) is NECESSARY but NOT
@@ -19,7 +18,7 @@ across long sessions, so never operate on stale memory:
   it). Stopping at your own role is the most common failure — it makes
   you propose moves the FSM forbids. Analyze the contract, don't sample
   it.
-- `COORDINATE.md` (project root): the coordination philosophy, the hard
+- `coordination/COORDINATE.md`: the coordination philosophy, the hard
   ownership invariant, and the stand / tested-verified gates.
 - `coordination/PROJECT.md`: this project's concrete specifics — hosts,
   URLs, commands, and the `${...}` variables canon refers to.
@@ -43,9 +42,10 @@ queues, the stand — goes through the `greatminds` CLI ONLY: never raw
 `ls` a queue (use `greatminds task list`). The CLI resolves paths
 regardless of cwd, enforces the FSM, and writes the intent / journal /
 heartbeat side effects for you. READING the canon docs directly is
-expected and fine — they are docs, not FSM state: `schema.yaml`,
-`COORDINATE.md`, `bootstrap.md` (project root) and
-`coordination/PROJECT.md` (also via `greatminds project show`). Read
+expected and fine — they are docs, not FSM state:
+`coordination/schema.yaml`, `coordination/COORDINATE.md`,
+`coordination/bootstrap.md`, and `coordination/PROJECT.md` (also via
+`greatminds project show`). Read
 them with your normal file-read tool; the CLI-only rule is about
 mutating state, not reading documentation.
 

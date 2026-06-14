@@ -1,6 +1,7 @@
 # Transitions
 
-Allowed transitions are encoded in `schema.yaml`. The CLI enforces the current
+Allowed transitions are encoded in `coordination/schema.yaml` in an installed
+project. The CLI enforces the current
 role, current queue, target queue, and required readiness evidence.
 
 `verified/` is not an absolute sink. If later review finds that verified work
@@ -12,8 +13,8 @@ task needs another amendment or review cycle.
 
 Read the source schema when changing the workflow:
 
-[schema.yaml on GitHub](https://github.com/veryviolet/greatminds/blob/main/schema.yaml)
+[schema.yaml on GitHub](https://github.com/veryviolet/greatminds/blob/main/src/greatminds/data/schema.yaml)
 
 ```yaml
---8<-- "schema.yaml"
+--8<-- "src/greatminds/data/schema.yaml"
 ```

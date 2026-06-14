@@ -3,21 +3,23 @@
 This document is the contract for a file-based finite state machine that
 coordinates Claude agents on a product. Mechanics (queue names, transitions,
 required front-matter fields, watchdog thresholds) are defined in the
-machine-readable `schema.yaml`. This document is the prose version: it
+machine-readable `coordination/schema.yaml`. This document is the prose version: it
 explains the philosophy and the invariants that hold the system together.
 
-When `schema.yaml` and this prose disagree, `schema.yaml` is authoritative
+When `coordination/schema.yaml` and this prose disagree,
+`coordination/schema.yaml` is authoritative
 for mechanics, and the prose is authoritative for the spirit of the
 invariants. Fix whichever is wrong, do not paper over the conflict.
 
 Project-specific values live in the installed `coordination/PROJECT.md`
 (canon refers to them as `${...}` variables). Each agent's system prompt is
-the single static `coordination/bootstrap.md`; it reads this canon
-(`schema.yaml` + `COORDINATE.md`) plus `PROJECT.md` at the start of every
-tick.
+the single static `coordination/bootstrap.md`; it reads the installed canon
+(`coordination/schema.yaml` + `coordination/COORDINATE.md`) plus
+`coordination/PROJECT.md` at the start of every tick.
 
-Every installed agent reads `COORDINATE.md`, `schema.yaml`, its own role
-`.md`, and `coordination/PROJECT.md` before acting.
+Every installed agent reads `coordination/COORDINATE.md`,
+`coordination/schema.yaml`, its own role contract, and
+`coordination/PROJECT.md` before acting.
 
 ---
 
@@ -43,11 +45,11 @@ Every installed agent reads `COORDINATE.md`, `schema.yaml`, its own role
 
 ## 2. Roles
 
-See `schema.yaml` `roles:` for the full roster and per-role description.
+See `coordination/schema.yaml` `roles:` for the full roster and per-role description.
 
 ### 2.1 Reactive fleet lifecycle
 
-Every role declares `schema.yaml > roles.<ROLE>.lifecycle`. That field
+Every role declares `coordination/schema.yaml > roles.<ROLE>.lifecycle`. That field
 describes how the role receives work; it is orthogonal to task scenario
 mode (`A`, `B`, `C`) and to the product queue it owns.
 
@@ -77,7 +79,7 @@ The launch path is selected by lifecycle plus tool:
 | `driven` | `codex` | coordd drives one fresh `codex app-server` stdio turn and persists the app-server thread id | idle bash pane |
 | `driven` | `bash` | direct command run by the owning automation | process exits |
 
-Driven dispatch is intentionally gated by both `schema.yaml` lifecycle
+Driven dispatch is intentionally gated by both `coordination/schema.yaml` lifecycle
 and the installed `coord.yaml` window mode. This lets an installed fleet
 migrate one role at a time; when both say `driven`, coordd uses the
 driven turn path. Otherwise the role keeps its configured legacy launch
@@ -100,20 +102,22 @@ product/FSM decisions back to PLANNER.
 
 ## 3. Scenarios
 
-See `schema.yaml` `scenarios:` for A/B/C definitions.
+See `coordination/schema.yaml` `scenarios:` for A/B/C definitions.
 
 ---
 
 ## 4. Shared state
 
-All runtime files live under `coordination/` in the project root. This
-directory is normally gitignored.
+All greatminds-owned project files live under `coordination/` in the project
+root. Product source, `coord.yaml`, and normal project files stay in the root;
+installed canon, queues, inboxes, logs, and runtime state stay under
+`coordination/`.
 
 ### Queues
 
 The full list of queues, their owners, and allowed transitions is in
-`schema.yaml`. Read it once when you onboard a role; do not re-derive from
-prose.
+`coordination/schema.yaml`. Read it once when you onboard a role; do not
+re-derive from prose.
 
 Categories:
 - **Active queues** (`feature_inbox`, `feature_plan`, `feature_dev`, etc.):
@@ -537,7 +541,7 @@ stand, not a local run.
 
 `uv run` / `uv run --active` is **forbidden for every role anywhere in
 the repo**: `--active` syncs the cwd project into the *active* venv —
-inside a `.worktrees/<id>/` that hijacks the fleet venv `.venv-coord`,
+inside a `.worktrees/<id>/` that hijacks the stable fleet environment,
 writing an editable `.pth → .worktrees/<id>/src`; when the worktree is
 later pruned on merge the `.pth` dangles and every fleet agent dies at
 import (`ModuleNotFoundError: greatminds`). If an implementer
@@ -564,7 +568,7 @@ Lifecycle:
 There is no file-lock model: operators look in `.worktrees/` for in-flight
 code instead of looking for lock files. The deploy playbook rsyncs the worktree
 (not the main project tree) when the active stand lease names the task and
-worktree. Policy lives in `schema.yaml > worktrees:`.
+worktree. Policy lives in `coordination/schema.yaml > worktrees:`.
 Before cutting the 1.2.x → 1.3 release, MAINTAINER runs
 `greatminds worktree assert-drained` to confirm no in-flight tasks
 straddle the lock-era → worktree-era boundary.
@@ -575,7 +579,7 @@ Default:
 
 - `ARCHITECT-REVIEWER` is the only product-work committer.
 - `MAINTAINER` commits **canon and infrastructure** changes only
-  (schema.yaml, role docs, CLI source, plugin skills, MCP config,
+  (coordination/schema.yaml, role docs, CLI source, plugin skills, MCP config,
   templates) — explicitly distinct from product-pipeline work, which
   flows through `ARCHITECT-REVIEWER`. MAINTAINER never commits
   product-task artifacts (plan / implementation / tests / reader /
@@ -612,10 +616,11 @@ No `git add .`; the committer stages exact paths only.
 Every agent's system prompt is the single static `coordination/bootstrap.md`
 (seeded from canon by `greatminds setup`). It is role-independent: the agent
 learns its role from `$GREATMINDS_ROLE` and reads its own contract from
-`schema.yaml > roles.<GREATMINDS_ROLE>`, plus `COORDINATE.md` and
+`coordination/schema.yaml > roles.<GREATMINDS_ROLE>`, plus
+`coordination/COORDINATE.md` and
 `coordination/PROJECT.md`. coordd injects it as the system prompt for driven
 turns; `greatminds start-agent` uses it for paned roles. The role list is
-`schema.yaml > roles`.
+`coordination/schema.yaml > roles`.
 
 To check the canon for unknown tokens or missing catalog entries:
 

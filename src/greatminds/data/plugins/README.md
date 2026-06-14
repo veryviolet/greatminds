@@ -26,11 +26,11 @@ To opt OUT of a canon skill without overriding it, set
 
 ## Marketplace installs
 
-`greatminds setup` also reads `schema.yaml` under
+`greatminds setup` also reads `coordination/schema.yaml` under
 `plugins.claude_marketplace` and installs the listed Claude marketplace plugins
 for each Claude-hosted role with `claude plugin install <name>`. The curated
 defaults are USER-owned schema data, so operators extend or trim the list by
-editing `schema.yaml` and re-running setup.
+editing `coordination/schema.yaml` and re-running setup.
 
 The installer checks `claude plugin list` first and preserves already installed
 plugins. Individual plugin install failures are logged in the setup summary and

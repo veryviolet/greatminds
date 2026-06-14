@@ -274,6 +274,52 @@ def _seed_bootstrap(coord: Path, canon: Path) -> bool:
     return True
 
 
+def _remove_root_canon_copy(project_dir: Path, coord: Path, name: str) -> str:
+    """Move/delete legacy root-level canon docs after the canonical copy
+    has been written under coordination/.
+
+    Pre-2.0.8 setup wrote ``schema.yaml`` and ``COORDINATE.md`` into the
+    product root. The v2 layout keeps greatminds-owned files under
+    ``coordination/``. If the root copy matches the new coordination copy,
+    delete it. If it differs, preserve it under coordination/.backups/ and
+    still remove the root copy so project roots stay clean.
+    """
+    root_file = project_dir / name
+    if not root_file.is_file():
+        return "absent"
+    coord_file = coord / name
+    coord.mkdir(parents=True, exist_ok=True)
+    try:
+        root_text = root_file.read_text(encoding="utf-8")
+    except OSError as exc:
+        return f"left in root: {exc}"
+    if not coord_file.is_file():
+        try:
+            coord_file.write_text(root_text, encoding="utf-8")
+            root_file.unlink()
+        except OSError as exc:
+            return f"left in root: {exc}"
+        return "moved to coordination/"
+    try:
+        coord_text = coord_file.read_text(encoding="utf-8")
+    except OSError as exc:
+        return f"left in root: {exc}"
+    if root_text != coord_text:
+        backups = coord / ".backups"
+        backups.mkdir(parents=True, exist_ok=True)
+        backup = backups / f"{name}.root-legacy.bak"
+        i = 1
+        while backup.exists():
+            backup = backups / f"{name}.root-legacy.{i}.bak"
+            i += 1
+        backup.write_text(root_text, encoding="utf-8")
+    try:
+        root_file.unlink()
+    except OSError as exc:
+        return f"left in root: {exc}"
+    return "removed" if root_text == coord_text else f"moved to {backup}"
+
+
 def _seed_stand_profiles(coord: Path, canon: Path) -> tuple[int, int]:
     """0281 (0276 Phase E): copy canon stand-profile presets into
     ``coord/stand-profiles/``.
@@ -1330,10 +1376,10 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     header(f"greatminds setup: bootstrapping {project_dir}")
     info(f"  canon source: {canon}")
 
-    # project-root config (schema.yaml, COORDINATE.md — canon-data,
-    # kept locally so humans + agents can read it without importing the
-    # package).
-    header("\nproject-root config:")
+    # project entrypoint config. Canon docs are greatminds-owned and live
+    # under coordination/; coord.yaml remains at the project root so launchers
+    # can find the session/project_dir without scanning coordination state.
+    header("\nproject config:")
 
     # coord.yaml generation (init-style: never overwrite a user-edited file).
     # The canonical roster lives in src/greatminds/data/coord.yaml.template
@@ -1376,13 +1422,16 @@ def setup(project_dir: Path | None, force: bool, lang: str,
             resolved_session = session_name
         else:
             warn("  coord.yaml: template missing in canon, skipping generation")
-    info(f"  schema.yaml: {_copy_if_missing(canon / 'schema.yaml', project_dir / 'schema.yaml', force=True)}")
-    info(f"  COORDINATE.md: {_copy_if_missing(canon / 'COORDINATE.md', project_dir / 'COORDINATE.md', force=True)}")
-
     # coordination/ — runtime state
     coord = project_dir / "coordination"
     header("\ncoordination/ (runtime state):")
     info(f"  dir: {_ensure_dir(coord)}")
+    info(f"  schema.yaml: {_copy_if_missing(canon / 'schema.yaml', coord / 'schema.yaml', force=True)}")
+    info(f"  COORDINATE.md: {_copy_if_missing(canon / 'COORDINATE.md', coord / 'COORDINATE.md', force=True)}")
+    for canon_name in ("schema.yaml", "COORDINATE.md"):
+        root_status = _remove_root_canon_copy(project_dir, coord, canon_name)
+        if root_status != "absent":
+            info(f"  legacy root {canon_name}: {root_status}")
     # 0274: PROJECT.md is generated from the template with the
     # schema-driven System variables section interpolated.
     md_status = _ensure_project_md(coord, canon, force, lang)

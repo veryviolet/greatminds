@@ -1,7 +1,7 @@
 # Lifecycle Model
 
 greatminds separates a role's responsibility from the mechanics used to run
-that role. The contract lives in `schema.yaml`; `coord.yaml` chooses the tool
+that role. The contract lives in `coordination/schema.yaml`; `coord.yaml` chooses the tool
 and launch mode for a concrete project.
 
 ## Role Lifecycles
@@ -46,4 +46,3 @@ configured tmux input.
 For driven roles, `coordd` spawns a single turn. A role that has no inbox
 message and no task in its owned queue exits without scheduling another turn;
 the next filesystem event drives it again.
-

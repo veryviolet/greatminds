@@ -82,7 +82,8 @@ back to `free`; `coordd` promotes the next queued lease on a later tick.
 
 ## TTL And Recovery
 
-Leases have a default TTL from `schema.yaml` (`stand.resource.lease`), currently
+Leases have a default TTL from `coordination/schema.yaml`
+(`stand.resource.lease`), currently
 four hours, with a warning window before automatic release. The TTL is a
 safety valve for abandoned leases; it is not a substitute for explicitly
 releasing a lease after probes finish.

@@ -7,7 +7,7 @@ start. Keep short and high-signal.
 
 Variables that greatminds reads out of the box. Concrete values live
 in `coordination/PROJECT.env` (gitignored). The list below is
-auto-synced from `schema.yaml` at setup time — to add a system var,
+auto-synced from `coordination/schema.yaml` at setup time — to add a system var,
 edit `schema.project_env.system_vars` and re-run `greatminds setup`.
 
 {{SYSTEM_VARS_DOCS}}

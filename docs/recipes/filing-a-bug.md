@@ -28,7 +28,7 @@ During intensive review, `EXPLORER` files focused bug tasks into
 
 For suspected bugs in greatminds itself, route the report through
 `MAINTAINER`. `greatminds report-upstream` is gated to the MAINTAINER role by
-`schema.yaml` under `report_upstream.permissions.invoke`; other roles should not
+`coordination/schema.yaml` under `report_upstream.permissions.invoke`; other roles should not
 file directly.
 
 If you are an agent role and you find a likely upstream bug, send MAINTAINER an

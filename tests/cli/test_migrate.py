@@ -107,6 +107,21 @@ def test_removes_legacy_root_files_and_empty_bot_queues(tmp_path: Path):
     assert "coordination/bot_wip/" not in removed
 
 
+def test_remove_legacy_artifacts_relocates_root_canon_docs(tmp_path: Path):
+    (tmp_path / "schema.yaml").write_text("version: 1\n", encoding="utf-8")
+    (tmp_path / "COORDINATE.md").write_text("legacy\n", encoding="utf-8")
+
+    removed = mg.remove_legacy_artifacts(tmp_path)
+
+    coord = tmp_path / "coordination"
+    assert not (tmp_path / "schema.yaml").exists()
+    assert not (tmp_path / "COORDINATE.md").exists()
+    assert (coord / "schema.yaml").read_text(encoding="utf-8") == "version: 1\n"
+    assert (coord / "COORDINATE.md").read_text(encoding="utf-8") == "legacy\n"
+    assert any(item.startswith("schema.yaml") for item in removed)
+    assert any(item.startswith("COORDINATE.md") for item in removed)
+
+
 # ---------- canonical roster loads from canon template ----------
 
 

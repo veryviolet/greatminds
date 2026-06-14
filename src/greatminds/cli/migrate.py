@@ -4,9 +4,10 @@ current greatminds version.
 ``greatminds update`` bumps the PACKAGE; this brings the PROJECT's on-disk
 config to the new model so the two don't drift:
 
-  1. canon refresh — re-run ``setup`` (overwrites schema.yaml / COORDINATE.md
-     / bootstrap.md, creates any missing queues e.g. feature_live, refreshes
-     coordination/.gitignore). Never touches PROJECT.md or coord.yaml.
+  1. canon refresh — re-run ``setup`` (overwrites coordination/schema.yaml /
+     coordination/COORDINATE.md / coordination/bootstrap.md, creates any
+     missing queues e.g. feature_live, refreshes coordination/.gitignore).
+     Never touches PROJECT.md or coord.yaml.
   2. coord.yaml migration — an old all-paned coord.yaml (every role gets a
      tmux window) is migrated to the current driven model (workers run as
      paneless coordd subprocesses; only planner/maintainer/dashboard/live are
@@ -161,6 +162,14 @@ def remove_legacy_artifacts(project_dir: Path) -> list[str]:
             except OSError as exc:
                 warn(f"    could not remove {name}: {exc}")
     coord = project_dir / "coordination"
+    try:
+        from greatminds.cli.setup import _remove_root_canon_copy
+        for name in ("schema.yaml", "COORDINATE.md"):
+            status = _remove_root_canon_copy(project_dir, coord, name)
+            if status != "absent":
+                removed.append(f"{name} ({status})")
+    except Exception as exc:  # noqa: BLE001 — cleanup should continue
+        warn(f"    could not relocate root canon docs: {exc}")
     for q in _LEGACY_BOT_QUEUES:
         qd = coord / q
         if qd.is_dir():
@@ -191,7 +200,7 @@ def run_migration(project_dir: Path, run_setup: bool = True) -> None:
             err("setup failed during migration:")
             click.echo(cp.stderr or cp.stdout, nl=False, err=True)
             raise click.exceptions.Exit(cp.returncode)
-        ok("    ✓ canon refreshed (schema / COORDINATE / bootstrap / queues / gitignore)")
+        ok("    ✓ canon refreshed (coordination/schema / COORDINATE / bootstrap / queues / gitignore)")
 
     info("==> migrating coord.yaml to the current window model...")
     status, detail = migrate_coord_yaml(project_dir)

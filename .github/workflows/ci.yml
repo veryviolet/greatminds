@@ -68,8 +68,10 @@ jobs:
         run: |
           .venv-test/bin/greatminds setup --project-dir /tmp/gm_ci_test
           test -d /tmp/gm_ci_test/coordination/feature_inbox
-          test -f /tmp/gm_ci_test/schema.yaml
-          test -f /tmp/gm_ci_test/COORDINATE.md
+          test ! -e /tmp/gm_ci_test/schema.yaml
+          test ! -e /tmp/gm_ci_test/COORDINATE.md
+          test -f /tmp/gm_ci_test/coordination/schema.yaml
+          test -f /tmp/gm_ci_test/coordination/COORDINATE.md
           test -f /tmp/gm_ci_test/coordination/PROJECT.md
 
       - name: install test deps + run pytest regression suite
