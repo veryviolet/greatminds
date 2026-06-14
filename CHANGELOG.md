@@ -4,6 +4,20 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## Unreleased
+
+### Fixed
+
+- Restored the `greatminds setup` role-gating pre-commit hook for coordinated
+  projects. The hook should be absent only from this repository's local
+  solo-development checkout, not from projects bootstrapped by the product.
+- `greatminds daemon doctor` now explains expired Claude OAuth credentials with
+  no refresh token and points operators to `claude setup-token` or
+  `claude auth login` before restarting the daemon.
+- Captured daemon agent env now follows Claude Code host-auth pointer variables
+  so a daemon started from a usable shell can preserve the referenced auth
+  value instead of saving only the pointer name.
+
 ## 2.0.11 — 2026-06-14
 
 ### Fixed
