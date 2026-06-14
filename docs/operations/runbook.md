@@ -71,6 +71,30 @@ greatminds restart --bootstrap
 greatminds agent status
 ```
 
+## Daemon Agent Auth Checks
+
+Before treating a driven Claude failure as a task/FSM stall, check the same
+environment that the daemon will use:
+
+```bash
+greatminds daemon doctor --project-dir "$PWD"
+```
+
+If the report says Claude OAuth credentials are expired and have no refresh
+token, repair the Claude login as the same OS user that runs the daemon:
+
+```bash
+claude setup-token
+# or
+claude auth login
+greatminds daemon restart
+```
+
+Use `greatminds daemon doctor` again after the restart. A manual interactive
+`claude` shell can have extra host-auth environment variables; the daemon must
+capture or inherit the same usable credentials before driven Claude turns will
+work reliably.
+
 ## Court Fix
 
 A court fix is a small, direct correction to coordination mechanics or docs

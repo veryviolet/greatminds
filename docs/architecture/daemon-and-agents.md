@@ -81,9 +81,14 @@ If a role does not react to new work, check these in order:
    Chat-mode wakes are rate-limited by
    `event_wake.tmux_send_keys.rate_limit_seconds`, so a burst of messages may
    coalesce into one prompt.
-8. Run `greatminds watchdog` to check dead pids, stale heartbeats, and orphaned
+8. For driven `claude`, run `greatminds daemon doctor --project-dir "$PWD"`.
+   It probes `claude -p` in daemon-equivalent env and reports expired OAuth
+   credentials, missing refresh tokens, and missing captured agent env files.
+   Repair auth with `claude setup-token` or `claude auth login` as the daemon's
+   OS user, then restart the daemon.
+9. Run `greatminds watchdog` to check dead pids, stale heartbeats, and orphaned
    intents.
-9. Run `greatminds agent status [ROLE]` to inspect the recorded pid, liveness,
+10. Run `greatminds agent status [ROLE]` to inspect the recorded pid, liveness,
    session id, venv, heartbeat age, and input socket without reading registry
    files by hand.
 
