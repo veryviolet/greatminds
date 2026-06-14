@@ -1620,7 +1620,12 @@ window's <code>coord.yaml</code> <code>tool:</code> value:</p>
 <p>For driven roles, <code>coordd</code> starts one turn instead of waking an existing loop:</p>
 <ul>
 <li><code>claude</code> driven roles run one <code>claude -p</code> / resume turn with the rendered
-  role bootstrap file.</li>
+  role bootstrap file through the daemon user's login shell. This keeps PATH,
+  toolchain setup, and shell-managed auth helpers current for every turn
+  instead of freezing whatever environment existed when the daemon started.
+  Stale captured Claude OAuth/host-auth environment variables are stripped
+  before the login shell is entered so they cannot override a refreshed user
+  login.</li>
 <li><code>codex</code> driven roles run one fresh <code>codex app-server</code> stdio process for the
   turn; the app-server thread id is persisted for continuity.</li>
 </ul>
@@ -1652,6 +1657,11 @@ send, the agent ends its own chat reply with the matching marker line.</p>
    Chat-mode wakes are rate-limited by
    <code>event_wake.tmux_send_keys.rate_limit_seconds</code>, so a burst of messages may
    coalesce into one prompt.</li>
+<li>For driven <code>claude</code>, run <code>greatminds daemon doctor --project-dir "$PWD"</code>.
+   It probes <code>claude -p</code> in daemon-equivalent env and reports expired OAuth
+   credentials, missing refresh tokens, and missing captured agent env files.
+   Repair auth with <code>claude setup-token</code> or <code>claude auth login</code> as the daemon's
+   OS user, then restart the daemon.</li>
 <li>Run <code>greatminds watchdog</code> to check dead pids, stale heartbeats, and orphaned
    intents.</li>
 <li>Run <code>greatminds agent status [ROLE]</code> to inspect the recorded pid, liveness,

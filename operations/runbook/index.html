@@ -1218,6 +1218,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#daemon-agent-auth-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Daemon Agent Auth Checks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#court-fix" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1546,6 +1557,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#daemon-agent-auth-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Daemon Agent Auth Checks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#court-fix" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1682,6 +1704,22 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
 greatminds<span class="w"> </span>restart<span class="w"> </span>--bootstrap
 greatminds<span class="w"> </span>agent<span class="w"> </span>status
 </code></pre></div>
+<h2 id="daemon-agent-auth-checks">Daemon Agent Auth Checks<a class="headerlink" href="#daemon-agent-auth-checks" title="Permanent link">&para;</a></h2>
+<p>Before treating a driven Claude failure as a task/FSM stall, check the same
+environment that the daemon will use:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>daemon<span class="w"> </span>doctor<span class="w"> </span>--project-dir<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">&quot;</span>
+</code></pre></div>
+<p>If the report says Claude OAuth credentials are expired and have no refresh
+token, repair the Claude login as the same OS user that runs the daemon:</p>
+<div class="highlight"><pre><span></span><code>claude<span class="w"> </span>setup-token
+<span class="c1"># or</span>
+claude<span class="w"> </span>auth<span class="w"> </span>login
+greatminds<span class="w"> </span>daemon<span class="w"> </span>restart
+</code></pre></div>
+<p>Use <code>greatminds daemon doctor</code> again after the restart. A manual interactive
+<code>claude</code> shell can have extra host-auth environment variables; the daemon must
+capture or inherit the same usable credentials before driven Claude turns will
+work reliably.</p>
 <h2 id="court-fix">Court Fix<a class="headerlink" href="#court-fix" title="Permanent link">&para;</a></h2>
 <p>A court fix is a small, direct correction to coordination mechanics or docs
 needed to unblock the fleet. Keep it narrow:</p>
