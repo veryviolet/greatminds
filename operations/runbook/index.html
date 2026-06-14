@@ -1207,10 +1207,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#fleet-launch-and-venvs" class="md-nav__link">
+  <a href="#fleet-launch-and-environments" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Fleet Launch And Venvs
+        Fleet Launch And Environments
       
     </span>
   </a>
@@ -1535,10 +1535,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#fleet-launch-and-venvs" class="md-nav__link">
+  <a href="#fleet-launch-and-environments" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Fleet Launch And Venvs
+        Fleet Launch And Environments
       
     </span>
   </a>
@@ -1661,16 +1661,16 @@ greatminds<span class="w"> </span>journal<span class="w"> </span>tail
 </code></pre></div>
 <p>If a CLI result conflicts with a remembered state or a directory listing, trust
 the CLI.</p>
-<h2 id="fleet-launch-and-venvs">Fleet Launch And Venvs<a class="headerlink" href="#fleet-launch-and-venvs" title="Permanent link">&para;</a></h2>
-<p>Launch the fleet through the fixed coordination environment:</p>
-<div class="highlight"><pre><span></span><code>./.venv-coord/bin/greatminds<span class="w"> </span>daemon<span class="w"> </span>start
-./.venv-coord/bin/greatminds<span class="w"> </span>launch<span class="w"> </span>--target<span class="w"> </span>tmux
+<h2 id="fleet-launch-and-environments">Fleet Launch And Environments<a class="headerlink" href="#fleet-launch-and-environments" title="Permanent link">&para;</a></h2>
+<p>Launch the fleet through the environment where greatminds is installed:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>daemon<span class="w"> </span>start
+greatminds<span class="w"> </span>launch<span class="w"> </span>--target<span class="w"> </span>tmux
 </code></pre></div>
-<p>The fleet venv is intentionally stable. It runs the daemon and live agents.
-The editable development venv is for changing and testing greatminds itself.
-Do not launch a long-running fleet with <code>uv run</code>; <code>uv run --active</code> can write
-editable paths from a task worktree into the active fleet venv and leave broken
-<code>.pth</code> files after the worktree is removed.</p>
+<p>Use a stable install for long-running fleets: pipx, <code>uv tool</code>, or a normal
+project venv. The editable development venv is for changing and testing
+greatminds itself. Do not launch a long-running fleet with <code>uv run</code>;
+<code>uv run --active</code> can write editable paths from a task worktree into the active
+environment and leave broken <code>.pth</code> files after the worktree is removed.</p>
 <p>When developing greatminds locally, use an isolated development venv:</p>
 <div class="highlight"><pre><span></span><code><span class="nb">unset</span><span class="w"> </span>VIRTUAL_ENV
 uv<span class="w"> </span>venv<span class="w"> </span>.venv
@@ -1678,9 +1678,9 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
 .venv/bin/greatminds<span class="w"> </span>--help
 </code></pre></div>
 <p>After upgrading the package used by the fleet, refresh the running processes:</p>
-<div class="highlight"><pre><span></span><code>./.venv-coord/bin/greatminds<span class="w"> </span>update
-./.venv-coord/bin/greatminds<span class="w"> </span>restart<span class="w"> </span>--bootstrap
-./.venv-coord/bin/greatminds<span class="w"> </span>agent<span class="w"> </span>status
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>update
+greatminds<span class="w"> </span>restart<span class="w"> </span>--bootstrap
+greatminds<span class="w"> </span>agent<span class="w"> </span>status
 </code></pre></div>
 <h2 id="court-fix">Court Fix<a class="headerlink" href="#court-fix" title="Permanent link">&para;</a></h2>
 <p>A court fix is a small, direct correction to coordination mechanics or docs
@@ -1698,10 +1698,10 @@ needed to unblock the fleet. Keep it narrow:</p>
 <p>If agents fail to import <code>greatminds</code>, check which venv the live processes use:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>agent<span class="w"> </span>status
 </code></pre></div>
-<p>If the fleet venv contains stale editable paths from a deleted worktree,
-recreate or repair <code>.venv-coord</code>, reinstall the intended package version, then
-restart the daemon and agents from that venv. Avoid <code>uv run</code> during recovery;
-call the target venv's <code>greatminds</code> binary directly.</p>
+<p>If the fleet environment contains stale editable paths from a deleted worktree,
+recreate or repair that environment, reinstall the intended package version,
+then restart the daemon and agents from it. Avoid <code>uv run</code> during recovery;
+call the target environment's <code>greatminds</code> binary directly.</p>
 <h2 id="inspect-stand-lease-deploy">Inspect Stand Lease Deploy<a class="headerlink" href="#inspect-stand-lease-deploy" title="Permanent link">&para;</a></h2>
 <p>Stand work is lease-backed. A holder requests a lease with:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>lease<span class="w"> </span>--task<span class="w"> </span>TASK_ID<span class="w"> </span>--worktree<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>greatminds<span class="w"> </span>worktree<span class="w"> </span>path<span class="w"> </span>TASK_ID<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span>--profile<span class="w"> </span>full-deploy

@@ -1578,7 +1578,7 @@ tools, windows, or launch modes.</p>
 <p>During setup, greatminds writes or extends
 <code>.claude/settings.local.json</code>. New files include the Stop hook,
 <code>autoMode.allow: ["$defaults"]</code>, and the canonical
-<code>permissions.allow</code> entries from <code>schema.yaml</code> under
+<code>permissions.allow</code> entries from <code>coordination/schema.yaml</code> under
 <code>claude_settings.permissions.allow</code>.</p>
 <p>Those allow rules let unattended Claude roles perform the git operations they
 are authorized to run, such as reviewer commit, tag, push, merge, branch,
@@ -1591,7 +1591,8 @@ rules. For a valid existing file, setup leaves other top-level settings such as
 custom hooks and <code>autoMode</code> untouched.</p>
 <h2 id="claude-marketplace-plugins">Claude marketplace plugins<a class="headerlink" href="#claude-marketplace-plugins" title="Permanent link">&para;</a></h2>
 <p>During setup, greatminds installs curated Claude marketplace plugins for each
-Claude-hosted role from <code>schema.yaml</code> under <code>plugins.claude_marketplace</code>.
+Claude-hosted role from <code>coordination/schema.yaml</code> under
+<code>plugins.claude_marketplace</code>.
 For example, the shipped schema can assign plugins such as <code>playwright</code>,
 <code>sentry</code>, <code>postman</code>, or <code>sourcegraph</code> to the roles that use them.</p>
 <p>The install step runs the equivalent of <code>claude plugin install &lt;name&gt;</code> for each
@@ -1613,7 +1614,7 @@ was already present before setup started; <code>dedupe-this-run</code> means ano
 installed it earlier in the same setup run. Failed installs include the plugin
 name in the summary, and setup also prints the first stderr line from the
 underlying <code>claude plugin install</code> command.</p>
-<p>To change the curated set for a project, edit <code>schema.yaml</code>:</p>
+<p>To change the curated set for a project, edit <code>coordination/schema.yaml</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">plugins</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">claude_marketplace</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">DEVELOPER</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">postman</span><span class="p p-Indicator">]</span>

@@ -1492,12 +1492,13 @@ agent exits mid-transition, intent files and the journal show what it attempted.
 If a daemon is down, the queues still describe the work.</p>
 <h2 id="contract-sources">Contract sources<a class="headerlink" href="#contract-sources" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>schema.yaml</code> defines queues, roles, transitions, required fields, stand
-  profiles, scenarios, and watchdog thresholds.</li>
-<li><code>COORDINATE.md</code> explains the invariants behind the schema.</li>
-<li>Role markdown files define what each role may claim, write, and move.</li>
+<li><code>coordination/schema.yaml</code> defines queues, roles, transitions, required
+  fields, stand profiles, scenarios, and watchdog thresholds.</li>
+<li><code>coordination/COORDINATE.md</code> explains the invariants behind the schema.</li>
+<li>Role contracts in <code>coordination/schema.yaml</code> define what each role may claim,
+  write, and move.</li>
 </ul>
-<p>When schema and prose disagree on mechanics, <code>schema.yaml</code> wins.</p>
+<p>When schema and prose disagree on mechanics, <code>coordination/schema.yaml</code> wins.</p>
 
 
 

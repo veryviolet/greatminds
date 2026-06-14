@@ -1578,17 +1578,16 @@
 
 
 <h1 id="daemon-and-agents">Daemon and Agents<a class="headerlink" href="#daemon-and-agents" title="Permanent link">&para;</a></h1>
-<p><code>greatminds launch</code> starts the configured agent windows. Fresh fleets should
-launch from the fixed coordination venv, for example
-<code>./.venv-coord/bin/greatminds launch --target tmux</code>. Each window is defined in
-<code>coord.yaml</code> with:</p>
+<p><code>greatminds launch</code> starts the configured agent windows from the environment
+where greatminds is installed, for example <code>greatminds launch --target tmux</code>.
+Each window is defined in <code>coord.yaml</code> with:</p>
 <ul>
 <li>window name</li>
 <li>role</li>
 <li>tool (<code>claude</code>, <code>codex</code>, <code>cursor</code>, or <code>bash</code>)</li>
 <li>mode (<code>chat</code>, <code>loop</code>, or <code>driven</code>)</li>
 </ul>
-<p>The role's lifecycle is declared in <code>schema.yaml</code>:</p>
+<p>The role's lifecycle is declared in <code>coordination/schema.yaml</code>:</p>
 <ul>
 <li><code>interactive</code>: human-paced chat. <code>ARCHITECT-PLANNER</code> is the normal
   user-facing planner.</li>
@@ -1597,7 +1596,7 @@ launch from the fixed coordination venv, for example
 <li><code>driven</code>: no persistent agent loop. The pane is idle between turns; <code>coordd</code>
   runs one turn when an inbox, queue, or stand-state event lands.</li>
 </ul>
-<p>Driven dispatch requires both <code>schema.yaml</code> lifecycle and the installed
+<p>Driven dispatch requires both <code>coordination/schema.yaml</code> lifecycle and the installed
 <code>coord.yaml</code> window mode to be <code>driven</code>. That gate lets existing fleets migrate
 role by role.</p>
 <h2 id="coordd">coordd<a class="headerlink" href="#coordd" title="Permanent link">&para;</a></h2>
@@ -1608,7 +1607,7 @@ the consumer can react immediately.</p>
 <p>On Linux, <code>coordd</code> arms an inotify watcher. New inbox files under
 <code>coordination/inbox/&lt;role&gt;/</code> and new task files landing in watched queues trigger
 the owning role's event path. For non-driven roles, the wake mechanism is
-selected from <code>schema.yaml</code> under <code>event_wake.by_tool</code>, keyed by the role
+selected from <code>coordination/schema.yaml</code> under <code>event_wake.by_tool</code>, keyed by the role
 window's <code>coord.yaml</code> <code>tool:</code> value:</p>
 <ul>
 <li><code>codex</code> and <code>cursor</code>: <code>coordd</code> finds the role's deepest sleeping descendant
@@ -1640,11 +1639,11 @@ send, the agent ends its own chat reply with the matching marker line.</p>
 <li>Confirm the daemon is running for the project with <code>greatminds daemon status</code>.</li>
 <li>Confirm the role exists in <code>coord.yaml</code>, has the expected <code>tool:</code>, and has a
    live agent registry entry.</li>
-<li>Confirm the role's <code>schema.yaml</code> lifecycle and <code>coord.yaml</code> mode agree with
+<li>Confirm the role's <code>coordination/schema.yaml</code> lifecycle and <code>coord.yaml</code> mode agree with
    the expected model. Driven roles require both values to be <code>driven</code>.</li>
 <li>For a driven role, inspect coordd logs for the driven spawn result and check
    the per-role run lock under <code>coordination/.locks/</code>.</li>
-<li>Confirm <code>schema.yaml</code> still maps that tool in <code>event_wake.by_tool</code> for
+<li>Confirm <code>coordination/schema.yaml</code> still maps that tool in <code>event_wake.by_tool</code> for
    non-driven roles.</li>
 <li>For non-driven <code>codex</code> or <code>cursor</code>, inspect whether the agent is actually inside a sleep
    descendant. <code>coordd</code> does not signal the agent process itself when no sleeping
@@ -1661,7 +1660,7 @@ send, the agent ends its own chat reply with the matching marker line.</p>
 </ol>
 <h2 id="visual-event-markers">Visual event markers<a class="headerlink" href="#visual-event-markers" title="Permanent link">&para;</a></h2>
 <p>Operators can scan live tmux panes by the marker at the end of an agent reply.
-The templates live in <code>schema.yaml</code> under <code>visual_events</code>; docs and prompts
+The templates live in <code>coordination/schema.yaml</code> under <code>visual_events</code>; docs and prompts
 describe the contract, but the schema is the source of truth for the exact emoji
 and markdown shape.</p>
 <ul>

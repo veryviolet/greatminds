@@ -1617,7 +1617,8 @@ the prepared stand and releases the lease:</p>
 <p>Only the lease holder can release an active lease. Releasing moves the stand
 back to <code>free</code>; <code>coordd</code> promotes the next queued lease on a later tick.</p>
 <h2 id="ttl-and-recovery">TTL And Recovery<a class="headerlink" href="#ttl-and-recovery" title="Permanent link">&para;</a></h2>
-<p>Leases have a default TTL from <code>schema.yaml</code> (<code>stand.resource.lease</code>), currently
+<p>Leases have a default TTL from <code>coordination/schema.yaml</code>
+(<code>stand.resource.lease</code>), currently
 four hours, with a warning window before automatic release. The TTL is a
 safety valve for abandoned leases; it is not a substitute for explicitly
 releasing a lease after probes finish.</p>
