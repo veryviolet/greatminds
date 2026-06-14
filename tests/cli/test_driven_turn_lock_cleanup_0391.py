@@ -143,6 +143,52 @@ def test_clean_turn_with_pending_refires(tmp_path):
     assert "developer" not in cd._DRIVEN_RETRY  # ok cleared state
 
 
+def test_clean_turn_with_stale_pending_does_not_refire(tmp_path):
+    """A mid-turn event marker is stale if the completed turn already moved
+    all work out of the role's claim queues. Do not spend a second turn just
+    because ``driven-<role>.pending`` exists."""
+    coord = _coord(tmp_path)
+    (coord / "feature_dev").mkdir()
+    (coord / "inbox" / "developer").mkdir(parents=True)
+    (coord / "schema.yaml").write_text(
+        "roles:\n"
+        "  DEVELOPER:\n"
+        "    claims_from: [feature_dev]\n",
+        encoding="utf-8",
+    )
+    lock = _held_lock(coord)
+    cd._driven_pending_path(coord, "developer").touch()
+    fired = []
+
+    cd._finalize_driven_turn(coord, "developer", lock, "ok", "", False,
+                             refire=lambda: fired.append(True))
+
+    assert fired == []
+    assert not cd._driven_pending_path(coord, "developer").exists()
+
+
+def test_clean_turn_with_pending_and_current_work_refires(tmp_path):
+    coord = _coord(tmp_path)
+    (coord / "feature_dev").mkdir()
+    (coord / "inbox" / "developer").mkdir(parents=True)
+    (coord / "feature_dev" / "0001-implement.yaml").write_text("id: x\n")
+    (coord / "schema.yaml").write_text(
+        "roles:\n"
+        "  DEVELOPER:\n"
+        "    claims_from: [feature_dev]\n",
+        encoding="utf-8",
+    )
+    lock = _held_lock(coord)
+    cd._driven_pending_path(coord, "developer").touch()
+    fired = []
+
+    cd._finalize_driven_turn(coord, "developer", lock, "ok", "", False,
+                             refire=lambda: fired.append(True))
+
+    assert fired == [True]
+    assert not cd._driven_pending_path(coord, "developer").exists()
+
+
 def test_failed_turn_with_pending_does_not_refire(tmp_path, monkeypatch):
     """A failed turn consumes the pending marker but does NOT re-fire — the
     retry scheduler owns re-dispatch (no double-spawn)."""

@@ -124,6 +124,25 @@ for line in sys.stdin:
 '''
 
 
+_FAKE_SILENT_TURN_APPSERVER = r'''
+import sys, json, time
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    msg = json.loads(line)
+    m, i = msg.get("method"), msg.get("id")
+    if m == "initialize":
+        print(json.dumps({"id": i, "result": {"ok": True}}), flush=True)
+    elif m == "thread/start":
+        print(json.dumps({"id": i, "result": {"thread": {"id": "th_silent"}}}),
+              flush=True)
+    elif m == "turn/start":
+        print(json.dumps({"id": i, "result": {"turn": {}}}), flush=True)
+        time.sleep(60)
+'''
+
+
 def _coord(tmp_path: Path) -> Path:
     coord = tmp_path / "coordination"
     (coord / ".locks").mkdir(parents=True)
@@ -178,6 +197,29 @@ def test_drive_codex_turn_stdio_raises_on_dead_server(
         cd._drive_codex_turn_stdio(
             coord, "explorer", "", "C", str(tmp_path), False,
             handshake_timeout=5.0, turn_timeout=5.0)
+
+
+def test_drive_codex_turn_stdio_fails_fast_on_silent_turn(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """A live app-server that emits no turn activity must not hold the
+    driven run-lock until the hard turn timeout. The driver fails on the
+    shorter no-progress timeout and leaves an operator-readable turn log."""
+    coord = _coord(tmp_path)
+    monkeypatch.setattr(
+        cd, "_codex_appserver_argv",
+        lambda *a, **k: [sys.executable, "-c", _FAKE_SILENT_TURN_APPSERVER])
+    with pytest.raises(OSError, match="no app-server turn activity"):
+        cd._drive_codex_turn_stdio(
+            coord, "explorer", "", "CONTRACT", str(tmp_path), False,
+            handshake_timeout=5.0, turn_timeout=10.0,
+            no_progress_timeout=0.2)
+
+    logs = list((coord / ".turns").glob("explorer-*.log"))
+    assert logs
+    text = logs[0].read_text(encoding="utf-8")
+    assert "status: failure" in text
+    assert "no app-server turn activity" in text
 
 
 # ---------- _spawn_driven_codex_turn: request sequence + run-lock ----------

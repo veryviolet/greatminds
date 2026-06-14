@@ -208,6 +208,11 @@ RETRY_HARD_CAP_SEC  = float(os.environ.get("COORDD_RETRY_HARD_CAP_SEC", "120"))
 RETRY_HARD_MAX      = int(os.environ.get("COORDD_RETRY_HARD_MAX",         "3"))
 DRIVEN_TURN_TIMEOUT_SEC = float(
     os.environ.get("COORDD_DRIVEN_TURN_TIMEOUT_SEC", "1800"))
+# Codex app-server may stay alive while emitting no turn events. A held
+# run-lock with no .turns log is indistinguishable from progress to the
+# operator, so fail a silent turn much earlier than the hard turn cap.
+CODEX_NO_PROGRESS_TIMEOUT_SEC = float(
+    os.environ.get("COORDD_CODEX_NO_PROGRESS_TIMEOUT_SEC", "300"))
 # issue #11 orphan-lock defense: a driven turn's subprocess is hard-killed
 # at DRIVEN_TURN_TIMEOUT_SEC and its worker's finally then releases the
 # run-lock. So a lock still present this many seconds PAST the kill bound
@@ -1271,8 +1276,9 @@ def _finalize_driven_turn(
       3. enrich the failure detail — guarded, so a raise here cannot skip…
       4. …``_note_turn_outcome`` (schedules retry/backoff or escalates) —
          guarded; this is the recoverability-critical step.
-      5. pending re-fire ONLY on a clean turn (``klass == 'ok'``); a failed
-         turn is re-dispatched by the retry scheduler (no double-spawn).
+      5. pending re-fire ONLY on a clean turn (``klass == 'ok'``) AND only
+         when the role still has actionable work by current schema state; a
+         failed turn is re-dispatched by the retry scheduler (no double-spawn).
     """
     # 1. Lock first, unconditionally. A turn that exited (however it exited)
     #    must never leave the lock for the next dispatch to read as live.
@@ -1305,7 +1311,7 @@ def _finalize_driven_turn(
         if verbose:
             print(f"  0391: {role_lower} outcome/retry note failed: "
                   f"{exc}", file=sys.stderr)
-    # 5. Pending re-fire only on a clean turn.
+    # 5. Pending re-fire only on a clean turn with current actionable work.
     pend = _driven_pending_path(coord, role_lower)
     if pend.exists():
         try:
@@ -1313,12 +1319,45 @@ def _finalize_driven_turn(
         except OSError:
             pass
         if klass == "ok" and refire is not None:
+            if not _driven_refire_has_current_work(coord, role_lower, verbose):
+                return
             try:
                 refire()
             except Exception as exc:  # noqa: BLE001
                 if verbose:
                     print(f"  0391: {role_lower} pending re-fire failed: "
                           f"{exc}", file=sys.stderr)
+
+
+def _driven_refire_has_current_work(
+    coord: Path, role_lower: str, verbose: bool,
+) -> bool:
+    """Return whether a consumed pending marker should spawn another turn.
+
+    A ``driven-<role>.pending`` marker means an event arrived while the role
+    was already running. It does NOT prove the role still owns work after the
+    turn completed: the turn may have moved the task to the next lifecycle
+    queue, leaving only the stale marker. Re-check the role's current
+    ``claims_from`` queues and inbox before spending another driven turn.
+
+    If schema cannot be loaded, preserve the historical refire behavior; this
+    keeps legacy/test fixtures without ``coordination/schema.yaml`` working.
+    """
+    roles = load_schema_roles(coord)
+    if not roles:
+        return True
+    meta = roles.get(role_lower.upper()) or roles.get(role_lower) or {}
+    if not isinstance(meta, dict):
+        if verbose:
+            print(f"  0391: {role_lower} pending re-fire skipped: "
+                  f"role missing from schema", file=sys.stderr)
+        return False
+    if _role_has_pending_task(coord, meta, role_lower):
+        return True
+    if verbose:
+        print(f"  0391: {role_lower} pending re-fire skipped: "
+              f"no current pending work", file=sys.stderr)
+    return False
 
 
 def _spawn_driven_turn(
@@ -1766,10 +1805,14 @@ class _CodexStdioSession:
         self._proc = proc
         self._buf = b""
 
-    def _read_msg(self, deadline: float) -> dict:
+    def _read_msg(self, deadline: float,
+                  idle_timeout: float | None = None) -> dict:
         import select as _select
         import time as _time
         fd = self._proc.stdout.fileno()
+        idle_deadline = (
+            _time.monotonic() + idle_timeout
+            if idle_timeout and idle_timeout > 0 else None)
         while True:
             # drain any complete line already buffered
             while b"\n" in self._buf:
@@ -1783,12 +1826,24 @@ class _CodexStdioSession:
             remaining = deadline - _time.monotonic()
             if remaining <= 0:
                 raise OSError("timeout reading app-server message")
-            r, _w, _e = _select.select([fd], [], [], remaining)
+            wait_for = remaining
+            if idle_deadline is not None:
+                idle_remaining = idle_deadline - _time.monotonic()
+                if idle_remaining <= 0:
+                    raise OSError(
+                        "no app-server turn activity before idle timeout")
+                wait_for = min(wait_for, idle_remaining)
+            r, _w, _e = _select.select([fd], [], [], wait_for)
             if not r:
+                if idle_deadline is not None:
+                    raise OSError(
+                        "no app-server turn activity before idle timeout")
                 raise OSError("timeout reading app-server message")
             chunk = os.read(fd, 65536)
             if not chunk:
                 raise OSError("app-server closed before response")
+            if idle_timeout and idle_timeout > 0:
+                idle_deadline = _time.monotonic() + idle_timeout
             self._buf += chunk
 
     def send(self, request: dict) -> None:
@@ -1807,7 +1862,10 @@ class _CodexStdioSession:
                 return msg
 
     def consume_turn(self, thread_id: str, deadline: float,
-                     *, turn_req_id: int = 3) -> tuple[int, str]:
+                     *, turn_req_id: int = 3,
+                     idle_timeout: float | None = None,
+                     progress: "callable | None" = None,
+                     ) -> tuple[int, str]:
         """0375: read app-server messages until ``turn/completed`` for
         ``thread_id``; return ``(work_items, transcript)``.
 
@@ -1823,7 +1881,7 @@ class _CodexStdioSession:
         work_items = 0
         transcript: list[str] = []
         while True:
-            msg = self._read_msg(deadline)
+            msg = self._read_msg(deadline, idle_timeout=idle_timeout)
             if not isinstance(msg, dict):
                 continue
             # 0378: scan ONLY error/transport-relevant text, never
@@ -1854,6 +1912,11 @@ class _CodexStdioSession:
                 work_items += 1
                 if len(transcript) < 40:
                     transcript.append(method)
+                if progress is not None:
+                    try:
+                        progress(work_items, "\n".join(transcript))
+                    except Exception:
+                        pass
 
     def wait_turn_completed(self, thread_id: str, deadline: float) -> dict:
         """Superseded by :meth:`consume_turn` (0375); kept as a thin
@@ -1867,6 +1930,7 @@ def _drive_codex_turn_stdio(
     coord: Path, role_lower: str, thread_id: str,
     base_instructions: str | None, cwd: str | None, verbose: bool,
     *, turn_timeout: float = 1800.0, handshake_timeout: float = 60.0,
+    no_progress_timeout: float | None = None,
     turn_log_path: Path | None = None,
 ) -> str:
     """0321-iter3: drive ONE codex turn over a fresh ``codex app-server``
@@ -1888,6 +1952,9 @@ def _drive_codex_turn_stdio(
     argv = _codex_appserver_argv(_codex_role_model(coord, role_lower))
     codex_home = _machine_codex_home()
     turn_log = turn_log_path or _turn_log_path(coord, role_lower)
+    no_progress = (
+        CODEX_NO_PROGRESS_TIMEOUT_SEC
+        if no_progress_timeout is None else no_progress_timeout)
     try:
         proc = _sp.Popen(
             argv, stdin=_sp.PIPE, stdout=_sp.PIPE, stderr=_sp.DEVNULL,
@@ -1897,6 +1964,34 @@ def _drive_codex_turn_stdio(
         raise OSError(f"failed to spawn codex app-server: {exc}")
     sess = _CodexStdioSession(proc)
     try:
+        def _write_turn_log(status: str, *,
+                            work_items: int | None = None,
+                            transcript: str = "",
+                            detail: str = "",
+                            reported_home: str | None = None) -> None:
+            try:
+                turn_log.write_text(
+                    f"codex app-server turn for {role_lower}\n"
+                    f"thread_id: {thread_id}\n"
+                    f"codex_home: {codex_home}\n"
+                    + (f"reported_codex_home: {reported_home}\n"
+                       if reported_home else "")
+                    + (f"work_items: {work_items}\n"
+                       if work_items is not None else "")
+                    + f"status: {status}\n"
+                    f"turn_timeout_sec: {turn_timeout}\n"
+                    f"no_progress_timeout_sec: {no_progress}\n"
+                    + (f"detail: {detail}\n" if detail else "")
+                    + (f"activity: {transcript}\n" if transcript else ""),
+                    encoding="utf-8",
+                )
+            except OSError:
+                pass
+
+        try:
+            _write_turn_log("running")
+        except Exception:
+            pass
         hs_deadline = _time.monotonic() + handshake_timeout
         init_resp = sess.call(_build_initialize_request(1), hs_deadline)
         # 0375: the app-server reports its codexHome in the initialize
@@ -1939,8 +2034,14 @@ def _drive_codex_turn_stdio(
             _record_codex_thread(coord / REGISTRY_DIR, role_lower,
                                  thread_id)
         sess.send(_build_turn_start_request(3, thread_id))
+        _write_turn_log("running_waiting_for_turn_completed",
+                        reported_home=reported_home)
         work_items, transcript = sess.consume_turn(
-            thread_id, _time.monotonic() + turn_timeout)
+            thread_id, _time.monotonic() + turn_timeout,
+            idle_timeout=no_progress,
+            progress=lambda n, tr: _write_turn_log(
+                "running_active", work_items=n, transcript=tr,
+                reported_home=reported_home))
         # Per-turn record (driven roles have no pane). 0375: record the
         # codexHome (machine home, not a per-role auth copy) + whether the
         # turn did non-zero work — the avatar-gate evidence (#14/#21/#22).
@@ -1974,6 +2075,19 @@ def _drive_codex_turn_stdio(
                 f"thread_id: {thread_id}\n"
                 f"codex_home: {codex_home}\n"
                 f"status: auth_failure\n"
+                f"detail: {exc}\n",
+                encoding="utf-8",
+            )
+        except OSError:
+            pass
+        raise
+    except OSError as exc:
+        try:
+            turn_log.write_text(
+                f"codex app-server turn for {role_lower}\n"
+                f"thread_id: {thread_id}\n"
+                f"codex_home: {codex_home}\n"
+                f"status: failure\n"
                 f"detail: {exc}\n",
                 encoding="utf-8",
             )

@@ -2681,6 +2681,8 @@ def _enforce_implementation_files_exist_or_are_changed(
     kind: str,
     block: dict[str, Any],
     coord: Path,
+    *,
+    evidence_dir: Path | None = None,
 ) -> None:
     """Reject implementation evidence that names files with no git/status
     footprint.
@@ -2696,7 +2698,7 @@ def _enforce_implementation_files_exist_or_are_changed(
     files = block.get("files") or []
     if not isinstance(files, list):
         return
-    project_dir = coord.parent
+    project_dir = evidence_dir or coord.parent
     in_git = False
     try:
         cp = subprocess.run(
@@ -2837,7 +2839,6 @@ def append_block(
                 pass  # best-effort; never block the append
 
         validate_block(data.get("stream") or "product", block)
-        _enforce_implementation_files_exist_or_are_changed(kind, block, coord)
         # 0303: refuse implementation / tests blocks when the caller's
         # cwd is not the per-task worktree. Pre-0303 implementers
         # could silently edit main while filing the block (upstream
@@ -2848,6 +2849,8 @@ def append_block(
         _enforce_worktree_isolation_for_block(
             kind, data, coord, task_id,
         )
+        _enforce_implementation_files_exist_or_are_changed(
+            kind, block, coord, evidence_dir=Path.cwd())
         require_block_cross_state(block, data)
 
         # 0185: file-lock acquisition removed. Per-task git worktree
