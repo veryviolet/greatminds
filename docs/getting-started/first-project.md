@@ -12,6 +12,56 @@ local agent configuration files, and copies the canon project templates. It does
 not overwrite an existing `coord.yaml`; edit that file when you want different
 tools, windows, or launch modes.
 
+## Agent tools and role mapping
+
+The documented quickstart path uses two agent tools:
+
+| Tool | Use it for | Setup requirement |
+| --- | --- | --- |
+| `claude` | Claude Code chat, loop, and driven roles. | Install Claude Code, authenticate it for the OS user that runs the fleet, and keep the `claude` binary reachable from daemon shells. |
+| `codex` | OpenAI Codex chat and driven roles. | Run `codex login` once for the machine account; optionally set `GREATMINDS_CODEX_HOME` when the login is not under `~/.codex`. |
+
+Role-to-tool assignment lives in `coord.yaml`. The default template mixes
+Claude and Codex roles, but it is ordinary project config. Change `tool:` per
+role, then restart the daemon and launch session:
+
+| Role | Default tool | Default mode |
+| --- | --- | --- |
+| `ARCHITECT-PLANNER` | `codex` | `chat` |
+| `MAINTAINER` | `claude` | `loop` |
+| `LIVE-DEVELOPER` | `claude` | `staged` |
+| `ARCHITECT-REVIEWER` | `codex` | `driven` |
+| `DEVELOPER` | `claude` | `driven` |
+| `UI-DEVELOPER` | `claude` | `driven` |
+| `TECHNICAL-WRITER` | `codex` | `driven` |
+| `TESTER` | `claude` | `driven` |
+| `READER` | `claude` | `driven` |
+| `EXPLORER` | `codex` | `driven` |
+
+```yaml
+windows:
+  - name: planner
+    role: ARCHITECT-PLANNER
+    tool: codex
+    mode: chat
+  - name: maintainer
+    role: MAINTAINER
+    tool: claude
+    mode: loop
+  - name: dev
+    role: DEVELOPER
+    tool: claude
+    mode: driven
+  - name: reviewer
+    role: ARCHITECT-REVIEWER
+    tool: codex
+    mode: driven
+```
+
+`mode: chat` and `mode: loop` create live tmux panes. `mode: driven` creates no
+agent pane; `coordd` starts one Claude or Codex turn when queue, inbox, or stand
+events arrive.
+
 ## Claude local settings
 
 During setup, greatminds writes or extends
@@ -84,6 +134,85 @@ After setup, verify the installed Claude plugins with:
 ```bash
 claude plugin list
 ```
+
+## Project environment
+
+`coordination/PROJECT.env` is the minimal place for project-specific values.
+It is gitignored, loaded before each agent starts, and passed to stand profiles
+as Ansible extra vars.
+
+For a local smoke stand:
+
+```bash
+cat > coordination/PROJECT.env <<'EOF'
+STAND_HOST=localhost
+STAND_USER=violet
+EOF
+```
+
+For a remote stand, make `STAND_HOST` an SSH config alias or comma-separated
+aliases, and set `STAND_USER` to the remote account whose PATH should be used
+by the stand playbook:
+
+```bash
+cat > coordination/PROJECT.env <<'EOF'
+STAND_HOST=app-stand
+STAND_USER=deploy
+EOF
+```
+
+Add product-specific values there as well, such as service URLs, ports,
+database names, deploy paths, or feature flags. Reference them in
+`coordination/PROJECT.md`, MCP configs, skills, and stand profiles.
+
+## Minimal stand profile
+
+A stand is the live environment that agents lease for deployed validation.
+The lease does not deploy by itself; `coordd` prepares the active lease by
+running an Ansible YAML profile from `coordination/stand-profiles/`.
+
+Setup copies reference profiles:
+
+- `smoke-only`: reachability probe, useful first.
+- `full-deploy`: rsync and install pattern for backend-style deployment.
+- `vite-dev`: backend plus a Vite dev server for live UI iteration.
+
+The smallest useful `coordination/stand-profiles/smoke-only.yaml` is:
+
+```yaml
+---
+- name: register stand node
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: add configured stand host
+      ansible.builtin.add_host:
+        name: "{{ STAND_HOST | default('localhost') }}"
+        groups: stand_nodes
+        ansible_connection: >-
+          {{ 'local' if (STAND_HOST | default('localhost')) == 'localhost'
+             else 'ssh' }}
+
+- name: smoke stand
+  hosts: stand_nodes
+  gather_facts: false
+  tasks:
+    - name: remote shell works
+      ansible.builtin.command: /bin/true
+      changed_when: false
+```
+
+When a task needs live validation, the holder leases a profile:
+
+```bash
+greatminds stand lease \
+  --task <task-id> \
+  --worktree "$(greatminds worktree path <task-id>)" \
+  --profile smoke-only
+```
+
+Use [Stand Operations](../concepts/stand-operations.md) for the complete lease,
+profile, and evidence flow.
 
 ## Start the daemon
 

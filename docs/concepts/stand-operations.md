@@ -1,7 +1,90 @@
 # Stand Operations
 
 The stand is a singleton live environment shared by the agent fleet. Agents
-coordinate access through a lease-backed state file.
+coordinate access through a lease-backed state file, and `coordd` prepares the
+active lease by running an Ansible YAML profile.
+
+A stand can be local (`STAND_HOST=localhost`) or remote (`STAND_HOST` as an SSH
+config alias or comma-separated aliases). The profile decides what "deploy"
+means for the project: a smoke probe, an rsync install, a Docker Compose
+restart, a Vite dev server, or any other Ansible-native deployment sequence.
+greatminds owns the lease/state/evidence protocol; the project owns the
+playbook content.
+
+## Project Environment
+
+Put stand-specific values in `coordination/PROJECT.env`:
+
+```bash
+STAND_HOST=localhost
+STAND_USER=violet
+```
+
+`PROJECT.env` is sourced before agents start and passed to stand profiles as
+Ansible extra vars. In a profile, `STAND_HOST` is readable as
+`{{ STAND_HOST }}`, `STAND_USER` as `{{ STAND_USER }}`, and any custom key the
+project adds is available the same way.
+
+For a remote stand:
+
+```bash
+STAND_HOST=app-stand
+STAND_USER=deploy
+```
+
+`app-stand` should resolve through the OS user's SSH config, known hosts, and
+keys. Multi-node stands can use a comma list such as
+`STAND_HOST=web-a,web-b`.
+
+## Ansible Profiles
+
+Stand profiles live under:
+
+```text
+coordination/stand-profiles/
+```
+
+The lease `--profile` value selects a YAML file with the same name, for
+example `--profile smoke-only` runs
+`coordination/stand-profiles/smoke-only.yaml`. The allowed profile names are
+defined in `coordination/schema.yaml` under `stand.resource.profiles_allowed`.
+
+`coordd` runs the profile with Ansible and injects:
+
+- every key from `coordination/PROJECT.env`;
+- the active lease id as `lease_id`;
+- the task id as `task_id`;
+- the isolated task worktree path as `worktree`.
+
+A minimal smoke profile:
+
+```yaml
+---
+- name: register stand node
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: add configured stand host
+      ansible.builtin.add_host:
+        name: "{{ STAND_HOST | default('localhost') }}"
+        groups: stand_nodes
+        ansible_connection: >-
+          {{ 'local' if (STAND_HOST | default('localhost')) == 'localhost'
+             else 'ssh' }}
+
+- name: smoke stand
+  hosts: stand_nodes
+  gather_facts: false
+  tasks:
+    - name: remote shell works
+      ansible.builtin.command: /bin/true
+      changed_when: false
+```
+
+For a deploy profile, add tasks that copy or build from `{{ worktree }}` and
+then run readiness probes. The shipped `full-deploy.yaml`, `vite-dev.yaml`, and
+`smoke-only.yaml` files are reference profiles, not hidden deployment logic.
+Edit or replace them in each project.
 
 ## State File
 
