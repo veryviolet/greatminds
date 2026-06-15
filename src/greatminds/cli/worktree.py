@@ -550,7 +550,7 @@ def _default_project_dir() -> Path:
     return Path.cwd()
 
 
-@click.group(help="Per-task git worktree lifecycle (0185).")
+@click.group(help="per-task git worktree lifecycle.")
 def worktree() -> None:
     pass
 
@@ -646,11 +646,9 @@ def cli_path(task_id: str, project_dir: Path | None) -> None:
 def cli_assert_drained(project_dir: Path | None) -> None:
     """Exit non-zero if any feature_* queue is non-empty.
 
-    0185 cutover safety: deploying the worktree feature on top of a
-    non-drained pipeline would mix lock-era tasks with worktree-era
-    tasks and produce unmergeable state. MAINTAINER runs this before
-    rebuilding the wheel; non-zero refuses the cutover with the list
-    of in-flight tasks per queue.
+    Deploying the worktree feature on top of a non-drained pipeline can
+    produce unmergeable state. MAINTAINER runs this before rebuilding the
+    wheel; non-zero refuses the run with the list of in-flight tasks per queue.
     """
     pd = project_dir or _default_project_dir()
     coord = pd / "coordination"

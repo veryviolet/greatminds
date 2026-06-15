@@ -15,7 +15,7 @@ Three submission modes, configurable via ``--mode`` or
                  PyPI artifact.
 
 Designed for MAINTAINER use only — other roles file inbox/maintainer/
-asks; MAINTAINER triages \"наш баг vs апстрим\" and invokes this command
+asks; MAINTAINER triages \"our bug vs upstream\" and invokes this command
 when the bug is upstream.
 """
 from __future__ import annotations

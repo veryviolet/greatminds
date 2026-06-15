@@ -1,9 +1,8 @@
 # Profile: reader
 # Usage: codex exec --profile reader "<prompt>"
-# Copied to coordination/.codex-home/reader/config.toml by
-# `greatminds setup`; start_agent.py launches codex with
-# CODEX_HOME=<project>/coordination/.codex-home/reader and
-# --profile reader.
+# Copied to coordination/.codex-home/reader/ by `greatminds setup`.
+# This directory is a role config source only; Codex auth uses the single
+# machine CODEX_HOME (~/.codex or GREATMINDS_CODEX_HOME).
 
 developer_instructions = """
 ## Mandatory tick heartbeat

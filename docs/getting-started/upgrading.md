@@ -13,13 +13,9 @@ environment. If the fleet is launched from tmux, restart the agent processes
 after the package upgrade so their registries, pty sockets, and role prompts
 match the installed version.
 
-`greatminds update` also handles the daemon systemd migration. Fleets created
-before the per-project `greatminds-daemon@<project>.service` template may still
-have only the legacy singleton `coordd.service`, or may be missing the template
-unit after package upgrade. During update, greatminds removes the legacy unit
-when present and runs the equivalent of `greatminds daemon install` when the
-template unit is missing. Operators upgrading those older fleets do not need a
-separate manual daemon-install step.
+`greatminds update` also refreshes daemon systemd units and runs the equivalent
+of `greatminds daemon install` when the template unit is missing. Operators do
+not need a separate manual daemon-install step during a normal update.
 
 ## Update notifications
 

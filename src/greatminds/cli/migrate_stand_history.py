@@ -55,8 +55,8 @@ def _plan_moves(coord: Path) -> tuple[Path, Path, list[Path]]:
 
 
 @click.command(name="migrate-stand-history",
-               help="Move legacy coordination/stand_done/* into "
-                    "coordination/archive/stand-history/ (0247 cleanup).")
+               help="Archive coordination/stand_done/* under "
+                    "coordination/archive/stand-history/.")
 @click.option("--coord", "coord_str", default=None,
               help="path to coordination/ (default: resolved via env / cwd)")
 @click.option("--dry-run", is_flag=True, default=False,

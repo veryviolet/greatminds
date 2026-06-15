@@ -2,22 +2,15 @@
 """Check stand-evidence gate for a product task.
 
 Usage:
-    gate_check <task-id> [--project-dir <dir>] [--canon-dir <dir>]
+    greatminds gate-check <task-id> [--project-dir <dir>] [--canon-dir <dir>]
 
-<task-id> may be the full id (e.g. 0123-foo) or just the seq (e.g. 0123).
+<task-id> may be the full id (for example TASK-slug) or just the seq.
 
 Looks up the task across coordination queues, reads its plan block, and
 verifies stand-evidence per the schema:
   - plan.stand_required: false  → output 'n/a'
-  - plan.stand_required: true   → find stand_done/*.{yaml,md} whose
-    stand_result.evidence_for (or the file's top-level evidence_for in
-    the yaml-native shape) contains this task id. If commit hash in
-    plan/implementation matches the stand_result.commit, output 'pass'.
-    If a candidate exists but commit differs or
-    result not in {pass, ok} → 'fail'. No candidate → 'missing'.
-
-Both the legacy fenced markdown shape and the yaml-native shape are
-supported; the reader picks the right parser per file.
+  - plan.stand_required: true   → require the latest tests block to carry
+    lease-backed stand evidence for the task commit and an acceptable result.
 
 Exit code:
   0  pass | n/a

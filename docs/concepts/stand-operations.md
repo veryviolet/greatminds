@@ -1,8 +1,7 @@
 # Stand Operations
 
-The stand is a singleton live environment shared by the agent fleet. Since
-1.3.0, agents coordinate access through a lease-backed state file instead of
-the old `stand_requests/`, `stand_wip/`, and `stand_done/` queues.
+The stand is a singleton live environment shared by the agent fleet. Agents
+coordinate access through a lease-backed state file.
 
 ## State File
 
@@ -115,7 +114,6 @@ including `stand_evidence.lease_id`, result, commit, worktree fingerprint, and
 its own `functional_probes` plus `stand_evidence.tester_observations`.
 `greatminds gate-check <task-id>` reads that tests-block evidence first.
 
-The old queue artifacts are removed from the active workflow. Do not create
-new `stand_requests/`, `stand_wip/`, or `stand_done/` tasks for current stand
-operations, and do not use the removed `stand request` or `stand result`
-commands in new instructions.
+Use the lease commands for all stand operations. Stand readiness belongs in
+`coordination/.stand/state.yaml`, and product validation evidence belongs in
+the task's `tests` block.

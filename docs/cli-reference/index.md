@@ -16,7 +16,7 @@ day-to-day coordination, use these groups instead of editing files under
 | Check blocked-task readiness | `greatminds wake-check` |
 | Check stale agents, stale tasks, and orphaned intents | `greatminds watchdog` |
 | Launch, restart, or update a fleet | `greatminds launch`, `greatminds restart`, `greatminds update` |
-| Render role bootstraps and contracts | `greatminds render-role`, `greatminds role contract` |
+| Inspect project docs and runtime paths | `greatminds project ...`, `greatminds task paths` |
 
 ::: mkdocs-click
     :module: greatminds.cli.main

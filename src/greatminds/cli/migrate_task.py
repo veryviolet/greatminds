@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""bin/migrate-task — convert legacy .md task files to the strict .yaml format.
+"""greatminds migrate-task — convert markdown task files to strict .yaml.
 
-Legacy format (current): a markdown file with multiple YAML blocks separated
+Input format: a markdown file with multiple YAML blocks separated
 by `---`, optionally interleaved with free prose.
   * the first dict-shaped YAML block is the header (id, stream, kind, ...);
   * subsequent dict-shaped YAML blocks whose only top-level key is a known
@@ -9,19 +9,22 @@ by `---`, optionally interleaved with free prose.
   * everything else (prose, headings) becomes the task's `description` field.
 
 New format: single YAML file with header fields at top level and an
-ordered `blocks:` list. See bin/task for the exact shape.
+ordered `blocks:` list. See `greatminds task show` output and
+`coordination/schema.yaml` for the exact shape.
 
 Usage:
-  migrate-task --file path/to/task.md          one file
-  migrate-task --queue feature_dev             all active in a queue
-  migrate-task --all                           every .md task in coordination/
-                                               (active queues only by default;
-                                               pass --include-terminal to also
-                                               touch verified/, archive/, etc.)
+  greatminds migrate-task --file path/to/task.md   one file
+  greatminds migrate-task --queue feature_dev      all active in a queue
+  greatminds migrate-task --all                    every .md task in
+                                                   coordination/ (active queues
+                                                   only by default; pass
+                                                   --include-terminal to also
+                                                   touch verified/, archive/,
+                                                   etc.)
 
 Flags:
   --dry-run         report what would be migrated; write nothing
-  --keep-md         leave .md alongside new .yaml (default: rename to .md.legacy)
+  --keep-md         leave .md alongside new .yaml
   --force           overwrite existing .yaml if present
 
 Best-effort: per-block fields are remapped where the canonical name
@@ -344,7 +347,7 @@ def collect_targets(file: str | None, queue: str | None, all_flag: bool,
 
 
 @click.command(name="migrate-task",
-               short_help="convert legacy .md task files to strict .yaml",
+               short_help="convert .md task files to strict .yaml",
                help=__doc__)
 @click.option("--file", "file", default=None, help="single .md file to migrate")
 @click.option("--queue", default=None, help="migrate all .md in this queue")
@@ -354,7 +357,7 @@ def collect_targets(file: str | None, queue: str | None, all_flag: bool,
               help="with --all, also include verified/archive/stand_done/...")
 @click.option("--dry-run", is_flag=True)
 @click.option("--keep-md", is_flag=True,
-              help="don't rename original .md to .md.legacy")
+              help="leave the original .md file in place")
 @click.option("--force", is_flag=True, help="overwrite existing .yaml")
 def migrate_task(file: str | None, queue: str | None, all_flag: bool,
                  include_terminal: bool, dry_run: bool, keep_md: bool,

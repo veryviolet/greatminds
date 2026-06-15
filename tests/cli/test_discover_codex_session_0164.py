@@ -1,11 +1,9 @@
-"""Tests for task 0164: discover_codex_session walks the per-role
-``<CODEX_HOME>/sessions/`` after 0158 instead of the legacy
-``~/.codex/sessions/``.
+"""Tests for task 0164: discover_codex_session walks per-role session storage.
 
 Pre-0164 (and post-0158) the discovery looked at the WRONG directory:
 ``~/.codex/sessions/`` carried pre-0158 rollouts, but codex 0.130+
-launches with ``CODEX_HOME=<project>/coordination/.codex-home/<role>/``
-and writes new rollouts under that per-role tree. Discovery found
+used ``coordination/.codex-home/<role>/`` for role-local rollouts.
+Discovery found
 stale legacy SIDs, cached them, and the next launch issued
 ``codex resume <sid>`` against the new home where the SID didn't
 exist. The wrapper-loop respawned forever.
@@ -15,7 +13,8 @@ first; fall back to ``~/.codex/sessions/`` only when the per-role
 home doesn't exist (legacy projects not yet re-run through 0158
 setup). Stop at the FIRST root that yields a hit — pre-0158
 rollouts are stale by definition once the post-0158 home is
-populated.
+populated. 0390 later moved Codex authentication back to the single
+machine CODEX_HOME; this test remains about session discovery only.
 """
 from __future__ import annotations
 

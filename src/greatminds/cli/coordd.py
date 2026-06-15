@@ -12,24 +12,26 @@ Two responsibilities, run every <interval> seconds:
      and write "check inbox and continue your tick\n" to that TTY. The sleeping
      agent wakes, reads the inbox, and continues the tick.
 
-If the daemon is NOT running, nothing changes — agents still work via
-ScheduleWakeup polling, just with the old multi-minute latency. The daemon
-is purely additive (a "side-load"): killing it never breaks the pipeline.
+If the daemon is NOT running, agents still work via their own fallback polling,
+but queue and inbox reaction latency is higher. The daemon is additive:
+killing it does not mutate task state.
 
 The daemon never moves task files, never edits queues, never decides on
 state. Its only side effects are:
-  - calling bin/notify_from_journal (which writes inbox messages),
+  - replaying journal transitions through notify_from_journal (which writes
+    inbox messages),
   - writing wake-up text to known agent TTYs.
 
 State sources (read-only):
   - coordination/inbox/<role>/*.md   — new files to react to
-  - coordination/.agent_registry/<role>.json — written by bin/start_agent
+  - coordination/.agent_registry/<role>.json — written by
+    ``greatminds start-agent``
     with {role, tool, pid, tty, started_at}
 
 Usage:
-    coordd [--project-dir <dir>] [--interval-sec 1.0] [--verbose]
+    greatminds coordd [--project-dir <dir>] [--interval-sec 1.0] [--verbose]
 
-For a long-lived install, run via systemd-user; see bin/coordd-install.
+For a long-lived install, run via systemd-user with `greatminds daemon install`.
 """
 from __future__ import annotations
 
@@ -161,8 +163,9 @@ def _driven_lock_decision(lock_age: float, hb_age: "float | None",
 # the agent is treated as actively working — coordd refuses to inject
 # keystroke mid-thought. The wake-* file stays in inbox; stop_decide
 # delivers it at the next natural Stop boundary (agent's tick end).
-# Default 60s: every bin/* call refreshes heartbeat as a side-effect,
-# so a busy loop-mode agent always has heartbeat <10s old.
+# Default 60s: every mutating/read-only greatminds CLI call refreshes
+# heartbeat as a side-effect, so a busy loop-mode agent always has heartbeat
+# <10s old.
 PUSH_FRESH_GUARD_SEC     = float(os.environ.get("COORDD_PUSH_FRESH_GUARD_SEC",      "60"))
 # Chat-driven roles are paced by a human, not by ticks. coordd must
 # NEVER inject keystrokes ("check inbox and continue your tick") into their
@@ -438,7 +441,7 @@ def _make_inotify_watcher(coord: Path, verbose: bool):
 
 
 def scan_inbox_files(inbox_dir: Path) -> set[str]:
-    """Find pending inbox messages across all roles. After R8 bin/inbox
+    """Find pending inbox messages across all roles. After R8 the inbox CLI
     writes .yaml; legacy .md is still recognised. Already-processed
     messages (renamed to processed-*) are skipped."""
     files: set[str] = set()
@@ -562,7 +565,7 @@ def write_dead_report(coord: Path, role: str, reg: dict, now_ts: float) -> None:
         f"Role {role.upper()} (pid={pid}, tool={tool}, started_at={started}) "
         f"is no longer alive. Coordd cannot push wake-ups to it; "
         f"all work routed to {role.upper()} will stall until the process "
-        f"is restarted. Diagnose and either rerun bin/start_agent "
+        f"is restarted. Diagnose and either rerun `greatminds start-agent` "
         f"{role.upper()} <tool> or, if intentional, remove "
         f".agent_registry/{role}.json so this report stops firing."
     )
@@ -3296,7 +3299,7 @@ def sigint_sleeping_descendant(coord: Path, role: str,
 def push_to_role(coord: Path, role: str, file_path: str, verbose: bool,
                  bypass_fresh_guard: bool = False) -> bool:
     """Attempt to nudge the role. Prefers writing to the unix socket
-    exposed by bin/pty-launch (this end is the *master* of the agent's
+    exposed by ``greatminds.cli.pty_launch`` (this end is the *master* of the agent's
     pty, so bytes become real input to the running process — identical
     to user keystrokes). Falls back to writing the slave-pts /dev/pts/N
     (legacy; shows on screen but does NOT inject input).

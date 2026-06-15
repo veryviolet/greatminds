@@ -25,7 +25,7 @@ glossary:
     ARCHITECT-REVIEWER: "Final review with stand-evidence verification (gate_check result in the tests block), commit, and push if policy allows. Owns feature_blocked wake-up: runs greatminds wake-check at the start of each tick."
     DEVELOPER: "Backend / product-code implementation. Claims from feature_dev/ (placed there by ARCHITECT-PLANNER routing scope:backend tasks)."
     UI-DEVELOPER: "UI implementation. Claims from feature_ui_dev/ (placed there by ARCHITECT-PLANNER routing scope:ui tasks), writes the implementation block, hands off to feature_test/."
-    LIVE-DEVELOPER: "Interactive, USER-paced developer for a single task on a leased stand (scenario C and ad-hoc live work). Claims from feature_live/, holds a stand lease and deploys to it during the session, chats live with the USER, and on USER approval hands to feature_review/ as a sprint task (REVIEWER no-regression review, no TESTER). Replaces the old UI-DEVELOPER FAST chat variant."
+    LIVE-DEVELOPER: "Interactive, USER-paced developer for a single task on a leased stand (scenario C and ad-hoc live work). Claims from feature_live/, holds a stand lease and deploys to it during the session, chats live with the USER, and on USER approval hands to feature_review/ as a sprint task (REVIEWER no-regression review, no TESTER)."
     TECHNICAL-WRITER: "Documentation implementation. Claims from feature_docs/ (placed there by ARCHITECT-PLANNER routing scope:docs tasks); hands off to feature_docs_review/."
     TESTER: "Validates implemented features on a deployed stand. Acquires the stand by lease, probes once it is ready, and runs greatminds gate-check before mv to feature_review/."
     READER: "Reads docs as a fresh user; validates clarity and accuracy; routes the result out of feature_docs_review/."
@@ -59,7 +59,7 @@ glossary:
     archive: "Duplicate, abandoned, superseded, or triaged-away product work."
     user_feedback: "Product feedback awaiting PLANNER triage."
     review_sessions: "Scenario-B review sessions; EXPLORER iterates live-stand exploration and files bugs to feature_inbox."
-    .stand: "Singleton stand resource state.yaml + lease bookkeeping; coordd watches it and runs the deploy itself on lease lifecycle events (1.6.0: retired stand deploy role)."
+    .stand: "Singleton stand resource state.yaml + lease bookkeeping; coordd watches it and runs the deploy itself on lease lifecycle events."
   stand_profiles:
     full-deploy: "Full backend deployment on the target hosts with service health checks; scenarios A and B."
     vite-dev: "Backend deployed plus a Vite UI dev server with HMR (UI changes reload, no per-change redeploy); scenario C."
@@ -81,7 +81,7 @@ glossary:
     regression_scenario: "Regression scenarios that EXPLORER would run."
     gate_check: "greatminds gate-check — TESTER-only; reads TESTER's tests-block lease evidence."
   intake_disciplines:
-    propose_then_file: "Present design / options / scope in chat first; WAIT for an explicit USER approval marker (ok / да / file / go / делай, or a chosen option) before any FSM mutation (task new / plan / mv). Read-only ops (inbox list, queue inspection, gate-check) need no approval. Exception: a standing USER instruction that explicitly authorizes auto-filing within a scope."
+    propose_then_file: "Present design / options / scope in chat first; WAIT for an explicit USER approval marker (ok / yes / file / go / do it, or a chosen option) before any FSM mutation (task new / plan / mv). Read-only ops (inbox list, queue inspection, gate-check) need no approval. Exception: a standing USER instruction that explicitly authorizes auto-filing within a scope."
 
 # ---------------------------------------------------------------------------
 # Queues
@@ -160,8 +160,7 @@ queues:
     writers: [ARCHITECT-PLANNER, EXPLORER]
     kind: active
   # .stand is a state-kind watch path, NOT a claim-from queue. coordd
-  # watches state.yaml and runs the deploy itself on a `preparing` lease
-  # (1.6.0: the old stand deploy role is retired; see coordd._maybe_auto_deploy_stand).
+  # watches state.yaml and runs the deploy itself on a `preparing` lease.
   .stand:
     writers: [TESTER, ARCHITECT-PLANNER, MAINTAINER, LIVE-DEVELOPER, EXPLORER, ARCHITECT-REVIEWER]
     kind: state
@@ -499,7 +498,7 @@ transitions:
   # registered validator in cli/task.py SCHEMA_REQUIRES_VALIDATORS;
   # unknown names raise an error at mv time (no silent documentary
   # keys). The validators run AFTER can_role_move and after the
-  # legacy require_target_readiness path — they're additive, not a
+  # existing require_target_readiness path — they're additive, not a
   # replacement, so adding a new require name today does not need to
   # retire the existing hardcoded check for it.
   #
@@ -521,7 +520,7 @@ transitions:
     by: ARCHITECT-PLANNER
     requires: [triage_block]
   # PLANNER may archive any task in its own intake/draft area when USER
-  # decides not to pursue it (split, deprecated, duplicate, withdrawn).
+  # decides not to pursue it (split, duplicate, superseded, withdrawn).
   - from: feature_inbox
     to: archive
     by: ARCHITECT-PLANNER
@@ -532,7 +531,7 @@ transitions:
     requires: []
   # review_sessions archive requires terminal-state evidence
   # (at least one session_iteration block, or a blocked block whose
-  # reason names "withdrawn"/"abandoned"/"obsoleted"). Prevents a
+  # reason names "withdrawn"/"abandoned"/"superseded"). Prevents a
   # single role silently wiping an empty or in-progress session.
   - from: review_sessions
     to: archive
@@ -553,15 +552,9 @@ transitions:
   #   2. PLANNER mv → feature_blocked.
   #   3. ARCHITECT-REVIEWER archives from feature_blocked (the existing
   #      feature_blocked → archive transition by ARCHITECT-REVIEWER).
-  # Two roles must agree to terminate in-flight work, never one. The
-  # removed transitions used to be:
-  #   feature_dev   → archive   by ARCHITECT-PLANNER   requires: []
-  #   feature_ui_dev → archive  by ARCHITECT-PLANNER   requires: []
-  #   feature_docs   → archive  by ARCHITECT-PLANNER   requires: []
-  #   feature_test   → archive  by ARCHITECT-PLANNER   requires: []
-  #   feature_review → archive  by ARCHITECT-PLANNER   requires: []
+  # Two roles must agree to terminate in-flight work, never one.
   # REVIEWER may archive blocked tasks that USER decides not to unblock
-  # (dependency was retracted, task obsoleted, etc).
+  # (dependency was retracted, task was superseded, etc).
   # Latest blocked.reason must name a withdrawn-class token; refuses
   # single-role wipe of waiting-but-recoverable work.
   - from: feature_blocked
@@ -1015,8 +1008,8 @@ tests_block_validation:
 # ---------------------------------------------------------------------------
 # Filesystem layout
 #
-# Paths relative to <COORDINATION_DIR>. Used by bin/ scripts to locate
-# artifacts.
+# Paths relative to <COORDINATION_DIR>. Used by the unified `greatminds` CLI
+# and daemon to locate artifacts.
 # ---------------------------------------------------------------------------
 layout:
   journal: journal.ndjson
@@ -1149,7 +1142,7 @@ product_enums:
   modes:      [A, B, C]
 
 # ---------------------------------------------------------------------------
-# Per-task git worktree policy (replaces the older file-locks).
+# Per-task git worktree policy.
 #
 # Each task gets its own working tree under <project_dir>/<base_path>/
 # <task-id>/ on branch <branch_prefix><task-id>. Implementer agents
@@ -1355,12 +1348,8 @@ claude_settings:
 # lease deploy.
 #
 #   * ``yaml`` — a subset of ansible-playbook syntax, run by coordd's
-#     deterministic deploy engine (1.6.0: the only dialect; MD/prose
-#     profiles were removed).
+#     deterministic deploy engine.
 #
-# Phase A only declares the schema + canon convention. Phases B-G
-# add the runtime loader, lease-metadata opt-out flag, validators,
-# bringup recipe, etc.
 stand_profile:
   directory: coordination/stand-profiles
   formats: [yaml]

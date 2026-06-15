@@ -1,10 +1,7 @@
 """greatminds journal — read-only view of the coordination journal.
 
-0338 (DOD2): the append-only ``coordination/journal.ndjson`` was only
-reachable by a raw ``tail`` of the file, which the CLI-only coordination
-access rule (0337) forbids. ``greatminds journal tail`` provides a
-clean, read-only view with ``-n``/``--role``/``--task`` filters. It
-NEVER writes.
+``greatminds journal tail`` provides a clean, read-only view with
+``-n``/``--role``/``--task`` filters. It never writes.
 
 Each journal line is a JSON object::
 

@@ -80,10 +80,9 @@ The launch path is selected by lifecycle plus tool:
 | `driven` | `bash` | direct command run by the owning automation | process exits |
 
 Driven dispatch is intentionally gated by both `coordination/schema.yaml` lifecycle
-and the installed `coord.yaml` window mode. This lets an installed fleet
-migrate one role at a time; when both say `driven`, coordd uses the
-driven turn path. Otherwise the role keeps its configured legacy launch
-behavior until the operator updates the fleet config.
+and the installed `coord.yaml` window mode. When both say `driven`, coordd uses
+the driven turn path. Otherwise the role keeps its configured launch behavior
+until the operator updates the fleet config.
 
 `MAINTAINER` is non-user-facing in this model. USER asks about fleet
 health, restarts, schema changes, or upgrades go to `ARCHITECT-PLANNER`
@@ -127,7 +126,7 @@ Categories:
 - **Terminal** (`verified`, `archive`, `*_verified`, `*_archive`): end
   states for normal flow. Product `verified` can still be rolled back by
   `ARCHITECT-REVIEWER` with an explicit `rollback` block when post-verify
-  discovery shows the work is wrong, obsolete, or already reverted.
+  discovery shows the work is wrong, invalid, or already reverted.
 
 Stand resource:
 
@@ -136,9 +135,7 @@ coordination/.stand/state.yaml
 greatminds stand lease -> coordd auto-deploys (ready/down) -> holder release
 ```
 
-The legacy `stand_requests/ -> stand_wip/ -> stand_done/` queue path is not
-the active workflow. Current stand access is lease-backed and mediated by the
-`greatminds stand` CLI.
+Stand access is lease-backed and mediated by the `greatminds stand` CLI.
 
 Review sessions (scenario B):
 
@@ -146,13 +143,13 @@ Review sessions (scenario B):
 review_sessions/<id>.md  (lives until the session concludes, then archive/)
 ```
 
-### Other runtime artifacts (new)
+### Other runtime artifacts
 
 - `coordination/journal.ndjson` — append-only journal of transitions. One
   NDJSON line per move with fields `t, actor, task, from, to, reason,
   intent_id`. Gitignored. Optional for observability; not load-bearing.
 - `coordination/intent/<task>-<role>-<uuid>.json` — created BEFORE every
-  `mv`, removed AFTER successful `mv`. Detects crashed transitions. See
+  `mv`, cleared AFTER successful `mv`. Detects crashed transitions. See
   §6.
 - `coordination/inbox/<role>/` — mailbox for cross-role messages without
   moving tasks. Each message is a small markdown file with front-matter
@@ -329,10 +326,10 @@ which is what anchors the stand's audit trail and the tested/verified
 gate. So "just deploy the stand" and "test the stand" are the SAME FSM
 path — a `verify_only` task — differing only in the verification DEPTH:
 
-- **deploy-only** ("разверни стенд по профилю X"): the bar is readiness —
+- **deploy-only** ("deploy the stand by profile X"): the bar is readiness —
   coordd deploys the profile and TESTER confirms the stand came up healthy
   (ssh / docker / health GET). No functional probes required.
-- **behavioural test** ("проверь, что работает X"): the bar adds
+- **behavioural test** ("check that X works"): the bar adds
   `functional_probes` + `tester_observations` — TESTER exercises the
   behaviour on the deployed stand.
 
@@ -603,7 +600,7 @@ No `git add .`; the committer stages exact paths only.
 
 - No second bug-fix loop (bugs are `plan_kind: bugfix` product tasks).
 - No `active_loop`.
-- No REVIEW/FIX/UI_FIX roles (deprecated and removed long ago).
+- No REVIEW/FIX/UI_FIX roles; use the role set defined in `schema.yaml`.
 - No central daemon, broker, or database.
 - No automatic conflict resolution.
 - No hidden state outside the task files, `stand.status`, and the journal.
@@ -683,16 +680,18 @@ role is launched on:
   Skill content is auto-invoked by Claude based on description-keyword
   match in the agent's working context.
 - **Codex** — codex CLI has no `--plugin-dir` equivalent. The
-  equivalent path is the codex **profile** mechanism: `greatminds setup`
-  creates one per-role Codex home at
-  `coordination/.codex-home/<role>/config.toml`, copied from
-  `<canon>/codex/profiles/*.config.toml`. Each generated config contains
-  `developer_instructions = """..."""` plus `[profiles.<role>]` with the
-  model, approval, and sandbox settings. `greatminds start-agent <ROLE>
-  codex` launches with `CODEX_HOME=<project>/coordination/.codex-home/<role>`
-  and `--profile <role-lower>`, so codex reads that role-local
-  `$CODEX_HOME/config.toml`; the old user-home per-role profile files
-  are not part of the launch path. The profile body summarizes the role
+  equivalent path is generated per-role profile source material:
+  `greatminds setup` creates `coordination/.codex-home/<role>/`
+  from `<canon>/codex/profiles/*.config.toml`. The generated
+  `config.toml` carries `developer_instructions` and skill registrations;
+  `<role>.config.toml` carries model / approval / sandbox settings.
+  These directories are config sources only, not auth homes.
+  `greatminds start-agent <ROLE> codex` and driven Codex turns set
+  `CODEX_HOME` to the single machine Codex home (`GREATMINDS_CODEX_HOME`,
+  an inherited non-per-role `CODEX_HOME`, or `~/.codex`) so Codex reads one
+  valid `auth.json`. Role-specific model/settings are injected with `-c`
+  overrides, and the role contract rides in the bootstrap prompt or
+  app-server `baseInstructions`. The profile body summarizes the role
   contract — it's not a full SKILL-format auto-invoke, but it brings the
   role-specific procedural posture into every codex session.
 - **Cursor** — currently no per-role plugin/profile mechanism is

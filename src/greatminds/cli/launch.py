@@ -5,7 +5,7 @@ Reads ``<project>/coord.yaml``, detects the project's Python env via
 
   ``--target tmux``        creates a tmux session with one window per
                            role. Each window pre-types the env activation
-                           command (so bare ``greatminds-start-agent``
+                           command (so bare ``greatminds start-agent``
                            works in the shell) followed by the actual
                            launcher line (without Enter — you review and
                            confirm).
@@ -15,7 +15,7 @@ Reads ``<project>/coord.yaml``, detects the project's Python env via
                            dedicated terminal panel; the task ``env``
                            block (for simple envs) or wrapping
                            ``bash -c`` (for pixi/conda) ensures
-                           greatminds-* is on PATH.
+                           the unified ``greatminds`` CLI is on PATH.
 
   ``--target cursor-ide``  same generated files as ``vscode`` (Cursor
                            IDE reads ``.vscode/`` verbatim); prints

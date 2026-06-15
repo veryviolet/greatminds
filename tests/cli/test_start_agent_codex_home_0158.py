@@ -1,10 +1,9 @@
-"""Tests for task 0158: start_agent sets ``CODEX_HOME`` per role.
+"""Tests for task 0158 historical per-role Codex home behavior.
 
-When a project has been set up with 0158 (``coordination/.codex-home/
-<role>/config.toml`` present), ``start_agent`` must export
-``CODEX_HOME`` pointing at that dir before exec'ing codex. The
-``--profile <role>`` flag then selects the ``[profiles.<role>]``
-section within ``$CODEX_HOME/config.toml``.
+0158 introduced ``coordination/.codex-home/<role>/`` profile sources.
+0390 later superseded the launch/auth part: current Codex launch paths set
+``CODEX_HOME`` to the single machine Codex home and read role settings from the
+per-role source as command-line overrides.
 
 Legacy fallback: if the per-role home is missing AND the pre-0158
 ``~/.codex/<role>.config.toml`` exists, ``start_agent`` logs a one-line
@@ -41,7 +40,7 @@ def fake_home(tmp_path, monkeypatch):
 
 
 def _seed_codex_home(project: Path, role_lower: str) -> Path:
-    """Drop a config.toml under the per-role codex home."""
+    """Drop a config.toml under the per-role Codex profile source."""
     home = project / "coordination" / ".codex-home" / role_lower
     home.mkdir(parents=True)
     (home / "config.toml").write_text(
@@ -64,10 +63,10 @@ def _seed_legacy(home_root: Path, role_lower: str) -> Path:
 
 
 def test_codex_home_set_when_per_role_home_exists(tmp_path: Path, monkeypatch) -> None:
-    """Happy path: per-role home exists → ``os.environ['CODEX_HOME']``
-    is set to it. We exercise the slice that
-    ``start_agent.start_agent()`` runs inside the ``elif tool ==
-    'codex'`` arm — direct env mutation, no exec."""
+    """Historical 0158 unit pin: per-role home existed → env was set.
+
+    Current end-to-end behavior is covered by the 0390 dry-run test below.
+    """
     project = tmp_path / "project"
     project.mkdir()
     home = _seed_codex_home(project, "architect-reviewer")
@@ -82,7 +81,7 @@ def test_codex_home_set_when_per_role_home_exists(tmp_path: Path, monkeypatch) -
 
 
 def test_codex_home_unset_when_per_role_home_missing(tmp_path: Path, fake_home) -> None:
-    """Per-role home missing → ``CODEX_HOME`` stays unset. Codex 0.130+
+    """Historical slice: per-role home missing → ``CODEX_HOME`` stayed unset. Codex 0.130+
     will fall back to ``~/.codex/``, which under the new mechanism
     misses the per-role file; the deprecation-hint test below covers
     the warn path."""
@@ -167,7 +166,7 @@ def test_legacy_fallback_warns_when_per_role_home_missing(
 def test_no_warning_when_per_role_home_present(tmp_path: Path,
                                                 fake_home, capsys) -> None:
     """Negative pin: the deprecation warning must NOT fire when the
-    per-role home exists. Otherwise every healthy codex launch would
+    per-role profile source exists. Otherwise every healthy codex launch would
     spam the operator's stderr."""
     project = tmp_path / "project"
     project.mkdir()

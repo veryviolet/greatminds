@@ -5,15 +5,13 @@ Three moving parts to keep in sync after a release:
   1. The package itself in the venv where ``greatminds`` is installed
      (typically the project's ``.venv/`` from ``uv add greatminds`` or
      ``pip install greatminds``).
-  2. The systemd-user daemon ``greatminds-daemon@<project>.service``
-     (per-project, refactored in task 0008).
-  3. The tmux agents (restarted via ``greatminds restart`` from 0001).
+  2. The systemd-user daemon ``greatminds-daemon@<project>.service``.
+  3. The tmux agents restarted via ``greatminds restart``.
 
 This command runs all three in one pass, with a self-replacement step
 (``os.execv``) between phase 1 and the rest so the new code drives the
-post-pip phases. ``--post-pip`` is the idempotent recovery mode used
-both by the self-replace dispatch and by users whose package version
-got out ahead of the daemon (e.g. raw ``pip install --upgrade``).
+daemon and agent refresh. ``--post-pip`` skips package installation and
+refreshes only daemon/agent state.
 
 CLI surface::
 

@@ -1,9 +1,8 @@
 # Profile: tester
 # Usage: codex exec --profile tester "<prompt>"
-# Copied to coordination/.codex-home/tester/config.toml by
-# `greatminds setup`; start_agent.py launches codex with
-# CODEX_HOME=<project>/coordination/.codex-home/tester and
-# --profile tester.
+# Copied to coordination/.codex-home/tester/ by `greatminds setup`.
+# This directory is a role config source only; Codex auth uses the single
+# machine CODEX_HOME (~/.codex or GREATMINDS_CODEX_HOME).
 
 developer_instructions = """
 ## Mandatory tick heartbeat

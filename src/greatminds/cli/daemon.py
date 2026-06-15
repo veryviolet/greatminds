@@ -19,8 +19,7 @@ Subcommands::
 
 ``install`` is idempotent: it writes the template unit if missing and
 adds the ``{name → project_dir}`` entry to the per-user registry at
-``~/.config/greatminds/projects.json``. ``migrate`` removes the deprecated
-singleton ``coordd.service`` if present.
+``~/.config/greatminds/projects.json``.
 """
 from __future__ import annotations
 
@@ -902,9 +901,7 @@ def install_cmd(name: str | None, project_dir: Path | None) -> None:
 
 
 @daemon.command("repair",
-                short_help="0307: ensure existing daemon instance is "
-                           "systemctl-enabled (one-shot for pre-0307 "
-                           "fleets that installed without --enable)")
+                short_help="ensure the daemon instance is systemctl-enabled")
 @click.option("--name", "name", default=None,
               help="project name (default: coord.yaml `session`)")
 @click.option("--project-dir",
@@ -912,11 +909,7 @@ def install_cmd(name: str | None, project_dir: Path | None) -> None:
               default=None,
               help="project root (default: cwd)")
 def repair_cmd(name: str | None, project_dir: Path | None) -> None:
-    """0307: idempotent ``systemctl --user enable`` for the project's
-    daemon instance. Pre-0307 ``daemon install`` skipped the enable
-    step → the unit was torn down with default.target on KDE
-    logout. Existing fleets need this one-time repair to recover
-    survive-logout behavior."""
+    """Idempotently enable the project's daemon instance."""
     pd = (project_dir or Path.cwd()).resolve()
     resolved = name or _read_session_from_coord_yaml(pd)
     if not resolved:
@@ -935,15 +928,15 @@ def repair_cmd(name: str | None, project_dir: Path | None) -> None:
         raise click.exceptions.Exit(cp.returncode)
 
 
-@daemon.command("migrate", short_help="remove legacy singleton coordd.service")
+@daemon.command("migrate", short_help="remove the singleton coordd.service unit")
 @click.option("--yes", is_flag=True,
-              help="confirm removal of legacy coordd.service")
+              help="confirm removal of coordd.service")
 def migrate_cmd(yes: bool) -> None:
     if not detect_legacy_coordd():
-        info("no legacy coordd.service detected — nothing to migrate")
+        info("no coordd.service detected — nothing to migrate")
         return
     if not yes:
-        warn("refusing to remove legacy unit without --yes")
+        warn("refusing to remove coordd.service without --yes")
         info("Run: `greatminds daemon migrate --yes` to confirm.")
         raise click.exceptions.Exit(2)
     _systemctl("stop", LEGACY_UNIT_NAME)

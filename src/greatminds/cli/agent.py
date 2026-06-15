@@ -473,7 +473,7 @@ def _render_human(rec: dict[str, Any]) -> str:
 
 
 @click.group(name="agent",
-             help="per-agent process diagnostics (0339).")
+             help="per-agent process diagnostics.")
 def agent() -> None:
     pass
 
@@ -485,7 +485,7 @@ def agent() -> None:
 @click.option("--json", "as_json", is_flag=True, default=False,
               help="emit a machine-readable JSON array (cat replacement).")
 @click.option("--no-pane", "no_pane", is_flag=True, default=False,
-              help="skip tmux pane inspection (0387 auth-wedge detection).")
+              help="skip tmux pane inspection.")
 def agent_status(roles: tuple[str, ...], as_json: bool,
                  no_pane: bool) -> None:
     coord = find_coord_dir()

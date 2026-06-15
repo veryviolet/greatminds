@@ -1,5 +1,4 @@
-"""``greatminds migrate`` — bring a project's coordination config up to the
-current greatminds version.
+"""``greatminds migrate`` — refresh a project's coordination config.
 
 ``greatminds update`` bumps the PACKAGE; this brings the PROJECT's on-disk
 config to the new model so the two don't drift:
@@ -8,19 +7,16 @@ config to the new model so the two don't drift:
      coordination/COORDINATE.md / coordination/bootstrap.md, creates any
      missing queues e.g. feature_live, refreshes coordination/.gitignore).
      Never touches PROJECT.md or coord.yaml.
-  2. coord.yaml migration — an old all-paned coord.yaml (every role gets a
-     tmux window) is migrated to the current driven model (workers run as
-     paneless coordd subprocesses; only planner/maintainer/dashboard/live are
-     paned). The old file is backed up; session, project_dir, the
+  2. coord.yaml normalization — coord.yaml is aligned with the driven model:
+     workers run as coordd subprocesses; planner/maintainer/dashboard/live
+     are paned. The previous file is backed up; session, project_dir, the
      per-project ``worktrees`` override, and any custom role-less windows are
      preserved.
-  3. legacy artifact removal — files deleted in newer versions
-     (command_START.yaml, the per-role ``<ROLE>.md`` docs, the bot_* queues)
-     are removed so they stop confusing agents.
+  3. artifact cleanup — removed files and queues are deleted so agents see
+     only the current coordination model.
 
-Standalone (``greatminds migrate``) for fleets already on the new package
-but with stale config (the version-already-current case ``update`` skips),
-and called automatically by ``greatminds update``.
+Standalone (``greatminds migrate``) is useful when package code is current but
+project config still needs refresh; it is also called by ``greatminds update``.
 """
 from __future__ import annotations
 
@@ -251,8 +247,7 @@ def run_migration(project_dir: Path, run_setup: bool = True) -> None:
               help="skip the canon refresh (setup) step.")
 def migrate(project_dir: str | None, no_setup: bool) -> None:
     """Bring a project's coord.yaml / canon / queues up to the installed
-    greatminds version (coord.yaml driven-model migration, canon refresh,
-    legacy-artifact removal). Idempotent; backs up coord.yaml."""
+    greatminds version. Idempotent; backs up coord.yaml."""
     pd = Path(project_dir).resolve() if project_dir else Path.cwd()
     run_migration(pd, run_setup=not no_setup)
     ok("==> migration complete")

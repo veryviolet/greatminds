@@ -11,7 +11,7 @@ Usage::
     greatminds launch --target tmux      # start the fleet
     greatminds task list verified        # list tasks in a queue
     greatminds inbox send DEVELOPER --kind wake --body "..."
-    greatminds stand request --request-type deploy --profile full
+    greatminds stand lease --task TASK_ID --profile full-deploy
     greatminds coordd --verbose          # run the keystroke daemon
     greatminds wake-check
     greatminds watchdog

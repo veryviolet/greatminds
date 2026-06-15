@@ -25,5 +25,4 @@ environment.
 Free-form prose: project name, root path, stack overview, deploy
 recipe, etc. Edit as needed.
 
-The legacy angle-bracket table format is removed — write prose
-directly and reference env vars via `${name}` shell form.
+Write prose directly and reference env vars via `${name}` shell form.

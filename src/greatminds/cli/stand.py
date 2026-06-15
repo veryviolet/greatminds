@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""greatminds stand — stand_request stream wrapper around task.
+"""greatminds stand — singleton stand lease and deployment commands.
 
-Two subcommands:
+Current stand operations use ``coordination/.stand/state.yaml`` plus the lease
+API:
 
-  request   create a new stand_request task in coordination/stand_requests/.
-            validates that each id in --evidence-for actually exists in
-            an active queue (a task that will benefit from the run).
-            On success: claim by STAND-KEEPER picks it up automatically.
-
-  result    append stand_result block to a stand_request already in
-            stand_wip/, then mv to stand_done/. STAND-KEEPER only.
-            Validates result / stand_status / profile enums.
+  lease    request a lease for a product task and stand profile.
+  status   inspect the stand state, active lease, pending queue, and history.
+  deploy   run the active lease's profile through the stand executor.
+  ready    mark a successfully deployed active lease ready.
+  release  release the active lease with pass/fail/partial result.
+  down/up  pause or recover the singleton stand resource.
+  reclaim  recover an expired or abandoned lease.
 
 Caller role from ``$GREATMINDS_ROLE`` (no ``--as`` override).
 
@@ -82,7 +82,7 @@ _REQUEST_TYPES = ["deploy", "restart", "rebuild", "smoke",
                   "remote_sync", "gpu_check", "teardown"]
 
 
-@click.group(help="stand_request stream — request a stand op, record result")
+@click.group(help="singleton stand lease and deployment commands")
 def stand() -> None:
     pass
 
@@ -352,8 +352,8 @@ def _file_inbox_info(coord: Path, to_role: str, body: str,
 @click.option("--task", "task_id", required=True,
               help="product-task id this lease serves")
 @click.option("--worktree", required=False, default=None,
-              help="path to the worktree coordd will deploy from. 0380: "
-                   "OPTIONAL — defaults to the canonical per-task worktree "
+              help="path to the worktree coordd will deploy from. "
+                   "Optional: defaults to the canonical per-task worktree "
                    "(.worktrees/<task_id>) and is auto-created if absent, so "
                    "review_session leases (EXPLORER) need no raw git.")
 @click.option("--profile", required=True,
@@ -364,14 +364,13 @@ def _file_inbox_info(coord: Path, to_role: str, body: str,
               help="override ttl (default: schema lease.ttl_seconds_default)")
 @click.option("--deploy-prerequisites-only", "deploy_prerequisites_only",
               is_flag=True, default=False,
-              help="0283: SK runs only the prerequisite-tagged tasks "
-                   "(YAML) or sees a PREREQUISITES-ONLY notice (MD); "
-                   "TESTER does the actual deploy. Overrides the "
+              help="run only prerequisite-tagged profile tasks before the "
+                   "holder performs the actual deploy. Overrides the "
                    "profile-level setting.")
 def stand_lease(task_id: str, worktree: "str | None", profile: str,
                  ttl_seconds: int | None,
                  deploy_prerequisites_only: bool) -> None:
-    """0244 (Phase 2 of 0242): request a lease on the singleton stand.
+    """Request a lease on the singleton stand.
 
     Behavior:
     - On state=free: transitions free→preparing(lease_id); SK picks
@@ -506,8 +505,7 @@ def stand_lease(task_id: str, worktree: "str | None", profile: str,
               type=click.Choice(["pass", "fail", "partial"]),
               help="machine-readable resolution status (NOT a report)")
 def stand_release(lease_id: str, result: str) -> None:
-    """0244: release the active lease. Transitions ready→free; SK
-    pops the next FIFO queue entry for the next lease.
+    """Release the active lease and promote the next queued lease.
 
     Only the holder may release. The CLI rejects with exit_code=3 if
     ``--lease-id`` doesn't match the current active lease. Result is
@@ -588,8 +586,7 @@ def stand_release(lease_id: str, result: str) -> None:
 @click.option("--lease-id", "lease_id", default=None,
               help="lease to reclaim (default: the active lease)")
 def stand_reclaim(lease_id: str | None) -> None:
-    """0342: reclaim an EXPIRED lease whose holder is no longer alive,
-    returning the singleton stand to ``free``.
+    """Reclaim an expired lease whose holder is no longer alive.
 
     A stale lease (a crashed holder past its ttl_seconds) otherwise
     permanently locks the singleton — ``release`` is holder-only and
@@ -664,8 +661,10 @@ def stand_reclaim(lease_id: str | None) -> None:
 @click.option("--reason", required=True,
               help="operational reason logged in state file")
 def stand_down(reason: str) -> None:
-    """0395: MAINTAINER-only. Mark the stand DOWN (failed deploy /
-    infra incident). Halts queue processing until `stand up`."""
+    """Mark the stand down after a deploy or infrastructure incident.
+
+    MAINTAINER-only.
+    """
     from greatminds.cli import stand_state as ss
     role = _require_stand_global_control_role("down")
     coord = find_coord_dir()
@@ -706,8 +705,10 @@ def stand_down(reason: str) -> None:
 @stand.command(name="up")
 @click.option("--reason", required=True, help="resolution note")
 def stand_up(reason: str) -> None:
-    """0395: MAINTAINER-only. Transition down→free; resumes queue processing
-    on coordd's next tick."""
+    """Recover a down stand and resume queue processing.
+
+    MAINTAINER-only.
+    """
     from greatminds.cli import stand_state as ss
     role = _require_stand_global_control_role("up")
     coord = find_coord_dir()
@@ -1056,10 +1057,11 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
 @click.option("--timeout", "timeout", type=float, default=None,
               help="kill the playbook after N seconds (rc=124)")
 def stand_deploy(lease_id: str, timeout: float | None) -> None:
-    """1.6.0: run the active lease's deploy profile (ansible) and
-    transition the stand ready/down by result. The deterministic deploy
-    path — coordd runs it automatically on a `preparing` lease; this is
-    the manual/operator entry to the SAME engine. Any role may run it."""
+    """Run the active lease's deploy profile and transition ready/down.
+
+    Coordd runs this automatically for a preparing lease; this command is the
+    manual/operator entry to the same deploy engine.
+    """
     coord = find_coord_dir()
     rc, _log = deploy_lease(coord, lease_id=lease_id, timeout_seconds=timeout)
     click.echo(
@@ -1075,14 +1077,11 @@ def stand_deploy(lease_id: str, timeout: float | None) -> None:
 @click.option("--lease-id", "lease_id", required=True,
               help="lease that just finished preparing")
 def stand_ready(lease_id: str) -> None:
-    """0244: SK-only. Transition preparing→ready for ``lease_id``
-    after deploy + smoke succeeds. Files an inbox-info to the lease
-    holder so they wake up and start probing the stand.
+    """Transition a prepared lease to ready and notify the holder.
 
-    0286: refuses the transition unless a deploy marker exists at
-    ``<coord>/.stand/deploy-<lease_id>.log`` — proves SK actually
-    invoked ``execute_yaml_profile`` / ``execute_md_profile`` and
-    didn't short-circuit to ``ready`` without running the playbook.
+    Refuses the transition unless a deploy marker exists at
+    ``<coord>/.stand/deploy-<lease_id>.log``. The marker proves coordd
+    invoked the YAML deploy profile before setting the lease ready.
     """
     from greatminds.cli import stand_state as ss
     from greatminds.cli.stand_executor import deploy_marker_path
@@ -1139,15 +1138,15 @@ def stand_ready(lease_id: str) -> None:
 
 @stand.command(name="status")
 def stand_status() -> None:
-    """0243 (0242 Phase 1): print the singleton stand resource state.
+    """Print the singleton stand resource state.
 
     Reads ``coordination/.stand/state.yaml`` (creates a synthetic
     empty-state view when the file doesn't exist yet) and prints a
     compact human-readable summary: state, active lease (if any),
     queue contents, and the last few transitions.
 
-    Read-only. Mutation paths land in 0244 (lease/release) and 0245
-    (SK migration).
+    Read-only. Use `stand lease`, `stand ready`, `stand release`, `stand down`,
+    and `stand up` for mutations.
     """
     from greatminds.cli import stand_state as ss
     coord = find_coord_dir()

@@ -43,7 +43,8 @@ kind: wake
 ---
 
 Transition in journal: {from_q} -> {to_q} (reason: {reason}).
-Check your queue / inbox / run bin/wake_check or bin/gate_check as
+Check your queue / inbox / run `greatminds wake-check` or
+`greatminds gate-check` as
 appropriate, then continue the tick.
 """
 

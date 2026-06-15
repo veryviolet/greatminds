@@ -1,9 +1,8 @@
 # Profile: maintainer
 # Usage: codex exec --profile maintainer "<prompt>"
-# Copied to coordination/.codex-home/maintainer/config.toml by
-# `greatminds setup`; start_agent.py launches codex with
-# CODEX_HOME=<project>/coordination/.codex-home/maintainer and
-# --profile maintainer.
+# Copied to coordination/.codex-home/maintainer/ by `greatminds setup`.
+# This directory is a role config source only; Codex auth uses the single
+# machine CODEX_HOME (~/.codex or GREATMINDS_CODEX_HOME).
 
 developer_instructions = """
 ## Mandatory tick heartbeat

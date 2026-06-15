@@ -1,12 +1,11 @@
 """start_agent — launch an agent for a coordination ROLE in a given TOOL.
 
-Replaces the 353-line Bash original at /opt/coordination/bin/start_agent.
-Same external contract; same env var surface; same exec semantics — the
-tool process replaces this script via ``os.execvp``.
+The public entry point is the unified ``greatminds start-agent`` command.
+After setup, the selected tool process replaces this script via ``os.execvp``.
 
 Usage::
 
-    greatminds-start-agent <ROLE> <TOOL> [--mode loop|chat] [extra tool args...]
+    greatminds start-agent <ROLE> <TOOL> [--mode loop|chat] [extra tool args...]
 
 ROLE
     Role key from ``schema.yaml > roles`` (DEVELOPER, ARCHITECT-PLANNER,
@@ -42,11 +41,12 @@ What it does:
        ``--mcp-config`` doesn't eat it.
 
    ``codex``
-       Discovers the role's most recent rollout in
-       ``~/.codex/sessions``; caches its UUID for ``codex resume``.
-       Falls back to ``codex resume --last`` if no session found. Adds
-       ``--profile <role-lower>`` when
-       ``~/.codex/<role-lower>.config.toml`` exists.
+       Uses the single machine Codex home for authentication
+       (``GREATMINDS_CODEX_HOME``, inherited non-per-role ``CODEX_HOME``, or
+       ``~/.codex``). Reads role model/settings from
+       ``coordination/.codex-home/<role>/`` as config source material and
+       passes them as ``-c`` overrides; it does not use ``--profile`` or a
+       per-role auth home.
 
    ``cursor``
        Wrapped in ``systemd-run --user --scope`` with memory/CPU caps
@@ -54,9 +54,9 @@ What it does:
        ``GREATMINDS_REGISTRY_TOOL=cursor`` so ``pty-launch`` records the
        logical tool, not ``systemd-run``.
 
-Optional ``greatminds-pty-launch`` wraps the tool process in a pty we
-control plus a unix socket so ``coordd`` can inject keystrokes from
-outside the terminal emulator. Disabled via ``GREATMINDS_START_AGENT_NOPTY=1``.
+By default the tool is wrapped through ``python -m greatminds.cli.pty_launch``,
+which records an input socket so ``coordd`` can inject keystrokes from outside
+the terminal emulator. Disable with ``GREATMINDS_START_AGENT_NOPTY=1``.
 """
 
 from __future__ import annotations
@@ -148,9 +148,9 @@ def discover_codex_session(role: str,
                            project_dir: Path | None = None) -> str:
     """Find the most recent ``rollout-*.jsonl`` for this role.
 
-    0164: post-0158, codex launches with ``CODEX_HOME=<project>/
-    coordination/.codex-home/<role>/`` and writes rollouts under
-    ``<CODEX_HOME>/sessions/`` — NOT under ``~/.codex/sessions/``.
+    0164: post-0158, Codex role sessions were stored under
+    ``<project>/coordination/.codex-home/<role>/sessions/`` — NOT under
+    ``~/.codex/sessions/``.
     The pre-0164 discovery walked ``~/.codex/sessions/``, found OLD
     pre-0158 rollouts (or unrelated ones), wrote their SIDs to the
     role's ``.codex-session-id`` cache, and the next launch issued
@@ -158,9 +158,11 @@ def discover_codex_session(role: str,
     where that SID doesn't exist. codex returned ``No saved session
     found`` and the wrapper-loop respawned forever.
 
-    Fix: walk the per-role ``<CODEX_HOME>/sessions/`` when the post-0158
-    home exists. Legacy ``~/.codex/sessions/`` is still consulted as a
-    fallback for projects not yet re-run through 0158 ``setup``.
+    Fix: walk the per-role ``.codex-home/<role>/sessions/`` when the
+    post-0158 home exists. Legacy ``~/.codex/sessions/`` is still
+    consulted as a fallback for projects not yet re-run through 0158
+    ``setup``. 0390 later moved Codex authentication to the single
+    machine ``CODEX_HOME``; this function remains about session discovery.
 
     The head-content check (``"You are <ROLE> agent"``) is still useful
     when multiple roles share a codex home in pathological installs;

@@ -1,9 +1,8 @@
 # Profile: ui-developer
 # Usage: codex exec --profile ui-developer "<prompt>"
-# Copied to coordination/.codex-home/ui-developer/config.toml by
-# `greatminds setup`; start_agent.py launches codex with
-# CODEX_HOME=<project>/coordination/.codex-home/ui-developer and
-# --profile ui-developer.
+# Copied to coordination/.codex-home/ui-developer/ by `greatminds setup`.
+# This directory is a role config source only; Codex auth uses the single
+# machine CODEX_HOME (~/.codex or GREATMINDS_CODEX_HOME).
 
 developer_instructions = """
 ## Mandatory tick heartbeat
@@ -25,7 +24,7 @@ Tick workflow:
 1. greatminds inbox list — answer + ack.
 2. greatminds task list feature_ui_dev — if present, claim (already triaged, planned, scope:ui).
 3. Implement the UI plan. Component / playwright surface / CSS as the plan demands.
-4. If plan.stand_required:true — greatminds stand request --evidence-for <task-id>. UI lifecycle/CRUD tasks frequently need live-mutating verification; check the plan body for the "live-mutating verify owner" line.
+4. If plan.stand_required:true — include the plan's stand notes in your implementation handoff; TESTER acquires the live stand with `greatminds stand lease --task <task-id> --profile <profile>`. UI lifecycle/CRUD tasks may need live-mutating verification; check the plan body for the "live-mutating verify owner" line.
 5. Local sanity (component tests, vitest/jest etc. per the project).
 6. greatminds task append-block implementation --id <X> --field files=<list> --field base_commit=<HEAD> --field ready_for_test=true --body "<what changed + before/after screenshots/diff references where relevant>".
 7. greatminds task mv <X> feature_test.

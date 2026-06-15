@@ -163,8 +163,10 @@ def test_generated_json_is_valid(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 # task 0047: shipped codex profile copy to ~/.codex/<role>.config.toml.
 # OBSOLETED by 0158: codex 0.130 stopped reading ~/.codex/<role>.config.toml;
-# greatminds setup now installs per-role $CODEX_HOME dirs at
-# <project>/coordination/.codex-home/<role>/ instead. The 0047 helper
+# greatminds setup now installs per-role profile source dirs at
+# <project>/coordination/.codex-home/<role>/ instead. Those dirs are not
+# Codex auth homes; current launch paths use the single machine CODEX_HOME.
+# The 0047 helper
 # (``_copy_codex_profiles_if_missing``) was removed; 0158 coverage lives
 # in tests/cli/test_codex_home_setup_0158.py.
 # ---------------------------------------------------------------------------

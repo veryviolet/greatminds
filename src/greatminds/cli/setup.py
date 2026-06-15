@@ -782,13 +782,11 @@ def _codex_skill_dirs_for_role(canon: Path, role: str) -> list[Path]:
 
 def _setup_codex_homes_per_role(canon: Path,
                                 project_dir: Path) -> tuple[int, int]:
-    """0158: install per-role codex homes at
+    """0158: install per-role codex profile sources at
     ``<project>/coordination/.codex-home/<role>/config.toml``.
 
     Replaces the pre-0158 ``~/.codex/<role>.config.toml`` mechanism that
-    codex 0.130.0 silently stopped reading. start_agent.py sets
-    ``CODEX_HOME=<project>/coordination/.codex-home/<role>`` at launch
-    and passes ``--profile <role>``.
+    codex 0.130.0 silently stopped reading.
 
     0375: these homes are config SOURCE ONLY (developer_instructions,
     model, skills) — they MUST NOT contain an ``auth.json``, and setup
@@ -1570,18 +1568,18 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     status = _ensure_claude_settings_local(project_dir, canon)
     info(f"  .claude/settings.local.json: {status}")
 
-    # Codex per-role homes (task 0158, supersedes 0047) — install
+    # Codex per-role profile sources (task 0158, supersedes 0047) — install
     # shipped profiles into ``<project>/coordination/.codex-home/<role>/
-    # config.toml``. codex 0.130+ reads ``$CODEX_HOME/config.toml`` and
-    # selects ``[profiles.<role>]`` within it; the previous
-    # ``~/.codex/<role>.config.toml`` location is no longer read by
-    # codex. start_agent.py sets ``CODEX_HOME`` per role at launch.
+    # config.toml``. These per-role dirs are config/profile sources only:
+    # Codex authentication uses the single machine CODEX_HOME, while
+    # start_agent.py / coordd read role settings from here and pass them as
+    # command-line overrides.
     # Per-project, idempotent: existing per-role config.toml is NOT
     # overwritten.
     written, skipped = _setup_codex_homes_per_role(canon, project_dir)
     if written or skipped:
         info(
-            f"  codex per-role homes → coordination/.codex-home/: "
+            f"  codex per-role profile sources → coordination/.codex-home/: "
             f"{written} written, {skipped} preserved (existing)"
         )
 

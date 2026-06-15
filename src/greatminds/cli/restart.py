@@ -1,22 +1,17 @@
 """greatminds restart — idempotent fleet restart.
 
-Replaces the temporary ``restart_fleet.sh`` bash crutch with a tested
-Python implementation. Same external behavior, same order:
+Restart the daemon if needed, ensure the tmux session exists, and relaunch
+eligible loop/chat agents whose registry entry is missing or dead.
 
   1. ``systemctl --user is-active --quiet coordd``; if not, start it.
   2. ``tmux has-session -t <session>``; if missing, shell out to
      ``greatminds launch --target tmux``.
   3. For each window in ``coord.yaml`` with a non-empty ``role``,
      resolve ``coordination/.agent_registry/<role-lowercase>.json``:
-       - missing / pid dead / no pid → ``tmux send-keys Enter`` to
-         (re)launch the agent. ``greatminds launch`` (since 0160)
-         installs a bash wrapper-loop in each pane that prints
-         ``press Enter to (re)start <ROLE>...`` and blocks at
-         ``read -r _ </dev/tty`` after each agent exit; ``restart``'s
-         Enter lands on that ``read`` and the wrapper re-execs the
-         agent. Pre-0160 ``launch.py`` pre-typed the start-agent
-         command with no Enter and ``restart`` was a no-op for any
-         pane whose agent had already exited.
+       - missing / pid dead / no pid → relaunch eligible loop/chat panes with
+         ``greatminds start-agent``.
+       - driven and staged roles are skipped because coordd or the operator
+         owns their next turn.
        - alive → skip.
   4. Wait 10s, then re-read each registry. A role passes if the file
      exists, ``pid`` is alive (``os.kill(pid, 0)``), and ``input_sock``
@@ -26,7 +21,7 @@ Usage::
 
     greatminds restart [--config <coord.yaml>] [--project-dir <dir>]
 
-Linux + systemd-user only, same as the bash version.
+Linux + systemd-user only.
 """
 from __future__ import annotations
 
@@ -748,7 +743,7 @@ def _verify(
     "--reset",
     is_flag=True,
     default=False,
-    help=("destructive re-launch (0147, formerly 0137 --bootstrap). "
+    help=("destructive re-launch. "
           "SIGTERMs each alive pid and clears claude/codex session-id "
           "files so the next start-agent goes through the fresh-session "
           "path. Use when the agent's context is unrecoverably corrupt "

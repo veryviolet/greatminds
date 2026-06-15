@@ -43,8 +43,7 @@
   environment:
     # uv installs to ~/.local/bin; ansible `command:` runs a non-login,
     # non-interactive shell that does NOT source ~/.profile, so ~/.local/bin
-    # is not on PATH and `uv` is not found. Add it explicitly (regression
-    # vs the pre-1.6 profile, which carried this block). STAND_USER comes
+    # is not on PATH and `uv` is not found. Add it explicitly. STAND_USER comes
     # from PROJECT.env (--extra-vars); default matches the canon example user.
     PATH: "/home/{{ STAND_USER | default('violet') }}/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   vars:
@@ -70,7 +69,7 @@
       tags: [prerequisite]
 
     - name: remove stale git metadata from deploy_path
-      # 0394: --exclude=.git prevents copying the worktree gitdir FILE, but
+      # --exclude=.git prevents copying the worktree gitdir FILE, but
       # rsync intentionally leaves an excluded destination .git in place. A
       # prior bad deploy can therefore leave /srv/.../.git containing
       # `gitdir: /opt/greatminds/.git/worktrees/...`, making the stand tree a

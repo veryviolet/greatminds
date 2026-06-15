@@ -121,9 +121,8 @@ and markdown shape.
 - `SENT`: an agent sent an inbox message to another role.
 
 Because these are emitted by the acting agent, they appear only when the agent
-successfully completes the CLI action and replies. A daemon-pushed dashboard or
-status overlay is not part of this behavior; that belongs to the future 1.3.0
-dashboard work.
+successfully completes the CLI action and replies. Daemon status belongs in
+`greatminds dashboard` and the driven event log, not in chat-pane overlays.
 
 ## pty launch
 

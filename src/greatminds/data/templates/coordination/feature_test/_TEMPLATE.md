@@ -39,7 +39,7 @@ What is covered. Edge cases tested. Anything intentionally not covered (with rea
 If `plan.stand_required: true`, include lease-backed `stand_evidence` from
 the active lease: lease id, checked commit/worktree, host/profile, the
 before/after live behavior, and TESTER-owned product checks with
-URLs/commands/screenshots/logs and caveats. Do not pass with old, blocked,
+URLs/commands/screenshots/logs and caveats. Do not pass with stale, blocked,
 wrong-host/profile, unrelated readiness evidence, or a missing lease id.
 
 The gate_check_* fields above record the verified greatminds gate-check run. If gate

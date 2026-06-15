@@ -37,11 +37,10 @@ the worktree.
 ## Runtime artifacts
 
 - `journal.ndjson`: append-only transition log.
-- `intent/`: short-lived files written before moves and removed after moves.
+- `intent/`: short-lived files written before moves and cleared after moves.
 - `inbox/`: role mailboxes.
 - `heartbeat.*`: role liveness files.
 - `.stand/state.yaml`: singleton stand state, active lease, FIFO queue, and
   recent transition history.
-- `.worktrees/<task-id>/`: in-flight code for a task. This replaces the older
-  file-lock and lock-release model; operators should inspect worktrees instead
-  of lock files.
+- `.worktrees/<task-id>/`: in-flight code for a task. Operators inspect
+  worktrees directly.

@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "greatminds"
-version = "2.1.0"
-description = "File-based multi-agent coordination protocol — per-role queues, Claude Code plugins, and per-role CODEX_HOME profiles for OpenAI Codex"
+version = "2.1.1"
+description = "File-based multi-agent coordination protocol — queues, driven roles, stand leases, and Claude/Codex agent orchestration"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
@@ -27,20 +27,14 @@ classifiers = [
 dependencies = [
   "pyyaml>=6.0",
   "click>=8.1",
-  # 0169: inotify-driven coordd wake. Linux-only; on non-Linux hosts
-  # the optional import in cli/coordd.py degrades gracefully back to
-  # the polling-only path.
+  # inotify-driven coordd wake. Linux-only; on non-Linux hosts the
+  # optional import in cli/coordd.py degrades gracefully back to polling.
   'inotify_simple>=2.0; platform_system == "Linux"',
-  # 0199 iter-2: coordd's PyPI auto-update check uses
-  # packaging.version.parse for PEP 440 ordering. Lexicographic
-  # fallback breaks on multi-digit segments (1.2.10 < 1.2.9 et al)
-  # so packaging must be a real direct dep, not a transitive guess.
+  # coordd's PyPI auto-update check uses packaging.version.parse for
+  # PEP 440 ordering; packaging is a direct dependency by design.
   "packaging>=21.0",
-  # 0280 (0276 Phase D): ansible-core powers the YAML stand-profile
-  # execution path (cli/stand_executor.py:execute_yaml_profile).
-  # ~25-30MB on disk plus jinja2/packaging/resolvelib transitives —
-  # acceptable trade-off for the structured-deploy path. Current stand
-  # profiles are YAML/ansible only.
+  # ansible-core powers the YAML stand-profile execution path
+  # (cli/stand_executor.py:execute_yaml_profile).
   "ansible-core>=2.16,<2.18",
 ]
 

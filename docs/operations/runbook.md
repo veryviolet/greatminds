@@ -52,7 +52,7 @@ Use a stable install for long-running fleets: pipx, `uv tool`, or a normal
 project venv. The editable development venv is for changing and testing
 greatminds itself. Do not launch a long-running fleet with `uv run`;
 `uv run --active` can write editable paths from a task worktree into the active
-environment and leave broken `.pth` files after the worktree is removed.
+environment and leave broken `.pth` files after the worktree is deleted.
 
 When developing greatminds locally, use an isolated development venv:
 

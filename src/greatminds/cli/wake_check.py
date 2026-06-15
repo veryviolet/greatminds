@@ -2,10 +2,10 @@
 """Report blocked tasks ready to wake, malformed deps, and deadlock cycles.
 
 Usage:
-    wake_check [--project-dir <dir>] [--canon-dir <dir>] [--quiet]
+    greatminds wake-check [--project-dir <dir>] [--canon-dir <dir>] [--quiet]
 
 Scans <project-dir>/coordination/feature_blocked/*.{yaml,md}. For each:
-  - parses the latest `blocked` block (or `blocked_block` for legacy md);
+  - parses the latest `blocked` block;
   - validates dependency entries match `<queue>/<id>.{yaml,md}`;
   - checks each referenced file actually exists;
   - flags tasks whose ALL deps exist AND none of those deps is itself

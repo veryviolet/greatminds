@@ -100,7 +100,7 @@ _CHAT_MODE_ROLES_FOR_USER_PROMPT_SUBMIT = {
 @click.option("--phase",
               type=click.Choice(["stop", "user-prompt-submit"]),
               default="stop",
-              help="hook phase (0236: user-prompt-submit fires at start "
+              help="hook phase (user-prompt-submit fires at start "
                    "of each USER turn for chat-mode roles).")
 def stop_decide(role: str, host: str, project_dir: Path | None,
                 canon_dir: Path | None, phase: str) -> None:

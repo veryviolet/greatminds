@@ -74,9 +74,10 @@ plugins:
 
 Keep empty lists for roles that should not receive marketplace plugins. Codex
 marketplace lists are currently empty by design; Codex roles use generated
-per-role `CODEX_HOME` configs instead of Claude marketplace plugin installs.
-See [Codex Profiles](../concepts/codex-profiles.md) for the generated layout
-and launch path.
+per-role profile sources plus the single machine Codex login instead of Claude
+marketplace plugin installs. See
+[Codex Profiles](../concepts/codex-profiles.md) for the generated layout and
+launch path.
 
 After setup, verify the installed Claude plugins with:
 

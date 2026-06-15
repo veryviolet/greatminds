@@ -16,8 +16,8 @@ Common product queues:
 - `feature_review/`: final architectural review.
 - `feature_blocked/`: tasks parked on explicit dependencies.
 - `verified/`: approved work. This is normally a final state, but
-  `ARCHITECT-REVIEWER` may roll it back when post-verify evidence shows the
-  work is wrong or obsolete.
+  `ARCHITECT-REVIEWER` may roll it back when later evidence shows the work is
+  wrong or invalid.
 - `archive/`: abandoned, superseded, or withdrawn work.
 
 A verified task can leave `verified/` only through an explicit reviewer
