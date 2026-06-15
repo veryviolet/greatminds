@@ -67,12 +67,15 @@ jobs:
       - name: smoke — setup scaffolds a fresh project
         run: |
           .venv-test/bin/greatminds setup --project-dir /tmp/gm_ci_test
-          test -d /tmp/gm_ci_test/coordination/feature_inbox
+          test -f /tmp/gm_ci_test/coordination/coord.yaml
+          test -f /tmp/gm_ci_test/coordination/PROJECT.md
+          test -d /tmp/gm_ci_test/.greatminds/feature_inbox
           test ! -e /tmp/gm_ci_test/schema.yaml
           test ! -e /tmp/gm_ci_test/COORDINATE.md
-          test -f /tmp/gm_ci_test/coordination/schema.yaml
-          test -f /tmp/gm_ci_test/coordination/COORDINATE.md
-          test -f /tmp/gm_ci_test/coordination/PROJECT.md
+          test ! -e /tmp/gm_ci_test/coord.yaml
+          test -f /tmp/gm_ci_test/.greatminds/schema.yaml
+          test -f /tmp/gm_ci_test/.greatminds/COORDINATE.md
+          test -f /tmp/gm_ci_test/.greatminds/PROJECT.env
 
       - name: install test deps + run pytest regression suite
         run: |
