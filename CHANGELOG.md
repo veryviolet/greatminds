@@ -4,7 +4,7 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
-## 2.0.13 — 2026-06-14
+## 2.0.14 — 2026-06-15
 
 ### Fixed
 
