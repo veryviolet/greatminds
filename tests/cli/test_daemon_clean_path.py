@@ -11,6 +11,7 @@ def test_clean_path_project_venv_first_and_no_junk():
     dirs = p.split(":")
     assert dirs[0] == "/opt/area/nginarea/.venv/bin", \
         "the project's own venv bin must be first (its ansible + greatminds)"
+    assert str(daemon._current_user_home() / ".local" / "bin") in dirs
     assert ".venv-coord" not in p, "must NOT leak another project's venv"
     for junk in ("cuda", "flutter", "JetBrains", "plugins/cache", "reflex"):
         assert junk not in p, f"raw-shell junk {junk!r} leaked into the PATH"
@@ -21,3 +22,9 @@ def test_clean_path_project_venv_first_and_no_junk():
 def test_clean_path_handles_execstart_with_args():
     p = daemon._clean_daemon_path("/x/.venv/bin/greatminds coordd --project %i")
     assert p.split(":")[0] == "/x/.venv/bin"
+
+
+def test_template_unit_sets_home_and_path():
+    body = daemon._template_unit_body()
+    assert f"Environment=HOME={daemon._current_user_home()}" in body
+    assert "Environment=PATH=" in body

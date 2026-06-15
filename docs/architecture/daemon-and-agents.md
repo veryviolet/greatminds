@@ -45,12 +45,12 @@ window's `coord.yaml` `tool:` value:
 For driven roles, `coordd` starts one turn instead of waking an existing loop:
 
 - `claude` driven roles run one `claude -p` / resume turn with the rendered
-  role bootstrap file through the daemon user's login shell. This keeps PATH,
-  toolchain setup, and shell-managed auth helpers current for every turn
-  instead of freezing whatever environment existed when the daemon started.
-  Stale captured Claude OAuth/host-auth environment variables are stripped
-  before the login shell is entered so they cannot override a refreshed user
-  login.
+  role bootstrap file using an explicit user environment. The daemon sets
+  `HOME` to the OS user's home directory, ensures `$HOME/.local/bin` is on
+  `PATH`, and resolves the Claude binary by absolute path when possible. This
+  matches non-interactive subprocess requirements: Claude Code reads first
+  party credentials from `$HOME/.claude` and is commonly installed under
+  `$HOME/.local/bin`.
 - `codex` driven roles run one fresh `codex app-server` stdio process for the
   turn; the app-server thread id is persisted for continuity.
 

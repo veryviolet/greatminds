@@ -26,7 +26,8 @@ def test_build_driven_argv_resume_and_prompt() -> None:
     """0315: the driven turn command is ``claude --resume <sid> -p
     'continue your tick'``."""
     argv = cd._build_driven_claude_argv("sess-123", None)
-    assert argv[:5] == ["claude", "--resume", "sess-123", "-p",
+    assert argv[0].endswith("claude")
+    assert argv[1:5] == ["--resume", "sess-123", "-p",
                          "continue your tick"]
     # No --append-system-prompt-file when bootstrap is None (0316
     # adds it).
@@ -41,17 +42,6 @@ def test_build_driven_argv_includes_bootstrap_when_present() -> None:
     assert "--append-system-prompt-file" in argv
     idx = argv.index("--append-system-prompt-file")
     assert argv[idx + 1] == "/coord/.bootstrap/developer.md"
-
-
-def test_login_shell_argv_preserves_quoted_claude_command() -> None:
-    argv = cd._login_shell_argv([
-        "claude", "-p", "continue your tick",
-        "--append-system-prompt-file", "/tmp/role file.md",
-    ])
-
-    assert argv[:2] == ["bash", "-lc"]
-    assert "claude -p 'continue your tick'" in argv[2]
-    assert "'/tmp/role file.md'" in argv[2]
 
 
 # ---------- run-lock semantics ----------
@@ -75,7 +65,8 @@ def test_spawn_acquires_lock_and_calls_spawn(tmp_path: Path) -> None:
     )
     assert ok is True
     assert len(spawned) == 1
-    assert spawned[0][:2] == ["claude", "--resume"]
+    assert spawned[0][0].endswith("claude")
+    assert spawned[0][1] == "--resume"
 
 
 def test_spawn_lock_contains_metadata_while_held(tmp_path: Path) -> None:

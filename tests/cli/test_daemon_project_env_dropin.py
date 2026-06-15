@@ -170,9 +170,11 @@ def test_claude_headless_probe_reports_auth_failure(
     project.mkdir()
 
     def fake_run(argv, **kwargs):
-        assert argv[:2] == ["bash", "-lc"]
-        assert "claude -p" in argv[2]
-        assert "--output-format json" in argv[2]
+        assert argv[0].endswith("claude") or argv[0] == "claude"
+        assert argv[1] == "-p"
+        assert "--output-format" in argv
+        assert kwargs["env"]["HOME"]
+        assert ".local/bin" in kwargs["env"]["PATH"]
         return subprocess.CompletedProcess(
             argv, 1,
             stdout=json.dumps({
@@ -192,7 +194,7 @@ def test_claude_headless_probe_reports_auth_failure(
     assert "status=401" in detail
 
 
-def test_claude_headless_probe_drops_stale_snapshot_oauth(
+def test_claude_headless_probe_preserves_claude_env_and_sets_home_path(
     tmp_path: Path, monkeypatch,
 ) -> None:
     project = tmp_path / "proj"
@@ -210,9 +212,11 @@ def test_claude_headless_probe_drops_stale_snapshot_oauth(
 
     def fake_run(argv, **kwargs):
         env = kwargs["env"]
-        assert "CLAUDE_CODE_OAUTH_TOKEN" not in env
-        assert "CLAUDE_CODE_HOST_AUTH_ENV_VAR" not in env
-        assert "HOST_AUTH" not in env
+        assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "old"
+        assert env["CLAUDE_CODE_HOST_AUTH_ENV_VAR"] == "HOST_AUTH"
+        assert env["HOST_AUTH"] == "old-host"
+        assert env["HOME"]
+        assert ".local/bin" in env["PATH"]
         return subprocess.CompletedProcess(
             argv, 0,
             stdout=json.dumps({"is_error": False, "result": "OK"}),

@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import os
+import pwd
 import shlex
 import shutil
 import subprocess
@@ -78,6 +79,35 @@ AGENT_ENV_NAMES = {
 }
 
 
+def _current_user_home() -> Path:
+    try:
+        return Path(pwd.getpwuid(os.getuid()).pw_dir)
+    except Exception:  # noqa: BLE001
+        return Path.home()
+
+
+def _agent_tool_env(env: dict[str, str]) -> dict[str, str]:
+    """Env for non-interactive agent CLI probes.
+
+    Claude Code stores first-party credentials under ``$HOME/.claude`` and is
+    commonly installed in ``$HOME/.local/bin``. A daemon/subprocess must set
+    both explicitly instead of relying on interactive shell inheritance.
+    """
+    home = _current_user_home()
+    out = dict(env)
+    out["HOME"] = str(home)
+    path_parts = [
+        str(home / ".local" / "bin"),
+        str(home / ".npm-global" / "bin"),
+    ]
+    path_parts.extend((out.get("PATH") or os.defpath).split(":"))
+    path_parts.extend(["/usr/local/bin", "/usr/bin", "/bin"])
+    seen: set[str] = set()
+    out["PATH"] = ":".join(
+        p for p in path_parts if p and not (p in seen or seen.add(p)))
+    return out
+
+
 def _resolved_greatminds_exec() -> str:
     """Pick the ExecStart command for the systemd template unit.
 
@@ -111,7 +141,7 @@ def _resolve_tool_exec(tool: str) -> str | None:
                 return cand
     except Exception:  # noqa: BLE001
         pass
-    home = Path.home()
+    home = _current_user_home()
     candidates = [
         home / ".local" / "bin" / tool,
         home / ".npm-global" / "bin" / tool,
@@ -270,6 +300,9 @@ def _clean_daemon_path(exec_cmd: str) -> str:
         dirs.append(str(Path(first).resolve().parent))
     except Exception:  # noqa: BLE001
         pass
+    home = _current_user_home()
+    dirs.append(str(home / ".local" / "bin"))
+    dirs.append(str(home / ".npm-global" / "bin"))
     # 2. dirs of the agent tools, resolved via which / the login shell.
     #    NOT ansible — the project venv above provides it; resolving it
     #    here risks pulling in a cross-project venv (the .venv-coord bug).
@@ -357,6 +390,10 @@ def _template_unit_body() -> str:
     if path_val and "Environment=PATH=" not in body:
         body = body.replace(
             "[Service]\n", f"[Service]\nEnvironment=PATH={path_val}\n", 1)
+    home_val = str(_current_user_home())
+    if home_val and "Environment=HOME=" not in body:
+        body = body.replace(
+            "[Service]\n", f"[Service]\nEnvironment=HOME={home_val}\n", 1)
     return body
 
 
@@ -509,22 +546,6 @@ def _claude_oauth_credential_diagnostic(env: dict[str, str]) -> str | None:
             "`claude setup-token` or `claude auth login` as the same OS user."
         )
     return None
-
-
-def _drop_stale_claude_snapshot_env(env: dict[str, str]) -> dict[str, str]:
-    out = dict(env)
-    host_auth_name = out.get("CLAUDE_CODE_HOST_AUTH_ENV_VAR")
-    for name in (
-        "CLAUDE_CODE_OAUTH_TOKEN",
-        "CLAUDE_BRIDGE_OAUTH_TOKEN",
-        "CLAUDE_CODE_HOST_AUTH_ENV_VAR",
-        "CLAUDE_CODE_SDK_HAS_HOST_AUTH_REFRESH",
-        "CLAUDE_CODE_HOST_AUTH_REFRESH_TIMEOUT_MS",
-    ):
-        out.pop(name, None)
-    if host_auth_name:
-        out.pop(host_auth_name, None)
-    return out
 
 
 def has_driven_claude_roles(project_dir: Path) -> bool:
@@ -1010,17 +1031,17 @@ def restart_cmd(project: str | None, project_dir: Path | None) -> None:
 
 def _claude_headless_probe(name: str, project_dir: Path,
                            timeout_sec: float) -> tuple[bool, str]:
-    env = _drop_stale_claude_snapshot_env(
-        _daemon_candidate_env(name, project_dir))
+    env = _agent_tool_env(_daemon_candidate_env(name, project_dir))
     credential_diag = _claude_oauth_credential_diagnostic(env)
+    claude_bin = _resolve_tool_exec("claude") or "claude"
     claude_argv = [
-        "claude", "-p",
+        claude_bin, "-p",
         "Reply with OK only. This is a greatminds daemon doctor probe.",
         "--strict-mcp-config",
         "--permission-mode", "auto",
         "--output-format", "json",
     ]
-    argv = ["bash", "-lc", shlex.join(claude_argv)]
+    argv = claude_argv
     started = time.monotonic()
     try:
         cp = subprocess.run(

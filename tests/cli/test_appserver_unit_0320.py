@@ -103,6 +103,7 @@ def test_tool_resolver_finds_user_local_bin_when_path_is_bare(
     codex.chmod(0o755)
     monkeypatch.setenv("PATH", "/usr/bin:/bin")
     monkeypatch.setattr(Path, "home", lambda: home)
+    monkeypatch.setattr(daemon_mod, "_current_user_home", lambda: home)
     monkeypatch.setattr(
         daemon_mod.subprocess,
         "run",

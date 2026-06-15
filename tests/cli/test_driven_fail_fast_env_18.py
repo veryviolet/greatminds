@@ -53,10 +53,9 @@ def test_fail_fast_overrides_inherited_env(monkeypatch) -> None:
     assert env["CLAUDE_CODE_MAX_RETRIES"] == cd.DRIVEN_MAX_RETRIES
 
 
-def test_env_drops_stale_claude_snapshot_oauth(monkeypatch) -> None:
-    """Captured OAuth env can outlive the user's real Claude login state.
-    Driven Claude re-enters the login shell each turn, so stale snapshot auth
-    must not override fresh shell/filesystem auth."""
+def test_env_preserves_claude_auth_and_sets_home_path(monkeypatch) -> None:
+    """Driven Claude needs explicit HOME/PATH, while operator-supplied
+    Claude auth env remains valid and must not be stripped."""
     monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "old-oauth")
     monkeypatch.setenv("CLAUDE_BRIDGE_OAUTH_TOKEN", "old-bridge")
     monkeypatch.setenv("CLAUDE_CODE_HOST_AUTH_ENV_VAR", "HOST_AUTH")
@@ -64,9 +63,11 @@ def test_env_drops_stale_claude_snapshot_oauth(monkeypatch) -> None:
 
     env = cd._driven_subprocess_env("developer")
 
-    assert "CLAUDE_CODE_OAUTH_TOKEN" not in env
-    assert "CLAUDE_BRIDGE_OAUTH_TOKEN" not in env
-    assert "CLAUDE_CODE_HOST_AUTH_ENV_VAR" not in env
-    assert "HOST_AUTH" not in env
+    assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "old-oauth"
+    assert env["CLAUDE_BRIDGE_OAUTH_TOKEN"] == "old-bridge"
+    assert env["CLAUDE_CODE_HOST_AUTH_ENV_VAR"] == "HOST_AUTH"
+    assert env["HOST_AUTH"] == "old-host-auth"
+    assert env["HOME"]
+    assert ".local/bin" in env["PATH"]
     assert env["GREATMINDS_ROLE"] == "DEVELOPER"
     assert env["CLAUDE_CODE_MAX_RETRIES"] == cd.DRIVEN_MAX_RETRIES

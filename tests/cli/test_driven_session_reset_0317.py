@@ -23,7 +23,8 @@ from greatminds.cli import coordd as cd
 def test_argv_resume_when_not_fresh() -> None:
     """Below threshold → ``claude --resume <sid> -p``."""
     argv = cd._build_driven_claude_argv("sess-1", None, fresh=False)
-    assert argv[:3] == ["claude", "--resume", "sess-1"]
+    assert argv[0].endswith("claude")
+    assert argv[1:3] == ["--resume", "sess-1"]
 
 
 def test_argv_fresh_omits_resume() -> None:
@@ -32,7 +33,8 @@ def test_argv_fresh_omits_resume() -> None:
     argv = cd._build_driven_claude_argv(
         "sess-1", "/coord/.bootstrap/developer.md", fresh=True)
     assert "--resume" not in argv
-    assert argv[:2] == ["claude", "-p"]
+    assert argv[0].endswith("claude")
+    assert argv[1] == "-p"
     # Bootstrap (full contract) MUST be present on a fresh session
     # so it isn't context-blind.
     assert "--append-system-prompt-file" in argv

@@ -18,9 +18,9 @@ follow [SemVer](https://semver.org/) once 1.0.0 ships.
   so a daemon started from a usable shell can preserve the referenced auth
   value instead of saving only the pointer name.
 - Driven Claude turns and `greatminds daemon doctor` now invoke `claude -p`
-  through the daemon user's login shell and strip stale captured Claude
-  OAuth/host-auth snapshot variables before launch, so refreshed user auth is
-  not masked by the daemon's old environment.
+  with explicit non-interactive process requirements: `HOME` set to the daemon
+  OS user's home, `$HOME/.local/bin` on `PATH`, and an absolute Claude binary
+  path when resolvable.
 
 ## 2.0.11 — 2026-06-14
 

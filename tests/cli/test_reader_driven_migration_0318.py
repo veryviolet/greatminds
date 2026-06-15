@@ -176,7 +176,8 @@ def test_driven_first_turn_forces_fresh_session(tmp_path: Path):
         "0318: force-fresh first turn must NOT use --resume "
         "(no session yet)"
     )
-    assert spawned[0][:2] == ["claude", "-p"]
+    assert spawned[0][0].endswith("claude")
+    assert spawned[0][1] == "-p"
 
 
 def test_driven_route_force_fresh_when_no_session(

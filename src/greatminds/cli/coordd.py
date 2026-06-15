@@ -35,8 +35,8 @@ from __future__ import annotations
 
 import json
 import os
+import pwd
 import re
-import shlex
 import shutil
 import signal
 import subprocess
@@ -796,13 +796,26 @@ def _build_driven_claude_argv(
     session-id, the caller records it. The bootstrap (system prompt)
     carries the full contract so the new session isn't context-blind.
     """
-    # 1.6.2: bare `claude` — the daemon unit bakes the operator's PATH
-    # (Environment=PATH), so claude resolves via PATH like in a shell. No
-    # in-code path resolver.
+    # Resolve Claude to an absolute path when possible. Non-interactive
+    # daemons do not get the interactive/login PATH that usually adds
+    # ~/.local/bin, so a bare `claude` is not reliable.
+    claude = shutil.which("claude")
+    if claude is None:
+        home = _current_user_home()
+        for cand in (
+            home / ".local" / "bin" / "claude",
+            home / ".npm-global" / "bin" / "claude",
+            Path("/usr/local/bin/claude"),
+            Path("/usr/bin/claude"),
+        ):
+            if cand.exists() and os.access(cand, os.X_OK):
+                claude = str(cand)
+                break
+    claude = claude or "claude"
     if fresh:
-        argv = ["claude", "-p", prompt]
+        argv = [claude, "-p", prompt]
     else:
-        argv = ["claude", "--resume", session_id, "-p", prompt]
+        argv = [claude, "--resume", session_id, "-p", prompt]
     # 0311 driven fix: a headless ``claude -p`` turn that uses ANY tool blocks
     # on MCP-server initialization before it can act. The fleet's default MCP
     # discovery includes heavy npm-exec browser servers (playwright,
@@ -825,34 +838,27 @@ def _build_driven_claude_argv(
     return argv
 
 
-def _login_shell_argv(argv: list[str]) -> list[str]:
-    """Run agent tools through the user's login shell.
-
-    A systemd user daemon and ``ssh host "cmd"`` do not automatically read the
-    same startup files as ``ssh host`` followed by an interactive command. For
-    Claude Code, that difference matters: PATH/toolchain/auth helpers commonly
-    live in ``~/.profile`` / shell init. Re-enter the login-shell context for
-    each driven turn instead of relying on a stale daemon-start env snapshot.
-    """
-    return ["bash", "-lc", shlex.join(argv)]
+def _current_user_home() -> Path:
+    try:
+        return Path(pwd.getpwuid(os.getuid()).pw_dir)
+    except Exception:  # noqa: BLE001
+        return Path.home()
 
 
-def _drop_stale_claude_snapshot_env(env: dict[str, str]) -> dict[str, str]:
-    """Avoid letting old captured Claude OAuth env override fresh login state."""
+def _agent_tool_env(env: dict[str, str]) -> dict[str, str]:
+    home = _current_user_home()
     out = dict(env)
-    host_auth_name = out.get("CLAUDE_CODE_HOST_AUTH_ENV_VAR")
-    for name in (
-        "CLAUDE_CODE_OAUTH_TOKEN",
-        "CLAUDE_BRIDGE_OAUTH_TOKEN",
-        "CLAUDE_CODE_HOST_AUTH_ENV_VAR",
-        "CLAUDE_CODE_SDK_HAS_HOST_AUTH_REFRESH",
-        "CLAUDE_CODE_HOST_AUTH_REFRESH_TIMEOUT_MS",
-    ):
-        out.pop(name, None)
-    if host_auth_name:
-        out.pop(host_auth_name, None)
+    out["HOME"] = str(home)
+    path_parts = [
+        str(home / ".local" / "bin"),
+        str(home / ".npm-global" / "bin"),
+    ]
+    path_parts.extend((out.get("PATH") or os.defpath).split(":"))
+    path_parts.extend(["/usr/local/bin", "/usr/bin", "/bin"])
+    seen: set[str] = set()
+    out["PATH"] = ":".join(
+        p for p in path_parts if p and not (p in seen or seen.add(p)))
     return out
-
 
 
 def _driven_subprocess_env(role_lower: str) -> dict[str, str]:
@@ -873,7 +879,7 @@ def _driven_subprocess_env(role_lower: str) -> dict[str, str]:
         "API_TIMEOUT_MS": DRIVEN_API_TIMEOUT_MS,
         "CLAUDE_CODE_MAX_RETRIES": DRIVEN_MAX_RETRIES,
     }
-    return _drop_stale_claude_snapshot_env(env)
+    return _agent_tool_env(env)
 
 
 # 0317: session-reset policy. ``claude --resume`` accumulates
@@ -1456,8 +1462,8 @@ def _spawn_driven_turn(
             except OSError:
                 pass
 
-    # Production: run ``claude -p`` via the user's login shell as a
-    # coordd-managed subprocess in a daemon thread. The run-lock is held for
+    # Production: run ``claude -p`` as a coordd-managed subprocess in a
+    # daemon thread with an explicit user HOME/PATH. The run-lock is held for
     # the FULL turn duration
     # (released on process exit) so coordd serializes per-role turns and
     # can detect a hung turn (lock held + heartbeat not advancing).
@@ -1466,7 +1472,7 @@ def _spawn_driven_turn(
     # ``--output-format json`` makes claude emit a single result object
     # carrying ``session_id``, which we record so the next ``--resume``
     # turn continues the same session.
-    run_argv = _login_shell_argv(argv + ["--output-format", "json"])
+    run_argv = argv + ["--output-format", "json"]
     turn_log = _turn_log_path(coord, role_lower)
     _write_driven_run_lock(lock, role_lower, driver="claude",
                            log_path=str(turn_log), session_id=session_id)
