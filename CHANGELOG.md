@@ -4,6 +4,16 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## Unreleased
+
+### Added
+
+- Added `greatminds driven-log`, a read-only chronological event stream for
+  driven-agent turns. Fresh tmux fleets now include a role-less `logs` pane
+  running `greatminds driven-log --follow`; `coordd` records accepted turns,
+  pending markers, completions, retries, and errors to
+  `coordination/.events/driven.ndjson`.
+
 ## 2.0.14 — 2026-06-15
 
 ### Fixed

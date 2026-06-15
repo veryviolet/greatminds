@@ -270,6 +270,10 @@ def _emit_tmux(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
             # (agents / tasks / stand). Role-less, registers nothing —
             # a pure observer. Auto-run it + Enter like any resident pane.
             launch_cmd = "greatminds dashboard"
+        elif mode == "logs":
+            # Chronological, read-only driven-agent event stream. Role-less
+            # observer pane; coordd writes the events, this command only tails.
+            launch_cmd = "greatminds driven-log --follow"
         elif tool == "bash" or not role or mode == "driven":
             launch_cmd = ""
         elif mode == "staged":

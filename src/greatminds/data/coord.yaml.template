@@ -8,9 +8,9 @@
 # Two kinds of entries under `windows:`:
 #   - PANE roles (mode: chat | loop) get a real tmux window. Only the
 #     human-facing / resident roles are paned: PLANNER (interactive
-#     chat), MAINTAINER (self-loop watchdog), plus the `dashboard`
-#     pane (mode: dashboard) which runs the read-only live status
-#     table `greatminds dashboard` (agents / tasks / stand).
+#     chat), MAINTAINER (self-loop watchdog), plus role-less observer
+#     panes: `dashboard` (mode: dashboard) for current status and `logs`
+#     (mode: logs) for the chronological driven-agent event stream.
 #   - DRIVEN roles (mode: driven) get NO tmux window. coordd runs each
 #     of their turns as a managed subprocess (claude -p / codex
 #     app-server), holds the per-role run-lock for the turn, and
@@ -36,6 +36,13 @@ windows:
     # `greatminds dashboard` here (agents / tasks / stand); pure
     # observer — no role, registers nothing.
     mode: dashboard
+  - name: logs
+    role: ""
+    tool: bash
+    # Read-only chronological driven-agent events. `greatminds launch`
+    # auto-runs `greatminds driven-log --follow` here; pure observer —
+    # no role, registers nothing.
+    mode: logs
   - name: live
     role: LIVE-DEVELOPER
     tool: claude

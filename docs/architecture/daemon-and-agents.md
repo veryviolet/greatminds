@@ -7,7 +7,7 @@ Each window is defined in `coord.yaml` with:
 - window name
 - role
 - tool (`claude`, `codex`, `cursor`, or `bash`)
-- mode (`chat`, `loop`, or `driven`)
+- mode (`chat`, `loop`, `dashboard`, `logs`, `staged`, or `driven`)
 
 The role's lifecycle is declared in `coordination/schema.yaml`:
 
@@ -57,6 +57,13 @@ For driven roles, `coordd` starts one turn instead of waking an existing loop:
 Driven roles do one tick, then exit. They do not schedule long sleeps or run a
 persistent `/loop`; their next turn comes from the next inbox, queue, or stand
 event.
+
+`coordd` also writes a best-effort chronological driven-agent event stream to
+`coordination/.events/driven.ndjson`. The stream is read-only operator
+observability, not FSM authority: task files, locks, stand state, and turn logs
+remain the source of truth. A fresh tmux launch includes a role-less `logs`
+window that runs `greatminds driven-log --follow` and shows accepted turns,
+pending markers, completions, retries, and errors in color.
 
 This reactive path replaces short idle polling for normal queue and inbox
 changes. Reaction time should be the daemon watcher interval plus one driven

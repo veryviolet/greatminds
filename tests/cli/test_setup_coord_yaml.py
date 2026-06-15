@@ -11,18 +11,19 @@ from greatminds.cli import setup as setup_mod
 from greatminds.cli import daemon as daemon_mod
 
 
-# Canonical coord.yaml layout: four paned roles (the human-facing /
+# Canonical coord.yaml layout: five paned windows (the human-facing /
 # resident seats) plus the eight driven workers. Driven roles get NO
 # tmux pane — coordd runs each of their turns as a managed subprocess —
 # but they are still listed so coordd knows each role's tool. PLANNER is
 # interactive chat (codex), MAINTAINER is the self-loop watchdog
-# (claude), `dashboard` is a placeholder pane, and `live` is the
-# USER-started staged pane for LIVE-DEVELOPER.
+# (claude), `dashboard` and `logs` are read-only observer panes, and
+# `live` is the USER-started staged pane for LIVE-DEVELOPER.
 CANONICAL_WINDOWS = [
     # --- paned, human-facing / resident roles ---
     ("planner",    "ARCHITECT-PLANNER",  "codex",  "chat"),
     ("maintainer", "MAINTAINER",         "claude", "loop"),
     ("dashboard",  "",                   "bash",   "dashboard"),
+    ("logs",       "",                   "bash",   "logs"),
     ("live",       "LIVE-DEVELOPER",     "claude", "staged"),
     # --- driven roles (no pane; coordd drives each turn) ---
     ("reviewer",   "ARCHITECT-REVIEWER", "codex",  "driven"),
@@ -198,7 +199,7 @@ def test_generated_coord_yaml_has_canonical_windows(tmp_path):
     doc = yaml.safe_load((project_dir / "coord.yaml").read_text())
 
     assert isinstance(doc["windows"], list)
-    assert len(doc["windows"]) == len(CANONICAL_WINDOWS) == 11
+    assert len(doc["windows"]) == len(CANONICAL_WINDOWS)
 
     for window, (name, role, tool, mode) in zip(
         doc["windows"], CANONICAL_WINDOWS,

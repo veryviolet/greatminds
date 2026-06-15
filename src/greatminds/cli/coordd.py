@@ -47,7 +47,7 @@ from pathlib import Path
 
 import click
 
-from greatminds.cli import codex_auth
+from greatminds.cli import codex_auth, driven_log
 
 try:
     import yaml
@@ -686,6 +686,32 @@ def _turn_log_path(coord: Path, role_lower: str) -> Path:
     return d / f"{role_lower}-{ts}.log"
 
 
+def _driven_event_task_refs(coord: Path, role_lower: str) -> str:
+    """Best-effort task ids currently claimable by a driven role.
+
+    Event logging is observability only, so this deliberately degrades to an
+    empty string if schema/queues cannot be read.
+    """
+    try:
+        roles = load_schema_roles(coord)
+        meta = roles.get(role_lower.upper()) or roles.get(role_lower) or {}
+        if not isinstance(meta, dict):
+            return ""
+        refs: list[str] = []
+        for name in sorted(_role_pending_signature(coord, meta, role_lower)):
+            stem = Path(name).stem
+            if name.startswith("inbox/") or stem.startswith("wake-"):
+                continue
+            if stem and stem not in refs:
+                refs.append(stem)
+            if len(refs) >= 3:
+                break
+        more = " +" if len(refs) == 3 else ""
+        return ", ".join(refs) + more
+    except Exception:
+        return ""
+
+
 def _driven_pending_path(coord: Path, role_lower: str) -> Path:
     """Per-role pending marker. Set when an event arrives mid-turn;
     the post-turn cleanup re-spawns once if present."""
@@ -1081,8 +1107,16 @@ def _note_turn_outcome(coord: Path, role_lower: str, klass: str,
                 delay = _retry_delay(klass, st["attempts"])
                 st["next_at"] = now + delay
                 st["next_at_epoch"] = time.time() + delay
-        snap = dict(st)
+    snap = dict(st)
     _write_driven_retry_status(coord, role_lower, snap, detail)
+    driven_log.append_event(
+        coord,
+        event="retry" if not snap.get("escalated") else "error",
+        role=role_lower,
+        message=f"{klass} attempt {snap['attempts']}",
+        detail=("escalated; auto-retry stopped" if snap.get("escalated")
+                else "backoff scheduled"),
+    )
     if klass != "rate_limit" and snap.get("escalated"):
         _escalate_to_maintainer(coord, role_lower, klass,
                                 snap["attempts"], detail)
@@ -1432,6 +1466,11 @@ def _spawn_driven_turn(
         # A turn is already running — mark pending so the post-turn
         # cleanup re-fires once, and do NOT spawn a second process.
         _driven_pending_path(coord, role_lower).touch()
+        driven_log.append_event(
+            coord, event="turn_pending", role=role_lower, tool="claude",
+            task=_driven_event_task_refs(coord, role_lower),
+            message="turn already running; pending marker set",
+        )
         if verbose:
             print(
                 f"  0315: driven turn for {role_lower} already "
@@ -1452,8 +1491,18 @@ def _spawn_driven_turn(
         try:
             _write_driven_run_lock(lock, role_lower, driver="claude",
                                    session_id=session_id)
+            driven_log.append_event(
+                coord, event="turn_start", role=role_lower, tool="claude",
+                task=_driven_event_task_refs(coord, role_lower),
+                message="accepted task",
+            )
             spawn(argv)
             _record_driven_turn(coord / REGISTRY_DIR, role_lower, reset=reset)
+            driven_log.append_event(
+                coord, event="turn_finish", role=role_lower, tool="claude",
+                task=_driven_event_task_refs(coord, role_lower),
+                message="completed",
+            )
             return (True, f"driven turn spawned for {role_lower}"
                           f"{' (session reset)' if reset else ''}")
         finally:
@@ -1476,6 +1525,11 @@ def _spawn_driven_turn(
     turn_log = _turn_log_path(coord, role_lower)
     _write_driven_run_lock(lock, role_lower, driver="claude",
                            log_path=str(turn_log), session_id=session_id)
+    task_refs = _driven_event_task_refs(coord, role_lower)
+    driven_log.append_event(
+        coord, event="turn_start", role=role_lower, tool="claude",
+        task=task_refs, message="accepted task", log_path=str(turn_log),
+    )
 
     def _worker() -> None:
         new_sid: str | None = None
@@ -1529,6 +1583,16 @@ def _spawn_driven_turn(
                 print(f"  driven claude turn for {role_lower} failed: "
                       f"{exc}", file=sys.stderr)
         finally:
+            driven_log.append_event(
+                coord,
+                event="turn_finish" if klass == "ok" else "error",
+                role=role_lower,
+                tool="claude",
+                task=task_refs,
+                message="completed" if klass == "ok" else klass,
+                detail="" if klass == "ok" else detail,
+                log_path=str(turn_log),
+            )
             # 0391: every exit path (success, rc=143/SIGTERM, TimeoutExpired,
             # or a raise while recording the outcome) funnels through
             # _finalize_driven_turn, which releases the run-lock FIRST +
@@ -2211,6 +2275,11 @@ def _spawn_driven_codex_turn(
     lock.parent.mkdir(parents=True, exist_ok=True)
     if lock.exists():
         _driven_pending_path(coord, role_lower).touch()
+        driven_log.append_event(
+            coord, event="turn_pending", role=role_lower, tool="codex",
+            task=_driven_event_task_refs(coord, role_lower),
+            message="turn already running; pending marker set",
+        )
         if verbose:
             print(
                 f"  0321: codex turn for {role_lower} already running; "
@@ -2223,6 +2292,11 @@ def _spawn_driven_codex_turn(
     if transport is None and not codex_auth.machine_codex_auth_present(machine_home):
         detail = codex_auth.machine_codex_auth_error(
             machine_home, role_lower.upper())
+        driven_log.append_event(
+            coord, event="error", role=role_lower, tool="codex",
+            task=_driven_event_task_refs(coord, role_lower),
+            message="auth missing", detail=detail,
+        )
         try:
             _turn_log_path(coord, role_lower).write_text(
                 f"codex app-server turn for {role_lower}\n"
@@ -2246,6 +2320,11 @@ def _spawn_driven_codex_turn(
     turn_log = _turn_log_path(coord, role_lower)
     _write_driven_run_lock(lock, role_lower, driver="codex",
                            log_path=str(turn_log), thread_id=thread_id)
+    task_refs = _driven_event_task_refs(coord, role_lower)
+    driven_log.append_event(
+        coord, event="turn_start", role=role_lower, tool="codex",
+        task=task_refs, message="accepted task", log_path=str(turn_log),
+    )
 
     # Test seam: drive the request sequence synchronously through the
     # injected transport (no real codex process). Leave the lock held
@@ -2272,10 +2351,19 @@ def _spawn_driven_codex_turn(
                 _record_codex_thread(coord / REGISTRY_DIR, role_lower,
                                      thread_id)
             transport(_build_turn_start_request(3, thread_id))
+            driven_log.append_event(
+                coord, event="turn_finish", role=role_lower, tool="codex",
+                task=task_refs, message="completed", log_path=str(turn_log),
+            )
             return (True,
                     f"codex turn driven for {role_lower} "
                     f"(thread {thread_id})")
         except Exception as exc:  # noqa: BLE001
+            driven_log.append_event(
+                coord, event="error", role=role_lower, tool="codex",
+                task=task_refs, message="transport failed",
+                detail=str(exc)[:300], log_path=str(turn_log),
+            )
             return (False, f"codex transport failed: {exc}"[:200])
 
     def _worker() -> None:
@@ -2315,6 +2403,16 @@ def _spawn_driven_codex_turn(
                     file=sys.stderr,
                 )
         finally:
+            driven_log.append_event(
+                coord,
+                event="turn_finish" if klass == "ok" else "error",
+                role=role_lower,
+                tool="codex",
+                task=task_refs,
+                message="completed" if klass == "ok" else klass,
+                detail="" if klass == "ok" else detail,
+                log_path=str(turn_log),
+            )
             # 0391: same exit-path hardening as the claude driver — the
             # lock is released first/unconditionally and each bookkeeping
             # step is independently guarded (codex records its thread inside

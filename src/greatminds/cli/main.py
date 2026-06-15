@@ -69,6 +69,7 @@ from . import update as _update_mod
 from . import worktree as _worktree_mod
 from . import agent as _agent_mod
 from . import dashboard as _dashboard_mod
+from . import driven_log as _driven_log_mod
 from . import project as _project_mod
 from . import migrate as _migrate_mod
 
@@ -100,6 +101,7 @@ cli.add_command(_update_mod.update)
 cli.add_command(_worktree_mod.worktree)
 cli.add_command(_agent_mod.agent)
 cli.add_command(_dashboard_mod.dashboard)
+cli.add_command(_driven_log_mod.driven_log, name="driven-log")
 cli.add_command(_project_mod.project)
 cli.add_command(_migrate_mod.migrate)
 
