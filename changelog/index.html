@@ -1408,7 +1408,7 @@
 <p>All notable changes to <strong>greatminds</strong> are documented here. Format follows
 <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a> loosely; versions
 follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
-<h2 id="2013-2026-06-14">2.0.13 — 2026-06-14<a class="headerlink" href="#2013-2026-06-14" title="Permanent link">&para;</a></h2>
+<h2 id="2014-2026-06-15">2.0.14 — 2026-06-15<a class="headerlink" href="#2014-2026-06-15" title="Permanent link">&para;</a></h2>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Restored the <code>greatminds setup</code> role-gating pre-commit hook for coordinated
@@ -1421,9 +1421,9 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
   so a daemon started from a usable shell can preserve the referenced auth
   value instead of saving only the pointer name.</li>
 <li>Driven Claude turns and <code>greatminds daemon doctor</code> now invoke <code>claude -p</code>
-  through the daemon user's login shell and strip stale captured Claude
-  OAuth/host-auth snapshot variables before launch, so refreshed user auth is
-  not masked by the daemon's old environment.</li>
+  with explicit non-interactive process requirements: <code>HOME</code> set to the daemon
+  OS user's home, <code>$HOME/.local/bin</code> on <code>PATH</code>, and an absolute Claude binary
+  path when resolvable.</li>
 </ul>
 <h2 id="2011-2026-06-14">2.0.11 — 2026-06-14<a class="headerlink" href="#2011-2026-06-14" title="Permanent link">&para;</a></h2>
 <h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
