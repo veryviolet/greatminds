@@ -1,10 +1,18 @@
 # Filesystem Layout
 
-A configured project contains a `coordination/` directory. Typical contents:
+A configured project separates editable project configuration from runtime
+state:
 
 ```text
 coordination/
   PROJECT.md
+  coord.yaml
+  mcp.local.json
+  plugins.local/
+  stand-profiles.yaml
+  stand-profiles/
+
+.greatminds/
   feature_inbox/
   feature_plan/
   feature_dev/
@@ -24,10 +32,10 @@ coordination/
 ```
 
 The task file path is meaningful. For example, a product task in
-`coordination/feature_docs/` is owned by `TECHNICAL-WRITER`; the same file in
-`coordination/feature_docs_review/` is owned by `READER`.
+`.greatminds/feature_docs/` is owned by `TECHNICAL-WRITER`; the same file in
+`.greatminds/feature_docs_review/` is owned by `READER`.
 
-Per-task implementation code lives outside `coordination/`, under
+Per-task implementation code lives outside `.greatminds/`, under
 `.worktrees/<task-id>/`. When a task enters an implementer queue,
 `greatminds task mv` creates a git worktree on `task/<task-id>` and the
 implementer works from that checkout. When REVIEWER moves the task to

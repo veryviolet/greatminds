@@ -14,7 +14,7 @@
 #   - DRIVEN roles (mode: driven) get NO tmux window. coordd runs each
 #     of their turns as a managed subprocess (claude -p / codex
 #     app-server), holds the per-role run-lock for the turn, and
-#     captures output to coordination/.turns/<role>-<ts>.log. They are
+#     captures output to .greatminds/.turns/{role}-{ts}.log. They are
 #     listed here only so coordd knows each role's tool (claude/codex);
 #     `greatminds launch` skips creating a window for them.
 session: __SESSION__

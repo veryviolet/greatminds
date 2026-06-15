@@ -6,7 +6,7 @@ same diagnostic commands, but they should route infrastructure changes through
 
 ## CLI-Only Discipline
 
-All mutations under `coordination/` go through the `greatminds` CLI. Do not
+All mutations under `.greatminds/` go through the `greatminds` CLI. Do not
 move task files with `mv`, edit inbox files by hand, append journal lines
 directly, or touch heartbeat files manually. The CLI validates role ownership,
 schema fields, transition readiness, intent files, journal lines, and heartbeat
@@ -154,7 +154,7 @@ greatminds stand release --lease-id LEASE_ID --result pass
 ## Stuck Driven Turns
 
 Driven roles do not keep a persistent agent process. `coordd` creates one turn
-per event and holds `coordination/.locks/driven-<role>.lock` for the duration
+per event and holds `.greatminds/.locks/driven-{role}.lock` for the duration
 of that turn. New lock files contain JSON metadata such as `role`, `driver`,
 `started_at`, `coordd_pid`, and `log_path`.
 
@@ -174,7 +174,7 @@ Do not assume a task is being worked just because a driven lock exists.
 
 When a driven turn exits with a rate-limit, timeout, or execution error,
 `coordd` records retry state in
-`coordination/.locks/driven-<role>.retry.json`. The live scheduler uses this
+`.greatminds/.locks/driven-{role}.retry.json`. The live scheduler uses this
 state to re-drive the role after backoff and restores it after a coordd
 restart. `greatminds dashboard --once` shows these roles as `backoff` or
 `failed`; `greatminds watchdog` reports them under `DRIVEN RETRIES`.

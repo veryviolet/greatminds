@@ -1,6 +1,6 @@
 # Queues
 
-Queues are directories under `coordination/`. A task's directory is its state.
+Queues are directories under `.greatminds/`. A task's directory is its state.
 Moving a task file from one queue to another transfers ownership to the next
 role.
 

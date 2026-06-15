@@ -107,10 +107,10 @@ See `.greatminds/schema.yaml` `scenarios:` for A/B/C definitions.
 
 ## 4. Shared state
 
-All greatminds-owned project files live under `coordination/` in the project
-root. Product source, `coord.yaml`, and normal project files stay in the root;
-installed canon, queues, inboxes, logs, and runtime state stay under
-`coordination/`.
+Editable project configuration lives under `coordination/` in the project
+root. Runtime/system state lives under `.greatminds/`: queues, inboxes, locks,
+events, the journal, heartbeats, and stand state. Product source and normal
+project files stay in the root.
 
 ### Queues
 
@@ -145,13 +145,13 @@ review_sessions/<id>.md  (lives until the session concludes, then archive/)
 
 ### Other runtime artifacts
 
-- `coordination/journal.ndjson` — append-only journal of transitions. One
+- `.greatminds/journal.ndjson` — append-only journal of transitions. One
   NDJSON line per move with fields `t, actor, task, from, to, reason,
   intent_id`. Gitignored. Optional for observability; not load-bearing.
-- `coordination/intent/<task>-<role>-<uuid>.json` — created BEFORE every
+- `.greatminds/intent/<task>-<role>-<uuid>.json` — created BEFORE every
   `mv`, cleared AFTER successful `mv`. Detects crashed transitions. See
   §6.
-- `coordination/inbox/<role>/` — mailbox for cross-role messages without
+- `.greatminds/inbox/{role}/` — mailbox for cross-role messages without
   moving tasks. Each message is a small markdown file with front-matter
   `to_role, from_role, task_ref, question, answered_at`. The recipient
   role reads its inbox at the start of every tick.
@@ -188,7 +188,7 @@ order of events. Both are write-only by the role doing the move; readers
 Before any `mv`, the moving role creates an intent file:
 
 ```text
-coordination/intent/<task>-<role>-<uuid>.json
+.greatminds/intent/{task}-{role}-{uuid}.json
 ```
 
 with contents:
@@ -212,7 +212,7 @@ investigates.
 ### Journal (`journal.ndjson`)
 
 After every successful `mv`, the role appends one NDJSON line to
-`coordination/journal.ndjson`:
+`.greatminds/journal.ndjson`:
 
 ```json
 {"t":"<ISO>","actor":"<role>","task":"<id>","from":"<q1>","to":"<q2>","reason":"<short>","intent_id":"<uuid>"}
@@ -231,7 +231,7 @@ named artifact (a verified task, a tests-block stand evidence record), the curre
 owner must:
 
 1. Append a `blocked` block (see
-   `templates/coordination/feature_blocked/_TEMPLATE.md`):
+   the feature-blocked task template):
    - `dependencies: ["<queue>/<task-id>.md", ...]` — strict format,
    - `resume_to: <queue>` — where the task should go when unblocked.
 2. `mv <current-queue>/X feature_blocked/X`.
@@ -466,7 +466,7 @@ prompted the change (asked, escalated, or PLANNER acted proactively).
 
 ## 10. Inbox mailbox (new)
 
-`coordination/inbox/<role>/` is a per-role mailbox for cross-role messages
+`.greatminds/inbox/{role}/` is a per-role mailbox for cross-role messages
 that do NOT need a task move. Use it for:
 
 - a question from DEVELOPER to ARCHITECT-PLANNER mid-implementation,

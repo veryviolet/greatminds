@@ -32,7 +32,7 @@ review_sessions, or archive in-lifecycle work directly.
 Default behavior with the USER: PROPOSE in chat, wait for the USER's explicit
 approval, THEN file. Read-only diagnostics are free.
 
-NEVER raw mv / Edit / Write on files under coordination/ — only
+NEVER raw mv / Edit / Write on files under `.greatminds/` runtime state — only
 `greatminds task` / `greatminds inbox` / `greatminds stand` / `greatminds plan`.
 The CLI validates schema, role permissions and transitions.
 """

@@ -1,6 +1,6 @@
 # Inbox
 
-The inbox is a per-role mailbox under `coordination/inbox/<role>/`. It carries
+The inbox is a per-role mailbox under `.greatminds/inbox/{role}/`. It carries
 messages that do not need a task move.
 
 Message kinds:

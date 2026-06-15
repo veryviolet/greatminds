@@ -86,7 +86,7 @@ glossary:
 # ---------------------------------------------------------------------------
 # Queues
 #
-# Each queue is a directory under coordination/. Field meanings:
+# Each queue is a directory under .greatminds/. Field meanings:
 #
 #   owner    — role responsible for the queue's content AND the single
 #              role that claims from it (moves files out). Location =
@@ -900,7 +900,7 @@ inbox:
   # Per-role message inbox: coordd and other roles message YOU here
   # (wakes, asks, infos). Read it FIRST every tick. It is NOT a task
   # queue — `greatminds task list inbox` is wrong (no such queue).
-  dir: "coordination/inbox/${GREATMINDS_ROLE}/"
+  dir: ".greatminds/inbox/${GREATMINDS_ROLE}/"
   read: "greatminds inbox list"          # role from $GREATMINDS_ROLE
   show: "greatminds inbox show <path>"
   ack: "greatminds inbox ack <path>"     # after acting on the message
@@ -1004,7 +1004,7 @@ stand:
       operations:
         - stand_probe_*: requires holder of active_lease's lease_id
       enforcement_layer: cli
-    state_file: .stand/state.yaml       # under coordination/
+    state_file: .stand/state.yaml       # under .greatminds/
     # Profile names are project-defined in coordination/stand-profiles.yaml.
     # The lease CLI accepts a profile only when the registry contains that
     # profile and the referenced YAML playbook exists.

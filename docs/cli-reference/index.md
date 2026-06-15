@@ -2,7 +2,7 @@
 
 The generated reference below comes from the installed Click commands. For
 day-to-day coordination, use these groups instead of editing files under
-`coordination/` by hand:
+`.greatminds/` by hand:
 
 | Need | Command surface |
 | --- | --- |

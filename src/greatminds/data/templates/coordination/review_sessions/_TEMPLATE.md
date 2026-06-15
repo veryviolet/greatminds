@@ -4,8 +4,8 @@ A review session is a coordination artifact for scenario B (intensive review
 on a live stand). ARCHITECT-PLANNER creates it; EXPLORER reads it and
 appends iteration notes; ARCHITECT-PLANNER fast-triages filed bugs.
 
-The session file lives in `coordination/review_sessions/<id>.md` until the
-review is concluded, then is moved to `coordination/archive/`.
+The session file lives in `.greatminds/review_sessions/{id}.md` until the
+review is concluded, then is moved to `.greatminds/archive/`.
 
 ---
 id: <seq>-<short-slug>

@@ -39,7 +39,7 @@ greatminds supports two primary agent tools:
   plugins for Claude-hosted roles.
 - `codex`: OpenAI Codex. Used for chat and driven roles. Run `codex login`
   once for the machine account; generated files under
-  `.greatminds/.codex-home/<role>/` are role config sources, not auth homes.
+  `.greatminds/.codex-home/{role}/` are role config sources, not auth homes.
 
 Window modes in `coordination/coord.yaml`:
 
@@ -107,7 +107,7 @@ A stand is a singleton live environment. Agents lease it with
 `greatminds stand lease`; `coordd` deploys the leased worktree by running an
 Ansible playbook selected through `coordination/stand-profiles.yaml`. There is
 no global current profile. The current profile is chosen for each lease with
-`greatminds stand lease --profile <name>`, stored in
+`greatminds stand lease --profile {profile}`, stored in
 `.greatminds/.stand/state.yaml` as `active_lease.profile`, and resolved through
 the registry to a YAML file under `coordination/stand-profiles/`.
 
@@ -142,7 +142,7 @@ approval:
 
 ```bash
 greatminds stand lease \
-  --task <task-id> \
+  --task TASK_ID \
   --profile production \
   --profile-approval USER_APPROVED
 ```

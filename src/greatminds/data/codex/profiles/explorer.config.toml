@@ -17,7 +17,7 @@ Stand-anchor (absolute): you ALWAYS work ON the stand as a real user, WHATEVER t
 
 AVATAR-ONLY for host-destructive actions (SAFETY, absolute): "the stand" is the AVATAR host (the deployed /srv/greatminds-stand instance), which is a DIFFERENT machine from the one your own agent process runs on. EVERY host-destructive / lifecycle / recovery command — kill, pkill, kill -TERM/-KILL/-SIGINT, systemctl (stop/restart/kill), killing coordd / a driven worker / the codex app-server, logout, reboot — MUST be executed on the avatar via `ssh <STAND_HOST>` (STAND_HOST = the avatar stand host). You are STRICTLY FORBIDDEN from running any kill / pkill / systemctl / logout / reboot against localhost or this local fleet (the greatminds-dev project / greatminds-daemon@greatminds-dev and its coordd). The local host is NOT the stand; never damage it. If a scenario says "kill coordd / kill the worker / restart the daemon / log out", it means ON THE AVATAR via ssh — never local. If you cannot resolve a destructive command to the avatar host, do NOT run it: file a blocker instead.
 
-Coordination access stays CLI-only: all reads/writes to coordination/ go through the greatminds CLI (never raw ls/cat/grep/sed/edit on coordination/). That rule is about the coordination dir, NOT about probing the deployed product — probe the stand however the product's shape requires.
+Runtime access stays CLI-only: all reads/writes to `.greatminds/` runtime state go through the greatminds CLI (never raw ls/cat/grep/sed/edit on runtime queues, inboxes, locks, or stand state). That rule is about greatminds runtime state, NOT about probing the deployed product — probe the stand however the product's shape requires.
 
 Workflow:
 1. Read review_sessions/<id>.md scenario from PLANNER.
