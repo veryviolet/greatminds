@@ -712,6 +712,41 @@ def _driven_event_task_refs(coord: Path, role_lower: str) -> str:
         return ""
 
 
+def _feature_blocked_is_actionable(coord: Path, path: Path) -> bool:
+    """Whether a parked task should wake/drive ARCHITECT-REVIEWER.
+
+    ``feature_blocked`` is a parking queue, not ordinary ready work. A task is
+    actionable when it is an explicit withdrawal (reviewer can archive) or when
+    the latest blocked block's dependency paths already exist. Missing
+    dependencies mean the task should remain quiet until another real event
+    changes the world; otherwise coordd repeatedly drives REVIEWER on work that
+    cannot move.
+    """
+    try:
+        from greatminds.cli.task import load_task
+        data = load_task(path)
+    except Exception:
+        return True
+    blocks = [b for b in (data.get("blocks") or [])
+              if isinstance(b, dict) and b.get("kind") == "blocked"]
+    if not blocks:
+        # Malformed legacy parked tasks should still surface to REVIEWER; the
+        # missing-dependency quieting below applies only when a blocked block
+        # explicitly declares dependencies that are not present yet.
+        return True
+    latest = blocks[-1]
+    reason = str(latest.get("reason") or "").lower()
+    if "withdrawn" in reason:
+        return True
+    deps = latest.get("dependencies") or []
+    if not isinstance(deps, list):
+        return False
+    for dep in deps:
+        if isinstance(dep, str) and dep and not (coord / dep).exists():
+            return False
+    return True
+
+
 def _driven_pending_path(coord: Path, role_lower: str) -> Path:
     """Per-role pending marker. Set when an event arrives mid-turn;
     the post-turn cleanup re-spawns once if present."""
@@ -2540,6 +2575,11 @@ def _role_pending_signature(coord: Path, role_meta: dict,
                 continue
             if n.startswith("processed-"):
                 continue
+            if d.name == "inbox" or d.parent.name == "inbox":
+                if n.startswith("wake-"):
+                    continue
+            if d.name == "feature_blocked" and not _feature_blocked_is_actionable(coord, f):
+                continue
             names.add(f"{d.name}/{n}")
 
     _collect(coord / "inbox" / role_lower)
@@ -2822,6 +2862,17 @@ def _route_queue_event(coord: Path, canon_dir: Path,
     # engine directly — no LLM role to wake.
     if queue == ".stand":
         return _maybe_auto_deploy_stand(coord, verbose)
+    if queue == "feature_blocked":
+        blocked_path = coord / queue / filename
+        if blocked_path.exists() and not _feature_blocked_is_actionable(
+                coord, blocked_path):
+            if verbose:
+                print(
+                    f"  0204: skip REVIEWER wake for parked blocked task "
+                    f"{filename}: dependencies not satisfied",
+                    file=sys.stderr,
+                )
+            return False
 
     owner = _owning_role_for_queue(canon_dir, queue)
     if owner is None:

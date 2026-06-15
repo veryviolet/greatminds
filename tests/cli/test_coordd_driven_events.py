@@ -70,3 +70,64 @@ def test_driven_event_task_refs_ignore_wake_markers(tmp_path: Path,
     refs = cd._driven_event_task_refs(coord, "developer")
 
     assert refs == "0042-real"
+
+
+def test_role_pending_signature_ignores_wake_inbox_markers(tmp_path: Path) -> None:
+    coord = tmp_path / "coordination"
+    (coord / "inbox" / "developer").mkdir(parents=True)
+    (coord / "inbox" / "developer" / "wake-20260615T000000Z-task.yaml").write_text(
+        "kind: wake\n", encoding="utf-8")
+
+    sig = cd._role_pending_signature(
+        coord, {"claims_from": ["feature_dev"]}, "developer")
+
+    assert sig == frozenset()
+
+
+def test_feature_blocked_missing_dependencies_are_not_actionable(
+    tmp_path: Path,
+) -> None:
+    coord = tmp_path / "coordination"
+    (coord / "feature_blocked").mkdir(parents=True)
+    task = coord / "feature_blocked" / "9003-blocked.yaml"
+    task.write_text(
+        "id: 9003-blocked\n"
+        "title: blocked\n"
+        "blocks:\n"
+        "- kind: blocked\n"
+        "  reason: waiting on infra\n"
+        "  dependencies:\n"
+        "  - verified/9004-stand-ssh-access.yaml\n",
+        encoding="utf-8",
+    )
+
+    sig = cd._role_pending_signature(
+        coord, {"claims_from": ["feature_blocked"]}, "architect-reviewer")
+
+    assert sig == frozenset()
+
+
+def test_feature_blocked_with_satisfied_dependencies_is_actionable(
+    tmp_path: Path,
+) -> None:
+    coord = tmp_path / "coordination"
+    (coord / "feature_blocked").mkdir(parents=True)
+    (coord / "verified").mkdir()
+    (coord / "verified" / "9004-stand-ssh-access.yaml").write_text(
+        "id: 9004\n", encoding="utf-8")
+    task = coord / "feature_blocked" / "9003-blocked.yaml"
+    task.write_text(
+        "id: 9003-blocked\n"
+        "title: blocked\n"
+        "blocks:\n"
+        "- kind: blocked\n"
+        "  reason: waiting on infra\n"
+        "  dependencies:\n"
+        "  - verified/9004-stand-ssh-access.yaml\n",
+        encoding="utf-8",
+    )
+
+    sig = cd._role_pending_signature(
+        coord, {"claims_from": ["feature_blocked"]}, "architect-reviewer")
+
+    assert sig == frozenset({"feature_blocked/9003-blocked.yaml"})

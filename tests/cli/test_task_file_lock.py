@@ -79,15 +79,15 @@ def test_task_file_lock_writes_holder_pid_to_file(tmp_path: Path) -> None:
         )
 
 
-def test_task_file_lock_clears_pid_on_release(tmp_path: Path) -> None:
+def test_task_file_lock_removes_file_on_release(tmp_path: Path) -> None:
     coord = tmp_path
     task_id = "0001-test"
     lock_path = coord / ".locks" / f"{task_id}.lock"
     with task_file_lock(coord, task_id):
-        pass
-    # After release, file exists but content is empty.
-    assert lock_path.is_file()
-    assert lock_path.read_text(encoding="utf-8").strip() == ""
+        assert lock_path.is_file()
+    # After release, no empty lock marker is left behind. A future acquire
+    # recreates it on demand.
+    assert not lock_path.exists()
 
 
 def test_task_file_lock_times_out_when_other_process_holds(

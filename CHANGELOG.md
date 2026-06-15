@@ -4,7 +4,7 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
-## Unreleased
+## 2.1.0 — 2026-06-15
 
 ### Added
 
@@ -13,6 +13,19 @@ follow [SemVer](https://semver.org/) once 1.0.0 ships.
   running `greatminds driven-log --follow`; `coordd` records accepted turns,
   pending markers, completions, retries, and errors to
   `coordination/.events/driven.ndjson`.
+
+### Fixed
+
+- Driven backlog detection now ignores `wake-*` inbox markers. These daemon
+  wake notices are not role work and no longer cause duplicate pending turns
+  after a task has already moved to the next FSM queue.
+- `feature_blocked` is treated as a parking queue for driven dispatch:
+  reviewer turns are driven only for withdrawn tasks or blocked tasks whose
+  declared dependencies already exist. Missing-dependency blocked tasks stay
+  quiet instead of repeatedly spending reviewer turns.
+- Per-task lock files are removed after release instead of being left as empty
+  `.locks/<task>.lock` files. A future task operation still recreates the lock
+  on demand.
 
 ## 2.0.14 — 2026-06-15
 

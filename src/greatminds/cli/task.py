@@ -561,6 +561,15 @@ def task_file_lock(coord: Path, task_id: str,
             except OSError:
                 pass
         os.close(fd)
+        if acquired:
+            try:
+                lock_path.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError:
+                # Best effort cleanup only. A future waiter still works:
+                # task_file_lock recreates/truncates the file on acquire.
+                pass
 
 
 # ---------------------------------------------------------------------------
