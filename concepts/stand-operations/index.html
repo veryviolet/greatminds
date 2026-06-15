@@ -1544,9 +1544,8 @@
 
 
 <h1 id="stand-operations">Stand Operations<a class="headerlink" href="#stand-operations" title="Permanent link">&para;</a></h1>
-<p>The stand is a singleton live environment shared by the agent fleet. Since
-1.3.0, agents coordinate access through a lease-backed state file instead of
-the old <code>stand_requests/</code>, <code>stand_wip/</code>, and <code>stand_done/</code> queues.</p>
+<p>The stand is a singleton live environment shared by the agent fleet. Agents
+coordinate access through a lease-backed state file.</p>
 <h2 id="state-file">State File<a class="headerlink" href="#state-file" title="Permanent link">&para;</a></h2>
 <p>The source of truth is:</p>
 <div class="highlight"><pre><span></span><code>coordination/.stand/state.yaml
@@ -1639,10 +1638,9 @@ and equivalent bring-up checks. It does not run product acceptance tests.</p>
 including <code>stand_evidence.lease_id</code>, result, commit, worktree fingerprint, and
 its own <code>functional_probes</code> plus <code>stand_evidence.tester_observations</code>.
 <code>greatminds gate-check &lt;task-id&gt;</code> reads that tests-block evidence first.</p>
-<p>The old queue artifacts are removed from the active workflow. Do not create
-new <code>stand_requests/</code>, <code>stand_wip/</code>, or <code>stand_done/</code> tasks for current stand
-operations, and do not use the removed <code>stand request</code> or <code>stand result</code>
-commands in new instructions.</p>
+<p>Use the lease commands for all stand operations. Stand readiness belongs in
+<code>coordination/.stand/state.yaml</code>, and product validation evidence belongs in
+the task's <code>tests</code> block.</p>
 
 
 

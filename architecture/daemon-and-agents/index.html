@@ -1690,9 +1690,8 @@ and markdown shape.</p>
 <li><code>SENT</code>: an agent sent an inbox message to another role.</li>
 </ul>
 <p>Because these are emitted by the acting agent, they appear only when the agent
-successfully completes the CLI action and replies. A daemon-pushed dashboard or
-status overlay is not part of this behavior; that belongs to the future 1.3.0
-dashboard work.</p>
+successfully completes the CLI action and replies. Daemon status belongs in
+<code>greatminds dashboard</code> and the driven event log, not in chat-pane overlays.</p>
 <h2 id="pty-launch">pty launch<a class="headerlink" href="#pty-launch" title="Permanent link">&para;</a></h2>
 <p>The launcher wraps agent tools in a pty and records an input socket in the
 agent registry. The socket lets <code>coordd</code> send actual input to the agent process

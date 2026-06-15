@@ -1531,13 +1531,9 @@ fleet path is:</p>
 environment. If the fleet is launched from tmux, restart the agent processes
 after the package upgrade so their registries, pty sockets, and role prompts
 match the installed version.</p>
-<p><code>greatminds update</code> also handles the daemon systemd migration. Fleets created
-before the per-project <code>greatminds-daemon@&lt;project&gt;.service</code> template may still
-have only the legacy singleton <code>coordd.service</code>, or may be missing the template
-unit after package upgrade. During update, greatminds removes the legacy unit
-when present and runs the equivalent of <code>greatminds daemon install</code> when the
-template unit is missing. Operators upgrading those older fleets do not need a
-separate manual daemon-install step.</p>
+<p><code>greatminds update</code> also refreshes daemon systemd units and runs the equivalent
+of <code>greatminds daemon install</code> when the template unit is missing. Operators do
+not need a separate manual daemon-install step during a normal update.</p>
 <h2 id="update-notifications">Update notifications<a class="headerlink" href="#update-notifications" title="Permanent link">&para;</a></h2>
 <p>When <code>coordd</code> is running, it periodically checks PyPI for a newer greatminds
 release. The interval and target live in <code>coordination/schema.yaml</code> under <code>auto_update</code>;

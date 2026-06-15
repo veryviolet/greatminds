@@ -1510,14 +1510,13 @@ the worktree.</p>
 <h2 id="runtime-artifacts">Runtime artifacts<a class="headerlink" href="#runtime-artifacts" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>journal.ndjson</code>: append-only transition log.</li>
-<li><code>intent/</code>: short-lived files written before moves and removed after moves.</li>
+<li><code>intent/</code>: short-lived files written before moves and cleared after moves.</li>
 <li><code>inbox/</code>: role mailboxes.</li>
 <li><code>heartbeat.*</code>: role liveness files.</li>
 <li><code>.stand/state.yaml</code>: singleton stand state, active lease, FIFO queue, and
   recent transition history.</li>
-<li><code>.worktrees/&lt;task-id&gt;/</code>: in-flight code for a task. This replaces the older
-  file-lock and lock-release model; operators should inspect worktrees instead
-  of lock files.</li>
+<li><code>.worktrees/&lt;task-id&gt;/</code>: in-flight code for a task. Operators inspect
+  worktrees directly.</li>
 </ul>
 
 

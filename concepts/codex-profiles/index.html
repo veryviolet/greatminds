@@ -1411,9 +1411,9 @@
 
 
 <h1 id="codex-profiles">Codex Profiles<a class="headerlink" href="#codex-profiles" title="Permanent link">&para;</a></h1>
-<p>Codex roles use generated per-role homes instead of Claude plugin
-directories. During <code>greatminds setup</code>, greatminds creates one Codex home for
-each shipped Codex profile:</p>
+<p>Codex roles use generated per-role profile sources instead of Claude plugin
+directories. During <code>greatminds setup</code>, greatminds creates one profile source
+directory for each shipped Codex role:</p>
 <div class="highlight"><pre><span></span><code>coordination/
   .codex-home/
     developer/
@@ -1424,21 +1424,33 @@ each shipped Codex profile:</p>
       config.toml
 </code></pre></div>
 <p>Each <code>config.toml</code> is copied from
-<code>src/greatminds/data/codex/profiles/&lt;role&gt;.config.toml</code>. The generated file
-contains <code>developer_instructions = """..."""</code> for the role posture and a
-<code>[profiles.&lt;role&gt;]</code> section with the Codex model, approval policy, and sandbox
-settings.</p>
-<p>When a Codex-backed role starts, <code>start_agent.py</code> points Codex at that role's
-home:</p>
-<div class="highlight"><pre><span></span><code><span class="nv">CODEX_HOME</span><span class="o">=</span>&lt;project&gt;/coordination/.codex-home/&lt;role&gt;<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>codex<span class="w"> </span>--profile<span class="w"> </span>&lt;role-lower&gt;
-</code></pre></div>
-<p>Codex then reads <code>$CODEX_HOME/config.toml</code> and selects the matching
-<code>[profiles.&lt;role&gt;]</code> section. The older pattern of storing per-role profile
-files under a user's home directory is not part of the greatminds launch path.</p>
+<code>src/greatminds/data/codex/profiles/&lt;role&gt;.config.toml</code> and then split for
+Codex profile-v2 loading:</p>
+<ul>
+<li><code>coordination/.codex-home/&lt;role&gt;/config.toml</code> contains the role posture,
+  trusted-project entry, and skill registrations.</li>
+<li><code>coordination/.codex-home/&lt;role&gt;/&lt;role&gt;.config.toml</code> contains the role model
+  and execution settings.</li>
+</ul>
+<p>These directories are profile sources only. They are not authentication homes
+and must not contain <code>auth.json</code>.</p>
+<p>Codex-backed roles authenticate through the single machine Codex home. By
+default that is <code>~/.codex</code>; operators may override it with
+<code>GREATMINDS_CODEX_HOME</code>. Greatminds sets <code>CODEX_HOME</code> to that machine home so
+Codex reads the one valid login and refreshes tokens in one place.</p>
+<p>Role-specific behavior is preserved without using a per-role auth home:</p>
+<ul>
+<li>The role bootstrap/contract is passed as the prompt or app-server
+  <code>baseInstructions</code>.</li>
+<li>The role model is read from the generated profile source and injected with a
+  <code>-c model="..."</code> override.</li>
+<li>Driven Codex turns also inject unattended execution settings with <code>-c</code>
+  overrides.</li>
+</ul>
 <p>To inspect or customize a project's Codex posture, edit the generated
-<code>coordination/.codex-home/&lt;role&gt;/config.toml</code> files after setup. To change the
-defaults for future projects, update the canon templates under
+<code>coordination/.codex-home/&lt;role&gt;/</code> files after setup. Do not copy or symlink
+machine auth into those directories. To change the defaults for future
+projects, update the canon templates under
 <code>src/greatminds/data/codex/profiles/</code> before running <code>greatminds setup</code> in
 those projects.</p>
 
