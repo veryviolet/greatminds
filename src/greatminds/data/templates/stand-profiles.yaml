@@ -1,0 +1,28 @@
+profiles:
+  smoke-only:
+    file: smoke-only.yaml
+    purpose: Fast reachability and readiness check.
+    environment: stand
+    used_for: [deploy_only, warmup, quick_readiness]
+    default_for: [verify_only]
+
+  full-deploy:
+    file: full-deploy.yaml
+    purpose: Full deployed product validation on a stand.
+    environment: stand
+    used_for:
+      - tester_validation
+      - explorer_review
+      - reviewer_validation
+      - full_product_validation
+    default_for:
+      - feature_test
+      - explorer
+      - reviewer
+
+  vite-dev:
+    file: vite-dev.yaml
+    purpose: UI live iteration with Vite HMR.
+    environment: stand
+    used_for: [live_ui, ui_iteration]
+    default_for: [live_developer, ui_iteration]

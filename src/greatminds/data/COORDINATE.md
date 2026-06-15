@@ -284,26 +284,35 @@ wrong-commit evidence, mismatched worktree fingerprints, or
 
 ### 8.1 Stand profiles (`coordination/stand-profiles/`)
 
-When a lease enters preparing, coordd loads a profile file matching
-`lease.profile` (the enum declared in `schema.stand.resource.profiles_allowed`)
-from the canonical directory `coordination/stand-profiles/` and executes
-it as part of the deploy.
+When a lease enters preparing, coordd reads `lease.profile`, resolves that
+profile through `coordination/stand-profiles.yaml`, loads the referenced
+Ansible YAML file from `coordination/stand-profiles/`, and executes it as part
+of the deploy.
 
 Ownership and usage:
 
-- Stand profiles live at `coordination/stand-profiles/<name>.yaml`.
+- The project profile registry lives at `coordination/stand-profiles.yaml`.
+- Stand playbooks live at `coordination/stand-profiles/<file>.yaml`.
 - USER and DEVELOPER write or update profiles when adding new deploy
   scenarios.
 - coordd uses a profile only when the active lease carries
-  `profile=<name>`, loading it with `load_profile(coord, lease.profile)`.
-- Only YAML/ansible profiles are executable. Older MD/prose profiles are
-  invalid for current deploys.
+  `profile=<name>`, loading the registry entry for `<name>` and then the
+  referenced YAML playbook.
+- Only YAML/ansible profiles are executable.
 
 Convention:
 
-- File name: `<profile-name>.yaml`,
-  where `<profile-name>` is the `lease.profile` enum value
-  (e.g. `full-deploy.yaml`, `vite-dev.yaml`, `smoke-only.yaml`).
+- Registry key: profile name used by `greatminds stand lease --profile <name>`.
+- Registry `file`: YAML file under `coordination/stand-profiles/`.
+- Registry `used_for`: machine-readable capability tokens from
+  `schema.stand_profile_registry.used_for_values`.
+- Registry `default_for`: role-intent tokens from
+  `schema.stand_profile_registry.default_for_values`; each token belongs to at
+  most one profile.
+- Production registry entries set `environment: production`,
+  `requires_explicit_user_approval: true`, and an `allowed_roles` list. Lease
+  commands for those profiles include `--profile-approval USER_APPROVED` after
+  USER approval.
 - YAML files use a subset of ansible-playbook syntax (machine-runnable
   by coordd's deploy path) — required fields `name`, `hosts`, `tasks`; optional `vars`,
   `handlers`, `gather_facts`.
@@ -566,9 +575,6 @@ There is no file-lock model: operators look in `.worktrees/` for in-flight
 code instead of looking for lock files. The deploy playbook rsyncs the worktree
 (not the main project tree) when the active stand lease names the task and
 worktree. Policy lives in `coordination/schema.yaml > worktrees:`.
-Before cutting the 1.2.x → 1.3 release, MAINTAINER runs
-`greatminds worktree assert-drained` to confirm no in-flight tasks
-straddle the lock-era → worktree-era boundary.
 
 ## 13. Git rules
 

@@ -219,12 +219,23 @@ def _load_yaml_profile(name: str, path: Path) -> ProfileSpec:
 # ---------------------------------------------------------------------------
 
 
-def profile_paths(coord_dir: Path, profile_name: str) -> tuple[Path, Path]:
+def profile_paths(coord_dir: Path, profile_name: str, *,
+                  file_name: str | None = None) -> tuple[Path, Path]:
     """Return ``(yaml_path, md_path)`` — the two candidate locations.
 
     Helper for callers (tests, error messages) that want to surface
     the looked-at paths without re-computing them.
     """
+    if file_name:
+        p = Path(file_name)
+        if p.name != file_name or p.suffix != ".yaml":
+            raise GreatMindsError(
+                f"stand-profile {profile_name!r}: registry file must be "
+                "a local .yaml file name",
+                exit_code=2,
+            )
+        yaml_path = coord_dir / STAND_PROFILES_DIRNAME / p.name
+        return yaml_path, yaml_path.with_suffix(".md")
     base = coord_dir / STAND_PROFILES_DIRNAME / profile_name
     return base.with_suffix(".yaml"), base.with_suffix(".md")
 
@@ -260,7 +271,8 @@ def _is_pristine_stale_shipped_profile(path: Path,
 
 
 def load_profile(coord_dir: Path, profile_name: str, *,
-                 worktree: "str | Path | None" = None) -> ProfileSpec:
+                 worktree: "str | Path | None" = None,
+                 file_name: str | None = None) -> ProfileSpec:
     """Load ``<coord_dir>/stand-profiles/<profile_name>.{yaml,md}``.
 
     YAML wins when both formats are present. Raises
@@ -296,7 +308,8 @@ def load_profile(coord_dir: Path, profile_name: str, *,
 
     looked: list[Path] = []
     for cdir, label in search:
-        yaml_path, md_path = profile_paths(cdir, profile_name)
+        yaml_path, md_path = profile_paths(cdir, profile_name,
+                                           file_name=file_name)
         looked.append(yaml_path)
         if yaml_path.is_file():
             if label == "lease-worktree":

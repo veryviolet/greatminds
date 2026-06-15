@@ -227,6 +227,19 @@ def test_cli_lease_without_worktree_auto_creates(tmp_path: Path) -> None:
     (sp / "smoke-only.yaml").write_text(
         yaml.safe_dump([{"name": "p", "hosts": "localhost", "tasks": []}]),
         encoding="utf-8")
+    (project / "coordination" / "stand-profiles.yaml").write_text(
+        yaml.safe_dump({
+            "profiles": {
+                "smoke-only": {
+                    "file": "smoke-only.yaml",
+                    "purpose": "review-session smoke validation",
+                    "used_for": ["explorer_review", "quick_readiness"],
+                    "default_for": ["explorer"],
+                }
+            }
+        }),
+        encoding="utf-8",
+    )
 
     cp = _run_lease(project, "--task", REVIEW_TASK, "--profile", "smoke-only")
     assert cp.returncode == 0, (

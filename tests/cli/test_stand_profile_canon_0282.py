@@ -13,5 +13,6 @@ from greatminds.core.paths import find_canon_dir
 def test_coordinate_md_has_stand_profiles_section() -> None:
     text = (find_canon_dir() / "COORDINATE.md").read_text(encoding="utf-8")
     assert "### 8.1 Stand profiles (`coordination/stand-profiles/`)" in text
-    assert "coordination/stand-profiles/<name>.yaml" in text
+    assert "coordination/stand-profiles/<file>.yaml" in text
+    assert "coordination/stand-profiles.yaml" in text
     assert "Only YAML/ansible profiles are executable" in text

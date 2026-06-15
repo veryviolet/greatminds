@@ -113,3 +113,34 @@ def test_public_docs_and_canon_are_english_only():
     assert not offenders, (
         "public docs/canon must be English-only:\n" + "\n".join(offenders)
     )
+
+
+def test_quickstarts_cover_agent_tools_and_stand_registry_contract():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    first_project = (
+        ROOT / "docs" / "getting-started" / "first-project.md"
+    ).read_text(encoding="utf-8")
+    stand_ops = (
+        ROOT / "docs" / "concepts" / "stand-operations.md"
+    ).read_text(encoding="utf-8")
+    combined = "\n".join([readme, first_project, stand_ops])
+
+    for required in (
+        "Claude Code",
+        "OpenAI Codex",
+        "Default tool",
+        "coord.yaml",
+        "coordination/PROJECT.env",
+        "coordination/stand-profiles.yaml",
+        "coordination/stand-profiles/",
+        "Ansible",
+        "used_for",
+        "default_for",
+        "stand_profile_registry",
+        "greatminds stand profiles list",
+        "greatminds stand profiles doctor",
+        "--profile-approval USER_APPROVED",
+        "requires_explicit_user_approval",
+        "allowed_roles",
+    ):
+        assert required in combined

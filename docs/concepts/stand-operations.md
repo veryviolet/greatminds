@@ -38,16 +38,50 @@ keys. Multi-node stands can use a comma list such as
 
 ## Ansible Profiles
 
-Stand profiles live under:
+The project profile registry lives at:
+
+```text
+coordination/stand-profiles.yaml
+```
+
+Stand playbooks live under:
 
 ```text
 coordination/stand-profiles/
 ```
 
-The lease `--profile` value selects a YAML file with the same name, for
-example `--profile smoke-only` runs
-`coordination/stand-profiles/smoke-only.yaml`. The allowed profile names are
-defined in `coordination/schema.yaml` under `stand.resource.profiles_allowed`.
+The lease `--profile` value selects a registry key, not a raw filename. The
+registry maps that key to a YAML playbook file:
+
+```yaml
+profiles:
+  smoke-only:
+    file: smoke-only.yaml
+    purpose: Fast reachability and readiness check.
+    environment: stand
+    used_for: [deploy_only, warmup, quick_readiness]
+    default_for: [verify_only]
+```
+
+For example, `--profile smoke-only` records `active_lease.profile:
+smoke-only` and runs the registry entry's `file`, usually
+`coordination/stand-profiles/smoke-only.yaml`. The same profile name can point
+at a differently named file, such as `file: smoke.yaml`, when a project wants
+that convention.
+
+`used_for` is the capability list for the profile. `default_for` assigns common
+role intents such as `feature_test`, `explorer`, `reviewer`,
+`live_developer`, `production_deploy`, and `production_review` to a profile.
+The vocabulary is defined in `coordination/schema.yaml` under
+`stand_profile_registry`. Each `default_for` token can belong to only one
+profile, so automated role selection is unambiguous.
+
+Use the registry commands after edits:
+
+```bash
+greatminds stand profiles list
+greatminds stand profiles doctor
+```
 
 `coordd` runs the profile with Ansible and injects:
 
@@ -84,7 +118,30 @@ A minimal smoke profile:
 For a deploy profile, add tasks that copy or build from `{{ worktree }}` and
 then run readiness probes. The shipped `full-deploy.yaml`, `vite-dev.yaml`, and
 `smoke-only.yaml` files are reference profiles, not hidden deployment logic.
-Edit or replace them in each project.
+Register additional project profiles in `coordination/stand-profiles.yaml`.
+
+For a production deployment or post-deploy review, create a profile with:
+
+```yaml
+profiles:
+  production:
+    file: production.yaml
+    purpose: Production deployment and post-deploy verification.
+    environment: production
+    requires_explicit_user_approval: true
+    allowed_roles: [ARCHITECT-REVIEWER, MAINTAINER]
+    used_for: [production_deploy, production_post_deploy_review]
+    default_for: [production_deploy, production_review]
+```
+
+The CLI enforces `allowed_roles` and requires an explicit approval marker:
+
+```bash
+greatminds stand lease \
+  --task <task-id> \
+  --profile production \
+  --profile-approval USER_APPROVED
+```
 
 ## State File
 
@@ -107,9 +164,9 @@ The stand has four states:
 | `ready` | The stand is ready for the lease holder to run probes. |
 | `down` | Stand operation is paused because deploy or infrastructure recovery is needed. |
 
-Each active lease carries a `lease_id`, task id, worktree path, profile,
-holder role, grant timestamp, optional ready timestamp, and TTL. Pending
-leases wait in FIFO order in the same state file.
+Each active lease carries a `lease_id`, task id, worktree path, profile name,
+profile file, holder role, grant timestamp, optional ready timestamp, and TTL.
+Pending leases wait in FIFO order in the same state file.
 
 ## Lease Flow
 
@@ -134,7 +191,8 @@ If the stand is `free`, the lease becomes active and the state moves to
 queue. The command prints the `lease_id`; the requester must keep that token.
 
 `coordd` watches `coordination/.stand/state.yaml` and runs the active lease
-profile. Operators can inspect progress with:
+profile file selected by `active_lease.profile`. Operators can inspect progress
+with:
 
 ```bash
 greatminds stand status

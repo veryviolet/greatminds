@@ -21,6 +21,15 @@ The documented quickstart path uses two agent tools:
 | `claude` | Claude Code chat, loop, and driven roles. | Install Claude Code, authenticate it for the OS user that runs the fleet, and keep the `claude` binary reachable from daemon shells. |
 | `codex` | OpenAI Codex chat and driven roles. | Run `codex login` once for the machine account; optionally set `GREATMINDS_CODEX_HOME` when the login is not under `~/.codex`. |
 
+Window modes in `coord.yaml`:
+
+| Mode | Meaning |
+| --- | --- |
+| `chat` | A live tmux pane for an operator-facing conversation. |
+| `loop` | A resident watchdog pane that wakes on its own timer. |
+| `staged` | A tmux pane with the start command pre-typed; the operator starts it manually when needed. |
+| `driven` | No live pane; `coordd` starts one Claude or Codex turn when work lands in the role's queue, inbox, or stand event stream. |
+
 Role-to-tool assignment lives in `coord.yaml`. The default template mixes
 Claude and Codex roles, but it is ordinary project config. Change `tool:` per
 role, then restart the daemon and launch session:
@@ -176,6 +185,52 @@ Setup copies reference profiles:
 - `smoke-only`: reachability probe, useful first.
 - `full-deploy`: rsync and install pattern for backend-style deployment.
 - `vite-dev`: backend plus a Vite dev server for live UI iteration.
+
+Setup also writes `coordination/stand-profiles.yaml`, the project-owned
+registry of allowed profile names. A lease selects a registry key:
+
+```bash
+greatminds stand lease --task <task-id> --profile full-deploy
+```
+
+The selected key is stored in `.stand/state.yaml` as `active_lease.profile`.
+The registry entry chooses the YAML file to run:
+
+```yaml
+profiles:
+  full-deploy:
+    file: full-deploy.yaml
+    purpose: Full deployed product validation on a stand.
+    environment: stand
+    used_for: [tester_validation, explorer_review, reviewer_validation]
+    default_for: [feature_test, explorer, reviewer]
+```
+
+`used_for` describes what the profile can safely serve. `default_for` maps
+common role intents to one registry key; each `default_for` token must be
+claimed by at most one profile. The allowed tokens are defined in
+`coordination/schema.yaml` under `stand_profile_registry`.
+
+Inspect and validate the registry after edits:
+
+```bash
+greatminds stand profiles list
+greatminds stand profiles doctor
+```
+
+To add a profile, add a registry entry and a matching YAML file under
+`coordination/stand-profiles/`. For production, add an explicit production
+entry with `environment: production`, `requires_explicit_user_approval: true`,
+and an `allowed_roles` list such as `[ARCHITECT-REVIEWER, MAINTAINER]`.
+Production leases must include an approval marker after the user has approved
+that lease:
+
+```bash
+greatminds stand lease \
+  --task <task-id> \
+  --profile production \
+  --profile-approval USER_APPROVED
+```
 
 The smallest useful `coordination/stand-profiles/smoke-only.yaml` is:
 

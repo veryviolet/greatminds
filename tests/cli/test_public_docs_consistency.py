@@ -71,3 +71,15 @@ def test_package_summary_matches_current_codex_auth_contract() -> None:
     assert data["project"]["urls"]["Documentation"] == (
         "https://veryviolet.github.io/greatminds/"
     )
+
+
+def test_stand_help_exposes_profile_registry_controls() -> None:
+    stand_help = _help("stand")
+    lease_help = _help("stand", "lease")
+    profiles_help = _help("stand", "profiles")
+    assert "profiles" in stand_help
+    assert "registered deploy profile name" in lease_help
+    assert re.search(r"stand-\s*profiles\.yaml", lease_help)
+    assert "--profile-approval" in lease_help
+    assert "list" in profiles_help
+    assert "doctor" in profiles_help

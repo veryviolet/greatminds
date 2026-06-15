@@ -26,19 +26,41 @@ from greatminds.cli import stand_state as ss
 
 @pytest.fixture(autouse=True)
 def _resolvable_presets(monkeypatch):
-    """Lease validates --profile by resolving a file in stand-profiles/;
-    these tests don't seed files, so stub the resolver (presets resolve,
-    anything else raises like a missing profile file)."""
+    """These tests isolate lease state behavior from profile file IO."""
     from greatminds.core.errors import GreatMindsError
+    from greatminds.cli.stand_profile_registry import (
+        ProfileEntry, ProfileRegistry,
+    )
 
     class _Spec:
         format = "yaml"
+
+    def _fake_registry(coord, **_kw):
+        entries = {
+            name: ProfileEntry(
+                name=name,
+                file=f"{name}.yaml",
+                purpose=f"{name} test profile",
+                used_for=("tester_validation",),
+                default_for=(),
+            )
+            for name in {"full-deploy", "vite-dev", "smoke-only"}
+        }
+        return ProfileRegistry(
+            path=Path(coord) / "stand-profiles.yaml",
+            source="test",
+            profiles=entries,
+        )
 
     def _fake(_coord, name, **_kw):
         if name in {"full-deploy", "vite-dev", "smoke-only"}:
             return _Spec()
         raise GreatMindsError(f"profile {name!r} has no file")
 
+    monkeypatch.setattr(
+        "greatminds.cli.stand_profile_registry.load_registry",
+        _fake_registry,
+    )
     monkeypatch.setattr("greatminds.cli.stand_profile.load_profile", _fake)
 
 

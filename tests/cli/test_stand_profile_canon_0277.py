@@ -62,7 +62,7 @@ def test_stand_profile_yaml_dialect_and_required_fields() -> None:
 
 def test_stand_profile_lookup_pattern_references_profile_enum() -> None:
     """The lookup pattern documents ``<lease.profile>`` so future
-    readers tie profile-file resolution to the existing lease enum
+    readers tie profile-file resolution to the active lease registry entry
     rather than a separate identifier scheme."""
     sp = _load_schema()["stand_profile"]
     pattern = sp.get("lookup") or ""
@@ -70,8 +70,8 @@ def test_stand_profile_lookup_pattern_references_profile_enum() -> None:
         f"0277: schema.stand_profile.lookup must reference "
         f"<lease.profile> (got {pattern!r})"
     )
-    assert "<directory>" in pattern
-    assert pattern.endswith(".yaml")  # 1.6.0: yaml-only, no <format>
+    assert "coordination/stand-profiles.yaml" in pattern
+    assert ".file" in pattern
 
 
 def test_stand_profile_declares_prereq_only_flag_name() -> None:
@@ -101,12 +101,14 @@ def test_coordinate_md_documents_stand_profiles_directory() -> None:
 
 
 def test_coordinate_md_documents_lookup_convention() -> None:
-    """Docs must spell out the ``<profile-name>.yaml | .md`` naming
-    convention so future tasks (Phase B+) and operators are aligned."""
+    """Docs must spell out registry lookup and YAML playbook files."""
     text = (find_canon_dir() / "COORDINATE.md").read_text(encoding="utf-8")
-    assert ".yaml" in text and ".md" in text and "lease.profile" in text, (
+    assert "coordination/stand-profiles.yaml" in text
+    assert "coordination/stand-profiles/<file>.yaml" in text
+    assert "lease.profile" in text
+    assert "Registry `file`" in text, (
         "0277: COORDINATE.md must document the lookup convention "
-        "(file extensions + lease.profile tie-in)"
+        "(registry + YAML file + lease.profile tie-in)"
     )
 
 

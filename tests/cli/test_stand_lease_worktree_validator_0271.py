@@ -175,6 +175,19 @@ def _project_with_state(tmp_path: Path) -> Path:
         yaml.safe_dump([{"name": "p", "hosts": "localhost", "tasks": []}]),
         encoding="utf-8",
     )
+    (project / "coordination" / "stand-profiles.yaml").write_text(
+        yaml.safe_dump({
+            "profiles": {
+                "full-deploy": {
+                    "file": "full-deploy.yaml",
+                    "purpose": "full validation",
+                    "used_for": ["tester_validation"],
+                    "default_for": ["feature_test"],
+                }
+            }
+        }),
+        encoding="utf-8",
+    )
     return project
 
 

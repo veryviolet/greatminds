@@ -87,17 +87,6 @@ def stand() -> None:
     pass
 
 
-# 0247 (1.3.0): `greatminds stand request` and `greatminds stand
-# result` CLI subcommands REMOVED. They wrote to the deleted
-# stand_requests / stand_wip / stand_done queues. Use the lease
-# API instead:
-#   - `greatminds stand lease --task <id> --worktree <path> --profile <enum>`
-#     (replaces `stand request`)
-#   - SK runs `greatminds stand ready --lease-id <id>` when deploy
-#     succeeds; TESTER runs `greatminds stand release --lease-id <id>
-#     --result pass|fail|partial` (replaces `stand result`).
-
-
 def _validate_lease_worktree(task_id: str, worktree: str,
                               project_dir: Path) -> None:
     """0271: enforce schema.stand.resource.lease.worktree_constraint.
@@ -226,20 +215,6 @@ def _stand_keeper_notification_target(event: str) -> str | None:
     return None
 
 
-def _available_profiles(coord: Path) -> list[str]:
-    """Profile names present in THIS project's ``stand-profiles/`` dir —
-    the real set a leaser may name (each fleet's own, e.g. mlgpu2 /
-    orange, plus the seeded presets full-deploy / vite-dev / smoke-only).
-    The lease no longer restricts to a hardcoded schema enum: whatever
-    profile the leaser names is what coordd deploys."""
-    d = coord / "stand-profiles"
-    if not d.is_dir():
-        return []
-    return sorted({p.stem for p in d.iterdir()
-                   if p.suffix in (".yaml", ".md")
-                   and not p.name.startswith("_")})
-
-
 def _holder_role() -> str:
     """Caller's role for lease bookkeeping."""
     role = (os.environ.get("GREATMINDS_ROLE") or "").strip().upper()
@@ -357,9 +332,7 @@ def _file_inbox_info(coord: Path, to_role: str, body: str,
                    "(.worktrees/<task_id>) and is auto-created if absent, so "
                    "review_session leases (EXPLORER) need no raw git.")
 @click.option("--profile", required=True,
-              help="deploy profile NAME — any profile file in this "
-                   "project's stand-profiles/ (the leaser picks it; "
-                   "coordd deploys exactly that profile)")
+              help="registered deploy profile name from stand-profiles.yaml")
 @click.option("--ttl-seconds", type=int, default=None,
               help="override ttl (default: schema lease.ttl_seconds_default)")
 @click.option("--deploy-prerequisites-only", "deploy_prerequisites_only",
@@ -367,9 +340,12 @@ def _file_inbox_info(coord: Path, to_role: str, body: str,
               help="run only prerequisite-tagged profile tasks before the "
                    "holder performs the actual deploy. Overrides the "
                    "profile-level setting.")
+@click.option("--profile-approval", default=None,
+              help="explicit approval marker required by high-risk profiles")
 def stand_lease(task_id: str, worktree: "str | None", profile: str,
                  ttl_seconds: int | None,
-                 deploy_prerequisites_only: bool) -> None:
+                 deploy_prerequisites_only: bool,
+                 profile_approval: str | None) -> None:
     """Request a lease on the singleton stand.
 
     Behavior:
@@ -398,26 +374,6 @@ def stand_lease(task_id: str, worktree: "str | None", profile: str,
             "the lease).",
             exit_code=2,
         )
-    # The leaser names ANY profile that exists in this project's
-    # stand-profiles/ dir — each fleet ships its own (e.g. mlgpu2 /
-    # orange) alongside the seeded presets (full-deploy / vite-dev /
-    # smoke-only). coordd deploys EXACTLY the profile named here, so
-    # validate it the same way coordd will resolve it: by load_profile.
-    # No hardcoded enum — that is what silently collapsed every lease
-    # onto the seeded full-deploy preset.
-    from greatminds.cli.stand_profile import load_profile
-    try:
-        # issue #12: validate the way coordd will RESOLVE it at deploy —
-        # worktree copy first (a profile that exists only in the lease
-        # worktree is valid), then the main tree.
-        load_profile(coord, profile, worktree=worktree)
-    except GreatMindsError as exc:
-        raise GreatMindsError(
-            f"--profile {profile!r}: {exc} (available in stand-profiles/: "
-            f"{_available_profiles(coord)})",
-            exit_code=2,
-        )
-
     # 0271: enforce per-task worktree isolation at acquire-time so
     # the mistake never reaches state.yaml. Pre-0271 a wrong path
     # would orphan TESTER's lease in preparing/ until SK's whitelist
@@ -432,6 +388,27 @@ def stand_lease(task_id: str, worktree: "str | None", profile: str,
     project_dir = find_coord_dir().parent
     worktree = _resolve_or_create_lease_worktree(task_id, worktree,
                                                  project_dir)
+
+    from greatminds.cli.stand_profile import load_profile
+    from greatminds.cli.stand_profile_registry import (
+        load_registry, validate_profile_lease_policy,
+    )
+    try:
+        registry = load_registry(coord, worktree=worktree)
+        profile_entry = registry.require(profile)
+        validate_profile_lease_policy(
+            profile_entry,
+            holder_role=holder,
+            profile_approval=profile_approval,
+        )
+        load_profile(
+            coord, profile, worktree=worktree, file_name=profile_entry.file
+        )
+    except GreatMindsError as exc:
+        raise GreatMindsError(
+            f"--profile {profile!r}: {exc}",
+            exit_code=2,
+        )
 
     # Read schema's default ttl.
     if ttl_seconds is None:
@@ -455,10 +432,18 @@ def stand_lease(task_id: str, worktree: "str | None", profile: str,
             "task": task_id,
             "worktree": worktree,
             "profile": profile,
+            "profile_file": profile_entry.file,
+            "profile_registry": str(registry.path),
+            "profile_registry_source": registry.source,
+            "profile_requires_explicit_user_approval": (
+                profile_entry.requires_explicit_user_approval
+            ),
             "holder_role": holder,
             "ttl_seconds": ttl_seconds,
             "enqueued_at": ss.now_iso(),
         }
+        if profile_approval:
+            lease_obj["profile_approval"] = "explicit-user-approval"
         # 0283: only persist the flag when set, so leases that
         # accept the profile default keep the state file minimal.
         if deploy_prerequisites_only:
@@ -978,7 +963,18 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
     # review is the one deployed/validated — not the unchanged main-tree
     # copy. Falls back to the main tree when the worktree lacks it.
     lease_worktree = cap.get("worktree")
-    spec = load_profile(coord, profile, worktree=lease_worktree)
+    profile_file = cap.get("profile_file")
+    if not profile_file:
+        try:
+            from greatminds.cli.stand_profile_registry import load_registry
+            profile_file = load_registry(
+                coord, worktree=lease_worktree
+            ).require(profile).file
+        except GreatMindsError:
+            profile_file = None
+    spec = load_profile(
+        coord, profile, worktree=lease_worktree, file_name=profile_file
+    )
     if spec.format != "yaml":
         raise GreatMindsError(
             f"stand deploy: profile {profile!r} is {spec.format!r}; the "
@@ -1000,6 +996,7 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
         "coord": str(coord),
         "lease_id": cap.get("lease_id"),
         "profile": profile,
+        "profile_file": profile_file or Path(spec.path).name,
         # issue #12: record which tree the deployed profile came from so the
         # deploy evidence (marker + logs) proves the worktree copy ran.
         "profile_source": spec.source,
@@ -1136,6 +1133,45 @@ def stand_ready(lease_id: str) -> None:
     click.echo(f"state → ready (lease {lease_id})")
 
 
+@stand.group(name="profiles", help="inspect and validate stand profile registry")
+def stand_profiles() -> None:
+    pass
+
+
+@stand_profiles.command(name="list")
+def stand_profiles_list() -> None:
+    """List registered stand profiles for this project."""
+    from greatminds.cli.stand_profile_registry import load_registry
+    coord = find_coord_dir()
+    registry = load_registry(coord)
+    click.echo(f"registry: {registry.path} ({registry.source})")
+    for entry in registry.profiles.values():
+        defaults = ",".join(entry.default_for) or "-"
+        used = ",".join(entry.used_for) or "-"
+        roles = ",".join(entry.allowed_roles) or "-"
+        approval = " approval" if entry.requires_explicit_user_approval else ""
+        click.echo(
+            f"{entry.name}\tfile={entry.file}\tenv={entry.environment}"
+            f"{approval}\troles={roles}\tdefault_for={defaults}"
+            f"\tused_for={used}"
+        )
+
+
+@stand_profiles.command(name="doctor")
+def stand_profiles_doctor() -> None:
+    """Validate registry tokens and referenced YAML playbooks."""
+    from greatminds.cli.stand_profile_registry import doctor_registry
+    coord = find_coord_dir()
+    errors, warnings = doctor_registry(coord)
+    for msg in warnings:
+        click.echo(f"warning: {msg}")
+    if errors:
+        for msg in errors:
+            click.echo(f"error: {msg}", err=True)
+        raise GreatMindsError("stand profile registry validation failed", exit_code=2)
+    click.echo("stand profile registry ok")
+
+
 @stand.command(name="status")
 def stand_status() -> None:
     """Print the singleton stand resource state.
@@ -1156,7 +1192,8 @@ def stand_status() -> None:
     active = state.get("active_lease")
     if active:
         click.echo("active_lease:")
-        for k in ("lease_id", "task", "worktree", "holder_role",
+        for k in ("lease_id", "task", "worktree", "profile", "profile_file",
+                  "holder_role",
                   "granted_at", "ready_at", "ttl_seconds"):
             v = active.get(k)
             if v is not None:

@@ -2,8 +2,8 @@
 release CLI + state transitions + FIFO queue + concurrent-lease
 race resolution + inbox-info on ready.
 
-API per PLANNER's corrected amendment (info-1779808442):
-    greatminds stand lease --task <id> --worktree <path> --profile <enum>
+API:
+    greatminds stand lease --task <id> --worktree <path> --profile <name>
         → returns lease_id (UUID hex)
         → state file: free → preparing(lease_id) OR queued
     greatminds stand ready --lease-id <id>  (SK-only)
@@ -50,15 +50,31 @@ def _git_worktree(path: Path) -> Path:
 
 @pytest.fixture(autouse=True)
 def _resolvable_presets(monkeypatch):
-    """The lease validates ``--profile`` by RESOLVING it (a real file in
-    the project's ``stand-profiles/``) — no hardcoded enum. These
-    lease-mechanics tests don't seed profile files, so stub the resolver:
-    the canonical presets resolve, anything else raises exactly like a
-    missing profile file (→ the lease rejects it)."""
+    """Lease-mechanics tests use a small project registry fixture."""
     from greatminds.core.errors import GreatMindsError
+    from greatminds.cli.stand_profile_registry import (
+        ProfileEntry, ProfileRegistry,
+    )
 
     class _Spec:
         format = "yaml"
+
+    def _fake_registry(coord, **_kw):
+        entries = {
+            name: ProfileEntry(
+                name=name,
+                file=f"{name}.yaml",
+                purpose=f"{name} test profile",
+                used_for=("tester_validation",),
+                default_for=(),
+            )
+            for name in {"full-deploy", "vite-dev", "smoke-only"}
+        }
+        return ProfileRegistry(
+            path=Path(coord) / "stand-profiles.yaml",
+            source="test",
+            profiles=entries,
+        )
 
     def _fake(_coord, name, **_kw):
         if name in {"full-deploy", "vite-dev", "smoke-only"}:
@@ -66,20 +82,26 @@ def _resolvable_presets(monkeypatch):
         raise GreatMindsError(f"profile {name!r} has no file")
 
     monkeypatch.setattr(
+        "greatminds.cli.stand_profile_registry.load_registry",
+        _fake_registry,
+    )
+    monkeypatch.setattr(
         "greatminds.cli.stand_profile.load_profile", _fake)
 
 
 # ---------- schema pin ----------
 
 
-def test_schema_has_profiles_allowed() -> None:
-    """0244: stand.resource.profiles_allowed enum present."""
+def test_schema_does_not_enumerate_stand_profiles() -> None:
+    """Stand profile names are project registry entries, not a schema enum."""
     doc = yaml.safe_load(
         (find_canon_dir() / "schema.yaml").read_text(encoding="utf-8")
     ) or {}
-    profiles = (doc["stand"]["resource"].get("profiles_allowed") or [])
-    assert "full-deploy" in profiles
-    assert "vite-dev" in profiles
+    resource = doc["stand"]["resource"]
+    assert "profiles_allowed" not in resource
+    assert doc["stand_profile"]["lookup"] == (
+        "coordination/stand-profiles.yaml profiles.<lease.profile>.file"
+    )
 
 
 # ---------- stand lease (free → preparing) ----------
@@ -117,8 +139,9 @@ def test_lease_rejects_unknown_profile(tmp_path, monkeypatch) -> None:
     a non-existent one is refused."""
     coord = tmp_path / "coordination"
     coord.mkdir()
+    wt = _git_worktree(tmp_path / ".worktrees" / "0099")
     result = _invoke(
-        ["lease", "--task", "0099", "--worktree", "/tmp/wt",
+        ["lease", "--task", "0099", "--worktree", str(wt),
          "--profile", "rogue-profile"],
         tmp_path, monkeypatch=monkeypatch,
     )

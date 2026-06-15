@@ -40,6 +40,15 @@ greatminds uses two primary agent tools:
 - `codex`: OpenAI Codex, using the single machine Codex login plus generated
   per-role profile sources under `coordination/.codex-home/<role>/`.
 
+Window modes in `coord.yaml`:
+
+- `chat`: a live tmux pane for an operator-facing conversation.
+- `loop`: a resident watchdog pane that wakes on its own timer.
+- `staged`: a tmux pane with the start command pre-typed, so the operator
+  starts that role manually when needed.
+- `driven`: no live pane; `coordd` starts one Claude or Codex turn when work
+  lands in the role's queue, inbox, or stand event stream.
+
 Choose which tool runs each role in `coord.yaml`:
 
 | Role | Default tool | Default mode |
@@ -80,11 +89,11 @@ STAND_USER=violet
 EOF
 ```
 
-The stand is a singleton live environment. `coordd` prepares it by running an
-Ansible stand profile from `coordination/stand-profiles/<profile>.yaml` for the
-active lease. Start with `smoke-only` for reachability, then replace
-`full-deploy` or `vite-dev` with a project-specific playbook when the product
-needs real live validation.
+The stand is a singleton live environment. `coordd` prepares it by running the
+Ansible playbook selected by `coordination/stand-profiles.yaml` for the active
+lease. Setup seeds reference profiles (`smoke-only`, `full-deploy`,
+`vite-dev`), and projects add more entries to the registry when they need
+additional stands such as production.
 
 Start the daemon and launch the tmux fleet:
 

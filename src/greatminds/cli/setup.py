@@ -355,6 +355,17 @@ def _seed_stand_profiles(coord: Path, canon: Path) -> tuple[int, int]:
     return (copied, skipped)
 
 
+def _seed_stand_profile_registry(coord: Path, canon: Path) -> str:
+    src = canon / "templates" / "stand-profiles.yaml"
+    dst = coord / "stand-profiles.yaml"
+    if dst.is_file():
+        return "exists"
+    if not src.is_file():
+        return "MISSING in canon"
+    dst.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+    return "written"
+
+
 # 0367 (follow-up to 0366/#16/#17): sha256 of every greatminds-SHIPPED
 # stand-profile version that predates the add_host / stand_nodes host
 # topology (the "host-agnostic deploy" rewrite). These legacy templates
@@ -1554,6 +1565,8 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     # NOT overwritten.
     sp_copied, sp_skipped = _seed_stand_profiles(coord, canon)
     info(f"  stand-profiles: {sp_copied} copied, {sp_skipped} exist")
+    sp_registry = _seed_stand_profile_registry(coord, canon)
+    info(f"  stand-profiles.yaml: {sp_registry}")
 
     # Seed the single static system-prompt coordination/bootstrap.md
     # from canon. The driven driver + start-agent pass it to claude's

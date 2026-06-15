@@ -203,8 +203,8 @@ roles:
       - chat_partner_for_user
       - file_review_sessions
       # PLANNER must know the stand-profile mechanism out of the box.
-      - coordinate_stand_profile_tasks_via_schema_and_canon
-      - file_schema_extension_task_on_lease_enum_block
+      - coordinate_stand_profile_tasks_via_registry_and_canon
+      - file_profile_registry_task_on_unregistered_profile
     forbidden_actions:
       - implement_code
       - run_ansible
@@ -240,14 +240,10 @@ roles:
         - read_down_reason_from_inbox_info
         - file_bugfix_task_for_coordination_stand_profiles_yaml
         - assign_to_developer
-      on_stand_down_md_interpretation_error:
-        - read_down_reason_from_inbox_info
-        - file_bugfix_task_for_coordination_stand_profiles_md
-        - assign_to_developer
-      on_stand_lease_enum_block:
-        - file_schema_extension_task_for_profiles_allowed_enum
-        - assign_to_developer
-        - block_dependent_lease_until_schema_lands
+      on_stand_unregistered_profile:
+        - read_registry_error
+        - file_feature_dev_task_for_stand_profile_registry_entry
+        - include_required_profile_name_file_used_for_default_for
   ARCHITECT-REVIEWER:
     category: product
     lifecycle: driven
@@ -275,6 +271,19 @@ roles:
       on_verified_rollback:
         - append_rollback_block_with_reason
         - mv_to_archive_or_feature_review
+    stand_profile_selection:
+      required_for:
+        - final_review_when_stand_required
+        - production_review
+      default_for:
+        final_review_when_stand_required: reviewer
+        production_review: production_review
+      allowed_used_for:
+        - reviewer_validation
+        - tester_validation
+        - explorer_review
+        - production_post_deploy_review
+      must_select_from: coordination/stand-profiles.yaml
   DEVELOPER:
     category: product
     lifecycle: driven
@@ -341,6 +350,15 @@ roles:
         - on_user_ok_append_implementation_block
         - release_lease
         - mv_to_feature_review
+    stand_profile_selection:
+      required_for:
+        - feature_live
+      default_for:
+        feature_live: live_developer
+      allowed_used_for:
+        - live_ui
+        - ui_iteration
+      must_select_from: coordination/stand-profiles.yaml
   TECHNICAL-WRITER:
     category: product
     lifecycle: driven
@@ -386,6 +404,19 @@ roles:
         - run_gate_check
         - release_lease_with_result
         - mv_to_feature_review
+    stand_profile_selection:
+      required_for:
+        - plan.stand_required
+        - plan.verify_only
+      default_for:
+        plan.stand_required: feature_test
+        plan.verify_only: verify_only
+      allowed_used_for:
+        - tester_validation
+        - deploy_only
+        - warmup
+        - quick_readiness
+      must_select_from: coordination/stand-profiles.yaml
   READER:
     category: product
     lifecycle: driven
@@ -432,6 +463,15 @@ roles:
         - append_session_iteration_block
         - release_lease
         - mv_to_archive_when_complete
+    stand_profile_selection:
+      required_for:
+        - review_session
+      default_for:
+        review_session: explorer
+      allowed_used_for:
+        - explorer_review
+        - full_product_validation
+      must_select_from: coordination/stand-profiles.yaml
   USER:
     category: entry
     # USER is the human entry point — interactive by definition.
@@ -965,11 +1005,9 @@ stand:
         - stand_probe_*: requires holder of active_lease's lease_id
       enforcement_layer: cli
     state_file: .stand/state.yaml       # under coordination/
-    # Profile enum the lease CLI validates ``--profile`` against — the
-    # single source of truth for the accepted set. Token definitions
-    # live in glossary.stand_profiles; deploy playbooks per value
-    # lives in PROJECT.md; canon presets ship in templates/stand-profiles/.
-    profiles_allowed: [full-deploy, vite-dev, smoke-only]
+    # Profile names are project-defined in coordination/stand-profiles.yaml.
+    # The lease CLI accepts a profile only when the registry contains that
+    # profile and the referenced YAML playbook exists.
 
 tests_block_validation:
   stand_evidence:
@@ -1342,10 +1380,36 @@ claude_settings:
       - "Bash(kill:*)"
       - "Bash(systemctl --user:*)"
 
-# Stand profile files. coordd reads the YAML profile matching
-# ``lease.profile`` (the enum from stand.resource.profiles_allowed) from the
-# project coordination directory at deploy time and executes it as part of the
-# lease deploy.
+stand_profile_registry:
+  path: coordination/stand-profiles.yaml
+  environment_values:
+    stand: "Disposable or staging-like live stand."
+    production: "Production environment; requires explicit approval policy."
+  used_for_values:
+    deploy_only: "Deploy/readiness check without product behavior validation."
+    warmup: "Prepare prerequisites before a validation lease."
+    quick_readiness: "Cheap liveness/reachability check."
+    tester_validation: "TESTER product validation for stand-required tasks."
+    explorer_review: "EXPLORER scenario-B live product review."
+    live_ui: "LIVE-DEVELOPER scenario-C UI iteration."
+    ui_iteration: "UI-focused live iteration."
+    reviewer_validation: "ARCHITECT-REVIEWER final stand verification."
+    full_product_validation: "End-to-end deployed product validation."
+    production_deploy: "Production deployment task."
+    production_post_deploy_review: "Post-deploy production verification."
+  default_for_values:
+    verify_only: "No-code stand/playbook verification task."
+    feature_test: "TESTER validation after implementation."
+    explorer: "EXPLORER review-session lease."
+    live_developer: "LIVE-DEVELOPER interactive lease."
+    ui_iteration: "UI-focused live iteration."
+    reviewer: "ARCHITECT-REVIEWER final verification lease."
+    production_deploy: "Deployment to production."
+    production_review: "Review that production deployment is complete and healthy."
+
+# Stand profile files. coordd reads the YAML file referenced by
+# ``coordination/stand-profiles.yaml`` for ``lease.profile`` and executes it as
+# part of the lease deploy.
 #
 #   * ``yaml`` — a subset of ansible-playbook syntax, run by coordd's
 #     deterministic deploy engine.
@@ -1353,7 +1417,7 @@ claude_settings:
 stand_profile:
   directory: coordination/stand-profiles
   formats: [yaml]
-  lookup: "<directory>/<lease.profile>.yaml"
+  lookup: "coordination/stand-profiles.yaml profiles.<lease.profile>.file"
   yaml_dialect: ansible_playbook
   yaml_required_fields: [name, hosts, tasks]
   yaml_optional_fields: [vars, handlers, gather_facts]
@@ -1362,7 +1426,7 @@ stand_profile:
   # that prepare the stand for the real probe).
   deploy_prerequisites_only_flag: deploy_prerequisites_only
 
-# Legacy key name for stand lifecycle notifications. coordd files inbox-info
+# Stand lifecycle notification policy. coordd files inbox-info
 # automatically on these events so PLANNER (or another role) does not need to
 # poll state.yaml. Keep the map small — only events PLANNER must react to.
 stand_keeper:

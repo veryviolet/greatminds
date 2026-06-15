@@ -39,6 +39,15 @@ greatminds supports two primary agent tools:
   once for the machine account; generated files under
   `coordination/.codex-home/<role>/` are role config sources, not auth homes.
 
+Window modes in `coord.yaml`:
+
+- `chat`: a live tmux pane for an operator-facing conversation.
+- `loop`: a resident watchdog pane that wakes on its own timer.
+- `staged`: a tmux pane with the start command pre-typed, so the operator
+  starts that role manually when needed.
+- `driven`: no live pane; `coordd` starts one Claude or Codex turn when work
+  lands in the role's queue, inbox, or stand event stream.
+
 Role-to-tool assignment lives in `coord.yaml`. Edit it after setup when you
 want different tools for different roles:
 
@@ -94,9 +103,48 @@ and set `STAND_USER` to the remote account whose PATH should be used.
 
 A stand is a singleton live environment. Agents lease it with
 `greatminds stand lease`; `coordd` deploys the leased worktree by running an
-Ansible stand profile from `coordination/stand-profiles/<profile>.yaml`.
-The default allowed profiles are `full-deploy`, `vite-dev`, and `smoke-only`.
-A minimal smoke profile looks like this:
+Ansible playbook selected through `coordination/stand-profiles.yaml`. There is
+no global current profile. The current profile is chosen for each lease with
+`greatminds stand lease --profile <name>`, stored in
+`coordination/.stand/state.yaml` as `active_lease.profile`, and resolved through
+the registry to a YAML file under `coordination/stand-profiles/`.
+
+Setup seeds reference profiles named `full-deploy`, `vite-dev`, and
+`smoke-only`. Add project profiles by adding registry entries and YAML files.
+The `used_for` and `default_for` values are machine-readable tokens from
+`coordination/schema.yaml` under `stand_profile_registry`; `default_for` tells
+roles which profile to choose for common lease purposes:
+
+```yaml
+profiles:
+  full-deploy:
+    file: full-deploy.yaml
+    purpose: Full deployed product validation on a stand.
+    environment: stand
+    used_for: [tester_validation, explorer_review, reviewer_validation]
+    default_for: [feature_test, explorer, reviewer]
+```
+
+Inspect and validate the registry with:
+
+```bash
+greatminds stand profiles list
+greatminds stand profiles doctor
+```
+
+For production, create an explicit registry entry with
+`environment: production`, `requires_explicit_user_approval: true`, and
+`allowed_roles` such as `[ARCHITECT-REVIEWER, MAINTAINER]`. Lease it only after
+approval:
+
+```bash
+greatminds stand lease \
+  --task <task-id> \
+  --profile production \
+  --profile-approval USER_APPROVED
+```
+
+A minimal smoke playbook looks like this:
 
 ```yaml
 ---
@@ -134,10 +182,9 @@ greatminds launch --target tmux
 tmux a -t myproject
 ```
 
-The windows defined in `coord.yaml` boot inside one tmux session; each role
-starts in chat, loop, staged, or driven mode according to that file. Driven
-roles do not keep live panes; `coordd` starts one Claude or Codex turn when
-their queue, inbox, or stand-state event changes.
+The windows defined in `coord.yaml` boot inside one tmux session. Roles with
+`mode: driven` do not keep live panes; `coordd` starts one Claude or Codex turn
+when their queue, inbox, or stand-state event changes.
 
 ## Key Concepts
 
