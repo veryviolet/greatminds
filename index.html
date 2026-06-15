@@ -1527,6 +1527,15 @@ greatminds<span class="w"> </span>setup<span class="w"> </span>--session<span cl
 <li><code>codex</code>: OpenAI Codex, using the single machine Codex login plus generated
   per-role profile sources under <code>coordination/.codex-home/&lt;role&gt;/</code>.</li>
 </ul>
+<p>Window modes in <code>coord.yaml</code>:</p>
+<ul>
+<li><code>chat</code>: a live tmux pane for an operator-facing conversation.</li>
+<li><code>loop</code>: a resident watchdog pane that wakes on its own timer.</li>
+<li><code>staged</code>: a tmux pane with the start command pre-typed, so the operator
+  starts that role manually when needed.</li>
+<li><code>driven</code>: no live pane; <code>coordd</code> starts one Claude or Codex turn when work
+  lands in the role's queue, inbox, or stand event stream.</li>
+</ul>
 <p>Choose which tool runs each role in <code>coord.yaml</code>:</p>
 <table>
 <thead>
@@ -1609,11 +1618,11 @@ greatminds<span class="w"> </span>setup<span class="w"> </span>--session<span cl
 <span class="s">STAND_USER=violet</span>
 <span class="s">EOF</span>
 </code></pre></div>
-<p>The stand is a singleton live environment. <code>coordd</code> prepares it by running an
-Ansible stand profile from <code>coordination/stand-profiles/&lt;profile&gt;.yaml</code> for the
-active lease. Start with <code>smoke-only</code> for reachability, then replace
-<code>full-deploy</code> or <code>vite-dev</code> with a project-specific playbook when the product
-needs real live validation.</p>
+<p>The stand is a singleton live environment. <code>coordd</code> prepares it by running the
+Ansible playbook selected by <code>coordination/stand-profiles.yaml</code> for the active
+lease. Setup seeds reference profiles (<code>smoke-only</code>, <code>full-deploy</code>,
+<code>vite-dev</code>), and projects add more entries to the registry when they need
+additional stands such as production.</p>
 <p>Start the daemon and launch the tmux fleet:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>daemon<span class="w"> </span>install
 greatminds<span class="w"> </span>daemon<span class="w"> </span>start

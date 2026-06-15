@@ -1663,6 +1663,33 @@ tools, windows, or launch modes.</p>
 </tr>
 </tbody>
 </table>
+<p>Window modes in <code>coord.yaml</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>chat</code></td>
+<td>A live tmux pane for an operator-facing conversation.</td>
+</tr>
+<tr>
+<td><code>loop</code></td>
+<td>A resident watchdog pane that wakes on its own timer.</td>
+</tr>
+<tr>
+<td><code>staged</code></td>
+<td>A tmux pane with the start command pre-typed; the operator starts it manually when needed.</td>
+</tr>
+<tr>
+<td><code>driven</code></td>
+<td>No live pane; <code>coordd</code> starts one Claude or Codex turn when work lands in the role's queue, inbox, or stand event stream.</td>
+</tr>
+</tbody>
+</table>
 <p>Role-to-tool assignment lives in <code>coord.yaml</code>. The default template mixes
 Claude and Codex roles, but it is ordinary project config. Change <code>tool:</code> per
 role, then restart the daemon and launch session:</p>
@@ -1835,6 +1862,39 @@ running an Ansible YAML profile from <code>coordination/stand-profiles/</code>.<
 <li><code>full-deploy</code>: rsync and install pattern for backend-style deployment.</li>
 <li><code>vite-dev</code>: backend plus a Vite dev server for live UI iteration.</li>
 </ul>
+<p>Setup also writes <code>coordination/stand-profiles.yaml</code>, the project-owned
+registry of allowed profile names. A lease selects a registry key:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>lease<span class="w"> </span>--task<span class="w"> </span>&lt;task-id&gt;<span class="w"> </span>--profile<span class="w"> </span>full-deploy
+</code></pre></div>
+<p>The selected key is stored in <code>.stand/state.yaml</code> as <code>active_lease.profile</code>.
+The registry entry chooses the YAML file to run:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">profiles</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">full-deploy</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">full-deploy.yaml</span>
+<span class="w">    </span><span class="nt">purpose</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Full deployed product validation on a stand.</span>
+<span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stand</span>
+<span class="w">    </span><span class="nt">used_for</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">tester_validation</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">explorer_review</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">reviewer_validation</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">default_for</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">feature_test</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">explorer</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">reviewer</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<p><code>used_for</code> describes what the profile can safely serve. <code>default_for</code> maps
+common role intents to one registry key; each <code>default_for</code> token must be
+claimed by at most one profile. The allowed tokens are defined in
+<code>coordination/schema.yaml</code> under <code>stand_profile_registry</code>.</p>
+<p>Inspect and validate the registry after edits:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>profiles<span class="w"> </span>list
+greatminds<span class="w"> </span>stand<span class="w"> </span>profiles<span class="w"> </span>doctor
+</code></pre></div>
+<p>To add a profile, add a registry entry and a matching YAML file under
+<code>coordination/stand-profiles/</code>. For production, add an explicit production
+entry with <code>environment: production</code>, <code>requires_explicit_user_approval: true</code>,
+and an <code>allowed_roles</code> list such as <code>[ARCHITECT-REVIEWER, MAINTAINER]</code>.
+Production leases must include an approval marker after the user has approved
+that lease:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>lease<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--task<span class="w"> </span>&lt;task-id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--profile<span class="w"> </span>production<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--profile-approval<span class="w"> </span>USER_APPROVED
+</code></pre></div>
 <p>The smallest useful <code>coordination/stand-profiles/smoke-only.yaml</code> is:</p>
 <div class="highlight"><pre><span></span><code><span class="nn">---</span>
 <span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">register stand node</span>

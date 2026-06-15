@@ -1627,8 +1627,8 @@ task needs another amendment or review cycle.</p>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">chat_partner_for_user</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file_review_sessions</span>
 <span class="w">      </span><span class="c1"># PLANNER must know the stand-profile mechanism out of the box.</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coordinate_stand_profile_tasks_via_schema_and_canon</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file_schema_extension_task_on_lease_enum_block</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coordinate_stand_profile_tasks_via_registry_and_canon</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file_profile_registry_task_on_unregistered_profile</span>
 <span class="w">    </span><span class="nt">forbidden_actions</span><span class="p">:</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">implement_code</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run_ansible</span>
@@ -1664,14 +1664,10 @@ task needs another amendment or review cycle.</p>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read_down_reason_from_inbox_info</span>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file_bugfix_task_for_coordination_stand_profiles_yaml</span>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">assign_to_developer</span>
-<span class="w">      </span><span class="nt">on_stand_down_md_interpretation_error</span><span class="p">:</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read_down_reason_from_inbox_info</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file_bugfix_task_for_coordination_stand_profiles_md</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">assign_to_developer</span>
-<span class="w">      </span><span class="nt">on_stand_lease_enum_block</span><span class="p">:</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file_schema_extension_task_for_profiles_allowed_enum</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">assign_to_developer</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">block_dependent_lease_until_schema_lands</span>
+<span class="w">      </span><span class="nt">on_stand_unregistered_profile</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read_registry_error</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file_feature_dev_task_for_stand_profile_registry_entry</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">include_required_profile_name_file_used_for_default_for</span>
 <span class="w">  </span><span class="nt">ARCHITECT-REVIEWER</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">category</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">product</span>
 <span class="w">    </span><span class="nt">lifecycle</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">driven</span>
@@ -1699,6 +1695,19 @@ task needs another amendment or review cycle.</p>
 <span class="w">      </span><span class="nt">on_verified_rollback</span><span class="p">:</span>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">append_rollback_block_with_reason</span>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mv_to_archive_or_feature_review</span>
+<span class="w">    </span><span class="nt">stand_profile_selection</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">required_for</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">final_review_when_stand_required</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production_review</span>
+<span class="w">      </span><span class="nt">default_for</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">final_review_when_stand_required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reviewer</span>
+<span class="w">        </span><span class="nt">production_review</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production_review</span>
+<span class="w">      </span><span class="nt">allowed_used_for</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reviewer_validation</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tester_validation</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">explorer_review</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production_post_deploy_review</span>
+<span class="w">      </span><span class="nt">must_select_from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coordination/stand-profiles.yaml</span>
 <span class="w">  </span><span class="nt">DEVELOPER</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">category</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">product</span>
 <span class="w">    </span><span class="nt">lifecycle</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">driven</span>
@@ -1765,6 +1774,15 @@ task needs another amendment or review cycle.</p>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">on_user_ok_append_implementation_block</span>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">release_lease</span>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mv_to_feature_review</span>
+<span class="w">    </span><span class="nt">stand_profile_selection</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">required_for</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_live</span>
+<span class="w">      </span><span class="nt">default_for</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">feature_live</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">live_developer</span>
+<span class="w">      </span><span class="nt">allowed_used_for</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">live_ui</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ui_iteration</span>
+<span class="w">      </span><span class="nt">must_select_from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coordination/stand-profiles.yaml</span>
 <span class="w">  </span><span class="nt">TECHNICAL-WRITER</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">category</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">product</span>
 <span class="w">    </span><span class="nt">lifecycle</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">driven</span>
@@ -1810,6 +1828,19 @@ task needs another amendment or review cycle.</p>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run_gate_check</span>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">release_lease_with_result</span>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mv_to_feature_review</span>
+<span class="w">    </span><span class="nt">stand_profile_selection</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">required_for</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plan.stand_required</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plan.verify_only</span>
+<span class="w">      </span><span class="nt">default_for</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">plan.stand_required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_test</span>
+<span class="w">        </span><span class="nt">plan.verify_only</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verify_only</span>
+<span class="w">      </span><span class="nt">allowed_used_for</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tester_validation</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deploy_only</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warmup</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">quick_readiness</span>
+<span class="w">      </span><span class="nt">must_select_from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coordination/stand-profiles.yaml</span>
 <span class="w">  </span><span class="nt">READER</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">category</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">product</span>
 <span class="w">    </span><span class="nt">lifecycle</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">driven</span>
@@ -1856,6 +1887,15 @@ task needs another amendment or review cycle.</p>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">append_session_iteration_block</span>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">release_lease</span>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mv_to_archive_when_complete</span>
+<span class="w">    </span><span class="nt">stand_profile_selection</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">required_for</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">review_session</span>
+<span class="w">      </span><span class="nt">default_for</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">review_session</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">explorer</span>
+<span class="w">      </span><span class="nt">allowed_used_for</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">explorer_review</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">full_product_validation</span>
+<span class="w">      </span><span class="nt">must_select_from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coordination/stand-profiles.yaml</span>
 <span class="w">  </span><span class="nt">USER</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">category</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">entry</span>
 <span class="w">    </span><span class="c1"># USER is the human entry point — interactive by definition.</span>
@@ -2389,11 +2429,9 @@ task needs another amendment or review cycle.</p>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">stand_probe_*</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">requires holder of active_lease&#39;s lease_id</span>
 <span class="w">      </span><span class="nt">enforcement_layer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cli</span>
 <span class="w">    </span><span class="nt">state_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.stand/state.yaml</span><span class="w">       </span><span class="c1"># under coordination/</span>
-<span class="w">    </span><span class="c1"># Profile enum the lease CLI validates ``--profile`` against — the</span>
-<span class="w">    </span><span class="c1"># single source of truth for the accepted set. Token definitions</span>
-<span class="w">    </span><span class="c1"># live in glossary.stand_profiles; deploy playbooks per value</span>
-<span class="w">    </span><span class="c1"># lives in PROJECT.md; canon presets ship in templates/stand-profiles/.</span>
-<span class="w">    </span><span class="nt">profiles_allowed</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">full-deploy</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">vite-dev</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">smoke-only</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="c1"># Profile names are project-defined in coordination/stand-profiles.yaml.</span>
+<span class="w">    </span><span class="c1"># The lease CLI accepts a profile only when the registry contains that</span>
+<span class="w">    </span><span class="c1"># profile and the referenced YAML playbook exists.</span>
 
 <span class="nt">tests_block_validation</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">stand_evidence</span><span class="p">:</span>
@@ -2766,10 +2804,36 @@ task needs another amendment or review cycle.</p>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;Bash(kill:*)&quot;</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;Bash(systemctl</span><span class="nv"> </span><span class="s">--user:*)&quot;</span>
 
-<span class="c1"># Stand profile files. coordd reads the YAML profile matching</span>
-<span class="c1"># ``lease.profile`` (the enum from stand.resource.profiles_allowed) from the</span>
-<span class="c1"># project coordination directory at deploy time and executes it as part of the</span>
-<span class="c1"># lease deploy.</span>
+<span class="nt">stand_profile_registry</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coordination/stand-profiles.yaml</span>
+<span class="w">  </span><span class="nt">environment_values</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">stand</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Disposable</span><span class="nv"> </span><span class="s">or</span><span class="nv"> </span><span class="s">staging-like</span><span class="nv"> </span><span class="s">live</span><span class="nv"> </span><span class="s">stand.&quot;</span>
+<span class="w">    </span><span class="nt">production</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Production</span><span class="nv"> </span><span class="s">environment;</span><span class="nv"> </span><span class="s">requires</span><span class="nv"> </span><span class="s">explicit</span><span class="nv"> </span><span class="s">approval</span><span class="nv"> </span><span class="s">policy.&quot;</span>
+<span class="w">  </span><span class="nt">used_for_values</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">deploy_only</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Deploy/readiness</span><span class="nv"> </span><span class="s">check</span><span class="nv"> </span><span class="s">without</span><span class="nv"> </span><span class="s">product</span><span class="nv"> </span><span class="s">behavior</span><span class="nv"> </span><span class="s">validation.&quot;</span>
+<span class="w">    </span><span class="nt">warmup</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Prepare</span><span class="nv"> </span><span class="s">prerequisites</span><span class="nv"> </span><span class="s">before</span><span class="nv"> </span><span class="s">a</span><span class="nv"> </span><span class="s">validation</span><span class="nv"> </span><span class="s">lease.&quot;</span>
+<span class="w">    </span><span class="nt">quick_readiness</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Cheap</span><span class="nv"> </span><span class="s">liveness/reachability</span><span class="nv"> </span><span class="s">check.&quot;</span>
+<span class="w">    </span><span class="nt">tester_validation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;TESTER</span><span class="nv"> </span><span class="s">product</span><span class="nv"> </span><span class="s">validation</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">stand-required</span><span class="nv"> </span><span class="s">tasks.&quot;</span>
+<span class="w">    </span><span class="nt">explorer_review</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;EXPLORER</span><span class="nv"> </span><span class="s">scenario-B</span><span class="nv"> </span><span class="s">live</span><span class="nv"> </span><span class="s">product</span><span class="nv"> </span><span class="s">review.&quot;</span>
+<span class="w">    </span><span class="nt">live_ui</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LIVE-DEVELOPER</span><span class="nv"> </span><span class="s">scenario-C</span><span class="nv"> </span><span class="s">UI</span><span class="nv"> </span><span class="s">iteration.&quot;</span>
+<span class="w">    </span><span class="nt">ui_iteration</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;UI-focused</span><span class="nv"> </span><span class="s">live</span><span class="nv"> </span><span class="s">iteration.&quot;</span>
+<span class="w">    </span><span class="nt">reviewer_validation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ARCHITECT-REVIEWER</span><span class="nv"> </span><span class="s">final</span><span class="nv"> </span><span class="s">stand</span><span class="nv"> </span><span class="s">verification.&quot;</span>
+<span class="w">    </span><span class="nt">full_product_validation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;End-to-end</span><span class="nv"> </span><span class="s">deployed</span><span class="nv"> </span><span class="s">product</span><span class="nv"> </span><span class="s">validation.&quot;</span>
+<span class="w">    </span><span class="nt">production_deploy</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Production</span><span class="nv"> </span><span class="s">deployment</span><span class="nv"> </span><span class="s">task.&quot;</span>
+<span class="w">    </span><span class="nt">production_post_deploy_review</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Post-deploy</span><span class="nv"> </span><span class="s">production</span><span class="nv"> </span><span class="s">verification.&quot;</span>
+<span class="w">  </span><span class="nt">default_for_values</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">verify_only</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;No-code</span><span class="nv"> </span><span class="s">stand/playbook</span><span class="nv"> </span><span class="s">verification</span><span class="nv"> </span><span class="s">task.&quot;</span>
+<span class="w">    </span><span class="nt">feature_test</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;TESTER</span><span class="nv"> </span><span class="s">validation</span><span class="nv"> </span><span class="s">after</span><span class="nv"> </span><span class="s">implementation.&quot;</span>
+<span class="w">    </span><span class="nt">explorer</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;EXPLORER</span><span class="nv"> </span><span class="s">review-session</span><span class="nv"> </span><span class="s">lease.&quot;</span>
+<span class="w">    </span><span class="nt">live_developer</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LIVE-DEVELOPER</span><span class="nv"> </span><span class="s">interactive</span><span class="nv"> </span><span class="s">lease.&quot;</span>
+<span class="w">    </span><span class="nt">ui_iteration</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;UI-focused</span><span class="nv"> </span><span class="s">live</span><span class="nv"> </span><span class="s">iteration.&quot;</span>
+<span class="w">    </span><span class="nt">reviewer</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ARCHITECT-REVIEWER</span><span class="nv"> </span><span class="s">final</span><span class="nv"> </span><span class="s">verification</span><span class="nv"> </span><span class="s">lease.&quot;</span>
+<span class="w">    </span><span class="nt">production_deploy</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Deployment</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">production.&quot;</span>
+<span class="w">    </span><span class="nt">production_review</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Review</span><span class="nv"> </span><span class="s">that</span><span class="nv"> </span><span class="s">production</span><span class="nv"> </span><span class="s">deployment</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">complete</span><span class="nv"> </span><span class="s">and</span><span class="nv"> </span><span class="s">healthy.&quot;</span>
+
+<span class="c1"># Stand profile files. coordd reads the YAML file referenced by</span>
+<span class="c1"># ``coordination/stand-profiles.yaml`` for ``lease.profile`` and executes it as</span>
+<span class="c1"># part of the lease deploy.</span>
 <span class="c1">#</span>
 <span class="c1">#   * ``yaml`` — a subset of ansible-playbook syntax, run by coordd&#39;s</span>
 <span class="c1">#     deterministic deploy engine.</span>
@@ -2777,7 +2841,7 @@ task needs another amendment or review cycle.</p>
 <span class="nt">stand_profile</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">directory</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coordination/stand-profiles</span>
 <span class="w">  </span><span class="nt">formats</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">yaml</span><span class="p p-Indicator">]</span>
-<span class="w">  </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;directory&gt;/&lt;lease.profile&gt;.yaml&quot;</span>
+<span class="w">  </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;coordination/stand-profiles.yaml</span><span class="nv"> </span><span class="s">profiles.&lt;lease.profile&gt;.file&quot;</span>
 <span class="w">  </span><span class="nt">yaml_dialect</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ansible_playbook</span>
 <span class="w">  </span><span class="nt">yaml_required_fields</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">name</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">hosts</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">tasks</span><span class="p p-Indicator">]</span>
 <span class="w">  </span><span class="nt">yaml_optional_fields</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">vars</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">handlers</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">gather_facts</span><span class="p p-Indicator">]</span>
@@ -2786,7 +2850,7 @@ task needs another amendment or review cycle.</p>
 <span class="w">  </span><span class="c1"># that prepare the stand for the real probe).</span>
 <span class="w">  </span><span class="nt">deploy_prerequisites_only_flag</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deploy_prerequisites_only</span>
 
-<span class="c1"># Legacy key name for stand lifecycle notifications. coordd files inbox-info</span>
+<span class="c1"># Stand lifecycle notification policy. coordd files inbox-info</span>
 <span class="c1"># automatically on these events so PLANNER (or another role) does not need to</span>
 <span class="c1"># poll state.yaml. Keep the map small — only events PLANNER must react to.</span>
 <span class="nt">stand_keeper</span><span class="p">:</span>

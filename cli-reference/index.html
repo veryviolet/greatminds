@@ -1418,6 +1418,45 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#greatminds-stand-profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        profiles
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="profiles">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-stand-profiles-doctor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        doctor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-stand-profiles-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        list
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#greatminds-stand-ready" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2760,6 +2799,45 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#greatminds-stand-profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        profiles
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="profiles">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-stand-profiles-doctor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        doctor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-stand-profiles-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        list
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#greatminds-stand-ready" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3895,16 +3973,40 @@ the holder may release.</p>
                                worktree (.worktrees/&lt;task_id&gt;) and is auto-
                                created if absent, so review_session leases
                                (EXPLORER) need no raw git.
-  --profile TEXT               deploy profile NAME — any profile file in this
-                               project&#39;s stand-profiles/ (the leaser picks it;
-                               coordd deploys exactly that profile)
-                               [required]
+  --profile TEXT               registered deploy profile name from stand-
+                               profiles.yaml  [required]
   --ttl-seconds INTEGER        override ttl (default: schema
                                lease.ttl_seconds_default)
   --deploy-prerequisites-only  run only prerequisite-tagged profile tasks
                                before the holder performs the actual deploy.
                                Overrides the profile-level setting.
+  --profile-approval TEXT      explicit approval marker required by high-risk
+                               profiles
   -h, --help                   Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-stand-profiles">greatminds stand profiles<a class="headerlink" href="#greatminds-stand-profiles" title="Permanent link">&para;</a></h4>
+<p>inspect and validate stand profile registry</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds stand profiles [OPTIONS] COMMAND [ARGS]...
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  -h, --help  Show this message and exit.
+</code></pre></div>
+<h5 id="greatminds-stand-profiles-doctor">greatminds stand profiles doctor<a class="headerlink" href="#greatminds-stand-profiles-doctor" title="Permanent link">&para;</a></h5>
+<p>Validate registry tokens and referenced YAML playbooks.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds stand profiles doctor [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  -h, --help  Show this message and exit.
+</code></pre></div>
+<h5 id="greatminds-stand-profiles-list">greatminds stand profiles list<a class="headerlink" href="#greatminds-stand-profiles-list" title="Permanent link">&para;</a></h5>
+<p>List registered stand profiles for this project.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds stand profiles list [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  -h, --help  Show this message and exit.
 </code></pre></div>
 <h4 id="greatminds-stand-ready">greatminds stand ready<a class="headerlink" href="#greatminds-stand-ready" title="Permanent link">&para;</a></h4>
 <p>Transition a prepared lease to ready and notify the holder.</p>

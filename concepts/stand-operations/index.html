@@ -1614,13 +1614,37 @@ project adds is available the same way.</p>
 keys. Multi-node stands can use a comma list such as
 <code>STAND_HOST=web-a,web-b</code>.</p>
 <h2 id="ansible-profiles">Ansible Profiles<a class="headerlink" href="#ansible-profiles" title="Permanent link">&para;</a></h2>
-<p>Stand profiles live under:</p>
+<p>The project profile registry lives at:</p>
+<div class="highlight"><pre><span></span><code>coordination/stand-profiles.yaml
+</code></pre></div>
+<p>Stand playbooks live under:</p>
 <div class="highlight"><pre><span></span><code>coordination/stand-profiles/
 </code></pre></div>
-<p>The lease <code>--profile</code> value selects a YAML file with the same name, for
-example <code>--profile smoke-only</code> runs
-<code>coordination/stand-profiles/smoke-only.yaml</code>. The allowed profile names are
-defined in <code>coordination/schema.yaml</code> under <code>stand.resource.profiles_allowed</code>.</p>
+<p>The lease <code>--profile</code> value selects a registry key, not a raw filename. The
+registry maps that key to a YAML playbook file:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">profiles</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">smoke-only</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smoke-only.yaml</span>
+<span class="w">    </span><span class="nt">purpose</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Fast reachability and readiness check.</span>
+<span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stand</span>
+<span class="w">    </span><span class="nt">used_for</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">deploy_only</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">warmup</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">quick_readiness</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">default_for</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">verify_only</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<p>For example, <code>--profile smoke-only</code> records <code>active_lease.profile:
+smoke-only</code> and runs the registry entry's <code>file</code>, usually
+<code>coordination/stand-profiles/smoke-only.yaml</code>. The same profile name can point
+at a differently named file, such as <code>file: smoke.yaml</code>, when a project wants
+that convention.</p>
+<p><code>used_for</code> is the capability list for the profile. <code>default_for</code> assigns common
+role intents such as <code>feature_test</code>, <code>explorer</code>, <code>reviewer</code>,
+<code>live_developer</code>, <code>production_deploy</code>, and <code>production_review</code> to a profile.
+The vocabulary is defined in <code>coordination/schema.yaml</code> under
+<code>stand_profile_registry</code>. Each <code>default_for</code> token can belong to only one
+profile, so automated role selection is unambiguous.</p>
+<p>Use the registry commands after edits:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>profiles<span class="w"> </span>list
+greatminds<span class="w"> </span>stand<span class="w"> </span>profiles<span class="w"> </span>doctor
+</code></pre></div>
 <p><code>coordd</code> runs the profile with Ansible and injects:</p>
 <ul>
 <li>every key from <code>coordination/PROJECT.env</code>;</li>
@@ -1653,7 +1677,24 @@ defined in <code>coordination/schema.yaml</code> under <code>stand.resource.prof
 <p>For a deploy profile, add tasks that copy or build from <code>{{ worktree }}</code> and
 then run readiness probes. The shipped <code>full-deploy.yaml</code>, <code>vite-dev.yaml</code>, and
 <code>smoke-only.yaml</code> files are reference profiles, not hidden deployment logic.
-Edit or replace them in each project.</p>
+Register additional project profiles in <code>coordination/stand-profiles.yaml</code>.</p>
+<p>For a production deployment or post-deploy review, create a profile with:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">profiles</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">production</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production.yaml</span>
+<span class="w">    </span><span class="nt">purpose</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Production deployment and post-deploy verification.</span>
+<span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production</span>
+<span class="w">    </span><span class="nt">requires_explicit_user_approval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">allowed_roles</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">ARCHITECT-REVIEWER</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">MAINTAINER</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">used_for</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">production_deploy</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">production_post_deploy_review</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">default_for</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">production_deploy</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">production_review</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<p>The CLI enforces <code>allowed_roles</code> and requires an explicit approval marker:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>lease<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--task<span class="w"> </span>&lt;task-id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--profile<span class="w"> </span>production<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--profile-approval<span class="w"> </span>USER_APPROVED
+</code></pre></div>
 <h2 id="state-file">State File<a class="headerlink" href="#state-file" title="Permanent link">&para;</a></h2>
 <p>The source of truth is:</p>
 <div class="highlight"><pre><span></span><code>coordination/.stand/state.yaml
@@ -1688,9 +1729,9 @@ the source of truth; do not inspect or edit <code>state.yaml</code> directly.</p
 </tr>
 </tbody>
 </table>
-<p>Each active lease carries a <code>lease_id</code>, task id, worktree path, profile,
-holder role, grant timestamp, optional ready timestamp, and TTL. Pending
-leases wait in FIFO order in the same state file.</p>
+<p>Each active lease carries a <code>lease_id</code>, task id, worktree path, profile name,
+profile file, holder role, grant timestamp, optional ready timestamp, and TTL.
+Pending leases wait in FIFO order in the same state file.</p>
 <h2 id="lease-flow">Lease Flow<a class="headerlink" href="#lease-flow" title="Permanent link">&para;</a></h2>
 <p>The role that needs a live stand requests a lease:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>lease<span class="w"> </span>--task<span class="w"> </span>&lt;task-id&gt;<span class="w"> </span>--worktree<span class="w"> </span>&lt;path&gt;<span class="w"> </span>--profile<span class="w"> </span>&lt;profile&gt;
@@ -1706,7 +1747,8 @@ leases wait in FIFO order in the same state file.</p>
 <code>preparing</code>. If another lease is active, the new lease is appended to the FIFO
 queue. The command prints the <code>lease_id</code>; the requester must keep that token.</p>
 <p><code>coordd</code> watches <code>coordination/.stand/state.yaml</code> and runs the active lease
-profile. Operators can inspect progress with:</p>
+profile file selected by <code>active_lease.profile</code>. Operators can inspect progress
+with:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>status
 </code></pre></div>
 <p>When state is <code>preparing</code>, <code>coordd</code> deploys from the lease worktree using the
