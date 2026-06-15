@@ -195,7 +195,7 @@ def test_append_block_body_file_loads_file(tmp_path: Path):
              "--body-file", str(body_path))
     assert cp.returncode == 0, cp.stderr
 
-    plan_files = list((proj / "coordination" / "feature_plan").glob("*.yaml"))
+    plan_files = list((proj / ".greatminds" / "feature_plan").glob("*.yaml"))
     assert len(plan_files) == 1
     data = yaml.safe_load(plan_files[0].read_text(encoding="utf-8"))
     plan = [b for b in data["blocks"] if b.get("kind") == "plan"][0]
@@ -219,7 +219,7 @@ def test_append_block_body_at_path_alias(tmp_path: Path):
              "--body", f"@{body_path}")
     assert cp.returncode == 0, cp.stderr
 
-    inbox_files = list((proj / "coordination" / "feature_inbox").glob("*.yaml"))
+    inbox_files = list((proj / ".greatminds" / "feature_inbox").glob("*.yaml"))
     data = yaml.safe_load(inbox_files[0].read_text(encoding="utf-8"))
     triage = [b for b in data["blocks"] if b.get("kind") == "triage"][0]
     assert "Triage via @PATH" in triage["notes"]

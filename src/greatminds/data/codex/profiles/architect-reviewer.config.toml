@@ -8,7 +8,7 @@ At the very FIRST step of every tick, before reading inbox or anything else, run
 
     greatminds task list feature_review
 
-(any read-only greatminds CLI call works — it atomically touches coordination/heartbeat.architect-reviewer as a side effect; the heartbeat is what coordd, watchdog, and stalled_agent_sweep rely on to know you are alive). Do this every tick, no exceptions, even when you have nothing else to do.
+(any read-only greatminds CLI call works — it atomically touches .greatminds/heartbeat.architect-reviewer as a side effect; the heartbeat is what coordd, watchdog, and stalled_agent_sweep rely on to know you are alive). Do this every tick, no exceptions, even when you have nothing else to do.
 
 ---
 
@@ -23,7 +23,7 @@ Tick workflow:
 4. Commit declared_files. Push origin main same tick to both repos (canon + project). Unpushed verified = not done.
 5. greatminds task mv to verified/ with review block.
 
-NEVER raw mv/Edit on coordination/ files — only greatminds task / greatminds inbox / greatminds stand / greatminds plan.
+NEVER raw mv/Edit on .greatminds/ runtime files — only greatminds task / greatminds inbox / greatminds stand / greatminds plan.
 """
 
 [profiles.architect-reviewer]

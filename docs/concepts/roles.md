@@ -1,7 +1,7 @@
 # Roles
 
 Each role owns a small part of the pipeline. Ownership is defined by queue
-location and encoded in `coordination/schema.yaml`.
+location and encoded in the packaged schema copied to `.greatminds/schema.yaml`.
 
 Product roles:
 
@@ -27,7 +27,7 @@ System and entry roles:
   rather than direct chat. It handles daemon and agent recovery, venv repair,
   canon cutover, and escalation of FSM stalls to the planner.
 
-Every active role has a heartbeat file under `coordination/`. Stale heartbeats
+Every active role has a heartbeat file under `.greatminds/`. Stale heartbeats
 are reported by `greatminds watchdog`.
 
 For lifecycle mechanics across tools, see

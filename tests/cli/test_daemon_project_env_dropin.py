@@ -20,7 +20,7 @@ def test_install_project_dropin_writes_environmentfile(
     monkeypatch.setattr(dm, "AGENT_ENV_DIR",
                         tmp_path / "greatminds" / "agent-env")
     project = tmp_path / "proj"
-    (project / "coordination").mkdir(parents=True)
+    (project / ".greatminds").mkdir(parents=True)
 
     wrote = dm.install_project_dropin("toy", project)
     assert wrote is True
@@ -29,7 +29,7 @@ def test_install_project_dropin_writes_environmentfile(
             / "greatminds-daemon@toy.service.d" / "10-project-env.conf")
     body = conf.read_text(encoding="utf-8")
     # Optional (leading `-`) EnvironmentFile pointing at the fleet PROJECT.env.
-    expected = str(project / "coordination" / "PROJECT.env")
+    expected = str(project / ".greatminds" / "PROJECT.env")
     assert f"EnvironmentFile=-{expected}" in body
     agent_env = str(tmp_path / "greatminds" / "agent-env" / "toy.env")
     assert f"EnvironmentFile=-{agent_env}" in body
@@ -121,8 +121,8 @@ def test_daemon_candidate_env_layers_project_then_agent_env(
                         tmp_path / "greatminds" / "agent-env")
     monkeypatch.setenv("ANTHROPIC_BASE_URL", "from-shell")
     project = tmp_path / "proj"
-    (project / "coordination").mkdir(parents=True)
-    (project / "coordination" / "PROJECT.env").write_text(
+    (project / ".greatminds").mkdir(parents=True)
+    (project / ".greatminds" / "PROJECT.env").write_text(
         "ANTHROPIC_BASE_URL=from-project\n"
         "PROJECT_ONLY='two words'\n",
         encoding="utf-8",

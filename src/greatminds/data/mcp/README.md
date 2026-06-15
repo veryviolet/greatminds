@@ -10,7 +10,7 @@ collision).
 
 Servers referencing `${TOKEN_NAME}` resolve those vars from the
 environment, which `greatminds start-agent` exports from
-`<project>/coordination/PROJECT.env` before launching Claude.
+`<project>/.greatminds/PROJECT.env` before launching Claude.
 
 Required env vars and their semantics: see the token-contract in
 `<canon>/templates/PROJECT.md.template`.

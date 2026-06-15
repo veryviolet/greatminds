@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "greatminds"
-version = "2.2.0"
-description = "File-based Claude/Codex agent coordination with queues, driven roles, registered Ansible stand leases, and evidence gates"
+version = "2.3.0"
+description = "File-based Claude/Codex agent coordination with driven roles, editable project config, runtime state, Ansible stand leases, and evidence gates"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"

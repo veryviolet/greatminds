@@ -6,15 +6,14 @@ start. Keep short and high-signal.
 ## System variables
 
 Variables that greatminds reads out of the box. Concrete values live
-in `coordination/PROJECT.env` (gitignored). The list below is
-auto-synced from `coordination/schema.yaml` at setup time — to add a system var,
-edit `schema.project_env.system_vars` and re-run `greatminds setup`.
+in `.greatminds/PROJECT.env` (gitignored). The list below is
+generated from the packaged greatminds schema at setup time.
 
 {{SYSTEM_VARS_DOCS}}
 
 ## Custom variables
 
-Add any `KEY=value` to `coordination/PROJECT.env` and reference via
+Add any `KEY=value` to `.greatminds/PROJECT.env` and reference via
 `${name}` in this file, in skill bodies, MCP server configs, or any
 subprocess. `greatminds start-agent` sources `PROJECT.env` before
 launching each agent, so the values appear in the agent's

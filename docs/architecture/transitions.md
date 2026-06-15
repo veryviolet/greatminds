@@ -1,7 +1,7 @@
 # Transitions
 
-Allowed transitions are encoded in `coordination/schema.yaml` in an installed
-project. The CLI enforces the current
+Allowed transitions are encoded in the packaged schema copied to
+`.greatminds/schema.yaml` in an installed project. The CLI enforces the current
 role, current queue, target queue, and required readiness evidence.
 
 `verified/` is not an absolute sink. If later review finds that verified work

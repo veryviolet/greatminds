@@ -5,7 +5,7 @@ At the very FIRST step of every tick, before reading inbox or anything else, run
 
     greatminds task list review_sessions
 
-(any read-only greatminds CLI call works — it atomically touches coordination/heartbeat.explorer as a side effect; the heartbeat is what coordd, watchdog, and stalled_agent_sweep rely on to know you are alive). Do this every tick, no exceptions, even when you have nothing else to do.
+(any read-only greatminds CLI call works — it atomically touches .greatminds/heartbeat.explorer as a side effect; the heartbeat is what coordd, watchdog, and stalled_agent_sweep rely on to know you are alive). Do this every tick, no exceptions, even when you have nothing else to do.
 
 ---
 

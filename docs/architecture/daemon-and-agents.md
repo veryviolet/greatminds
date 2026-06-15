@@ -2,14 +2,15 @@
 
 `greatminds launch` starts the configured agent windows from the environment
 where greatminds is installed, for example `greatminds launch --target tmux`.
-Each window is defined in `coord.yaml` with:
+Each window is defined in `coordination/coord.yaml` with:
 
 - window name
 - role
 - tool (`claude`, `codex`, `cursor`, or `bash`)
 - mode (`chat`, `loop`, `dashboard`, `logs`, `staged`, or `driven`)
 
-The role's lifecycle is declared in `coordination/schema.yaml`:
+The role's lifecycle is declared in the packaged schema copied to
+`.greatminds/schema.yaml`:
 
 - `interactive`: human-paced chat. `ARCHITECT-PLANNER` is the normal
   user-facing planner.
@@ -18,22 +19,21 @@ The role's lifecycle is declared in `coordination/schema.yaml`:
 - `driven`: no persistent agent loop. The pane is idle between turns; `coordd`
   runs one turn when an inbox, queue, or stand-state event lands.
 
-Driven dispatch requires both `coordination/schema.yaml` lifecycle and the installed
-`coord.yaml` window mode to be `driven`. That gate lets existing fleets migrate
-role by role.
+Driven dispatch requires both the schema lifecycle and the installed
+`coordination/coord.yaml` window mode to be `driven`.
 
 ## coordd
 
-`coordd` watches `coordination/` for inbox, queue-file, and stand-state
+`coordd` watches `.greatminds/` for inbox, queue-file, and stand-state
 activity. It does not own the task FSM and does not decide task transitions.
 Its job is turn delivery: when a producer moves work into another role's queue,
 the consumer can react immediately.
 
 On Linux, `coordd` arms an inotify watcher. New inbox files under
-`coordination/inbox/<role>/` and new task files landing in watched queues trigger
+`.greatminds/inbox/<role>/` and new task files landing in watched queues trigger
 the owning role's event path. For non-driven roles, the wake mechanism is
-selected from `coordination/schema.yaml` under `event_wake.by_tool`, keyed by the role
-window's `coord.yaml` `tool:` value:
+selected from `.greatminds/schema.yaml` under `event_wake.by_tool`, keyed by
+the role window's `coordination/coord.yaml` `tool:` value:
 
 - `codex` and `cursor`: `coordd` finds the role's deepest sleeping descendant
   and sends `SIGINT`. That interrupts the long sleep wrapper so the next tick
@@ -59,7 +59,7 @@ persistent `/loop`; their next turn comes from the next inbox, queue, or stand
 event.
 
 `coordd` also writes a best-effort chronological driven-agent event stream to
-`coordination/.events/driven.ndjson`. The stream is read-only operator
+`.greatminds/.events/driven.ndjson`. The stream is read-only operator
 observability, not FSM authority: task files, locks, stand state, and turn logs
 remain the source of truth. A fresh tmux launch includes a role-less `logs`
 window that runs `greatminds driven-log --follow` and shows accepted turns,
@@ -78,18 +78,19 @@ send, the agent ends its own chat reply with the matching marker line.
 If a role does not react to new work, check these in order:
 
 1. Confirm the daemon is running for the project with `greatminds daemon status`.
-2. Confirm the role exists in `coord.yaml`, has the expected `tool:`, and has a
-   live agent registry entry.
-3. Confirm the role's `coordination/schema.yaml` lifecycle and `coord.yaml` mode agree with
-   the expected model. Driven roles require both values to be `driven`.
+2. Confirm the role exists in `coordination/coord.yaml`, has the expected
+   `tool:`, and has a live agent registry entry.
+3. Confirm the role's schema lifecycle and `coordination/coord.yaml` mode agree
+   with the expected model. Driven roles require both values to be `driven`.
 4. For a driven role, inspect coordd logs for the driven spawn result and check
-   the per-role run lock under `coordination/.locks/`.
-5. Confirm `coordination/schema.yaml` still maps that tool in `event_wake.by_tool` for
+   the per-role run lock under `.greatminds/.locks/`.
+5. Confirm `.greatminds/schema.yaml` maps that tool in `event_wake.by_tool` for
    non-driven roles.
 6. For non-driven `codex` or `cursor`, inspect whether the agent is actually inside a sleep
    descendant. `coordd` does not signal the agent process itself when no sleeping
    child exists.
-7. For non-driven `claude`, confirm the tmux session and window name match `coord.yaml`.
+7. For non-driven `claude`, confirm the tmux session and window name match
+   `coordination/coord.yaml`.
    Chat-mode wakes are rate-limited by
    `event_wake.tmux_send_keys.rate_limit_seconds`, so a burst of messages may
    coalesce into one prompt.
@@ -107,9 +108,9 @@ If a role does not react to new work, check these in order:
 ## Visual event markers
 
 Operators can scan live tmux panes by the marker at the end of an agent reply.
-The templates live in `coordination/schema.yaml` under `visual_events`; docs and prompts
-describe the contract, but the schema is the source of truth for the exact emoji
-and markdown shape.
+The templates live in `.greatminds/schema.yaml` under `visual_events`; docs and
+prompts describe the contract, but the schema is the source of truth for the
+exact emoji and markdown shape.
 
 - `CLAIMED`: an agent moved a task into an implementation or ownership queue it
   is taking over.

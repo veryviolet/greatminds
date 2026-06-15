@@ -3,22 +3,22 @@
 This document is the contract for a file-based finite state machine that
 coordinates Claude agents on a product. Mechanics (queue names, transitions,
 required front-matter fields, watchdog thresholds) are defined in the
-machine-readable `coordination/schema.yaml`. This document is the prose version: it
+machine-readable `.greatminds/schema.yaml`. This document is the prose version: it
 explains the philosophy and the invariants that hold the system together.
 
-When `coordination/schema.yaml` and this prose disagree,
-`coordination/schema.yaml` is authoritative
+When `.greatminds/schema.yaml` and this prose disagree,
+`.greatminds/schema.yaml` is authoritative
 for mechanics, and the prose is authoritative for the spirit of the
 invariants. Fix whichever is wrong, do not paper over the conflict.
 
 Project-specific values live in the installed `coordination/PROJECT.md`
 (canon refers to them as `${...}` variables). Each agent's system prompt is
-the single static `coordination/bootstrap.md`; it reads the installed canon
-(`coordination/schema.yaml` + `coordination/COORDINATE.md`) plus
+the single static `.greatminds/bootstrap.md`; it reads the installed canon
+(`.greatminds/schema.yaml` + `.greatminds/COORDINATE.md`) plus
 `coordination/PROJECT.md` at the start of every tick.
 
-Every installed agent reads `coordination/COORDINATE.md`,
-`coordination/schema.yaml`, its own role contract, and
+Every installed agent reads `.greatminds/COORDINATE.md`,
+`.greatminds/schema.yaml`, its own role contract, and
 `coordination/PROJECT.md` before acting.
 
 ---
@@ -45,11 +45,11 @@ Every installed agent reads `coordination/COORDINATE.md`,
 
 ## 2. Roles
 
-See `coordination/schema.yaml` `roles:` for the full roster and per-role description.
+See `.greatminds/schema.yaml` `roles:` for the full roster and per-role description.
 
 ### 2.1 Reactive fleet lifecycle
 
-Every role declares `coordination/schema.yaml > roles.<ROLE>.lifecycle`. That field
+Every role declares `.greatminds/schema.yaml > roles.<ROLE>.lifecycle`. That field
 describes how the role receives work; it is orthogonal to task scenario
 mode (`A`, `B`, `C`) and to the product queue it owns.
 
@@ -79,7 +79,7 @@ The launch path is selected by lifecycle plus tool:
 | `driven` | `codex` | coordd drives one fresh `codex app-server` stdio turn and persists the app-server thread id | idle bash pane |
 | `driven` | `bash` | direct command run by the owning automation | process exits |
 
-Driven dispatch is intentionally gated by both `coordination/schema.yaml` lifecycle
+Driven dispatch is intentionally gated by both `.greatminds/schema.yaml` lifecycle
 and the installed `coord.yaml` window mode. When both say `driven`, coordd uses
 the driven turn path. Otherwise the role keeps its configured launch behavior
 until the operator updates the fleet config.
@@ -101,7 +101,7 @@ product/FSM decisions back to PLANNER.
 
 ## 3. Scenarios
 
-See `coordination/schema.yaml` `scenarios:` for A/B/C definitions.
+See `.greatminds/schema.yaml` `scenarios:` for A/B/C definitions.
 
 ---
 
@@ -115,7 +115,7 @@ installed canon, queues, inboxes, logs, and runtime state stay under
 ### Queues
 
 The full list of queues, their owners, and allowed transitions is in
-`coordination/schema.yaml`. Read it once when you onboard a role; do not
+`.greatminds/schema.yaml`. Read it once when you onboard a role; do not
 re-derive from prose.
 
 Categories:
@@ -131,7 +131,7 @@ Categories:
 Stand resource:
 
 ```
-coordination/.stand/state.yaml
+.greatminds/.stand/state.yaml
 greatminds stand lease -> coordd auto-deploys (ready/down) -> holder release
 ```
 
@@ -518,7 +518,7 @@ A heartbeat is **not** a periodic-liveness signal. It is an
 **in-flight-turn hang detector**, owned by `coordd`:
 
 ```
-coordination/heartbeat.<role>
+.greatminds/heartbeat.<role>
 ```
 
 While `coordd` holds a driven role's run-lock — i.e. a turn is in flight —
@@ -574,7 +574,7 @@ Lifecycle:
 There is no file-lock model: operators look in `.worktrees/` for in-flight
 code instead of looking for lock files. The deploy playbook rsyncs the worktree
 (not the main project tree) when the active stand lease names the task and
-worktree. Policy lives in `coordination/schema.yaml > worktrees:`.
+worktree. Policy lives in `.greatminds/schema.yaml > worktrees:`.
 
 ## 13. Git rules
 
@@ -582,7 +582,7 @@ Default:
 
 - `ARCHITECT-REVIEWER` is the only product-work committer.
 - `MAINTAINER` commits **canon and infrastructure** changes only
-  (coordination/schema.yaml, role docs, CLI source, plugin skills, MCP config,
+  (.greatminds/schema.yaml, role docs, CLI source, plugin skills, MCP config,
   templates) — explicitly distinct from product-pipeline work, which
   flows through `ARCHITECT-REVIEWER`. MAINTAINER never commits
   product-task artifacts (plan / implementation / tests / reader /
@@ -616,14 +616,14 @@ No `git add .`; the committer stages exact paths only.
 
 ## 15. Bootstrap
 
-Every agent's system prompt is the single static `coordination/bootstrap.md`
+Every agent's system prompt is the single static `.greatminds/bootstrap.md`
 (seeded from canon by `greatminds setup`). It is role-independent: the agent
 learns its role from `$GREATMINDS_ROLE` and reads its own contract from
-`coordination/schema.yaml > roles.<GREATMINDS_ROLE>`, plus
-`coordination/COORDINATE.md` and
+`.greatminds/schema.yaml > roles.<GREATMINDS_ROLE>`, plus
+`.greatminds/COORDINATE.md` and
 `coordination/PROJECT.md`. coordd injects it as the system prompt for driven
 turns; `greatminds start-agent` uses it for paned roles. The role list is
-`coordination/schema.yaml > roles`.
+`.greatminds/schema.yaml > roles`.
 
 To check the canon for unknown tokens or missing catalog entries:
 
@@ -687,7 +687,7 @@ role is launched on:
   match in the agent's working context.
 - **Codex** — codex CLI has no `--plugin-dir` equivalent. The
   equivalent path is generated per-role profile source material:
-  `greatminds setup` creates `coordination/.codex-home/<role>/`
+  `greatminds setup` creates `.greatminds/.codex-home/<role>/`
   from `<canon>/codex/profiles/*.config.toml`. The generated
   `config.toml` carries `developer_instructions` and skill registrations;
   `<role>.config.toml` carries model / approval / sandbox settings.

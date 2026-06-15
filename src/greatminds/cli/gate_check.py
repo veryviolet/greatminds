@@ -26,7 +26,7 @@ from pathlib import Path
 
 import click
 
-from greatminds.core.paths import find_canon_dir
+from greatminds.core.paths import find_canon_dir, project_runtime_dir
 
 import yaml
 
@@ -158,7 +158,7 @@ def find_task_file(project_dir: Path, task_id: str, queues: list[str]) -> Path |
     eliminating the resolution divergence REVIEWER flagged."""
     from greatminds.cli.task import find_task as _unified_find_task
 
-    coord = project_dir / "coordination"
+    coord = project_runtime_dir(project_dir)
     allowed = set(queues)
     found = _unified_find_task(coord, task_id)
     if found is None:
@@ -190,7 +190,7 @@ def find_stand_evidence(project_dir: Path, task_id: str) -> list[tuple[Path, dic
     (``stand_result.evidence_for``) shapes via ``parse_task_file``.
     """
     found: list[tuple[Path, dict]] = []
-    stand_done = project_dir / "coordination" / "stand_done"
+    stand_done = project_runtime_dir(project_dir) / "stand_done"
     seq = task_id.split("-")[0] if "-" in task_id else task_id
     for f in _candidate_files(stand_done):
         merged = parse_task_file(f)

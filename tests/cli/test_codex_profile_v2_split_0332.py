@@ -44,7 +44,7 @@ def _setup(tmp_path: Path) -> Path:
 
 
 def _codex_homes(project_dir: Path) -> list[Path]:
-    root = project_dir / "coordination" / ".codex-home"
+    root = project_dir / ".greatminds" / ".codex-home"
     return sorted(p for p in root.iterdir() if p.is_dir())
 
 
@@ -101,7 +101,7 @@ def test_idempotent_existing_home_not_overwritten(tmp_path: Path) -> None:
     """Re-running setup must NOT clobber an operator-customized base
     config.toml (idempotency preserved)."""
     project_dir = _setup(tmp_path)
-    explorer_base = (project_dir / "coordination" / ".codex-home"
+    explorer_base = (project_dir / ".greatminds" / ".codex-home"
                      / "explorer" / "config.toml")
     explorer_base.write_text("# operator edit\n", encoding="utf-8")
     result = CliRunner().invoke(

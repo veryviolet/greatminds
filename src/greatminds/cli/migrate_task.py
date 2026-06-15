@@ -9,14 +9,14 @@ by `---`, optionally interleaved with free prose.
   * everything else (prose, headings) becomes the task's `description` field.
 
 New format: single YAML file with header fields at top level and an
-ordered `blocks:` list. See `greatminds task show` output and
-`coordination/schema.yaml` for the exact shape.
+ordered `blocks:` list. See `greatminds task show` output and the packaged
+schema for the exact shape.
 
 Usage:
   greatminds migrate-task --file path/to/task.md   one file
   greatminds migrate-task --queue feature_dev      all active in a queue
   greatminds migrate-task --all                    every .md task in
-                                                   coordination/ (active queues
+                                                   .greatminds/ (active queues
                                                    only by default; pass
                                                    --include-terminal to also
                                                    touch verified/, archive/,

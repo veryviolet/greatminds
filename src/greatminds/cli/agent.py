@@ -1,7 +1,7 @@
 """0339 (DOD2): ``greatminds agent status [ROLE]`` — per-role process
 diagnostics.
 
-Replaces raw ``cat coordination/.agent_registry/<role>.json`` (and the
+Replaces raw ``cat .greatminds/.agent_registry/<role>.json`` (and the
 ad-hoc ``os.kill`` / ``stat heartbeat.<role>`` an operator would
 otherwise run by hand) with one CLI that reports, per role:
 
@@ -44,7 +44,7 @@ from typing import Any, NamedTuple
 import click
 
 from greatminds.core.errors import GreatMindsError
-from greatminds.core.paths import find_coord_dir
+from greatminds.core.paths import find_coord_dir, project_runtime_dir
 from greatminds.cli.coordd import (
     REGISTRY_DIR,
     heartbeat_age_seconds,
@@ -344,13 +344,13 @@ def required_live_roles_context(header: dict[str, Any],
                                 blocked_block: "dict[str, Any] | None"
                                 ) -> "str | None":
     """0389: opt-in target context where required live roles must be
-    evaluated — a coordination dir or a project dir path.
+    evaluated — a greatminds runtime dir or a project dir path.
 
     Read from the latest blocked block (override) else the task header.
     Absent / non-str / blank → None, meaning «evaluate locally» (the 0388
     behaviour, unchanged). Lets a review_session whose objective targets a
     REMOTE stand require its live roles to be checked against THAT stand's
-    coordination project, so a healthy LOCAL role can't falsely unblock a
+    runtime state, so a healthy LOCAL role can't falsely unblock a
     remote-targeted campaign."""
     val: Any = None
     if (blocked_block is not None
@@ -367,34 +367,36 @@ def required_live_roles_context(header: dict[str, Any],
 def resolve_live_roles_coord(context: "str | None", local_coord: Path
                              ) -> "tuple[Path | None, str | None]":
     """0389: resolve a declared ``requires_live_roles_context`` to the
-    coordination dir whose agents must be inspected.
+    runtime dir whose agents must be inspected.
 
     Returns ``(coord, error)``:
       * context None        → ``(local_coord, None)`` — local behaviour.
       * context resolvable  → ``(<target coord>, None)``. Accepts either a
-        coordination dir directly or a project dir that contains
-        ``coordination/``; an existing dir without a registry yet still
+        runtime dir directly or a project dir that contains
+        ``.greatminds/``; an existing dir without a registry yet still
         resolves (its agents simply read as not-registered).
       * context unreachable → ``(None, <reason>)``. DELIBERATELY NOT
         fail-open: a task that explicitly names a remote target whose
-        coordination project can't be found must HOLD with an actionable
+        runtime state can't be found must HOLD with an actionable
         message, never silently resume against nothing (an unreachable
         avatar must not read READY)."""
     if context is None:
         return local_coord, None
     p = Path(context).expanduser()
-    # A project dir (``…/<stand>``) resolves to its ``coordination/`` child;
-    # a coordination dir resolves to itself. Check the project-dir form first
-    # so ``/srv/greatminds-stand`` lands on ``/srv/greatminds-stand/
-    # coordination`` rather than the bare project root.
+    # A project dir resolves to its ``.greatminds/`` child; a runtime dir
+    # resolves to itself.
+    if (p / ".greatminds").is_dir():
+        return project_runtime_dir(p), None
     if (p / "coordination").is_dir():
         return p / "coordination", None
-    if p.is_dir():
+    if p.is_dir() and (
+        p.name in {".greatminds", "coordination"} or (p / REGISTRY_DIR).is_dir()
+    ):
         return p, None
     return None, (
         f"target context {context!r} not found / unreachable (looked for "
-        f"{p / 'coordination'}/ and {p}/). Deploy / fix the target stand, "
-        f"confirm its coordination project exists, then retry the resume.")
+        f"{p / '.greatminds'}/ and {p}/). Deploy / fix the target stand, "
+        f"confirm its greatminds runtime exists, then retry the resume.")
 
 
 def held_live_roles(local_coord: Path, header: dict[str, Any],

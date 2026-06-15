@@ -11,9 +11,11 @@ heartbeats, and a launcher for tmux-based fleets.
 
 ## What you get
 
-- A generated `coord.yaml` that defines the agent windows, roles, tools, and
-  modes for one project.
-- A `coordination/` tree with queues such as `feature_inbox/`,
+- Editable project configuration under `coordination/`, including
+  `coord.yaml`, `PROJECT.md`, MCP/plugin config, and stand profile registry
+  files.
+- Runtime/system state under `.greatminds/`, including queues such as
+  `feature_inbox/`,
   `feature_plan/`, `feature_dev/`, `feature_docs/`, `feature_test/`,
   `feature_review/`, and `verified/`.
 - A `greatminds` CLI for task moves, inbox messages, stand leases, role
@@ -38,9 +40,9 @@ greatminds uses two primary agent tools:
 - `claude`: Claude Code, including project-local settings and configured
   Claude marketplace plugins.
 - `codex`: OpenAI Codex, using the single machine Codex login plus generated
-  per-role profile sources under `coordination/.codex-home/<role>/`.
+  per-role profile sources under `.greatminds/.codex-home/<role>/`.
 
-Window modes in `coord.yaml`:
+Window modes in `coordination/coord.yaml`:
 
 - `chat`: a live tmux pane for an operator-facing conversation.
 - `loop`: a resident watchdog pane that wakes on its own timer.
@@ -49,7 +51,7 @@ Window modes in `coord.yaml`:
 - `driven`: no live pane; `coordd` starts one Claude or Codex turn when work
   lands in the role's queue, inbox, or stand event stream.
 
-Choose which tool runs each role in `coord.yaml`:
+Choose which tool runs each role in `coordination/coord.yaml`:
 
 | Role | Default tool | Default mode |
 | --- | --- | --- |
@@ -80,10 +82,10 @@ windows:
     mode: driven
 ```
 
-Put local project and stand variables in `coordination/PROJECT.env`:
+Put machine-local project and stand variables in `.greatminds/PROJECT.env`:
 
 ```bash
-cat > coordination/PROJECT.env <<'EOF'
+cat > .greatminds/PROJECT.env <<'EOF'
 STAND_HOST=localhost
 STAND_USER=violet
 EOF

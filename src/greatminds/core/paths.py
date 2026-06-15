@@ -1,24 +1,11 @@
-"""Canonical path resolution for the coordination protocol.
+"""Canonical path resolution for greatminds projects.
 
-Every CLI module imports from here instead of forking its own copy of
-``find_coord_dir`` / ``find_canon_dir`` / ``caller_role``. The originals were
-duplicated across 6+ scripts in ``/opt/coordination/bin/*`` with subtle
-differences (some accept a ``start`` arg, some fall back to ``cwd/coordination``
-without dying, some validate the role against ``schema.yaml``).
+Project layout:
 
-Resolution rules (in order, first match wins):
-
-- **coord** (project-local task store, e.g. ``/opt/guardora/lattice/coordination/``):
-    1. ``$GREATMINDS_PROJECT_DIR / "coordination"`` if that directory exists.
-    2. Walk up from ``start`` (or ``Path.cwd()``) looking for ``coordination/``.
-
-- **canon** (package data — schema, bootstrap, COORDINATE, plugins, mcp,
-  templates):
-    1. ``$GREATMINDS_CANON_DIR`` if set and contains ``schema.yaml``.
-    2. ``importlib.resources.files('greatminds.data')`` — wheel-shipped data.
-
-- **role** (caller identity):
-    1. ``$GREATMINDS_ROLE`` (uppercased, trimmed). Empty → die.
+- ``coordination/`` is tracked, user-editable project configuration.
+- ``.greatminds/`` is ignored runtime/system state.
+- package data is the installed canon source for schema, bootstrap, docs,
+  templates, plugins, and profiles.
 """
 
 from __future__ import annotations
@@ -28,6 +15,9 @@ from pathlib import Path
 
 from .util import die
 
+
+CONFIG_DIR_NAME = "coordination"
+RUNTIME_DIR_NAME = ".greatminds"
 
 def _under_worktrees(path: Path) -> bool:
     """True if ``path`` has a ``.worktrees`` ancestor segment.
@@ -41,48 +31,124 @@ def _under_worktrees(path: Path) -> bool:
     return ".worktrees" in path.parts
 
 
-def find_coord_dir(start: Path | None = None, *, strict: bool = True) -> Path:
-    """Locate the project-local ``coordination/`` directory.
+def find_project_dir(start: Path | None = None, *, strict: bool = True) -> Path:
+    """Locate the project root.
 
-    Walks from ``start`` (default ``Path.cwd()``) upward looking for a
-    ``coordination/`` child. The ``$GREATMINDS_PROJECT_DIR`` env var overrides the
-    walk: if set, ``$GREATMINDS_PROJECT_DIR/coordination`` is returned unconditionally
-    when it exists.
-
-    Args:
-        start: starting point for the walk; ``None`` means ``Path.cwd()``.
-        strict: when ``True`` (the default) the function ``die``s if no
-            ``coordination/`` is found. When ``False`` it returns
-            ``start/coordination`` as a best-effort fallback (used by
-            ``pty-launch`` which runs before the project tree may exist).
+    ``$GREATMINDS_PROJECT_DIR`` wins. Otherwise walk upward from ``start`` and
+    look for either the runtime directory or the tracked config directory.
     """
     env_dir = os.environ.get("GREATMINDS_PROJECT_DIR")
     if env_dir:
-        p = Path(env_dir) / "coordination"
-        # Skip an orphan coordination/ that lives inside a worktree even
-        # when GREATMINDS_PROJECT_DIR points at the worktree (GitHub #10).
-        if p.is_dir() and not _under_worktrees(p):
-            return p
+        root = Path(env_dir).resolve()
+        if (root / RUNTIME_DIR_NAME).is_dir() and not _under_worktrees(root):
+            return root
+        if (root / CONFIG_DIR_NAME).is_dir() and not _under_worktrees(root):
+            return root
     cur = (start or Path.cwd()).resolve()
     for p in [cur, *cur.parents]:
-        c = p / "coordination"
-        # A coordination/ under .worktrees/<id>/ is an orphan, not the
-        # project store: keep walking up to the canonical project root.
-        if c.is_dir() and not _under_worktrees(c):
-            return c
+        if _under_worktrees(p):
+            continue
+        runtime = p / RUNTIME_DIR_NAME
+        config = p / CONFIG_DIR_NAME
+        if runtime.is_dir() or config.is_dir():
+            return p
     if not strict:
-        # Best-effort fallback. Never point at an orphan coordination/
-        # inside a worktree: if cwd is under .worktrees/, root the
-        # fallback at the directory holding .worktrees (the project root).
         base = cur
         if _under_worktrees(cur):
             for anc in cur.parents:
                 if anc.name == ".worktrees":
                     base = anc.parent
                     break
-        return base / "coordination"
-    die(1, f"no coordination/ directory found from {cur}")
-    raise SystemExit  # unreachable, helps type-checkers
+        return base
+    die(1, f"no greatminds project found from {cur}")
+    raise SystemExit
+
+
+def find_config_dir(start: Path | None = None, *, strict: bool = True) -> Path:
+    """Locate tracked project configuration under ``coordination/``."""
+    project = find_project_dir(start, strict=strict)
+    return project / CONFIG_DIR_NAME
+
+
+def find_runtime_dir(start: Path | None = None, *, strict: bool = True) -> Path:
+    """Locate ignored runtime/system state under ``.greatminds/``."""
+    project = find_project_dir(start, strict=strict)
+    runtime = project / RUNTIME_DIR_NAME
+    if not runtime.is_dir():
+        config = project / CONFIG_DIR_NAME
+        if config.is_dir():
+            return config
+    if strict and not runtime.is_dir():
+        die(1, f"no {RUNTIME_DIR_NAME}/ runtime directory found under {project}")
+        raise SystemExit
+    return runtime
+
+
+def find_coord_dir(start: Path | None = None, *, strict: bool = True) -> Path:
+    """Compatibility alias for the runtime directory.
+
+    Internal modules historically call the runtime task store ``coord``. In
+    the project layout, that store is ``.greatminds/``.
+    """
+    return find_runtime_dir(start, strict=strict)
+
+
+def project_config_dir(project_dir: Path) -> Path:
+    return project_dir / CONFIG_DIR_NAME
+
+
+def project_runtime_dir(project_dir: Path) -> Path:
+    runtime = project_dir / RUNTIME_DIR_NAME
+    if not runtime.is_dir():
+        config = project_dir / CONFIG_DIR_NAME
+        if config.is_dir():
+            return config
+    return runtime
+
+
+def project_env_file(project_dir: Path) -> Path:
+    return project_runtime_dir(project_dir) / "PROJECT.env"
+
+
+def coord_yaml_path(project_dir: Path) -> Path:
+    current = project_config_dir(project_dir) / "coord.yaml"
+    root_copy = project_dir / "coord.yaml"
+    if not current.is_file() and root_copy.is_file():
+        return root_copy
+    return current
+
+
+def stand_profiles_dir(project_dir: Path) -> Path:
+    return project_config_dir(project_dir) / "stand-profiles"
+
+
+def stand_profiles_registry_path(project_dir: Path) -> Path:
+    return project_config_dir(project_dir) / "stand-profiles.yaml"
+
+
+def config_dir_for_runtime(runtime_dir: Path) -> Path:
+    return runtime_dir.parent / CONFIG_DIR_NAME
+
+
+def ensure_layout_dirs(project_dir: Path) -> tuple[Path, Path]:
+    """Create and return ``(config_dir, runtime_dir)``."""
+    config = project_config_dir(project_dir)
+    runtime = project_runtime_dir(project_dir)
+    config.mkdir(parents=True, exist_ok=True)
+    runtime.mkdir(parents=True, exist_ok=True)
+    return config, runtime
+
+
+def project_schema_path(project_dir: Path) -> Path:
+    return project_runtime_dir(project_dir) / "schema.yaml"
+
+
+def project_bootstrap_path(project_dir: Path) -> Path:
+    return project_runtime_dir(project_dir) / "bootstrap.md"
+
+
+def project_coordinate_doc_path(project_dir: Path) -> Path:
+    return project_runtime_dir(project_dir) / "COORDINATE.md"
 
 
 def find_canon_dir() -> Path:

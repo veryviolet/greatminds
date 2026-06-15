@@ -44,7 +44,7 @@ def _write_coord_yaml(
     }
     p = project_dir / "coord.yaml"
     p.write_text(yaml.safe_dump(cfg), encoding="utf-8")
-    (project_dir / "coordination" / ".agent_registry").mkdir(parents=True, exist_ok=True)
+    (project_dir / ".greatminds" / ".agent_registry").mkdir(parents=True, exist_ok=True)
     return p
 
 
@@ -54,7 +54,7 @@ def _write_registry(
     pid: int,
     with_sock: bool = True,
 ) -> Path:
-    reg_dir = project_dir / "coordination" / ".agent_registry"
+    reg_dir = project_dir / ".greatminds" / ".agent_registry"
     reg_dir.mkdir(parents=True, exist_ok=True)
     payload: dict = {
         "role": role_lower.upper(),
@@ -355,7 +355,7 @@ def test_default_restart_preserves_sidecar_session_files_dead_pid(env):
     reserved for the explicit --reset flag."""
     _write_coord_yaml(env.project_dir)
     _write_registry(env.project_dir, "developer", pid=9999, with_sock=True)
-    reg_dir = env.project_dir / "coordination" / ".agent_registry"
+    reg_dir = env.project_dir / ".greatminds" / ".agent_registry"
     (reg_dir / "developer.session-id").write_text("claude-sid", encoding="utf-8")
     (reg_dir / "developer.codex-session-id").write_text("codex-sid", encoding="utf-8")
 
@@ -622,7 +622,7 @@ def _run_reset(env_) -> "CliRunner.invoke":
 
 def _seed_session_files(project_dir: Path, role_lower: str) -> tuple[Path, Path]:
     """Drop both claude and codex session-id files for ``role_lower``."""
-    reg_dir = project_dir / "coordination" / ".agent_registry"
+    reg_dir = project_dir / ".greatminds" / ".agent_registry"
     claude_sid = reg_dir / f"{role_lower}.session-id"
     codex_sid = reg_dir / f"{role_lower}.codex-session-id"
     claude_sid.write_text("11111111-2222-3333-4444-555555555555\n", encoding="utf-8")

@@ -1,8 +1,9 @@
 # Lifecycle Model
 
 greatminds separates a role's responsibility from the mechanics used to run
-that role. The contract lives in `coordination/schema.yaml`; `coord.yaml` chooses the tool
-and launch mode for a concrete project.
+that role. The packaged schema defines the role contract; setup copies the
+runtime copy to `.greatminds/schema.yaml`. `coordination/coord.yaml` chooses
+the tool and launch mode for a concrete project.
 
 ## Role Lifecycles
 

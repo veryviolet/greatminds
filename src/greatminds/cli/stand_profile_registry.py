@@ -14,12 +14,22 @@ from typing import Any
 import yaml
 
 from greatminds.core.errors import GreatMindsError
-from greatminds.core.paths import find_canon_dir
+from greatminds.core.paths import (
+    RUNTIME_DIR_NAME,
+    config_dir_for_runtime,
+    find_canon_dir,
+)
 
 
 REGISTRY_FILENAME = "stand-profiles.yaml"
 PROFILE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 PROFILE_APPROVAL_TOKEN = "USER_APPROVED"
+
+
+def _config_dir(coord_or_config_dir: Path) -> Path:
+    if coord_or_config_dir.name == RUNTIME_DIR_NAME:
+        return config_dir_for_runtime(coord_or_config_dir)
+    return coord_or_config_dir
 
 
 @dataclass(frozen=True)
@@ -79,7 +89,7 @@ def registry_path(coord_dir: Path, *, worktree: str | Path | None = None
         wt_path = Path(worktree) / "coordination" / REGISTRY_FILENAME
         if wt_path.is_file():
             return wt_path, "lease-worktree"
-    return coord_dir / REGISTRY_FILENAME, "main"
+    return _config_dir(coord_dir) / REGISTRY_FILENAME, "main"
 
 
 def _safe_profile_name(name: str) -> bool:
@@ -230,7 +240,7 @@ def load_registry(coord_dir: Path, *,
 
 
 def profile_file_path(coord_dir: Path, entry: ProfileEntry) -> Path:
-    return coord_dir / "stand-profiles" / entry.file
+    return _config_dir(coord_dir) / "stand-profiles" / entry.file
 
 
 def validate_profile_lease_policy(entry: ProfileEntry, *,
@@ -274,7 +284,7 @@ def doctor_registry(coord_dir: Path, *,
             continue
         if spec.format != "yaml":
             errors.append(f"{entry.name}: profile file must be YAML")
-    profiles_dir = coord_dir / "stand-profiles"
+    profiles_dir = _config_dir(coord_dir) / "stand-profiles"
     if profiles_dir.is_dir():
         registered_files = {entry.file for entry in registry.profiles.values()}
         for path in sorted(profiles_dir.glob("*.yaml")):

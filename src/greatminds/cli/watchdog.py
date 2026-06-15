@@ -23,7 +23,7 @@ from pathlib import Path
 import click
 import yaml
 
-from greatminds.core.paths import find_canon_dir
+from greatminds.core.paths import find_canon_dir, find_runtime_dir
 from greatminds.cli._colors import err, info, ok, warn
 
 
@@ -79,7 +79,7 @@ def _read_json_file(path: Path) -> dict:
     help=__doc__,
 )
 @click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
-              default=None, help="project root containing coordination/ (default: cwd)")
+              default=None, help="project root containing .greatminds/ (default: cwd)")
 @click.option("--canon-dir", type=click.Path(exists=True, file_okay=False, path_type=Path),
               default=None, help="canon data directory (default: packaged greatminds.data)")
 @click.option("--quiet", is_flag=True, help="only print sections with findings")
@@ -87,10 +87,10 @@ def watchdog(project_dir: Path | None, canon_dir: Path | None, quiet: bool) -> N
     project_dir = project_dir or Path.cwd()
     canon_dir = canon_dir or find_canon_dir()
 
-    if project_dir.name == "coordination" and (project_dir / "stand_requests").is_dir():
+    if project_dir.name == ".greatminds" and (project_dir / ".stand").is_dir():
         coord = project_dir
     else:
-        coord = project_dir / "coordination"
+        coord = find_runtime_dir(project_dir, strict=False)
     if not coord.is_dir():
         err(f"error: {coord} not found")
         raise click.exceptions.Exit(1)

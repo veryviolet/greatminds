@@ -12,7 +12,7 @@ from __future__ import annotations
 import click
 
 from greatminds.core.errors import GreatMindsError
-from greatminds.core.paths import find_coord_dir
+from greatminds.core.paths import find_config_dir
 
 
 @click.group(name="project",
@@ -24,7 +24,7 @@ def project() -> None:
 @project.command(name="show",
                  help="print coordination/PROJECT.md (read-only).")
 def project_show() -> None:
-    coord = find_coord_dir()
+    coord = find_config_dir()
     p = coord / "PROJECT.md"
     if not p.is_file():
         raise GreatMindsError(

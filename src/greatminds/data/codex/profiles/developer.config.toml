@@ -1,6 +1,6 @@
 # Profile: developer
 # Usage: codex exec --profile developer "<prompt>"
-# Copied to coordination/.codex-home/developer/ by `greatminds setup`.
+# Copied to .greatminds/.codex-home/developer/ by `greatminds setup`.
 # This directory is a role config source only; Codex auth uses the single
 # machine CODEX_HOME (~/.codex or GREATMINDS_CODEX_HOME).
 
@@ -11,7 +11,7 @@ At the very FIRST step of every tick, before reading inbox or anything else, run
 
     greatminds task list feature_dev
 
-(any read-only greatminds CLI call works — it atomically touches coordination/heartbeat.developer as a side effect; the heartbeat is what coordd, watchdog, and stalled_agent_sweep rely on to know you are alive). Do this every tick, no exceptions, even when you have nothing else to do.
+(any read-only greatminds CLI call works — it atomically touches .greatminds/heartbeat.developer as a side effect; the heartbeat is what coordd, watchdog, and stalled_agent_sweep rely on to know you are alive). Do this every tick, no exceptions, even when you have nothing else to do.
 
 ---
 
@@ -33,7 +33,7 @@ On handback (task returns to feature_dev) — fix per the bouncing role's notes,
 
 Waiting on an external dependency (e.g. another task must verify first): greatminds task append-block blocked --id <X> --field dependencies=<queue>/<id>.yaml --field resume_to=feature_dev, then greatminds task mv <X> feature_blocked.
 
-Mutation paths: greatminds task / greatminds inbox / greatminds stand only. No bare mv/Edit on coordination/ files.
+Mutation paths: greatminds task / greatminds inbox / greatminds stand only. No bare mv/Edit/Write on .greatminds/ runtime files.
 
 Forbidden: stand.status writes, deploy/restart/rsync, commit/push, claiming ui/docs/stand tasks, product validation on the stand instead of TESTER, reading or moving from feature_plan/.
 """

@@ -7,7 +7,7 @@ eligible loop/chat agents whose registry entry is missing or dead.
   2. ``tmux has-session -t <session>``; if missing, shell out to
      ``greatminds launch --target tmux``.
   3. For each window in ``coord.yaml`` with a non-empty ``role``,
-     resolve ``coordination/.agent_registry/<role-lowercase>.json``:
+     resolve ``.greatminds/.agent_registry/<role-lowercase>.json``:
        - missing / pid dead / no pid → relaunch eligible loop/chat panes with
          ``greatminds start-agent``.
        - driven and staged roles are skipped because coordd or the operator
@@ -38,6 +38,7 @@ import click
 import yaml
 
 from greatminds.cli._colors import err, info
+from greatminds.core.paths import coord_yaml_path, project_env_file, project_runtime_dir
 
 
 VERIFY_WAIT_SEC = 10
@@ -311,7 +312,7 @@ def _soft_inject_bootstrap(
     coord_dir: Path,
 ) -> tuple[bool, str]:
     """``--bootstrap`` (soft): paste the static system prompt
-    (``coordination/bootstrap.md``) into the live tmux pane and submit
+    (``.greatminds/bootstrap.md``) into the live tmux pane and submit
     with Enter. The agent keeps running and re-reads canon on its next
     reply. Session-id files are NOT touched; the agent's pid is NOT
     killed; claude ``--resume`` / codex resume continuity is preserved.
@@ -575,11 +576,13 @@ def _restart_dead_agents(
                 Path.home() / ".config" / "greatminds" / "agent-env"
                 / f"{session}.env"
             )
+            project_env = project_env_file(registry_dir.parent.parent)
             _tmux("send-keys", "-t", f"{session}:{name}",
                   f"set -a; [ -f {shlex.quote(str(agent_env))} ] && "
                   f". {shlex.quote(str(agent_env))}; "
-                  "[ -f coordination/PROJECT.env ] && "
-                  ". coordination/PROJECT.env; set +a", "Enter")
+                  f"[ -f {shlex.quote(str(project_env))} ] && "
+                  f". {shlex.quote(str(project_env))}; "
+                  "set +a", "Enter")
             cp = _tmux(
                 "send-keys", "-t", f"{session}:{name}",
                 launch_cmd, "Enter",
@@ -718,7 +721,7 @@ def _verify(
     "--config", "config_path",
     type=click.Path(dir_okay=False, path_type=Path),
     default=None,
-    help="path to coord.yaml (default: <project>/coord.yaml)",
+    help="path to coord.yaml (default: <project>/coordination/coord.yaml)",
 )
 @click.option(
     "--project-dir",
@@ -731,7 +734,7 @@ def _verify(
     is_flag=True,
     default=False,
     help=("soft canon refresh for alive agents. Pastes the static "
-          "`coordination/bootstrap.md` into the live tmux pane via "
+          "`.greatminds/bootstrap.md` into the live tmux pane via "
           "bracketed paste, then submits with "
           "Enter. The agent keeps running — session-id files are NOT "
           "touched, pid is NOT killed, claude --resume / codex resume "
@@ -758,11 +761,9 @@ def restart(
     reset: bool,
 ) -> None:
     if config_path is None:
-        for p in (Path.cwd() / "coord.yaml",
-                  Path.cwd() / "coordination" / "coord.yaml"):
-            if p.is_file():
-                config_path = p
-                break
+        p = coord_yaml_path(Path.cwd())
+        if p.is_file():
+            config_path = p
     if config_path is None or not config_path.is_file():
         err("coord.yaml not found (pass --config or run from project root)")
         raise click.exceptions.Exit(1)
@@ -781,7 +782,7 @@ def restart(
         err("coord.yaml: windows must be a non-empty list")
         raise click.exceptions.Exit(1)
 
-    registry_dir = project_dir / "coordination" / ".agent_registry"
+    registry_dir = project_runtime_dir(project_dir) / ".agent_registry"
 
     if bootstrap and reset:
         raise click.UsageError(

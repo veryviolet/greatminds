@@ -1,6 +1,6 @@
 """Tests for task 0158 historical per-role Codex home behavior.
 
-0158 introduced ``coordination/.codex-home/<role>/`` profile sources.
+0158 introduced ``.greatminds/.codex-home/<role>/`` profile sources.
 0390 later superseded the launch/auth part: current Codex launch paths set
 ``CODEX_HOME`` to the single machine Codex home and read role settings from the
 per-role source as command-line overrides.
@@ -41,7 +41,7 @@ def fake_home(tmp_path, monkeypatch):
 
 def _seed_codex_home(project: Path, role_lower: str) -> Path:
     """Drop a config.toml under the per-role Codex profile source."""
-    home = project / "coordination" / ".codex-home" / role_lower
+    home = project / ".greatminds" / ".codex-home" / role_lower
     home.mkdir(parents=True)
     (home / "config.toml").write_text(
         f'developer_instructions = "ok"\n\n[profiles.{role_lower}]\n'
@@ -73,7 +73,7 @@ def test_codex_home_set_when_per_role_home_exists(tmp_path: Path, monkeypatch) -
 
     # Replicate the 0158 inline logic for an isolated unit-level pin.
     role_lower = "architect-reviewer"
-    codex_home = project / "coordination" / ".codex-home" / role_lower
+    codex_home = project / ".greatminds" / ".codex-home" / role_lower
     if (codex_home / "config.toml").is_file():
         os.environ["CODEX_HOME"] = str(codex_home)
 
@@ -90,7 +90,7 @@ def test_codex_home_unset_when_per_role_home_missing(tmp_path: Path, fake_home) 
     # No per-role home seeded.
 
     role_lower = "architect-reviewer"
-    codex_home = project / "coordination" / ".codex-home" / role_lower
+    codex_home = project / ".greatminds" / ".codex-home" / role_lower
     if (codex_home / "config.toml").is_file():
         os.environ["CODEX_HOME"] = str(codex_home)
 
@@ -143,7 +143,7 @@ def test_legacy_fallback_warns_when_per_role_home_missing(
     project.mkdir()
     _seed_legacy(fake_home, "architect-reviewer")
     role_lower = "architect-reviewer"
-    codex_home = project / "coordination" / ".codex-home" / role_lower
+    codex_home = project / ".greatminds" / ".codex-home" / role_lower
     legacy = Path.home() / ".codex" / f"{role_lower}.config.toml"
     import sys as _sys
     if (codex_home / "config.toml").is_file():
@@ -173,7 +173,7 @@ def test_no_warning_when_per_role_home_present(tmp_path: Path,
     _seed_codex_home(project, "architect-reviewer")
     _seed_legacy(fake_home, "architect-reviewer")  # legacy present too
     role_lower = "architect-reviewer"
-    codex_home = project / "coordination" / ".codex-home" / role_lower
+    codex_home = project / ".greatminds" / ".codex-home" / role_lower
     legacy = Path.home() / ".codex" / f"{role_lower}.config.toml"
     import sys as _sys
     if (codex_home / "config.toml").is_file():

@@ -128,7 +128,7 @@ def test_machine_codex_home_resolution(monkeypatch):
     assert cd._machine_codex_home() == "/opt/machine/.codex"
     # 3. an inherited PER-ROLE home is rejected → fall back to ~/.codex
     monkeypatch.setenv(
-        "CODEX_HOME", "/proj/coordination/.codex-home/architect-reviewer")
+        "CODEX_HOME", "/proj/.greatminds/.codex-home/architect-reviewer")
     assert cd._machine_codex_home() == "/home/violet/.codex"
     # 4. nothing set → ~/.codex
     monkeypatch.delenv("CODEX_HOME", raising=False)

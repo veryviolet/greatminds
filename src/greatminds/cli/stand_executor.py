@@ -36,7 +36,7 @@ PREREQ_TAG = "prerequisite"
 
 
 def read_project_env(coord: Path | None) -> dict[str, str]:
-    """Parse ``coordination/PROJECT.env`` (``KEY=value`` lines) into a dict.
+    """Parse ``.greatminds/PROJECT.env`` (``KEY=value`` lines) into a dict.
 
     PROJECT.env is the SINGLE per-fleet config source, visible to everyone:
     injected into the daemon + every driven agent's process environment

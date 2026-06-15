@@ -840,21 +840,21 @@ scenarios:
     stand_profile: vite-dev
 
 # ---------------------------------------------------------------------------
-# Coordination access
+# Runtime access
 #
-# Hard rule for EVERY role (incl. ARCHITECT-PLANNER): access to
-# coordination/ is ONLY via the greatminds CLI; raw ls/cat/grep/sed/edit
-# on coordination/ is forbidden. Why: a raw relative coordination/ path
-# breaks from a per-task worktree cwd (the worktree has no
-# coordination/); the CLI resolves the project root regardless of cwd;
+# Hard rule for EVERY role (incl. ARCHITECT-PLANNER): mutation and queue
+# inspection for .greatminds/ runtime state is ONLY via the greatminds CLI;
+# raw ls/cat/grep/sed/edit on runtime queues/inbox/stand state is forbidden.
+# Why: a raw relative path breaks from a per-task worktree cwd; the CLI
+# resolves the project root regardless of cwd;
 # and a direct task-yaml edit bypasses FSM validation. Every agent
 # reads this rule from canon at tick start (machine-readable, no prose).
 # ---------------------------------------------------------------------------
-coordination_access:
+runtime_access:
   cli_only: true
-  rule: coordination_access_via_greatminds_cli_only
+  rule: runtime_access_via_greatminds_cli_only
   forbidden:
-    - raw_ls_cat_grep_sed_edit_on_coordination
+    - raw_ls_cat_grep_sed_edit_on_runtime_state
   surfaces:
     - greatminds inbox list|show|ack|send
     - greatminds task list|show|mv|append-block
@@ -866,7 +866,7 @@ coordination_access:
 # heartbeat is NOT a periodic liveness signal. Between turns a driven
 # pane is idle bash — that is normal, not "stale". heartbeat matters in
 # exactly one situation: coordd dispatched a turn to an agent and holds
-# that role's run-lock. The agent touches coordination/heartbeat.<role>
+# that role's run-lock. The agent touches .greatminds/heartbeat.<role>
 # as a side effect of every greatminds CLI call, so a progressing turn
 # keeps it fresh. If a turn is in-flight (run-lock held) AND the
 # heartbeat has not advanced for `hang_threshold_seconds`, the turn is
@@ -1298,7 +1298,7 @@ report_upstream:
   upstream_repo_required: true
 
 # Canonical list of system variables greatminds reads out of
-# the box. ``setup`` generates ``coordination/PROJECT.env`` from this
+# the box. ``setup`` generates ``.greatminds/PROJECT.env`` from this
 # section, pre-populating each var with its description / acquire
 # instructions. Users add their own KEY=value to PROJECT.env after
 # setup; only the entries listed here come from canon.

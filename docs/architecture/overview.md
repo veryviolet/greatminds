@@ -15,10 +15,11 @@ If a daemon is down, the queues still describe the work.
 
 ## Contract sources
 
-- `coordination/schema.yaml` defines queues, roles, transitions, required
-  fields, stand profiles, scenarios, and watchdog thresholds.
-- `coordination/COORDINATE.md` explains the invariants behind the schema.
-- Role contracts in `coordination/schema.yaml` define what each role may claim,
+- The packaged schema defines queues, roles, transitions, required fields,
+  stand profile tokens, scenarios, and watchdog thresholds. Setup copies the
+  runtime copy to `.greatminds/schema.yaml`.
+- `.greatminds/COORDINATE.md` explains the invariants behind the schema.
+- Role contracts in `.greatminds/schema.yaml` define what each role may claim,
   write, and move.
 
-When schema and prose disagree on mechanics, `coordination/schema.yaml` wins.
+When schema and prose disagree on mechanics, `.greatminds/schema.yaml` wins.

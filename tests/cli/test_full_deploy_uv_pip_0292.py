@@ -1,5 +1,5 @@
 """Tests for task 0292: canon ``full-deploy.yaml`` must use
-``uv pip install`` (not ``.venv-coord/bin/pip``) since ``uv venv``
+``uv pip install`` (not ``.venv/bin/pip``) since ``uv venv``
 doesn't install pip into the venv by default.
 
 EXPLORER 2026-05-27 finding: Phase H lease on 0284 failed at the
@@ -72,7 +72,7 @@ def _chdir(task: dict) -> str | None:
 def test_install_step_uses_uv_pip_not_dot_venv_pip() -> None:
     """0292: the install command must invoke ``uv pip install``
     (uv's built-in pip surface) — NOT the missing
-    ``.venv-coord/bin/pip`` binary."""
+    ``.venv/bin/pip`` binary."""
     play = _full_deploy_playbook()
     task = _install_task(play)
     cmd = _cmd_text(task)
@@ -80,20 +80,20 @@ def test_install_step_uses_uv_pip_not_dot_venv_pip() -> None:
         f"0292: install command must use 'uv pip install' "
         f"(got: {cmd!r})"
     )
-    assert ".venv-coord/bin/pip " not in cmd, (
-        f"0292: must not invoke .venv-coord/bin/pip directly "
+    assert ".venv/bin/pip " not in cmd, (
+        f"0292: must not invoke .venv/bin/pip directly "
         f"(uv venv lacks pip): {cmd!r}"
     )
 
 
 def test_install_step_pins_python_interpreter() -> None:
     """``uv pip install`` must be pinned to the venv's interpreter
-    via ``--python .venv-coord/bin/python`` so the wheel lands in
+    via ``--python .venv/bin/python`` so the wheel lands in
     the right env."""
     play = _full_deploy_playbook()
     task = _install_task(play)
     cmd = _cmd_text(task)
-    assert "--python .venv-coord/bin/python" in cmd, (
+    assert "--python .venv/bin/python" in cmd, (
         f"0292: install command must --python-pin the venv's "
         f"interpreter (got: {cmd!r})"
     )

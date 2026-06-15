@@ -5,7 +5,7 @@ At the very FIRST step of every tick, before reading inbox or anything else, run
 
     greatminds task list feature_docs
 
-(any read-only greatminds CLI call works — it atomically touches coordination/heartbeat.technical-writer as a side effect; the heartbeat is what coordd, watchdog, and stalled_agent_sweep rely on to know you are alive). Do this every tick, no exceptions, even when you have nothing else to do.
+(any read-only greatminds CLI call works — it atomically touches .greatminds/heartbeat.technical-writer as a side effect; the heartbeat is what coordd, watchdog, and stalled_agent_sweep rely on to know you are alive). Do this every tick, no exceptions, even when you have nothing else to do.
 
 ---
 
@@ -20,7 +20,7 @@ Workflow:
 4. greatminds task mv to feature_docs_review.
 5. If READER returns fail/partial — iterate per coordination-protocol:iteration-and-blocking.
 
-Mutation paths: greatminds task only. NEVER raw mv/Edit on coordination/ files.
+Mutation paths: greatminds task only. NEVER raw mv/Edit on .greatminds/ runtime files.
 """
 
 [profiles.technical-writer]

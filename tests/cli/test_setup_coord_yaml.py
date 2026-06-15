@@ -54,6 +54,12 @@ def _invoke(args: list[str]):
     )
 
 
+def _coord_yaml(project_dir: Path) -> Path:
+    path = project_dir / "coordination" / "coord.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 # ---------------------------------------------------------------------------
 # Default session = basename(project_dir)
 # ---------------------------------------------------------------------------
@@ -65,7 +71,7 @@ def test_fresh_setup_generates_coord_yaml_with_basename_session(tmp_path):
     result = _invoke(["--project-dir", str(project_dir)])
     assert result.exit_code == 0, result.output
 
-    coord_yaml = project_dir / "coord.yaml"
+    coord_yaml = _coord_yaml(project_dir)
     assert coord_yaml.is_file()
     doc = yaml.safe_load(coord_yaml.read_text(encoding="utf-8"))
     assert doc["session"] == "foo-project"
@@ -80,9 +86,9 @@ def test_fresh_setup_keeps_greatminds_canon_under_coordination(tmp_path):
 
     assert not (project_dir / "schema.yaml").exists()
     assert not (project_dir / "COORDINATE.md").exists()
-    assert (project_dir / "coordination" / "schema.yaml").is_file()
-    assert (project_dir / "coordination" / "COORDINATE.md").is_file()
-    assert (project_dir / "coordination" / "bootstrap.md").is_file()
+    assert (project_dir / ".greatminds" / "schema.yaml").is_file()
+    assert (project_dir / ".greatminds" / "COORDINATE.md").is_file()
+    assert (project_dir / ".greatminds" / "bootstrap.md").is_file()
 
 
 def test_setup_relocates_legacy_root_canon_files(tmp_path):
@@ -96,7 +102,7 @@ def test_setup_relocates_legacy_root_canon_files(tmp_path):
     result = _invoke(["--project-dir", str(project_dir)])
     assert result.exit_code == 0, result.output
 
-    coord = project_dir / "coordination"
+    coord = project_dir / ".greatminds"
     assert not (project_dir / "schema.yaml").exists()
     assert not (project_dir / "COORDINATE.md").exists()
     assert (coord / "schema.yaml").is_file()
@@ -112,7 +118,7 @@ def test_explicit_session_flag_overrides_default(tmp_path):
     project_dir.mkdir()
     result = _invoke(["--project-dir", str(project_dir), "--session", "alpha"])
     assert result.exit_code == 0, result.output
-    doc = yaml.safe_load((project_dir / "coord.yaml").read_text())
+    doc = yaml.safe_load((_coord_yaml(project_dir)).read_text())
     assert doc["session"] == "alpha"
 
 
@@ -125,12 +131,12 @@ def test_existing_coord_yaml_is_left_untouched(tmp_path):
     project_dir = tmp_path / "with-existing"
     project_dir.mkdir()
     custom = "session: hand-rolled\nproject_dir: /irrelevant\nwindows: []\n"
-    (project_dir / "coord.yaml").write_text(custom, encoding="utf-8")
+    (_coord_yaml(project_dir)).write_text(custom, encoding="utf-8")
 
     result = _invoke(["--project-dir", str(project_dir),
                       "--session", "would-be-overwritten"])
     assert result.exit_code == 0, result.output
-    assert (project_dir / "coord.yaml").read_text() == custom
+    assert (_coord_yaml(project_dir)).read_text() == custom
     assert "exists, skipping" in result.output
 
 
@@ -141,14 +147,14 @@ def test_force_flag_does_not_overwrite_existing_coord_yaml(tmp_path):
     project_dir = tmp_path / "with-existing-force"
     project_dir.mkdir()
     custom = "session: handrolled\nproject_dir: /irrelevant\nwindows: []\n"
-    (project_dir / "coord.yaml").write_text(custom, encoding="utf-8")
+    (_coord_yaml(project_dir)).write_text(custom, encoding="utf-8")
 
     result = _invoke(["--project-dir", str(project_dir),
                       "--session", "would-be-overwritten",
                       "--force"])
     assert result.exit_code == 0, result.output
     # Even with --force, coord.yaml is preserved.
-    assert (project_dir / "coord.yaml").read_text() == custom
+    assert (_coord_yaml(project_dir)).read_text() == custom
     assert "exists, skipping" in result.output
 
 
@@ -196,7 +202,7 @@ def test_generated_coord_yaml_has_canonical_windows(tmp_path):
     project_dir.mkdir()
     result = _invoke(["--project-dir", str(project_dir)])
     assert result.exit_code == 0, result.output
-    doc = yaml.safe_load((project_dir / "coord.yaml").read_text())
+    doc = yaml.safe_load((_coord_yaml(project_dir)).read_text())
 
     assert isinstance(doc["windows"], list)
     assert len(doc["windows"]) == len(CANONICAL_WINDOWS)
@@ -217,7 +223,7 @@ def test_generated_coord_yaml_roundtrips_through_yaml_safe_load(tmp_path):
     project_dir = tmp_path / "rt"
     project_dir.mkdir()
     _invoke(["--project-dir", str(project_dir)])
-    text = (project_dir / "coord.yaml").read_text(encoding="utf-8")
+    text = (_coord_yaml(project_dir)).read_text(encoding="utf-8")
     doc = yaml.safe_load(text)
     assert isinstance(doc, dict)
     # Roundtrip yaml→text→yaml.
@@ -245,7 +251,7 @@ def test_registry_populated_when_coord_yaml_pre_exists(tmp_path):
     refreshed in case the project_dir was moved/renamed)."""
     project_dir = tmp_path / "beta"
     project_dir.mkdir()
-    (project_dir / "coord.yaml").write_text(
+    (_coord_yaml(project_dir)).write_text(
         yaml.safe_dump({"session": "beta-existing", "windows": []}),
         encoding="utf-8",
     )
@@ -271,7 +277,7 @@ def test_setup_degrades_gracefully_when_register_project_fails(
     assert result.exit_code == 0, result.output
     assert "could not register" in result.output
     # coord.yaml still generated; only the registry step degraded.
-    assert (project_dir / "coord.yaml").is_file()
+    assert (_coord_yaml(project_dir)).is_file()
 
 
 # ---------------------------------------------------------------------------
@@ -309,7 +315,7 @@ def test_valid_session_names_are_accepted(tmp_path, good):
     project_dir.mkdir()
     result = _invoke(["--project-dir", str(project_dir), "--session", good])
     assert result.exit_code == 0
-    doc = yaml.safe_load((project_dir / "coord.yaml").read_text())
+    doc = yaml.safe_load((_coord_yaml(project_dir)).read_text())
     assert doc["session"] == good
 
 
@@ -323,7 +329,7 @@ def test_default_session_strips_leading_dot(tmp_path):
     project_dir.mkdir()
     result = _invoke(["--project-dir", str(project_dir)])
     assert result.exit_code == 0
-    doc = yaml.safe_load((project_dir / "coord.yaml").read_text())
+    doc = yaml.safe_load((_coord_yaml(project_dir)).read_text())
     assert doc["session"] == "dotted"
 
 

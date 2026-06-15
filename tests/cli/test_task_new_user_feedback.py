@@ -58,7 +58,7 @@ def test_user_feedback_intake_works_without_role_env(tmp_path: Path):
         f"GREATMINDS_ROLE. stderr={cp.stderr}"
     )
 
-    files = list((proj / "coordination" / "user_feedback").glob("*.yaml"))
+    files = list((proj / ".greatminds" / "user_feedback").glob("*.yaml"))
     assert len(files) == 1, files
     data = yaml.safe_load(files[0].read_text(encoding="utf-8"))
     # Reporter is what the caller passed explicitly.
@@ -77,7 +77,7 @@ def test_user_feedback_intake_records_user_as_actor_in_journal(tmp_path: Path):
                      "--in-queue", "user_feedback")
     assert cp.returncode == 0, cp.stderr
 
-    journal = (proj / "coordination" / "journal.ndjson")
+    journal = (proj / ".greatminds" / "journal.ndjson")
     assert journal.is_file(), "journal must exist after task new"
     lines = journal.read_text(encoding="utf-8").splitlines()
     new_lines = [l for l in lines if '"from": "_new"' in l]
@@ -131,7 +131,7 @@ def test_user_feedback_intake_with_role_env_uses_that_role(tmp_path: Path):
     )
     assert cp.returncode == 0, cp.stderr
 
-    journal = proj / "coordination" / "journal.ndjson"
+    journal = proj / ".greatminds" / "journal.ndjson"
     lines = journal.read_text(encoding="utf-8").splitlines()
     import json as _json
     rec = _json.loads([l for l in lines if '"from": "_new"' in l][-1])

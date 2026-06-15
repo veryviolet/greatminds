@@ -155,7 +155,8 @@ def test_body_cap_enforced_when_symptom_alone_exceeds_cap(tmp_path):
         severity="normal",
         user_body=huge_user_body,
         project_root=tmp_path,
-        coord_dir=coord,
+        config_dir=coord,
+        runtime_dir=coord,
         include_diagnostics=True,
     )
     assert len(body) <= ru_mod.BODY_SIZE_CAP, \
@@ -542,10 +543,9 @@ def test_full_report_body_environment_line_no_venv_coord(monkeypatch, tmp_path):
     body, _ = ru_mod._build_body(
         title="t", severity="medium",
         user_body="symptom text",
-        project_root=proj, coord_dir=coord,
+        project_root=proj, config_dir=coord, runtime_dir=coord,
         include_diagnostics=True,
     )
     assert ".venv-coord" not in body, body
     assert "venv: /home/u/p/.venv (PyPI wheel)" in body
-
 

@@ -4,7 +4,7 @@
 # no per-edit redeploy. The dev server stays up across the interactive session.
 #
 # Host scheme (same as full-deploy.yaml): greatminds is host-agnostic — it
-# passes the WHOLE coordination/PROJECT.env (+ lease meta) as --extra-vars, so
+# passes the WHOLE .greatminds/PROJECT.env (+ lease meta) as --extra-vars, so
 # every key is `{{ KEY }}` here. Play 1 registers the stand node(s) from
 # `STAND_HOST` (single alias, or comma list) via add_host; Play 2 deploys.
 # Override any var (deploy_path / vite_port / ui_dir) from PROJECT.env.

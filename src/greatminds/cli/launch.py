@@ -1,7 +1,7 @@
 """greatminds launch — start the fleet (tmux | vscode | cursor-ide).
 
-Reads ``<project>/coord.yaml``, detects the project's Python env via
-``greatminds.core.env``, and:
+Reads ``<project>/coordination/coord.yaml``, detects the project's Python env
+via ``greatminds.core.env``, and:
 
   ``--target tmux``        creates a tmux session with one window per
                            role. Each window pre-types the env activation
@@ -42,6 +42,7 @@ import click
 import yaml
 
 from greatminds.core import env as gm_env
+from greatminds.core.paths import coord_yaml_path, project_config_dir, project_env_file
 from greatminds.cli._colors import err, header, info, ok, warn
 
 
@@ -216,10 +217,10 @@ def _emit_tmux(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
         err("coord.yaml: windows must be a non-empty list")
         raise click.exceptions.Exit(1)
 
-    # Driven roles have NO tmux pane — coordd runs each turn as a managed
+    # Driven roles have NO tmux pane; coordd runs each turn as a managed
     # subprocess (claude -p / codex app-server) and captures output to
-    # coordination/.turns/. The tmux session is only the human-facing /
-    # resident panes: interactive (PLANNER), self-loop (MAINTAINER), the
+    # .greatminds/.turns/. The tmux session is only the human-facing
+    # resident panes: interactive roles, self-loop MAINTAINER, the
     # dashboard, and any bare bash window. Driven entries stay in
     # coord.yaml so coordd can read their tool — they just don't get a
     # window. (coord.yaml still drives coordd's per-role tool lookup.)
@@ -317,19 +318,11 @@ def _emit_tmux(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
             _tmux("send-keys", "-t", f"{session}:{name}",
                   f"set -a; [ -f {shlex.quote(str(agent_env))} ] && "
                   f". {shlex.quote(str(agent_env))}; "
-                  "[ -f coordination/PROJECT.env ] && "
-                  ". coordination/PROJECT.env; set +a", "Enter")
-        # 3. 0308: emit the launch_command directly + Enter. Pre-0308
-        # we installed a wrapper-loop bash one-liner that printed
-        # ``press Enter to (re)start <ROLE>...`` and blocked on
-        # ``read -r _`` — so the operator had to press Enter once per
-        # pane to actually start the agents. The wrapper also hid the
-        # actual command behind ~120 chars of bash, which made
-        # debugging confusing. 0308 removes the wrapper: clear the
-        # bash line with ``C-u`` (defense against leftover characters
-        # from earlier commands), then send the launch_command + Enter.
-        # ``restart.py`` mirrors this exact sequence when resurrecting
-        # a dead agent in an existing pane.
+                  f"[ -f {shlex.quote(str(project_env_file(project_dir)))} ] && "
+                  f". {shlex.quote(str(project_env_file(project_dir)))}; "
+                  "set +a", "Enter")
+        # 3. Emit the launch command directly. ``restart.py`` mirrors this
+        # exact sequence when resurrecting a dead agent in an existing pane.
         if launch_cmd:
             _tmux("send-keys", "-t", f"{session}:{name}", "C-u")
             if mode == "staged":
@@ -347,12 +340,7 @@ def _emit_tmux(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
     info(f"  attach:   tmux a -t {session}")
     info(f"  detach:   Ctrl+B d")
     info(f"  switch:   Ctrl+B <num>   or   Ctrl+B w (list)")
-    info(f"\neach window: env activated ({setup.env_type or 'system'}), "
-         f"wrapper-loop installed that re-runs '{launcher} <ROLE> <tool>' "
-         f"on Enter.")
-    info("press Enter in each window to start the first agent. "
-         "Subsequent agent exits print 'press Enter to (re)start ...' "
-         "and wait — `greatminds restart` lands on that prompt.")
+    info(f"\neach window: env activated ({setup.env_type or 'system'}).")
 
 
 def _emit_vscode(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
@@ -452,7 +440,8 @@ def _emit_vscode(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
               type=click.Choice(["tmux", "vscode", "cursor-ide"]),
               help="frontend (default: tmux)")
 @click.option("--config", "config_path", type=click.Path(dir_okay=False, path_type=Path),
-              default=None, help="path to coord.yaml (default: <project>/coord.yaml)")
+              default=None,
+              help="path to coord.yaml (default: <project>/coordination/coord.yaml)")
 @click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
               default=None, help="override config.project_dir / cwd")
 @click.option("--venv", type=click.Path(file_okay=False, path_type=Path),
@@ -463,11 +452,9 @@ def launch(target: str, config_path: Path | None, project_dir: Path | None,
            venv: Path | None, recreate: bool) -> None:
     # Locate coord.yaml.
     if config_path is None:
-        for p in (Path.cwd() / "coord.yaml",
-                  Path.cwd() / "coordination" / "coord.yaml"):
-            if p.is_file():
-                config_path = p
-                break
+        p = coord_yaml_path(Path.cwd())
+        if p.is_file():
+            config_path = p
     if config_path is None or not config_path.is_file():
         err("coord.yaml not found (pass --config or run from project root)")
         raise click.exceptions.Exit(1)
@@ -477,8 +464,8 @@ def launch(target: str, config_path: Path | None, project_dir: Path | None,
     if not project_dir.is_dir():
         err(f"project_dir {project_dir} not found")
         raise click.exceptions.Exit(1)
-    if not (project_dir / "coordination").is_dir():
-        err(f"{project_dir}/coordination/ not found (run greatminds setup first)")
+    if not project_config_dir(project_dir).is_dir():
+        err(f"{project_config_dir(project_dir)} not found (run greatminds setup first)")
         raise click.exceptions.Exit(1)
 
     # Detect env + verify greatminds-task reachable after activation.

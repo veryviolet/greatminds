@@ -1,8 +1,7 @@
-"""0278 (0276 Phase B): stand-profile loader.
+"""Stand-profile loader.
 
-Pure parser for ``coordination/stand-profiles/<name>.{yaml,md}``
-files. No runtime side effects, no SK integration — those land in
-Phase C+ (the loader is consumed by SK's deploy flow there).
+Pure parser for project-owned ``coordination/stand-profiles/<name>.yaml``
+files. No runtime side effects.
 
 Lookup precedence (per ``schema.stand_profile``):
 
@@ -33,7 +32,11 @@ from typing import Any, Literal
 import yaml
 
 from greatminds.core.errors import GreatMindsError
-from greatminds.core.paths import find_canon_dir
+from greatminds.core.paths import (
+    RUNTIME_DIR_NAME,
+    config_dir_for_runtime,
+    find_canon_dir,
+)
 
 
 STAND_PROFILES_DIRNAME = "stand-profiles"
@@ -49,6 +52,12 @@ DEPLOY_HOST_KEY = "deploy_host"
 # schema's ``stand_profile.yaml_required_fields`` if the schema is
 # reachable. The constants are the safety net for partial installs.
 _DEFAULT_YAML_REQUIRED = ("name", "hosts", "tasks")
+
+
+def _config_dir(coord_or_config_dir: Path) -> Path:
+    if coord_or_config_dir.name == RUNTIME_DIR_NAME:
+        return config_dir_for_runtime(coord_or_config_dir)
+    return coord_or_config_dir
 
 
 @dataclass
@@ -234,9 +243,11 @@ def profile_paths(coord_dir: Path, profile_name: str, *,
                 "a local .yaml file name",
                 exit_code=2,
             )
-        yaml_path = coord_dir / STAND_PROFILES_DIRNAME / p.name
+        base_dir = _config_dir(coord_dir)
+        yaml_path = base_dir / STAND_PROFILES_DIRNAME / p.name
         return yaml_path, yaml_path.with_suffix(".md")
-    base = coord_dir / STAND_PROFILES_DIRNAME / profile_name
+    base_dir = _config_dir(coord_dir)
+    base = base_dir / STAND_PROFILES_DIRNAME / profile_name
     return base.with_suffix(".yaml"), base.with_suffix(".md")
 
 
@@ -304,7 +315,7 @@ def load_profile(coord_dir: Path, profile_name: str, *,
     search: list[tuple[Path, str]] = []
     if worktree:
         search.append((Path(worktree) / "coordination", "lease-worktree"))
-    search.append((coord_dir, "main"))
+    search.append((_config_dir(coord_dir), "main"))
 
     looked: list[Path] = []
     for cdir, label in search:

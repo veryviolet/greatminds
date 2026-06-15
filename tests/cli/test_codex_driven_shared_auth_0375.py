@@ -1,7 +1,7 @@
 """Task 0375: driven Codex roles use the SINGLE machine Codex login.
 
 Codex 0.137 stores+refreshes the ChatGPT auth in ``$CODEX_HOME/auth.json``
-with single-use refresh tokens, so per-role ``coordination/.codex-home/
+with single-use refresh tokens, so per-role ``.greatminds/.codex-home/
 <role>`` auth copies diverge on the first refresh (``refresh_token_reused``
 / ``token_expired``) and every other role's driven turn then completes
 doing zero useful work — the shared root cause blocking #14/#21/#22 and

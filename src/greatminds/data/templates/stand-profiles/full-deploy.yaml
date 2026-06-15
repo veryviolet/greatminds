@@ -1,7 +1,7 @@
 # full-deploy.yaml — REFERENCE profile: deploy greatminds onto a stand.
 #
 # greatminds is host-agnostic: it runs `ansible-playbook <this file>` in the
-# fleet's coordination dir and hands the WHOLE coordination/PROJECT.env (plus
+# fleet's coordination dir and hands the WHOLE .greatminds/PROJECT.env (plus
 # lease meta: worktree / task_id / lease_id) to ansible as --extra-vars. So
 # every PROJECT.env key is readable here as `{{ KEY }}`. There is NO inventory
 # synthesis and NO ${}-substitution — the profile AUTHOR owns host topology by
@@ -131,9 +131,9 @@
 
     - name: create venv
       ansible.builtin.command:
-        cmd: uv venv .venv-coord
+        cmd: uv venv .venv
         chdir: "{{ deploy_path }}"
-        creates: "{{ deploy_path }}/.venv-coord"
+        creates: "{{ deploy_path }}/.venv"
 
     - name: remove stale wheels from dist/ (uv pip refuses ambiguous glob)
       ansible.builtin.shell: rm -f dist/greatminds-*.whl
@@ -153,7 +153,7 @@
     # task above (which builds exactly one wheel, so the glob is unambiguous).
     - name: install greatminds into venv (uv pip — uv venv lacks pip)
       ansible.builtin.shell: >
-        uv pip install --python .venv-coord/bin/python
+        uv pip install --python .venv/bin/python
         --force-reinstall dist/greatminds-*.whl
       args:
         chdir: "{{ deploy_path }}"
@@ -161,14 +161,14 @@
 
     - name: greatminds setup (idempotent)
       ansible.builtin.command:
-        cmd: ".venv-coord/bin/greatminds setup --project-dir {{ deploy_path }}"
+        cmd: ".venv/bin/greatminds setup --project-dir {{ deploy_path }}"
         chdir: "{{ deploy_path }}"
       register: setup_out
       changed_when: "'written' in setup_out.stdout or 'extended' in setup_out.stdout"
 
     - name: smoke — greatminds --version reports the expected version
       ansible.builtin.command:
-        cmd: ".venv-coord/bin/greatminds --version"
+        cmd: ".venv/bin/greatminds --version"
         chdir: "{{ deploy_path }}"
       register: version_out
       changed_when: false

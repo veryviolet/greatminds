@@ -2,13 +2,13 @@
 
 Pre-0164 (and post-0158) the discovery looked at the WRONG directory:
 ``~/.codex/sessions/`` carried pre-0158 rollouts, but codex 0.130+
-used ``coordination/.codex-home/<role>/`` for role-local rollouts.
+used ``.greatminds/.codex-home/<role>/`` for role-local rollouts.
 Discovery found
 stale legacy SIDs, cached them, and the next launch issued
 ``codex resume <sid>`` against the new home where the SID didn't
 exist. The wrapper-loop respawned forever.
 
-0164 fix: walk ``<project>/coordination/.codex-home/<role>/sessions/``
+0164 fix: walk ``<project>/.greatminds/.codex-home/<role>/sessions/``
 first; fall back to ``~/.codex/sessions/`` only when the per-role
 home doesn't exist (legacy projects not yet re-run through 0158
 setup). Stop at the FIRST root that yields a hit — pre-0158
@@ -55,7 +55,7 @@ def _seed_rollout(root: Path, role: str, sid: str, mtime: float | None = None) -
 
 def test_discovery_prefers_per_role_home_over_legacy(tmp_path: Path,
                                                       monkeypatch) -> None:
-    """0164 contract: when ``<project>/coordination/.codex-home/<role>/
+    """0164 contract: when ``<project>/.greatminds/.codex-home/<role>/
     sessions/`` exists, discovery walks IT, not the legacy
     ``~/.codex/sessions/``. A SID found in the per-role tree wins
     even if the legacy tree carries a newer rollout for the same
@@ -64,7 +64,7 @@ def test_discovery_prefers_per_role_home_over_legacy(tmp_path: Path,
     home = tmp_path / "home"
     monkeypatch.setattr(Path, "home", staticmethod(lambda: home))
 
-    per_role = (project / "coordination" / ".codex-home" / "developer"
+    per_role = (project / ".greatminds" / ".codex-home" / "developer"
                 / "sessions")
     legacy = home / ".codex" / "sessions"
     # Each SID is the trailing segment the discovery regex captures.
@@ -124,7 +124,7 @@ def test_discovery_returns_empty_when_per_role_home_empty(tmp_path: Path,
     The post-0158 home shape signals 'this is a 0158-era install; use
     only its rollouts'."""
     project = tmp_path / "project"
-    per_role = (project / "coordination" / ".codex-home" / "developer"
+    per_role = (project / ".greatminds" / ".codex-home" / "developer"
                 / "sessions")
     per_role.mkdir(parents=True)  # exists but empty
     home = tmp_path / "home"
@@ -146,12 +146,12 @@ def test_discovery_no_legacy_fallback_when_codex_home_root_exists_without_sessio
 ) -> None:
     """0164 iter-2 (REVIEWER + TESTER ask): the legacy gate is the
     codex_home ROOT, not the sessions subdir. A fresh ``greatminds
-    setup`` creates ``coordination/.codex-home/<role>/`` (containing
+    setup`` creates ``.greatminds/.codex-home/<role>/`` (containing
     config.toml) before codex has written any rollouts; ``sessions/``
     doesn't exist yet. Iter-1 fell through to legacy in this case;
     iter-2 must NOT. The codex_home root is the 0158-era marker."""
     project = tmp_path / "project"
-    codex_home = (project / "coordination" / ".codex-home" / "developer")
+    codex_home = (project / ".greatminds" / ".codex-home" / "developer")
     codex_home.mkdir(parents=True)
     # NOTE: no sessions/ subdir — codex hasn't run yet.
     home = tmp_path / "home"
@@ -203,7 +203,7 @@ def test_discovery_finds_session_with_generic_1_5_0_bootstrap_head(
     home = tmp_path / "home"
     monkeypatch.setattr(Path, "home", staticmethod(lambda: home))
 
-    tester_home = (project / "coordination" / ".codex-home" / "tester"
+    tester_home = (project / ".greatminds" / ".codex-home" / "tester"
                    / "sessions")
     # Head is the generic 1.5.0 bootstrap, NOT "You are TESTER agent".
     _seed_rollout(tester_home, "a greatminds coordination", "aa11aa11aa11")

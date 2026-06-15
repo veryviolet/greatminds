@@ -3,7 +3,7 @@
 Task 0390 — a paned/interactive Codex role could sit at the Codex
 sign-in UI forever even though the host user is already logged in: the
 old paned ``start_agent`` path pointed ``CODEX_HOME`` at the per-role
-``coordination/.codex-home/<role>`` home, and Codex 0.137 reads auth
+``.greatminds/.codex-home/<role>`` home, and Codex 0.137 reads auth
 from ``$CODEX_HOME/auth.json``. A per-role home holds config ONLY (no
 auth.json), so Codex showed the login prompt and ignored the machine
 login in ``~/.codex/auth.json``.
@@ -17,7 +17,7 @@ auth-home selection.
 
 Hard invariants (both paths):
   * ONE machine Codex auth source per host/user owns ``auth.json``.
-  * Per-role ``coordination/.codex-home/<role>`` dirs are config /
+  * Per-role ``.greatminds/.codex-home/<role>`` dirs are config /
     profile SOURCES only — never auth, never a login target.
   * auth.json is NEVER copied or symlinked into a per-role home.
 """
@@ -39,7 +39,7 @@ def machine_codex_home() -> str:
     Resolution order:
       1. ``GREATMINDS_CODEX_HOME`` — explicit operator override.
       2. An inherited ``CODEX_HOME`` that is NOT a per-role
-         ``coordination/.codex-home/<role>`` home (a real machine home
+         ``.greatminds/.codex-home/<role>`` home (a real machine home
          the process was launched with).
       3. ``~/.codex`` (codex's default).
     """
@@ -55,7 +55,7 @@ def machine_codex_home() -> str:
 def read_role_codex_model(role_home: Path, role_lower: str) -> str | None:
     """Read the role's model from its per-role config SOURCE.
 
-    The per-role ``coordination/.codex-home/<role>`` home is retained as
+    The per-role ``.greatminds/.codex-home/<role>`` home is retained as
     role-profile SOURCE MATERIAL ONLY (model selection) — NEVER for auth.
     Reads ``model = "..."`` from the profile layer ``<role>.config.toml``
     (the 0332 split) or the base ``config.toml`` so the launch can inject
@@ -95,7 +95,7 @@ def machine_codex_auth_error(home: str, role: str) -> str:
     has no usable ``auth.json``.
 
     Names the EFFECTIVE machine Codex home and states explicitly that the
-    per-role ``coordination/.codex-home/<role>`` homes are config sources,
+    per-role ``.greatminds/.codex-home/<role>`` homes are config sources,
     NOT login targets — so the operator logs in against the machine home,
     not a role dir."""
     login_hint = (
@@ -109,7 +109,7 @@ def machine_codex_auth_error(home: str, role: str) -> str:
         f"machine home:\n    {login_hint}\n"
         f"Paned/driven Codex roles authenticate "
         f"against this ONE machine login; the per-role "
-        f"coordination/.codex-home/<role> dirs are config/profile sources "
+        f".greatminds/.codex-home/<role> dirs are config/profile sources "
         f"ONLY and are NOT login targets (no auth.json is copied there). "
         f"(or set GREATMINDS_CODEX_HOME to the machine home that owns "
         f"auth.json)."

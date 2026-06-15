@@ -7,8 +7,8 @@ Two responsibilities, run every <interval> seconds:
      write wake-up messages to inbox/<role>/. (If PostToolUse hooks
      already did this, the call is a cheap no-op since state advances
      monotonically.)
-  2. Scan coordination/inbox/<role>/ for new files. For each new file,
-     find the role's active TTY from coordination/.agent_registry/<role>.json
+  2. Scan .greatminds/inbox/<role>/ for new files. For each new file,
+     find the role's active TTY from .greatminds/.agent_registry/<role>.json
      and write "check inbox and continue your tick\n" to that TTY. The sleeping
      agent wakes, reads the inbox, and continues the tick.
 
@@ -23,8 +23,8 @@ state. Its only side effects are:
   - writing wake-up text to known agent TTYs.
 
 State sources (read-only):
-  - coordination/inbox/<role>/*.md   — new files to react to
-  - coordination/.agent_registry/<role>.json — written by
+  - .greatminds/inbox/<role>/*.md   — new files to react to
+  - .greatminds/.agent_registry/<role>.json — written by
     ``greatminds start-agent``
     with {role, tool, pid, tty, started_at}
 
@@ -50,6 +50,11 @@ from pathlib import Path
 import click
 
 from greatminds.cli import codex_auth, driven_log
+from greatminds.core.paths import (
+    coord_yaml_path,
+    find_canon_dir,
+    find_runtime_dir,
+)
 
 try:
     import yaml
@@ -115,9 +120,9 @@ def write_hang_report(coord: Path, role_lower: str, lock_age: float,
         f"role's heartbeat has not advanced ({hb} since last touch) — the "
         f"turn's subprocess is running but making no progress. coordd does "
         f"NOT kill it. Diagnose and decide: kill the turn subprocess + clear "
-        f"coordination/.locks/driven-{role_lower}.lock so coordd can re-drive, "
+        f".greatminds/.locks/driven-{role_lower}.lock so coordd can re-drive, "
         f"or investigate why the turn stalled (MCP init, blocked tool, rate "
-        f"limit). Turn output: coordination/.turns/{role_lower}-*.log."
+        f"limit). Turn output: .greatminds/.turns/{role_lower}-*.log."
     )
     text = (
         "to_role: MAINTAINER\n"
@@ -321,7 +326,7 @@ INOTIFY_QUEUE_DIRS: tuple[str, ...] = (
     # ``.stand`` subdir below (added by 0245).
     "review_sessions",
     # 0245 (0242c / Phase 3 of 0242): SK polls the singleton stand
-    # resource state via inotify on ``coordination/.stand/`` so
+    # resource state via inotify on ``.greatminds/.stand/`` so
     # state transitions (lease grants, releases, down events) wake
     # the daemon sub-second instead of waiting for the next poll
     # tick.
@@ -461,7 +466,7 @@ def scan_inbox_files(inbox_dir: Path) -> set[str]:
 
 
 def role_from_path(path: str) -> str | None:
-    # .../coordination/inbox/<role>/<file>.md
+    # .../.greatminds/inbox/<role>/<file>.md
     p = Path(path)
     if p.parent.name == "inbox":
         return None
@@ -621,7 +626,7 @@ def _lifecycle_for_role(canon_dir: Path, role: str) -> str | None:
 
 def _driven_bootstrap_path(coord: Path, role_lower: str) -> str:
     """Path to the single static system-prompt file
-    ``coordination/bootstrap.md`` (seeded from canon by ``setup``).
+    ``.greatminds/bootstrap.md`` (seeded from canon by ``setup``).
 
     Role-independent: the prompt is the same for every role, which reads
     its own contract from ``schema.roles.<GREATMINDS_ROLE>`` (coordd sets
@@ -1450,7 +1455,7 @@ def _driven_refire_has_current_work(
     ``claims_from`` queues and inbox before spending another driven turn.
 
     If schema cannot be loaded, preserve the historical refire behavior; this
-    keeps legacy/test fixtures without ``coordination/schema.yaml`` working.
+    keeps minimal test fixtures without a loadable schema working.
     """
     roles = load_schema_roles(coord)
     if not roles:
@@ -1757,7 +1762,7 @@ def _machine_codex_home() -> str:
     Resolution order:
       1. ``GREATMINDS_CODEX_HOME`` — explicit operator override.
       2. An inherited ``CODEX_HOME`` that is NOT a per-role
-         ``coordination/.codex-home/<role>`` home (a real machine home
+         ``.greatminds/.codex-home/<role>`` home (a real machine home
          the daemon was launched with).
       3. ``~/.codex`` (codex's default).
 
@@ -1771,7 +1776,7 @@ def _machine_codex_home() -> str:
 def _codex_role_model(coord: Path | None, role_lower: str | None) -> str | None:
     """0375: read the role's model from its codex profile SOURCE.
 
-    The per-role ``coordination/.codex-home/<role>`` home is retained as
+    The per-role ``.greatminds/.codex-home/<role>`` home is retained as
     role-profile SOURCE MATERIAL ONLY (model selection) — NEVER for auth.
     We read ``model = "..."`` from the profile layer
     ``<role>.config.toml`` (the 0332 split) or the base ``config.toml``
@@ -1796,7 +1801,7 @@ def _codex_appserver_env(role_lower: str | None = None,
 
     ``CODEX_HOME`` points at the SINGLE machine Codex home (see
     :func:`_machine_codex_home`), NOT a per-role
-    ``coordination/.codex-home/<role>`` home. WHY (0375): codex 0.137
+    ``.greatminds/.codex-home/<role>`` home. WHY (0375): codex 0.137
     refreshes the ChatGPT auth in ``$CODEX_HOME/auth.json`` with
     single-use tokens, so per-role auth copies diverge after the first
     refresh and driven turns fail with ``refresh_token_reused`` /
@@ -3142,21 +3147,18 @@ def _notify_maintainer_of_new_version(coord: Path, notify_target: str,
 
 
 def _read_coord_yaml(project_dir: Path) -> dict | None:
-    """0186: read ``<project>/coord.yaml`` to look up a role's tmux
+    """Read ``<project>/coordination/coord.yaml`` to look up a role's tmux
     window + tool. Cached behavior is deliberately omitted — coord.yaml
     is small and operator edits during runtime should be picked up on
     the next nudge (rate-limited anyway). Returns None on missing/
     malformed file."""
-    for cand in (
-        project_dir / "coord.yaml",
-        project_dir / "coordination" / "coord.yaml",
-    ):
-        if cand.is_file():
-            try:
-                doc = yaml.safe_load(cand.read_text(encoding="utf-8"))
-            except (OSError, yaml.YAMLError):
-                return None
-            return doc if isinstance(doc, dict) else None
+    cand = coord_yaml_path(project_dir)
+    if cand.is_file():
+        try:
+            doc = yaml.safe_load(cand.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError):
+            return None
+        return doc if isinstance(doc, dict) else None
     return None
 
 
@@ -3431,7 +3433,7 @@ def push_to_role(coord: Path, role: str, file_path: str, verbose: bool,
                help=__doc__)
 @click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
               default=None,
-              help="project root containing coordination/ (default: cwd "
+              help="project root containing .greatminds/ (default: cwd "
                    "or registry lookup via --project)")
 @click.option("--project", "project_name", default=None,
               help="project name; resolved to project_dir via "
@@ -3443,8 +3445,6 @@ def push_to_role(coord: Path, role: str, file_path: str, verbose: bool,
 @click.option("--verbose", "-v", is_flag=True)
 def coordd(project_dir: Path | None, project_name: str | None,
            interval_sec: float, verbose: bool) -> None:
-    from greatminds.core.paths import find_canon_dir
-
     if project_dir is None and project_name:
         # Resolve via the per-user project registry written by
         # `greatminds daemon install` (and `greatminds setup` going forward).
@@ -3460,7 +3460,7 @@ def coordd(project_dir: Path | None, project_name: str | None,
         project_dir = resolved
 
     project_dir = project_dir or Path.cwd()
-    coord = project_dir / "coordination"
+    coord = find_runtime_dir(project_dir, strict=False)
     if not coord.is_dir():
         click.echo(f"coordd: error: {coord} not found", err=True)
         raise click.exceptions.Exit(1)

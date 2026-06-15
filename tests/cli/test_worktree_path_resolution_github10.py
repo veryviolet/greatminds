@@ -114,7 +114,7 @@ def test_nonstrict_fallback_under_worktree_roots_at_project(
     worktree.mkdir(parents=True)
     # No coordination/ anywhere — exercise the fallback branch.
     coord = find_coord_dir(start=worktree, strict=False)
-    assert coord == project / "coordination", (
+    assert coord == project / ".greatminds", (
         f"#10: non-strict fallback must root at project, not the "
         f"worktree orphan; got {coord}"
     )

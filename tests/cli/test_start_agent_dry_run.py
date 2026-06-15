@@ -5,7 +5,7 @@ EXPLORER avatar dogfood (review_sessions/0019) caught two problems:
   1. ``--dry-run`` did not exist; ``start-agent EXPLORER claude --dry-run``
      fell through to ``EXTRA`` and was passed to ``claude``, which then
      failed at ``execvp`` on hosts without ``claude`` installed and left
-     ``coordination/.agent_registry/explorer.session-id`` behind as a
+     ``.greatminds/.agent_registry/explorer.session-id`` behind as a
      side effect.
   2. There was no read-only way to inspect which plugin dirs, MCP layers,
      and final argv ``start-agent`` would produce — the only way to
@@ -14,7 +14,7 @@ EXPLORER avatar dogfood (review_sessions/0019) caught two problems:
 The fix introduces a ``--dry-run`` flag that:
 - prints role, tool, mode, project / canon dirs, session resume status,
   plugin layers, MCP layers, env vars, prompt preview, and final argv
-- writes nothing under ``coordination/.agent_registry/``
+- writes nothing under ``.greatminds/.agent_registry/``
 - never exec's the tool
 
 These tests pin both: (a) dry-run is side-effect-free, (b) the report
@@ -67,7 +67,7 @@ def test_dry_run_writes_no_registry_files(tmp_path: Path):
     cp = _start_agent_dry_run(proj, "EXPLORER", "claude")
     assert cp.returncode == 0, cp.stderr
 
-    registry_dir = proj / "coordination" / ".agent_registry"
+    registry_dir = proj / ".greatminds" / ".agent_registry"
     # setup creates the directory; that's fine. What we check is that
     # nothing matching explorer.* was written.
     explorer_artifacts = list(registry_dir.glob("explorer.*"))
@@ -130,7 +130,7 @@ def test_dry_run_resume_reads_existing_session_id(tmp_path: Path):
     """When a session-id file exists, dry-run must show RESUME with that UUID
     and must NOT overwrite the file."""
     proj = _setup_project(tmp_path)
-    sid_file = proj / "coordination" / ".agent_registry" / "explorer.session-id"
+    sid_file = proj / ".greatminds" / ".agent_registry" / "explorer.session-id"
     sid_file.parent.mkdir(parents=True, exist_ok=True)
     pinned = "deadbeef-1111-2222-3333-444444444444"
     sid_file.write_text(pinned + "\n", encoding="utf-8")
@@ -146,7 +146,7 @@ def test_dry_run_resume_reads_existing_session_id(tmp_path: Path):
 def test_dry_run_new_session_does_not_write_session_file(tmp_path: Path):
     """No prior session-id → dry-run shows NEW UUID but doesn't write it."""
     proj = _setup_project(tmp_path)
-    sid_file = proj / "coordination" / ".agent_registry" / "explorer.session-id"
+    sid_file = proj / ".greatminds" / ".agent_registry" / "explorer.session-id"
     # Ensure it doesn't already exist.
     assert not sid_file.exists()
 

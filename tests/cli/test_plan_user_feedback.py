@@ -100,7 +100,7 @@ def test_plan_routes_user_feedback_through_feature_inbox(tmp_path: Path):
                        "return value.")
     assert cp.returncode == 0, f"plan failed: {cp.stderr}"
 
-    coord = proj / "coordination"
+    coord = proj / ".greatminds"
     # Final landing: feature_dev (scope=backend → SCOPE_QUEUE[backend])
     final_path = coord / "feature_dev" / f"{tid}.yaml"
     assert final_path.is_file(), (
@@ -145,7 +145,7 @@ def test_plan_from_feature_inbox_still_one_hop(tmp_path: Path):
              "--body", "Stub plan to verify the feature_inbox path still works.")
     assert cp.returncode == 0, cp.stderr
 
-    coord = proj / "coordination"
+    coord = proj / ".greatminds"
     assert (coord / "feature_dev" / f"{tid}.yaml").is_file()
     for queue in ("user_feedback", "feature_inbox", "feature_plan"):
         leftover = list((coord / queue).glob(f"{tid}*.yaml"))

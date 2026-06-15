@@ -4,7 +4,7 @@
 Usage:
     greatminds wake-check [--project-dir <dir>] [--canon-dir <dir>] [--quiet]
 
-Scans <project-dir>/coordination/feature_blocked/*.{yaml,md}. For each:
+Scans <project-dir>/.greatminds/feature_blocked/*.{yaml,md}. For each:
   - parses the latest `blocked` block;
   - validates dependency entries match `<queue>/<id>.{yaml,md}`;
   - checks each referenced file actually exists;
@@ -32,7 +32,7 @@ from pathlib import Path
 import click
 import yaml
 
-from greatminds.core.paths import find_canon_dir
+from greatminds.core.paths import find_canon_dir, find_runtime_dir
 from greatminds.cli._colors import info, ok, warn
 
 # accept either yaml or md task files in dependency entries during the
@@ -146,7 +146,7 @@ def all_blocked_files(coord: Path) -> list[Path]:
     help=__doc__,
 )
 @click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
-              default=None, help="project root containing coordination/ (default: cwd)")
+              default=None, help="project root containing .greatminds/ (default: cwd)")
 @click.option("--canon-dir", type=click.Path(exists=True, file_okay=False, path_type=Path),
               default=None, help="canon data dir (default: packaged greatminds.data)")
 @click.option("--quiet", is_flag=True, help="suppress no-findings output")
@@ -154,11 +154,11 @@ def wake_check(project_dir: Path | None, canon_dir: Path | None, quiet: bool) ->
     project_dir = project_dir or Path.cwd()
     canon_dir = canon_dir or find_canon_dir()
 
-    if (project_dir.name == "coordination"
+    if (project_dir.name == ".greatminds"
             and (project_dir / "feature_blocked").is_dir()):
         coord = project_dir
     else:
-        coord = project_dir / "coordination"
+        coord = find_runtime_dir(project_dir, strict=False)
     if not (coord / "feature_blocked").is_dir():
         if not quiet:
             info(f"no feature_blocked/ at {coord}")

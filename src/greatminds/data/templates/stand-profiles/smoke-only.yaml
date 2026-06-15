@@ -3,7 +3,7 @@
 # liveness checks.
 #
 # Host scheme (same as full-deploy.yaml): greatminds passes the WHOLE
-# coordination/PROJECT.env as --extra-vars; Play 1 registers the stand
+# .greatminds/PROJECT.env as --extra-vars; Play 1 registers the stand
 # node(s) from `STAND_HOST` (single alias, or comma list) via add_host;
 # Play 2 probes each.
 ---
@@ -45,7 +45,7 @@
 
     - name: greatminds CLI responds
       ansible.builtin.command:
-        cmd: ".venv-coord/bin/greatminds --version"
+        cmd: ".venv/bin/greatminds --version"
         chdir: "{{ deploy_path }}"
       register: version_out
       changed_when: false

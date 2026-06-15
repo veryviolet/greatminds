@@ -151,7 +151,7 @@ def test_generated_config_has_skills_config_entries(tmp_path: Path) -> None:
 
     setup_mod._setup_codex_homes_per_role(canon, project)
 
-    cfg = (project / "coordination" / ".codex-home" / "developer"
+    cfg = (project / ".greatminds" / ".codex-home" / "developer"
            / "config.toml").read_text(encoding="utf-8")
     assert "[[skills.config]]" in cfg
     assert 'enabled = true' in cfg
@@ -169,9 +169,9 @@ def test_generated_config_per_role_skills_present(tmp_path: Path) -> None:
 
     setup_mod._setup_codex_homes_per_role(canon, project)
 
-    explorer_cfg = (project / "coordination" / ".codex-home" / "explorer"
+    explorer_cfg = (project / ".greatminds" / ".codex-home" / "explorer"
                     / "config.toml").read_text(encoding="utf-8")
-    developer_cfg = (project / "coordination" / ".codex-home" / "developer"
+    developer_cfg = (project / ".greatminds" / ".codex-home" / "developer"
                      / "config.toml").read_text(encoding="utf-8")
     assert "exploratory-probing" in explorer_cfg
     assert "exploratory-probing" not in developer_cfg
@@ -190,7 +190,7 @@ def test_generated_config_preserves_developer_instructions(tmp_path: Path) -> No
 
     setup_mod._setup_codex_homes_per_role(canon, project)
 
-    home = project / "coordination" / ".codex-home" / "developer"
+    home = project / ".greatminds" / ".codex-home" / "developer"
     cfg = (home / "config.toml").read_text(encoding="utf-8")
     assert cfg.startswith("developer_instructions = ")
     # 0332: the profile table is split OUT of config.toml.
@@ -215,7 +215,7 @@ def test_generated_config_idempotent_does_not_double_write_skills(tmp_path: Path
     project.mkdir()
 
     setup_mod._setup_codex_homes_per_role(canon, project)
-    cfg_path = (project / "coordination" / ".codex-home" / "developer"
+    cfg_path = (project / ".greatminds" / ".codex-home" / "developer"
                 / "config.toml")
     first = cfg_path.read_text(encoding="utf-8")
     first_skill_count = first.count("[[skills.config]]")
@@ -240,7 +240,7 @@ def test_skills_use_absolute_paths(tmp_path: Path) -> None:
 
     setup_mod._setup_codex_homes_per_role(canon, project)
 
-    cfg = (project / "coordination" / ".codex-home" / "developer"
+    cfg = (project / ".greatminds" / ".codex-home" / "developer"
            / "config.toml").read_text(encoding="utf-8")
     # Find a path line.
     import re

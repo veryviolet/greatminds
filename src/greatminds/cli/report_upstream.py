@@ -11,7 +11,7 @@ Three submission modes, configurable via ``--mode`` or
                  requires ``gh auth login`` already done.
   ``api-token``  POST to the GitHub REST API directly, using a PAT read
                  from ``$<token_env>`` first, then
-                 ``coordination/PROJECT.env``. No token is bundled in the
+                 ``.greatminds/PROJECT.env``. No token is bundled in the
                  PyPI artifact.
 
 Designed for MAINTAINER use only — other roles file inbox/maintainer/
@@ -41,6 +41,12 @@ import yaml
 
 from greatminds import __version__
 from greatminds.cli._colors import err, info
+from greatminds.core.paths import (
+    coord_yaml_path,
+    project_config_dir,
+    project_env_file,
+    project_runtime_dir,
+)
 
 
 # Default upstream repo. Sourced from this project's `pyproject.toml`
@@ -96,14 +102,13 @@ def _check_role_permission() -> None:
 
 
 def _load_coord_yaml(project_root: Path) -> dict:
-    for p in (project_root / "coord.yaml",
-              project_root / "coordination" / "coord.yaml"):
-        if p.is_file():
-            try:
-                data = yaml.safe_load(p.read_text(encoding="utf-8"))
-            except yaml.YAMLError:
-                return {}
-            return data if isinstance(data, dict) else {}
+    p = coord_yaml_path(project_root)
+    if p.is_file():
+        try:
+            data = yaml.safe_load(p.read_text(encoding="utf-8"))
+        except yaml.YAMLError:
+            return {}
+        return data if isinstance(data, dict) else {}
     return {}
 
 
@@ -117,8 +122,8 @@ def _resolve_project_root(project_dir: Path | None) -> Path:
     return Path.cwd().resolve()
 
 
-def _read_project_env(coord_dir: Path) -> dict[str, str]:
-    p = coord_dir / "PROJECT.env"
+def _read_project_env(project_root: Path) -> dict[str, str]:
+    p = project_env_file(project_root)
     if not p.is_file():
         return {}
     out: dict[str, str] = {}
@@ -245,7 +250,8 @@ def _build_body(
     severity: str,
     user_body: str,
     project_root: Path,
-    coord_dir: Path,
+    config_dir: Path,
+    runtime_dir: Path,
     include_diagnostics: bool,
 ) -> tuple[str, Path | None]:
     """Build the markdown report body.
@@ -266,7 +272,7 @@ def _build_body(
         sections.append(("Reporter context",
                          f"- greatminds: {__version__}\n"
                          f"- project_root: {project_root}\n"
-                         f"- PROJECT_NAME: {_project_name(coord_dir)}\n"))
+                         f"- PROJECT_NAME: {_project_name(config_dir)}\n"))
         sections.append(("Environment",
                          f"- platform: {platform.platform()}\n"
                          f"- python: {sys.version.split()[0]} "
@@ -277,11 +283,11 @@ def _build_body(
     sections.append(("Symptom", body_text))
 
     if include_diagnostics:
-        tail = _journal_tail(coord_dir)
+        tail = _journal_tail(runtime_dir)
         sections.append(("Journal tail (last 50 lines)",
                          f"```\n{tail}\n```" if tail
                          else "(journal.ndjson not found)"))
-        hb = _heartbeat_snapshot(coord_dir)
+        hb = _heartbeat_snapshot(runtime_dir)
         sections.append(("Heartbeats", hb or "(no heartbeat files)"))
         sections.append(("coord.yaml",
                          f"```yaml\n{_coord_yaml_content(project_root)}\n```"))
@@ -493,7 +499,8 @@ def report_upstream(
         user_body = body_inline or ""
 
     project_root = _resolve_project_root(project_dir)
-    coord_dir = project_root / "coordination"
+    config_dir = project_config_dir(project_root)
+    runtime_dir = project_runtime_dir(project_root)
     cfg = _load_coord_yaml(project_root)
     report_cfg = cfg.get("report") if isinstance(cfg, dict) else None
     if not isinstance(report_cfg, dict):
@@ -528,7 +535,8 @@ def report_upstream(
         severity=severity,
         user_body=user_body,
         project_root=project_root,
-        coord_dir=coord_dir,
+        config_dir=config_dir,
+        runtime_dir=runtime_dir,
         include_diagnostics=not no_diagnostics,
     )
     if full_path is not None:
@@ -547,7 +555,7 @@ def report_upstream(
         token_env = report_cfg.get("token_env") or DEFAULT_TOKEN_ENV
         token = os.environ.get(token_env)
         if not token:
-            token = _read_project_env(coord_dir).get(token_env)
+            token = _read_project_env(project_root).get(token_env)
         if not token:
             err(f"no token found (env: {token_env}, "
                 f"PROJECT.env key: {token_env}) — set it or switch mode")

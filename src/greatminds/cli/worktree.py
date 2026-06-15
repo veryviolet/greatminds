@@ -31,7 +31,7 @@ import click
 import yaml
 
 from greatminds.core.errors import GreatMindsError
-from greatminds.core.paths import find_canon_dir
+from greatminds.core.paths import coord_yaml_path, find_canon_dir, project_runtime_dir
 from greatminds.cli._colors import err, info, ok, warn
 
 
@@ -92,17 +92,15 @@ def load_worktree_policy(project_dir: Path | None = None) -> WorktreePolicy:
         raw = {}
     # Per-project override from coord.yaml (durable across upgrades).
     if project_dir is not None:
-        for cand in (project_dir / "coord.yaml",
-                     project_dir / "coordination" / "coord.yaml"):
-            if cand.is_file():
-                try:
-                    cdoc = yaml.safe_load(cand.read_text(encoding="utf-8")) or {}
-                    over = cdoc.get("worktrees")
-                    if isinstance(over, dict):
-                        raw.update(over)  # project wins over canon defaults
-                except (OSError, yaml.YAMLError):
-                    pass
-                break
+        cand = coord_yaml_path(project_dir)
+        if cand.is_file():
+            try:
+                cdoc = yaml.safe_load(cand.read_text(encoding="utf-8")) or {}
+                over = cdoc.get("worktrees")
+                if isinstance(over, dict):
+                    raw.update(over)  # project wins over canon defaults
+            except (OSError, yaml.YAMLError):
+                pass
     return WorktreePolicy(
         base_path=str(raw.get("base_path") or ".worktrees"),
         branch_prefix=str(raw.get("branch_prefix") or "task/"),
@@ -153,13 +151,13 @@ def canonical_task_id(project_dir: Path, task_id: str) -> str:
     ``find_task`` so every worktree operation converges on the SAME
     worktree/branch. Falls back to the given id when no task file is
     found (e.g. a brand-new task whose file isn't written yet, or a
-    test fixture with no coordination/ tree)."""
+    test fixture with no runtime tree)."""
     try:
         from greatminds.cli.task import find_task
     except ImportError:
         return task_id
     try:
-        located = find_task(project_dir / "coordination", task_id)
+        located = find_task(project_runtime_dir(project_dir), task_id)
     except Exception:
         return task_id
     if located:
@@ -185,7 +183,7 @@ def _resolve_base_commit(project_dir: Path, task_id: str,
     except ImportError:
         find_task = None
     if find_task is not None:
-        coord = project_dir / "coordination"
+        coord = project_runtime_dir(project_dir)
         located = find_task(coord, task_id)
         if located:
             path, _queue = located
@@ -224,7 +222,7 @@ def _task_stream_and_queue(project_dir: Path,
     except ImportError:
         return None, None
     try:
-        located = find_task(project_dir / "coordination", task_id)
+        located = find_task(project_runtime_dir(project_dir), task_id)
     except Exception:
         return None, None
     if not located:
@@ -651,9 +649,9 @@ def cli_assert_drained(project_dir: Path | None) -> None:
     wheel; non-zero refuses the run with the list of in-flight tasks per queue.
     """
     pd = project_dir or _default_project_dir()
-    coord = pd / "coordination"
+    coord = project_runtime_dir(pd)
     if not coord.is_dir():
-        err("no coordination/ directory found")
+        err("no .greatminds/ runtime directory found")
         raise SystemExit(2)
     drain_queues = (
         "feature_inbox", "feature_plan", "feature_dev",
@@ -688,8 +686,8 @@ def cli_assert_drained(project_dir: Path | None) -> None:
 def cli_prune(project_dir: Path | None) -> None:
     """Remove worktrees whose task_id is not in any active queue."""
     pd = project_dir or _default_project_dir()
-    # Discover active task ids from coordination/.
-    coord = pd / "coordination"
+    # Discover active task ids from the runtime queue store.
+    coord = project_runtime_dir(pd)
     active: set[str] = set()
     if coord.is_dir():
         for q in coord.iterdir():

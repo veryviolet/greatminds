@@ -19,13 +19,13 @@ What it does:
 1. Resolve project root from ``$GREATMINDS_PROJECT_DIR`` (or cwd).
 2. Resolve canon (packaged ``greatminds.data``) via ``find_canon_dir``.
 3. Export ``GREATMINDS_ROLE``, ``PROJECT_ROOT`` and source the optional
-   ``$PROJECT/coordination/PROJECT.env`` (gitignored secrets file).
+   ``$PROJECT/.greatminds/PROJECT.env`` (gitignored secrets file).
 4. Manage the per-role registry under
-   ``$PROJECT/coordination/.agent_registry/<role>.{json,session-id}``:
+   ``$PROJECT/.greatminds/.agent_registry/<role>.{json,session-id}``:
    refuse to start if another agent is alive (unless ``GREATMINDS_FORCE=1``);
    reuse the persistent session UUID for ``--resume`` semantics;
    rotate the UUID when ``GREATMINDS_FRESH=1``.
-5. Use the single static system prompt ``coordination/bootstrap.md``
+5. Use the single static system prompt ``.greatminds/bootstrap.md``
    (seeded from canon by setup) as the prompt; the agent reads its own
    contract from ``schema.roles.<GREATMINDS_ROLE>``. On resume, replace
    it with a short "continue your tick" nudge.
@@ -44,7 +44,7 @@ What it does:
        Uses the single machine Codex home for authentication
        (``GREATMINDS_CODEX_HOME``, inherited non-per-role ``CODEX_HOME``, or
        ``~/.codex``). Reads role model/settings from
-       ``coordination/.codex-home/<role>/`` as config source material and
+       ``.greatminds/.codex-home/<role>/`` as config source material and
        passes them as ``-c`` overrides; it does not use ``--profile`` or a
        per-role auth home.
 
@@ -76,7 +76,13 @@ import click
 from greatminds.cli import codex_auth
 
 from greatminds.core.errors import GreatMindsError
-from greatminds.core.paths import find_canon_dir
+from greatminds.core.paths import (
+    find_canon_dir,
+    project_bootstrap_path,
+    project_config_dir,
+    project_env_file as runtime_project_env_file,
+    project_runtime_dir,
+)
 from greatminds.core.util import now_iso
 
 
@@ -101,7 +107,7 @@ def load_env_file(path: Path) -> None:
     """Source a simple ``KEY=value`` env file into ``os.environ``.
 
     Supports the subset Bash ``set -a; . file; set +a`` uses for
-    coordination's PROJECT.env: shell-style ``KEY=value`` (one per line,
+    PROJECT.env: shell-style ``KEY=value`` (one per line,
     optional ``export `` prefix), ``#`` comments, blank lines. Quotes
     around the value are stripped (single or double). Variable expansion
     is NOT performed — the values are recorded literally, matching the
@@ -149,7 +155,7 @@ def discover_codex_session(role: str,
     """Find the most recent ``rollout-*.jsonl`` for this role.
 
     0164: post-0158, Codex role sessions were stored under
-    ``<project>/coordination/.codex-home/<role>/sessions/`` — NOT under
+    ``<project>/.greatminds/.codex-home/<role>/sessions/`` — NOT under
     ``~/.codex/sessions/``.
     The pre-0164 discovery walked ``~/.codex/sessions/``, found OLD
     pre-0158 rollouts (or unrelated ones), wrote their SIDs to the
@@ -171,18 +177,13 @@ def discover_codex_session(role: str,
     Returns the rollout's session UUID (extracted from the filename),
     or an empty string if none found.
     """
-    # 0164 iter-2 (REVIEWER ask): the legacy fallback fires ONLY when
-    # this is a pre-0158 install (no per-role codex_home root exists
-    # at all). Once ``coordination/.codex-home/<role>/`` is on disk,
-    # this is a 0158-era install — even an empty ``sessions/`` subdir
-    # must NOT leak to ``~/.codex/sessions/``. PLANNER's spec:
-    # "drop discovery entirely on 0158-era installs". The gate is the
-    # codex_home root, not its sessions subdir.
+    # Once the per-role codex config source exists, even an empty
+    # ``sessions/`` subdir must not leak to ``~/.codex/sessions/``.
+    # The gate is the codex_home root, not its sessions subdir.
     roots: list[Path] = []
     is_0158_era = False
     if project_dir is not None:
-        codex_home = (project_dir / "coordination" / ".codex-home"
-                      / role.lower())
+        codex_home = project_runtime_dir(project_dir) / ".codex-home" / role.lower()
         if codex_home.is_dir():
             is_0158_era = True
             sessions = codex_home / "sessions"
@@ -284,12 +285,14 @@ def build_claude_argv(
     role_plugin = canon_dir / "plugins" / f"role-{role_plugin_suffix}"
     if role_plugin.is_dir():
         plugin_dirs.append(role_plugin)
-    proj_overrides = project_dir / "coordination" / "plugins.local" / "project-overrides"
+    proj_overrides = (
+        project_config_dir(project_dir) / "plugins.local" / "project-overrides"
+    )
     if proj_overrides.is_dir():
         plugin_dirs.append(proj_overrides)
 
     mcp_files = [canon_dir / "mcp" / "canon.json"]
-    mcp_local = project_dir / "coordination" / "mcp.local.json"
+    mcp_local = project_config_dir(project_dir) / "mcp.local.json"
     if mcp_local.is_file():
         mcp_files.append(mcp_local)
 
@@ -370,7 +373,7 @@ def build_codex_argv(
     # a config source (model); the bootstrap prompt + canon carry the rest
     # of the role contract. No --profile, no per-role CODEX_HOME for auth.
     project_dir = registry_dir.parent.parent
-    role_home = project_dir / "coordination" / ".codex-home" / role_lower
+    role_home = project_runtime_dir(project_dir) / ".codex-home" / role_lower
     codex_model_args = codex_auth.codex_model_config_args(role_home, role_lower)
 
     yolo = _yolo_args("codex")
@@ -475,7 +478,7 @@ def _print_dry_run_report(
             (f"role-{role_plugin_suffix} (canon)",
              canon_dir / "plugins" / f"role-{role_plugin_suffix}"),
             ("project-overrides (project)",
-             project_dir / "coordination" / "plugins.local" / "project-overrides"),
+             project_config_dir(project_dir) / "plugins.local" / "project-overrides"),
         ]
         out("claude plugin layers (--plugin-dir each, in order):\n")
         for label, p in plugin_layers:
@@ -485,7 +488,7 @@ def _print_dry_run_report(
 
         mcp_layers = [
             ("canon", canon_dir / "mcp" / "canon.json"),
-            ("project", project_dir / "coordination" / "mcp.local.json"),
+            ("project", project_config_dir(project_dir) / "mcp.local.json"),
         ]
         out("mcp config layers (--mcp-config each, in order):\n")
         for label, p in mcp_layers:
@@ -547,14 +550,14 @@ def start_agent(role: str, tool: str, mode: str,
     os.environ["PROJECT_ROOT"] = str(project_dir)
 
     # Source per-project env vars (gitignored secrets file; optional).
-    project_env_file = project_dir / "coordination" / "PROJECT.env"
+    project_env_file = runtime_project_env_file(project_dir)
     if not dry_run:
         load_env_file(project_env_file)
 
     # Registry per role — coordd uses this to find our tty/socket. In
     # --dry-run we compute paths but never mkdir or write.
     role_lower = role.lower()
-    registry_dir = project_dir / "coordination" / ".agent_registry"
+    registry_dir = project_runtime_dir(project_dir) / ".agent_registry"
     if not dry_run:
         registry_dir.mkdir(parents=True, exist_ok=True)
     registry_file = registry_dir / f"{role_lower}.json"
@@ -633,18 +636,18 @@ def start_agent(role: str, tool: str, mode: str,
         }
         registry_file.write_text(json.dumps(registry_payload), encoding="utf-8")
 
-    # The system prompt is the single static coordination/bootstrap.md
+    # The system prompt is the single static .greatminds/bootstrap.md
     # (seeded from canon by setup); the agent reads its own contract from
     # schema.roles.<GREATMINDS_ROLE> (exported above). On resume, replace
     # with a short nudge — the contract is already in session history.
-    bootstrap_md = project_dir / "coordination" / "bootstrap.md"
+    bootstrap_md = project_bootstrap_path(project_dir)
     if bootstrap_md.is_file():
         prompt = bootstrap_md.read_text(encoding="utf-8").rstrip()
     else:
         prompt = (f"You are {role}, a greatminds agent. Read "
-                  f"coordination/schema.yaml (roles.{role}), "
-                  f"coordination/COORDINATE.md, coordination/PROJECT.md; "
-                  f"follow your lifecycle; coordination/ access via the "
+                  f".greatminds/schema.yaml (roles.{role}), "
+                  f".greatminds/COORDINATE.md, coordination/PROJECT.md; "
+                  f"follow your lifecycle; runtime access via the "
                   f"greatminds CLI only. Act on your tick.")
     if not session_new:
         prompt = f"continue your tick as {role} — you already know the contract"
@@ -672,7 +675,7 @@ def start_agent(role: str, tool: str, mode: str,
         # 0390: paned/interactive Codex authenticates against the SINGLE
         # machine Codex home — the one place codex 0.137 finds a usable
         # auth.json. The pre-0390 path pointed CODEX_HOME at the per-role
-        # ``coordination/.codex-home/<role>`` home; that home holds config
+        # ``.greatminds/.codex-home/<role>`` home; that home holds config
         # ONLY (no auth.json), so codex 0.137 — which reads auth from
         # ``$CODEX_HOME/auth.json`` — ignored the machine login in
         # ``~/.codex/auth.json`` and wedged the pane at the sign-in UI

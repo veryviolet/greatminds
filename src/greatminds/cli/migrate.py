@@ -1,13 +1,12 @@
-"""``greatminds migrate`` — refresh a project's coordination config.
+"""``greatminds migrate`` — refresh a project's greatminds layout.
 
 ``greatminds update`` bumps the PACKAGE; this brings the PROJECT's on-disk
 config to the new model so the two don't drift:
 
-  1. canon refresh — re-run ``setup`` (overwrites coordination/schema.yaml /
-     coordination/COORDINATE.md / coordination/bootstrap.md, creates any
-     missing queues e.g. feature_live, refreshes coordination/.gitignore).
-     Never touches PROJECT.md or coord.yaml.
-  2. coord.yaml normalization — coord.yaml is aligned with the driven model:
+  1. layout refresh — re-run ``setup`` to ensure ``coordination/`` project
+     config and ``.greatminds/`` runtime state exist.
+     Never overwrites PROJECT.md or coord.yaml unless explicitly forced.
+  2. coord.yaml normalization — coordination/coord.yaml is aligned with the driven model:
      workers run as coordd subprocesses; planner/maintainer/dashboard/live
      are paned. The previous file is backed up; session, project_dir, the
      per-project ``worktrees`` override, and any custom role-less windows are
@@ -28,7 +27,12 @@ import click
 import yaml
 
 from greatminds.cli._colors import err, info, ok, warn
-from greatminds.core.paths import find_canon_dir
+from greatminds.core.paths import (
+    coord_yaml_path,
+    find_canon_dir,
+    project_config_dir,
+    project_runtime_dir,
+)
 
 
 # Per-role canon docs + stream artifacts deleted in 1.5.0 (role contract
@@ -63,7 +67,7 @@ def migrate_coord_yaml(project_dir: Path) -> tuple[str, str]:
     ``already-current`` / ``migrated``. Idempotent: a coord.yaml that
     already has any ``mode: driven`` window is treated as current.
     """
-    coord_yaml = project_dir / "coord.yaml"
+    coord_yaml = coord_yaml_path(project_dir)
     if not coord_yaml.is_file():
         return ("no-file", "no coord.yaml (setup generates a fresh one)")
     try:
@@ -92,7 +96,7 @@ def migrate_coord_yaml(project_dir: Path) -> tuple[str, str]:
         new_doc["worktrees"] = old["worktrees"]
     new_doc["windows"] = canonical + preserved
 
-    backup = project_dir / "coord.yaml.premigrate.bak"
+    backup = coord_yaml.with_name("coord.yaml.premigrate.bak")
     backup.write_text(coord_yaml.read_text(encoding="utf-8"), encoding="utf-8")
     coord_yaml.write_text(
         yaml.safe_dump(new_doc, sort_keys=False, allow_unicode=True),
@@ -116,7 +120,7 @@ def strip_retired_role_windows(project_dir: Path) -> list[str]:
     ``update`` of an existing 1.5.x fleet drops the stand-keeper pane
     instead of launching an agent for a role the schema no longer has.
     Returns the list of removed role names."""
-    coord_yaml = project_dir / "coord.yaml"
+    coord_yaml = coord_yaml_path(project_dir)
     if not coord_yaml.is_file():
         return []
     try:
@@ -157,7 +161,7 @@ def remove_legacy_artifacts(project_dir: Path) -> list[str]:
                 removed.append(name)
             except OSError as exc:
                 warn(f"    could not remove {name}: {exc}")
-    coord = project_dir / "coordination"
+    coord = project_runtime_dir(project_dir)
     try:
         from greatminds.cli.setup import _remove_root_canon_copy
         for name in ("schema.yaml", "COORDINATE.md"):
@@ -178,7 +182,7 @@ def remove_legacy_artifacts(project_dir: Path) -> list[str]:
             try:
                 import shutil
                 shutil.rmtree(qd)
-                removed.append(f"coordination/{q}/")
+                removed.append(f".greatminds/{q}/")
             except OSError as exc:
                 warn(f"    could not remove {q}: {exc}")
     return removed
@@ -196,7 +200,7 @@ def run_migration(project_dir: Path, run_setup: bool = True) -> None:
             err("setup failed during migration:")
             click.echo(cp.stderr or cp.stdout, nl=False, err=True)
             raise click.exceptions.Exit(cp.returncode)
-        ok("    ✓ canon refreshed (coordination/schema / COORDINATE / bootstrap / queues / gitignore)")
+        ok("    ✓ layout refreshed (coordination/ config + .greatminds/ runtime)")
 
     info("==> migrating coord.yaml to the current window model...")
     status, detail = migrate_coord_yaml(project_dir)
@@ -224,7 +228,7 @@ def run_migration(project_dir: Path, run_setup: bool = True) -> None:
     # reseed only runs on the deliberate migrate/update path.
     info("==> migrating stale seeded stand profiles to add_host topology...")
     from greatminds.cli.setup import reseed_stale_stand_profiles
-    sp = reseed_stale_stand_profiles(project_dir / "coordination", find_canon_dir())
+    sp = reseed_stale_stand_profiles(project_config_dir(project_dir), find_canon_dir())
     if sp["reseeded"]:
         ok(f"    ✓ reseeded {len(sp['reseeded'])} stale profile(s): "
            f"{', '.join(sp['reseeded'])} "

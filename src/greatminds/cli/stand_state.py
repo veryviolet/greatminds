@@ -1,7 +1,7 @@
 """0243 (0242a / 0242 Phase 1): stand resource state file IO.
 
 Singleton stand resource per project. State lives in
-``coordination/.stand/state.yaml`` as the FSM source of truth:
+``.greatminds/.stand/state.yaml`` as the FSM source of truth:
 
     state: free | preparing | ready | down
     active_lease:        # null when state == free | down
@@ -74,7 +74,7 @@ def _empty_state() -> dict[str, Any]:
 
 
 def state_file_path(coord: Path) -> Path:
-    """Resolved absolute path to ``coordination/.stand/state.yaml``."""
+    """Resolved absolute path to ``.greatminds/.stand/state.yaml``."""
     return coord / STAND_STATE_DIR / STAND_STATE_FILE
 
 

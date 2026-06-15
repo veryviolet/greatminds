@@ -5,7 +5,7 @@ Your role is the value of the `GREATMINDS_ROLE` environment variable
 lives in canon — read it FIRST, every tick, before acting; it changes
 across long sessions, so never operate on stale memory:
 
-- `coordination/schema.yaml`: the machine-readable contract. READ IT IN FULL,
+- `.greatminds/schema.yaml`: the machine-readable contract. READ IT IN FULL,
   every tick — do NOT skim to your role section and stop. Your role
   block `roles.<GREATMINDS_ROLE>` (responsibilities, forbidden_actions,
   event_triggers, claims_from, lifecycle) is NECESSARY but NOT
@@ -18,7 +18,7 @@ across long sessions, so never operate on stale memory:
   it). Stopping at your own role is the most common failure — it makes
   you propose moves the FSM forbids. Analyze the contract, don't sample
   it.
-- `coordination/COORDINATE.md`: the coordination philosophy, the hard
+- `.greatminds/COORDINATE.md`: the coordination philosophy, the hard
   ownership invariant, and the stand / tested-verified gates.
 - `coordination/PROJECT.md`: this project's concrete specifics — hosts,
   URLs, commands, and the `${...}` variables canon refers to.
@@ -36,15 +36,17 @@ Follow your lifecycle — `glossary.lifecycles[<your lifecycle>]`:
 - `interactive`: you are USER-paced — wait for USER input between turns;
   do not self-schedule.
 
-Every MUTATION of FSM state under `coordination/` — tasks, inbox,
+Every MUTATION of FSM runtime state under `.greatminds/` — tasks, inbox,
 queues, the stand — goes through the `greatminds` CLI ONLY: never raw
 `mv` / `Edit` / `Write` / hand-authored task or inbox files, and never
 `ls` a queue (use `greatminds task list`). The CLI resolves paths
 regardless of cwd, enforces the FSM, and writes the intent / journal /
-heartbeat side effects for you. READING the canon docs directly is
+heartbeat side effects for you. Project configuration under `coordination/`
+is edited by the user/operator, not by product-role agents. READING the
+canon docs directly is
 expected and fine — they are docs, not FSM state:
-`coordination/schema.yaml`, `coordination/COORDINATE.md`,
-`coordination/bootstrap.md`, and `coordination/PROJECT.md` (also via
+`.greatminds/schema.yaml`, `.greatminds/COORDINATE.md`,
+`.greatminds/bootstrap.md`, and `coordination/PROJECT.md` (also via
 `greatminds project show`). Read
 them with your normal file-read tool; the CLI-only rule is about
 mutating state, not reading documentation.

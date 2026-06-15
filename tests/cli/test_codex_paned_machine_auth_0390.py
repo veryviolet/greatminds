@@ -3,7 +3,7 @@
 A paned/interactive Codex role could sit at the Codex sign-in UI forever
 (USABLE=NO(pane:auth_prompt)) even though the host user was already logged
 in: the pre-0390 ``start_agent`` codex arm pointed ``CODEX_HOME`` at the
-per-role ``coordination/.codex-home/<role>`` home, which holds config ONLY
+per-role ``.greatminds/.codex-home/<role>`` home, which holds config ONLY
 (no ``auth.json``). Codex 0.137 reads auth from ``$CODEX_HOME/auth.json``,
 so it ignored the machine login in ``~/.codex/auth.json`` and showed the
 sign-in prompt.
@@ -58,7 +58,7 @@ def _machine_home(tmp_path: Path, with_auth: bool, name: str = "machine-codex") 
 
 def _seed_per_role_config(project: Path, role_lower: str) -> Path:
     """Per-role config SOURCE: model declared, NO auth.json."""
-    home = project / "coordination" / ".codex-home" / role_lower
+    home = project / ".greatminds" / ".codex-home" / role_lower
     home.mkdir(parents=True)
     (home / "config.toml").write_text(
         f'developer_instructions = "ok"\nmodel = "gpt-5-codex"\n'
@@ -77,7 +77,7 @@ def test_machine_home_prefers_explicit_override(tmp_path, monkeypatch):
     home = _machine_home(tmp_path, with_auth=True)
     monkeypatch.setenv("GREATMINDS_CODEX_HOME", str(home))
     monkeypatch.setenv("CODEX_HOME",
-                       str(tmp_path / "coordination" / ".codex-home" / "dev"))
+                       str(tmp_path / ".greatminds" / ".codex-home" / "dev"))
     assert codex_auth.machine_codex_home() == str(home)
 
 
@@ -91,7 +91,7 @@ def test_machine_home_uses_inherited_non_per_role(tmp_path, monkeypatch):
 def test_machine_home_ignores_inherited_per_role_home(tmp_path, monkeypatch):
     """An inherited CODEX_HOME that is a per-role ``.codex-home`` dir must
     NOT be treated as the machine home — fall through to ~/.codex."""
-    per_role = tmp_path / "coordination" / ".codex-home" / "developer"
+    per_role = tmp_path / ".greatminds" / ".codex-home" / "developer"
     per_role.mkdir(parents=True)
     monkeypatch.setenv("CODEX_HOME", str(per_role))
     # machine_codex_home falls back via os.path.expanduser("~/.codex"),

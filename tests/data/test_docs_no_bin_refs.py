@@ -130,7 +130,7 @@ def test_quickstarts_cover_agent_tools_and_stand_registry_contract():
         "OpenAI Codex",
         "Default tool",
         "coord.yaml",
-        "coordination/PROJECT.env",
+        ".greatminds/PROJECT.env",
         "coordination/stand-profiles.yaml",
         "coordination/stand-profiles/",
         "Ansible",

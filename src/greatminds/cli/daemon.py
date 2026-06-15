@@ -36,7 +36,12 @@ from pathlib import Path
 import click
 import yaml
 
-from greatminds.core.paths import find_canon_dir
+from greatminds.core.paths import (
+    coord_yaml_path,
+    find_canon_dir,
+    project_env_file,
+    project_schema_path,
+)
 from greatminds.cli._colors import err, info, ok, warn
 
 
@@ -250,18 +255,17 @@ def lookup_project_dir(name: str) -> Path | None:
 
 
 def _read_session_from_coord_yaml(project_dir: Path) -> str | None:
-    for p in (project_dir / "coord.yaml",
-              project_dir / "coordination" / "coord.yaml"):
-        if not p.is_file():
-            continue
-        try:
-            data = yaml.safe_load(p.read_text(encoding="utf-8"))
-        except yaml.YAMLError:
-            continue
-        if isinstance(data, dict):
-            v = data.get("session")
-            if isinstance(v, str) and v:
-                return v
+    p = coord_yaml_path(project_dir)
+    if not p.is_file():
+        return None
+    try:
+        data = yaml.safe_load(p.read_text(encoding="utf-8"))
+    except yaml.YAMLError:
+        return None
+    if isinstance(data, dict):
+        v = data.get("session")
+        if isinstance(v, str) and v:
+            return v
     return None
 
 
@@ -505,10 +509,10 @@ def _daemon_candidate_env(name: str, project_dir: Path) -> dict[str, str]:
     """Environment a daemon-started driven subprocess should see.
 
     Mirrors the systemd drop-in order: current process env, then
-    coordination/PROJECT.env, then the private captured agent env.
+    .greatminds/PROJECT.env, then the private captured agent env.
     """
     env = dict(os.environ)
-    env.update(_parse_env_file(project_dir / "coordination" / "PROJECT.env"))
+    env.update(_parse_env_file(project_env_file(project_dir)))
     env.update(_parse_env_file(_agent_env_file(name)))
     return env
 
@@ -549,20 +553,17 @@ def _claude_oauth_credential_diagnostic(env: dict[str, str]) -> str | None:
 
 def has_driven_claude_roles(project_dir: Path) -> bool:
     lifecycles = _schema_lifecycles(project_dir)
-    for p in (project_dir / "coord.yaml",
-              project_dir / "coordination" / "coord.yaml"):
-        doc = _safe_yaml(p)
-        if not doc:
-            continue
-        for win in (doc.get("windows") or []):
-            if not isinstance(win, dict):
-                continue
-            if (win.get("tool") or "").lower() != "claude":
-                continue
-            role = (win.get("role") or "").upper()
-            if role and lifecycles.get(role) == "driven":
-                return True
+    doc = _safe_yaml(coord_yaml_path(project_dir))
+    if not doc:
         return False
+    for win in (doc.get("windows") or []):
+        if not isinstance(win, dict):
+            continue
+        if (win.get("tool") or "").lower() != "claude":
+            continue
+        role = (win.get("role") or "").upper()
+        if role and lifecycles.get(role) == "driven":
+            return True
     return False
 
 
@@ -591,7 +592,7 @@ def install_project_dropin(name: str, project_dir: Path) -> bool:
     yet (or before setup writes it) simply gets no extra env, no failure.
     Returns True when the drop-in was written/changed.
     """
-    env_file = project_dir / "coordination" / "PROJECT.env"
+    env_file = project_env_file(project_dir)
     agent_env_file = _agent_env_file(name)
     body = (
         "[Service]\n"
@@ -692,13 +693,11 @@ def _schema_lifecycles(project_dir: Path) -> dict[str, str]:
     """Read ``roles[<ROLE>].lifecycle`` from the project's schema.yaml
     (preferred) or the packaged canon schema (fallback). Role keys are
     upper-cased for case-insensitive matching against coord.yaml roles."""
-    for p in (project_dir / "coordination" / "schema.yaml",
-              project_dir / "schema.yaml"):
-        doc = _safe_yaml(p)
-        if doc:
-            break
-    else:
-        doc = None
+    doc = _safe_yaml(project_schema_path(project_dir))
+    if doc is None:
+        doc = _safe_yaml(project_dir / "coordination" / "schema.yaml")
+    if doc is None:
+        doc = _safe_yaml(project_dir / "schema.yaml")
     if doc is None:
         try:
             doc = _safe_yaml(find_canon_dir() / "schema.yaml")
@@ -732,20 +731,17 @@ def has_driven_codex_roles(project_dir: Path) -> bool:
     Through Phase 2e the codex roles are still loop-mode, so this stays
     False and the unit is not installed."""
     lifecycles = _schema_lifecycles(project_dir)
-    for p in (project_dir / "coord.yaml",
-              project_dir / "coordination" / "coord.yaml"):
-        doc = _safe_yaml(p)
-        if not doc:
+    doc = _safe_yaml(coord_yaml_path(project_dir))
+    if not doc:
+        return False
+    for win in (doc.get("windows") or []):
+        if not isinstance(win, dict):
             continue
-        for win in (doc.get("windows") or []):
-            if not isinstance(win, dict):
-                continue
-            if (win.get("tool") or "").lower() != "codex":
-                continue
-            role = (win.get("role") or "").upper()
-            if role and lifecycles.get(role) == "driven":
-                return True
-        return False  # coord.yaml found but no driven codex window
+        if (win.get("tool") or "").lower() != "codex":
+            continue
+        role = (win.get("role") or "").upper()
+        if role and lifecycles.get(role) == "driven":
+            return True
     return False
 
 
@@ -843,7 +839,7 @@ def install_cmd(name: str | None, project_dir: Path | None) -> None:
         info("template unit already present, no rewrite")
     if wrote_dropin:
         ok("PROJECT.env wired into daemon env "
-           f"(EnvironmentFile=-{pd / 'coordination' / 'PROJECT.env'})")
+           f"(EnvironmentFile=-{project_env_file(pd)})")
     if captured_env:
         ok("agent auth/session env captured for daemon "
            f"(0600 {_agent_env_file(resolved)})")

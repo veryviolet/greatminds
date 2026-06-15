@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """greatminds stand — singleton stand lease and deployment commands.
 
-Current stand operations use ``coordination/.stand/state.yaml`` plus the lease
+Current stand operations use ``.greatminds/.stand/state.yaml`` plus the lease
 API:
 
   lease    request a lease for a product task and stand profile.
@@ -1176,7 +1176,7 @@ def stand_profiles_doctor() -> None:
 def stand_status() -> None:
     """Print the singleton stand resource state.
 
-    Reads ``coordination/.stand/state.yaml`` (creates a synthetic
+    Reads ``.greatminds/.stand/state.yaml`` (creates a synthetic
     empty-state view when the file doesn't exist yet) and prints a
     compact human-readable summary: state, active lease (if any),
     queue contents, and the last few transitions.

@@ -45,17 +45,17 @@ def _registry_under_project(tmp_path: Path) -> Path:
     """A ``.agent_registry`` dir whose ``.parent.parent`` is the project
     root — ``build_codex_argv`` derives ``project_dir`` from
     ``registry_dir.parent.parent`` to find the per-role config SOURCE."""
-    registry = tmp_path / "project" / "coordination" / ".agent_registry"
+    registry = tmp_path / "project" / ".greatminds" / ".agent_registry"
     registry.mkdir(parents=True)
     return registry
 
 
 def _seed_role_model(registry: Path, role_lower: str, model: str) -> Path:
-    """Per-role config SOURCE under ``coordination/.codex-home/<role>`` —
+    """Per-role config SOURCE under ``.greatminds/.codex-home/<role>`` —
     declares ``model`` (no auth.json). ``build_codex_argv`` reads this to
     compose the ``-c model="..."`` override (post-0390)."""
     project = registry.parent.parent
-    home = project / "coordination" / ".codex-home" / role_lower
+    home = project / ".greatminds" / ".codex-home" / role_lower
     home.mkdir(parents=True, exist_ok=True)
     (home / "config.toml").write_text(
         f'developer_instructions = "ok"\nmodel = "{model}"\n'

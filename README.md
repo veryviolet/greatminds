@@ -15,8 +15,10 @@ greatminds runs a fleet of Claude Code and OpenAI Codex agents on a shared
 filesystem-based finite state machine. Tasks flow through queues such as
 `feature_inbox/`, `feature_plan/`, `feature_dev/`, `feature_test/`, and
 `verified/`; a small `coordd` daemon nudges agents when input appears. There is
-no central broker and no database. Per-project setup writes `coord.yaml`;
-the per-user daemon can supervise multiple projects on one machine.
+no central broker and no database. Per-project setup writes editable project
+configuration under `coordination/` and runtime/system state under
+`.greatminds/`; the per-user daemon can supervise multiple projects on one
+machine.
 
 ## Quickstart
 
@@ -37,9 +39,9 @@ greatminds supports two primary agent tools:
   plugins for Claude-hosted roles.
 - `codex`: OpenAI Codex. Used for chat and driven roles. Run `codex login`
   once for the machine account; generated files under
-  `coordination/.codex-home/<role>/` are role config sources, not auth homes.
+  `.greatminds/.codex-home/<role>/` are role config sources, not auth homes.
 
-Window modes in `coord.yaml`:
+Window modes in `coordination/coord.yaml`:
 
 - `chat`: a live tmux pane for an operator-facing conversation.
 - `loop`: a resident watchdog pane that wakes on its own timer.
@@ -48,8 +50,8 @@ Window modes in `coord.yaml`:
 - `driven`: no live pane; `coordd` starts one Claude or Codex turn when work
   lands in the role's queue, inbox, or stand event stream.
 
-Role-to-tool assignment lives in `coord.yaml`. Edit it after setup when you
-want different tools for different roles:
+Role-to-tool assignment lives in `coordination/coord.yaml`. Edit it after
+setup when you want different tools for different roles:
 
 | Role | Default tool | Default mode |
 | --- | --- | --- |
@@ -86,12 +88,12 @@ windows:
     mode: driven
 ```
 
-Put project and stand variables in `coordination/PROJECT.env`. It is
-gitignored, sourced before agent launch, and passed to stand profiles as
+Put machine-local project and stand variables in `.greatminds/PROJECT.env`.
+It is gitignored, sourced before agent launch, and passed to stand profiles as
 Ansible extra vars:
 
 ```bash
-cat > coordination/PROJECT.env <<'EOF'
+cat > .greatminds/PROJECT.env <<'EOF'
 STAND_HOST=localhost
 STAND_USER=violet
 EOF
@@ -106,14 +108,15 @@ A stand is a singleton live environment. Agents lease it with
 Ansible playbook selected through `coordination/stand-profiles.yaml`. There is
 no global current profile. The current profile is chosen for each lease with
 `greatminds stand lease --profile <name>`, stored in
-`coordination/.stand/state.yaml` as `active_lease.profile`, and resolved through
+`.greatminds/.stand/state.yaml` as `active_lease.profile`, and resolved through
 the registry to a YAML file under `coordination/stand-profiles/`.
 
 Setup seeds reference profiles named `full-deploy`, `vite-dev`, and
 `smoke-only`. Add project profiles by adding registry entries and YAML files.
 The `used_for` and `default_for` values are machine-readable tokens from
-`coordination/schema.yaml` under `stand_profile_registry`; `default_for` tells
-roles which profile to choose for common lease purposes:
+the packaged schema copied to `.greatminds/schema.yaml` under
+`stand_profile_registry`; `default_for` tells roles which profile to choose for
+common lease purposes:
 
 ```yaml
 profiles:

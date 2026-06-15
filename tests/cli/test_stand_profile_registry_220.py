@@ -25,6 +25,8 @@ def _coord(tmp_path: Path) -> Path:
     coord = tmp_path / "coordination"
     coord.mkdir()
     (coord / "stand-profiles").mkdir()
+    runtime = tmp_path / ".greatminds"
+    runtime.mkdir()
     return coord
 
 
@@ -291,7 +293,7 @@ def test_production_profile_lease_succeeds_with_policy_satisfied(
     ])
     assert result.exit_code == 0, result.output + str(result.exception)
     state = yaml.safe_load(
-        (coord / ".stand" / "state.yaml").read_text("utf-8")
+        (tmp_path / ".greatminds" / ".stand" / "state.yaml").read_text("utf-8")
     )
     lease = state["active_lease"]
     assert lease["profile"] == "production"

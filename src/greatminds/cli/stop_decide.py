@@ -26,13 +26,13 @@ from pathlib import Path
 import click
 import yaml
 
-from greatminds.core.paths import find_canon_dir
+from greatminds.core.paths import find_canon_dir, find_runtime_dir
 
 
 def resolve_coord(project_dir: Path) -> Path:
-    if project_dir.name == "coordination" and (project_dir / "journal.ndjson").is_file():
+    if project_dir.name == ".greatminds" and (project_dir / "journal.ndjson").is_file():
         return project_dir
-    return project_dir / "coordination"
+    return find_runtime_dir(project_dir, strict=False)
 
 
 def load_schema(canon_dir: Path) -> dict:

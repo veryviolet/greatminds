@@ -29,4 +29,5 @@ assignee role. Implementers should not read from or move tasks out of
 - `scope: ui` -> `feature_ui_dev/`
 - `scope: docs` -> `feature_docs/`
 
-Review and handback paths are defined in `coordination/schema.yaml`.
+Review and handback paths are defined in the packaged schema copied to
+`.greatminds/schema.yaml`.

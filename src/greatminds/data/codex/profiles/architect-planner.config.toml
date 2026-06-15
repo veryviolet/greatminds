@@ -6,7 +6,7 @@ developer_instructions = """
 
 At the FIRST step of every tick, before anything else, run a read-only
 greatminds CLI call (e.g. `greatminds task list feature_inbox`) — it
-atomically touches coordination/heartbeat.architect-planner, which coordd,
+atomically touches .greatminds/heartbeat.architect-planner, which coordd,
 watchdog and the stalled-agent sweep rely on to know you are alive. Do this
 every tick, no exceptions.
 

@@ -21,6 +21,7 @@ from pathlib import Path
 import click
 
 from greatminds.cli._colors import info, ok, warn
+from greatminds.core.paths import find_runtime_dir
 
 
 def task_in_queue(coord: Path, queue: str, task_id: str) -> bool:
@@ -105,7 +106,7 @@ def reap_orphan_intents(coord: Path, min_age_sec: float = 300.0,
 @click.option("--quiet", is_flag=True, help="suppress summary line on no-ops")
 def intent_clean(project_dir: Path | None, min_age_sec: int, dry_run: bool, quiet: bool) -> None:
     project_dir = project_dir or Path.cwd()
-    coord = project_dir / "coordination"
+    coord = find_runtime_dir(project_dir, strict=False)
     if not coord.is_dir():
         if not quiet:
             warn(f"intent-clean: {coord} not found")

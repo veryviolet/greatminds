@@ -3,9 +3,9 @@
 codex 0.130.0 removed the per-role-file mechanism that ``greatminds``
 relied on (``~/.codex/<role>.config.toml``). The current ``--profile``
 flag reads ``[profiles.<role>]`` from ``$CODEX_HOME/config.toml`` only.
-0158 generates per-role ``$CODEX_HOME`` dirs at
-``<project>/coordination/.codex-home/<role>/`` at setup time, and
-``start_agent.py`` points codex at that dir via the ``CODEX_HOME`` env.
+greatminds generates per-role config source dirs at
+``<project>/.greatminds/.codex-home/<role>/`` at setup time. Codex
+authentication still uses the single machine ``CODEX_HOME``.
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ def _make_canon_with_profiles(canon_root: Path, role_payloads: dict[str, str]) -
 
 def test_setup_creates_one_codex_home_per_role(tmp_path: Path) -> None:
     """One ``<role>/config.toml`` per shipped profile gets written under
-    ``coordination/.codex-home/``."""
+    ``.greatminds/.codex-home/``."""
     canon = tmp_path / "canon"
     project = tmp_path / "project"
     project.mkdir()
@@ -42,7 +42,7 @@ def test_setup_creates_one_codex_home_per_role(tmp_path: Path) -> None:
     assert written == 2
     assert skipped == 0
     for role in ("developer", "tester"):
-        cfg = project / "coordination" / ".codex-home" / role / "config.toml"
+        cfg = project / ".greatminds" / ".codex-home" / role / "config.toml"
         assert cfg.is_file(), f"missing {cfg}"
 
 
@@ -62,13 +62,13 @@ def test_generated_config_has_top_level_developer_instructions(tmp_path: Path) -
 
     setup_mod._setup_codex_homes_per_role(canon, project)
 
-    cfg = project / "coordination" / ".codex-home" / "developer" / "config.toml"
+    cfg = project / ".greatminds" / ".codex-home" / "developer" / "config.toml"
     text = cfg.read_text(encoding="utf-8")
     assert text.startswith("developer_instructions ="), text[:200]
     # 0332: the profile table is split out to developer.config.toml; the
     # base config.toml must NOT carry [profiles.developer] (codex 0.135).
     assert "[profiles.developer]" not in text
-    layer = (project / "coordination" / ".codex-home" / "developer"
+    layer = (project / ".greatminds" / ".codex-home" / "developer"
              / "developer.config.toml").read_text(encoding="utf-8")
     assert "model = " in layer
 
@@ -95,7 +95,7 @@ def test_generated_config_splits_profile_into_layer(tmp_path: Path) -> None:
 
     setup_mod._setup_codex_homes_per_role(canon, project)
 
-    home = project / "coordination" / ".codex-home" / "developer"
+    home = project / ".greatminds" / ".codex-home" / "developer"
     base = (home / "config.toml").read_text(encoding="utf-8")
     layer = (home / "developer.config.toml").read_text(encoding="utf-8")
     # Base: developer_instructions retained, NO profile table.
@@ -123,7 +123,7 @@ def test_setup_does_not_clobber_operator_edits(tmp_path: Path) -> None:
     })
 
     setup_mod._setup_codex_homes_per_role(canon, project)
-    cfg = project / "coordination" / ".codex-home" / "developer" / "config.toml"
+    cfg = project / ".greatminds" / ".codex-home" / "developer" / "config.toml"
     edited = 'developer_instructions = "operator-edited"\n# extra comment\n'
     cfg.write_text(edited, encoding="utf-8")
 

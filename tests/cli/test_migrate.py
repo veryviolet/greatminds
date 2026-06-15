@@ -100,7 +100,7 @@ def test_removes_legacy_root_files_and_empty_bot_queues(tmp_path: Path):
 
     assert "command_START.yaml" in removed
     assert "DEVELOPER.md" in removed
-    assert "coordination/bot_inbox/" in removed
+    assert ".greatminds/bot_inbox/" in removed
     assert not (tmp_path / "command_START.yaml").exists()
     assert (tmp_path / "keep_me.py").exists()             # product file untouched
     assert (coord / "bot_wip").is_dir()                   # non-empty queue kept
@@ -113,7 +113,7 @@ def test_remove_legacy_artifacts_relocates_root_canon_docs(tmp_path: Path):
 
     removed = mg.remove_legacy_artifacts(tmp_path)
 
-    coord = tmp_path / "coordination"
+    coord = tmp_path / ".greatminds"
     assert not (tmp_path / "schema.yaml").exists()
     assert not (tmp_path / "COORDINATE.md").exists()
     assert (coord / "schema.yaml").read_text(encoding="utf-8") == "version: 1\n"

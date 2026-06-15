@@ -5,23 +5,24 @@ directories. During `greatminds setup`, greatminds creates one profile source
 directory for each shipped Codex role:
 
 ```text
-coordination/
-  .codex-home/
-    developer/
-      config.toml
-    tester/
-      config.toml
-    technical-writer/
-      config.toml
+<project>/
+  .greatminds/
+    .codex-home/
+      developer/
+        config.toml
+      tester/
+        config.toml
+      technical-writer/
+        config.toml
 ```
 
 Each `config.toml` is copied from
 `src/greatminds/data/codex/profiles/<role>.config.toml` and then split for
 Codex profile-v2 loading:
 
-- `coordination/.codex-home/<role>/config.toml` contains the role posture,
+- `.greatminds/.codex-home/<role>/config.toml` contains the role posture,
   trusted-project entry, and skill registrations.
-- `coordination/.codex-home/<role>/<role>.config.toml` contains the role model
+- `.greatminds/.codex-home/<role>/<role>.config.toml` contains the role model
   and execution settings.
 
 These directories are profile sources only. They are not authentication homes
@@ -42,7 +43,7 @@ Role-specific behavior is preserved without using a per-role auth home:
   overrides.
 
 To inspect or customize a project's Codex posture, edit the generated
-`coordination/.codex-home/<role>/` files after setup. Do not copy or symlink
+`.greatminds/.codex-home/<role>/` files after setup. Do not copy or symlink
 machine auth into those directories. To change the defaults for future
 projects, update the canon templates under
 `src/greatminds/data/codex/profiles/` before running `greatminds setup` in

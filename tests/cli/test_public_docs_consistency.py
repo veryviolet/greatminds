@@ -48,7 +48,7 @@ def test_public_cli_help_has_no_retired_entrypoints_or_stand_request() -> None:
         "stand result",
         "~/.codex/<role-lower>.config.toml",
         "--profile <role-lower>",
-        "CODEX_HOME=<project>/coordination/.codex-home",
+        "CODEX_HOME=<project>/.greatminds/.codex-home",
     ]
     offenders: list[str] = []
     for name, text in surfaces.items():

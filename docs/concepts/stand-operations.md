@@ -13,7 +13,7 @@ playbook content.
 
 ## Project Environment
 
-Put stand-specific values in `coordination/PROJECT.env`:
+Put machine-local stand values in `.greatminds/PROJECT.env`:
 
 ```bash
 STAND_HOST=localhost
@@ -72,9 +72,10 @@ that convention.
 `used_for` is the capability list for the profile. `default_for` assigns common
 role intents such as `feature_test`, `explorer`, `reviewer`,
 `live_developer`, `production_deploy`, and `production_review` to a profile.
-The vocabulary is defined in `coordination/schema.yaml` under
-`stand_profile_registry`. Each `default_for` token can belong to only one
-profile, so automated role selection is unambiguous.
+The vocabulary is defined in the packaged schema copied to
+`.greatminds/schema.yaml` under `stand_profile_registry`. Each `default_for`
+token can belong to only one profile, so automated role selection is
+unambiguous.
 
 Use the registry commands after edits:
 
@@ -85,7 +86,7 @@ greatminds stand profiles doctor
 
 `coordd` runs the profile with Ansible and injects:
 
-- every key from `coordination/PROJECT.env`;
+- every key from `.greatminds/PROJECT.env`;
 - the active lease id as `lease_id`;
 - the task id as `task_id`;
 - the isolated task worktree path as `worktree`.
@@ -148,7 +149,7 @@ greatminds stand lease \
 The source of truth is:
 
 ```text
-coordination/.stand/state.yaml
+.greatminds/.stand/state.yaml
 ```
 
 `greatminds stand status` reads that file and prints the current state, active
@@ -190,7 +191,7 @@ If the stand is `free`, the lease becomes active and the state moves to
 `preparing`. If another lease is active, the new lease is appended to the FIFO
 queue. The command prints the `lease_id`; the requester must keep that token.
 
-`coordd` watches `coordination/.stand/state.yaml` and runs the active lease
+`coordd` watches `.greatminds/.stand/state.yaml` and runs the active lease
 profile file selected by `active_lease.profile`. Operators can inspect progress
 with:
 
@@ -222,9 +223,9 @@ back to `free`; `coordd` promotes the next queued lease on a later tick.
 
 ## TTL And Recovery
 
-Leases have a default TTL from `coordination/schema.yaml`
-(`stand.resource.lease`), currently
-four hours, with a warning window before automatic release. The TTL is a
+Leases have a default TTL from the packaged schema copied to
+`.greatminds/schema.yaml` (`stand.resource.lease`), currently four hours, with
+a warning window before automatic release. The TTL is a
 safety valve for abandoned leases; it is not a substitute for explicitly
 releasing a lease after probes finish.
 
@@ -256,5 +257,5 @@ its own `functional_probes` plus `stand_evidence.tester_observations`.
 `greatminds gate-check <task-id>` reads that tests-block evidence first.
 
 Use the lease commands for all stand operations. Stand readiness belongs in
-`coordination/.stand/state.yaml`, and product validation evidence belongs in
+`.greatminds/.stand/state.yaml`, and product validation evidence belongs in
 the task's `tests` block.

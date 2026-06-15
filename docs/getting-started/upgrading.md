@@ -20,9 +20,9 @@ not need a separate manual daemon-install step during a normal update.
 ## Update notifications
 
 When `coordd` is running, it periodically checks PyPI for a newer greatminds
-release. The interval and target live in `coordination/schema.yaml` under `auto_update`;
-the default interval is `14400` seconds, and the default target is
-`MAINTAINER`.
+release. The interval and target come from the packaged schema under
+`auto_update`; the default interval is `14400` seconds, and the default target
+is `MAINTAINER`.
 
 The current mode is `notify_only`. If PyPI has a newer version, `coordd` sends
 one inbox `info` message to MAINTAINER with the installed version, latest

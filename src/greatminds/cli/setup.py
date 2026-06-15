@@ -7,7 +7,8 @@ directory, plus the inbox + plugin-overlay layout.
 After this command, the project has everything it needs to run the
 fleet. Next steps:
 
-  1. edit ``<project>/coord.yaml`` to confirm project_dir + window list
+\b
+  1. edit ``<project>/coordination/coord.yaml`` to confirm project_dir + window list
   2. fill in ``<project>/coordination/PROJECT.md`` tokens (project name,
      stand hosts, env paths, etc.)
   3. run ``greatminds launch --target tmux`` to start the fleet
@@ -30,7 +31,12 @@ from pathlib import Path
 
 import click
 
-from greatminds.core.paths import find_canon_dir
+from greatminds.core.paths import (
+    coord_yaml_path,
+    ensure_layout_dirs,
+    find_canon_dir,
+    project_env_file,
+)
 from greatminds.cli._colors import err, header, info, ok, warn
 
 
@@ -181,15 +187,15 @@ def _render_system_vars_docs(system_vars: dict[str, dict]) -> str:
             out.append(desc)
         out.append("")
         out.append(
-            "See `coordination/PROJECT.env` for the entry + setup "
+            "See `.greatminds/PROJECT.env` for the entry + setup "
             "instructions."
         )
         out.append("")
     return "\n".join(out).rstrip()
 
 
-def _ensure_project_env(coord: Path, canon: Path, force: bool) -> str:
-    """0274: write/refresh ``coordination/PROJECT.env`` from schema.
+def _ensure_project_env(runtime: Path, canon: Path, force: bool) -> str:
+    """Write/refresh ``.greatminds/PROJECT.env`` from schema.
 
     Behavior:
     - File missing → write from template + schema. Returns "written".
@@ -198,7 +204,7 @@ def _ensure_project_env(coord: Path, canon: Path, force: bool) -> str:
     - File present + force=False → leave alone (preserves user's
       filled-in values). Returns "exists".
     """
-    target = coord / "PROJECT.env"
+    target = runtime / "PROJECT.env"
     if target.is_file() and not force:
         return "exists"
 
@@ -222,7 +228,7 @@ def _ensure_project_env(coord: Path, canon: Path, force: bool) -> str:
 
 def _ensure_project_md(coord: Path, canon: Path, force: bool,
                         lang: str) -> str:
-    """0274: write/refresh ``coordination/PROJECT.md`` from template
+    """Write/refresh ``coordination/PROJECT.md`` from template
     + schema-driven System variables section.
 
     Behavior mirrors ``_ensure_project_env``: missing → written;
@@ -259,7 +265,7 @@ def _ensure_project_md(coord: Path, canon: Path, force: bool,
 
 
 def _seed_bootstrap(coord: Path, canon: Path) -> bool:
-    """Seed the single static system-prompt ``coordination/bootstrap.md``
+    """Seed the single static system-prompt ``.greatminds/bootstrap.md``
     from canon (``greatminds.data/bootstrap.md``), overwriting on each
     setup so it tracks canon. Role-independent: every agent reads its own
     contract from ``schema.roles.<GREATMINDS_ROLE>``. The driven driver
@@ -275,14 +281,11 @@ def _seed_bootstrap(coord: Path, canon: Path) -> bool:
 
 
 def _remove_root_canon_copy(project_dir: Path, coord: Path, name: str) -> str:
-    """Move/delete legacy root-level canon docs after the canonical copy
-    has been written under coordination/.
+    """Remove root-level canon docs after the runtime copy exists.
 
-    Pre-2.0.8 setup wrote ``schema.yaml`` and ``COORDINATE.md`` into the
-    product root. The v2 layout keeps greatminds-owned files under
-    ``coordination/``. If the root copy matches the new coordination copy,
-    delete it. If it differs, preserve it under coordination/.backups/ and
-    still remove the root copy so project roots stay clean.
+    If the root copy matches the runtime copy, delete it. If it differs,
+    preserve it under ``.greatminds/.backups/`` and still remove the root copy
+    so project roots stay clean.
     """
     root_file = project_dir / name
     if not root_file.is_file():
@@ -299,7 +302,7 @@ def _remove_root_canon_copy(project_dir: Path, coord: Path, name: str) -> str:
             root_file.unlink()
         except OSError as exc:
             return f"left in root: {exc}"
-        return "moved to coordination/"
+        return "moved to runtime"
     try:
         coord_text = coord_file.read_text(encoding="utf-8")
     except OSError as exc:
@@ -794,7 +797,7 @@ def _codex_skill_dirs_for_role(canon: Path, role: str) -> list[Path]:
 def _setup_codex_homes_per_role(canon: Path,
                                 project_dir: Path) -> tuple[int, int]:
     """0158: install per-role codex profile sources at
-    ``<project>/coordination/.codex-home/<role>/config.toml``.
+    ``<project>/.greatminds/.codex-home/<role>/config.toml``.
 
     Replaces the pre-0158 ``~/.codex/<role>.config.toml`` mechanism that
     codex 0.130.0 silently stopped reading.
@@ -835,7 +838,7 @@ def _setup_codex_homes_per_role(canon: Path,
     src_dir = canon / "codex" / "profiles"
     if not src_dir.is_dir():
         return (0, 0)
-    homes_root = project_dir / "coordination" / ".codex-home"
+    homes_root = project_dir / ".greatminds" / ".codex-home"
     try:
         homes_root.mkdir(parents=True, exist_ok=True)
     except OSError:
@@ -1385,26 +1388,29 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     header(f"greatminds setup: bootstrapping {project_dir}")
     info(f"  canon source: {canon}")
 
-    # project entrypoint config. Canon docs are greatminds-owned and live
-    # under coordination/; coord.yaml remains at the project root so launchers
-    # can find the session/project_dir without scanning coordination state.
+    # Project layout:
+    #   coordination/  tracked, user-editable project contract
+    #   .greatminds/   ignored runtime/system state
+    config, coord = ensure_layout_dirs(project_dir)
+
+    # project entrypoint config.
     header("\nproject config:")
 
     # coord.yaml generation (init-style: never overwrite a user-edited file).
     # The canonical roster lives in src/greatminds/data/coord.yaml.template
     # (3 paned roles — planner / maintainer / dashboard — plus the driven
     # roles coordd runs as paneless subprocesses); we substitute
-    # {SESSION, PROJECT_DIR} into it and write to <project>/coord.yaml.
-    coord_yaml_path = project_dir / "coord.yaml"
+    # {SESSION, PROJECT_DIR} into it and write to coordination/coord.yaml.
+    coord_yaml_file = coord_yaml_path(project_dir)
     resolved_session: str | None = None
-    if coord_yaml_path.is_file():
-        info(f"  coord.yaml: exists, skipping — delete it first to regenerate")
+    if coord_yaml_file.is_file():
+        info(f"  coordination/coord.yaml: exists, skipping — delete it first to regenerate")
         # Read the session name from the existing file so we can still register
         # the project with the daemon below (0015 — runs on both gen + skip paths).
         try:
             import yaml as _yaml
             existing = _yaml.safe_load(
-                coord_yaml_path.read_text(encoding="utf-8")
+                coord_yaml_file.read_text(encoding="utf-8")
             )
             if isinstance(existing, dict):
                 v = existing.get("session")
@@ -1426,74 +1432,40 @@ def setup(project_dir: Path | None, force: bool, lang: str,
                 tpl.replace("__SESSION__", session_name)
                    .replace("__PROJECT_DIR__", str(project_dir))
             )
-            coord_yaml_path.write_text(body, encoding="utf-8")
-            info(f"  coord.yaml: written (session: {session_name})")
+            coord_yaml_file.write_text(body, encoding="utf-8")
+            info(f"  coordination/coord.yaml: written (session: {session_name})")
             resolved_session = session_name
         else:
             warn("  coord.yaml: template missing in canon, skipping generation")
-    # coordination/ — runtime state
-    coord = project_dir / "coordination"
-    header("\ncoordination/ (runtime state):")
-    info(f"  dir: {_ensure_dir(coord)}")
+    header(f"\n{coord.name}/ (runtime state):")
+    info(f"  dir: exists")
     info(f"  schema.yaml: {_copy_if_missing(canon / 'schema.yaml', coord / 'schema.yaml', force=True)}")
     info(f"  COORDINATE.md: {_copy_if_missing(canon / 'COORDINATE.md', coord / 'COORDINATE.md', force=True)}")
     for canon_name in ("schema.yaml", "COORDINATE.md"):
         root_status = _remove_root_canon_copy(project_dir, coord, canon_name)
         if root_status != "absent":
-            info(f"  legacy root {canon_name}: {root_status}")
+            info(f"  root {canon_name}: {root_status}")
     # 0274: PROJECT.md is generated from the template with the
     # schema-driven System variables section interpolated.
-    md_status = _ensure_project_md(coord, canon, force, lang)
-    info(f"  PROJECT.md: {md_status} (lang={lang})")
-
-    gi = coord / ".gitignore"
-    if not gi.is_file() or force:
-        gi.write_text(
-            "# Runtime churn — NOT version-controlled. Everything else\n"
-            "# under coordination/ (PROJECT.md, queue task files,\n"
-            "# verified/archive history, templates) IS tracked.\n"
-            "journal.ndjson\n"
-            ".notify_state.json\n"
-            "intent/\n"
-            ".agent_registry/\n"
-            ".locks/\n"
-            ".id_counter\n"
-            "heartbeat.*\n"
-            # Per-role tool runtime + live state — runtime churn, never
-            # tracked. .codex-home* holds codex sessions/logs/plugin caches
-            # (an embedded git repo that pollutes the outer repo if added);
-            # .turns are driven-turn logs; .stand is live lease state +
-            # deploy logs.
-            ".codex-home*/\n"
-            ".turns/\n"
-            ".stand/\n"
-            "inbox/*/*\n"
-            "!inbox/*/.gitkeep\n"
-            "*.legacy\n"
-            "PROJECT.env\n",
-            encoding="utf-8",
-        )
-        info("  .gitignore: written")
-    else:
-        info("  .gitignore: exists")
+    md_status = _ensure_project_md(config, canon, force, lang)
+    info(f"  coordination/PROJECT.md: {md_status} (lang={lang})")
 
     # 0185: ensure project-root .gitignore excludes the worktree base.
-    # ``.worktrees/`` is git-internal state (one .git linked-worktree
-    # per task) and must NOT be staged. Idempotent: only appends if
-    # absent.
+    # ``.worktrees/`` and ``.greatminds/`` are runtime state and must NOT be staged.
     root_gi = project_dir / ".gitignore"
-    needed_line = ".worktrees/"
+    needed_lines = [".worktrees/", ".greatminds/"]
     existing = (
         root_gi.read_text(encoding="utf-8") if root_gi.is_file() else ""
     )
-    if needed_line not in existing.splitlines():
+    missing = [line for line in needed_lines if line not in existing.splitlines()]
+    if missing:
         suffix = "" if existing.endswith("\n") or not existing else "\n"
         root_gi.write_text(
             existing + suffix +
-            "\n# 0185: per-task worktrees\n" + needed_line + "\n",
+            "\n# greatminds runtime state\n" + "\n".join(missing) + "\n",
             encoding="utf-8",
         )
-        info("  project .gitignore: appended .worktrees/")
+        info("  project .gitignore: appended runtime ignores")
 
     header("\nqueues:")
     for q in QUEUES:
@@ -1520,8 +1492,8 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     _ensure_dir(coord / ".agent_registry")
 
     # plugin overlay
-    header("\nplugin overlay (project-overrides):")
-    overlay = coord / "plugins.local" / "project-overrides"
+    header("\nproject plugin and MCP config:")
+    overlay = config / "plugins.local" / "project-overrides"
     overlay_meta = overlay / ".claude-plugin"
     overlay_skills = overlay / "skills"
     _ensure_dir(overlay)
@@ -1545,7 +1517,7 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     if not sg.is_file():
         sg.touch()
 
-    mcpl = coord / "mcp.local.json"
+    mcpl = config / "mcp.local.json"
     if not mcpl.is_file():
         mcpl.write_text('{\n  "mcpServers": {}\n}\n', encoding="utf-8")
         info("  mcp.local.json: written")
@@ -1556,24 +1528,27 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     # ``.example`` step). Contents come from
     # ``schema.project_env.system_vars`` — pre-populated KEY= lines
     # with description / acquire-instructions comments per var.
+    header("\nruntime env:")
     env_status = _ensure_project_env(coord, canon, force)
-    info(f"  PROJECT.env: {env_status}")
+    info(f"  .greatminds/PROJECT.env: {env_status}")
 
     # 0281 (0276 Phase E): seed the per-project stand-profiles dir
     # with the canonical presets (full-deploy / smoke-only, both
     # yaml + md). Idempotent — existing operator-edited copies are
     # NOT overwritten.
-    sp_copied, sp_skipped = _seed_stand_profiles(coord, canon)
+    header("\nstand profile config:")
+    sp_copied, sp_skipped = _seed_stand_profiles(config, canon)
     info(f"  stand-profiles: {sp_copied} copied, {sp_skipped} exist")
-    sp_registry = _seed_stand_profile_registry(coord, canon)
+    sp_registry = _seed_stand_profile_registry(config, canon)
     info(f"  stand-profiles.yaml: {sp_registry}")
 
-    # Seed the single static system-prompt coordination/bootstrap.md
+    # Seed the single static system-prompt .greatminds/bootstrap.md
     # from canon. The driven driver + start-agent pass it to claude's
     # ``--append-system-prompt-file`` / codex ``baseInstructions``; each
     # agent reads its own contract from schema.roles.<GREATMINDS_ROLE>.
+    header("\nruntime prompts:")
     bs_ok = _seed_bootstrap(coord, canon)
-    info(f"  bootstrap.md: {'written' if bs_ok else 'MISSING in canon'}")
+    info(f"  .greatminds/bootstrap.md: {'written' if bs_ok else 'MISSING in canon'}")
 
     # .claude/settings.local.json — Stop hook + schema's claude_settings
     # permissions.allow rules (0191). Merge-on-existing preserves any
@@ -1582,7 +1557,7 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     info(f"  .claude/settings.local.json: {status}")
 
     # Codex per-role profile sources (task 0158, supersedes 0047) — install
-    # shipped profiles into ``<project>/coordination/.codex-home/<role>/
+    # shipped profiles into ``<project>/.greatminds/.codex-home/<role>/
     # config.toml``. These per-role dirs are config/profile sources only:
     # Codex authentication uses the single machine CODEX_HOME, while
     # start_agent.py / coordd read role settings from here and pass them as
@@ -1592,7 +1567,7 @@ def setup(project_dir: Path | None, force: bool, lang: str,
     written, skipped = _setup_codex_homes_per_role(canon, project_dir)
     if written or skipped:
         info(
-            f"  codex per-role profile sources → coordination/.codex-home/: "
+            f"  codex per-role profile sources → .greatminds/.codex-home/: "
             f"{written} written, {skipped} preserved (existing)"
         )
 
@@ -1666,7 +1641,7 @@ def setup(project_dir: Path | None, force: bool, lang: str,
 
     ok("\ndone.")
     info("\nNext:")
-    info(f"  1. edit {project_dir}/coord.yaml — confirm project_dir + window list")
+    info(f"  1. edit {project_dir}/coordination/coord.yaml — confirm project_dir + window list")
     info(f"  2. fill {project_dir}/coordination/PROJECT.md tokens")
     info(f"  3. run: cd {project_dir} && greatminds launch --target tmux")
 
