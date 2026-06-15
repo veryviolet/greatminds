@@ -1658,7 +1658,7 @@
 same diagnostic commands, but they should route infrastructure changes through
 <code>MAINTAINER</code> instead of editing coordination state directly.</p>
 <h2 id="cli-only-discipline">CLI-Only Discipline<a class="headerlink" href="#cli-only-discipline" title="Permanent link">&para;</a></h2>
-<p>All mutations under <code>coordination/</code> go through the <code>greatminds</code> CLI. Do not
+<p>All mutations under <code>.greatminds/</code> go through the <code>greatminds</code> CLI. Do not
 move task files with <code>mv</code>, edit inbox files by hand, append journal lines
 directly, or touch heartbeat files manually. The CLI validates role ownership,
 schema fields, transition readiness, intent files, journal lines, and heartbeat
@@ -1758,7 +1758,7 @@ stand control runs:</p>
 </code></pre></div>
 <h2 id="stuck-driven-turns">Stuck Driven Turns<a class="headerlink" href="#stuck-driven-turns" title="Permanent link">&para;</a></h2>
 <p>Driven roles do not keep a persistent agent process. <code>coordd</code> creates one turn
-per event and holds <code>coordination/.locks/driven-&lt;role&gt;.lock</code> for the duration
+per event and holds <code>.greatminds/.locks/driven-{role}.lock</code> for the duration
 of that turn. New lock files contain JSON metadata such as <code>role</code>, <code>driver</code>,
 <code>started_at</code>, <code>coordd_pid</code>, and <code>log_path</code>.</p>
 <p>Use:</p>
@@ -1772,7 +1772,7 @@ Do not assume a task is being worked just because a driven lock exists.</p>
 <h2 id="driven-retry-backoff">Driven Retry Backoff<a class="headerlink" href="#driven-retry-backoff" title="Permanent link">&para;</a></h2>
 <p>When a driven turn exits with a rate-limit, timeout, or execution error,
 <code>coordd</code> records retry state in
-<code>coordination/.locks/driven-&lt;role&gt;.retry.json</code>. The live scheduler uses this
+<code>.greatminds/.locks/driven-{role}.retry.json</code>. The live scheduler uses this
 state to re-drive the role after backoff and restores it after a coordd
 restart. <code>greatminds dashboard --once</code> shows these roles as <code>backoff</code> or
 <code>failed</code>; <code>greatminds watchdog</code> reports them under <code>DRIVEN RETRIES</code>.</p>

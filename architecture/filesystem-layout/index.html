@@ -1478,9 +1478,17 @@
 
 
 <h1 id="filesystem-layout">Filesystem Layout<a class="headerlink" href="#filesystem-layout" title="Permanent link">&para;</a></h1>
-<p>A configured project contains a <code>coordination/</code> directory. Typical contents:</p>
+<p>A configured project separates editable project configuration from runtime
+state:</p>
 <div class="highlight"><pre><span></span><code>coordination/
   PROJECT.md
+  coord.yaml
+  mcp.local.json
+  plugins.local/
+  stand-profiles.yaml
+  stand-profiles/
+
+.greatminds/
   feature_inbox/
   feature_plan/
   feature_dev/
@@ -1499,9 +1507,9 @@
   heartbeat.&lt;role&gt;
 </code></pre></div>
 <p>The task file path is meaningful. For example, a product task in
-<code>coordination/feature_docs/</code> is owned by <code>TECHNICAL-WRITER</code>; the same file in
-<code>coordination/feature_docs_review/</code> is owned by <code>READER</code>.</p>
-<p>Per-task implementation code lives outside <code>coordination/</code>, under
+<code>.greatminds/feature_docs/</code> is owned by <code>TECHNICAL-WRITER</code>; the same file in
+<code>.greatminds/feature_docs_review/</code> is owned by <code>READER</code>.</p>
+<p>Per-task implementation code lives outside <code>.greatminds/</code>, under
 <code>.worktrees/&lt;task-id&gt;/</code>. When a task enters an implementer queue,
 <code>greatminds task mv</code> creates a git worktree on <code>task/&lt;task-id&gt;</code> and the
 implementer works from that checkout. When REVIEWER moves the task to

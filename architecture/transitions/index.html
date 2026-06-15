@@ -1510,7 +1510,7 @@ task needs another amendment or review cycle.</p>
 <span class="c1"># ---------------------------------------------------------------------------</span>
 <span class="c1"># Queues</span>
 <span class="c1">#</span>
-<span class="c1"># Each queue is a directory under coordination/. Field meanings:</span>
+<span class="c1"># Each queue is a directory under .greatminds/. Field meanings:</span>
 <span class="c1">#</span>
 <span class="c1">#   owner    — role responsible for the queue&#39;s content AND the single</span>
 <span class="c1">#              role that claims from it (moves files out). Location =</span>
@@ -2324,7 +2324,7 @@ task needs another amendment or review cycle.</p>
 <span class="w">  </span><span class="c1"># Per-role message inbox: coordd and other roles message YOU here</span>
 <span class="w">  </span><span class="c1"># (wakes, asks, infos). Read it FIRST every tick. It is NOT a task</span>
 <span class="w">  </span><span class="c1"># queue — `greatminds task list inbox` is wrong (no such queue).</span>
-<span class="w">  </span><span class="nt">dir</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;coordination/inbox/${GREATMINDS_ROLE}/&quot;</span>
+<span class="w">  </span><span class="nt">dir</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;.greatminds/inbox/${GREATMINDS_ROLE}/&quot;</span>
 <span class="w">  </span><span class="nt">read</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;greatminds</span><span class="nv"> </span><span class="s">inbox</span><span class="nv"> </span><span class="s">list&quot;</span><span class="w">          </span><span class="c1"># role from $GREATMINDS_ROLE</span>
 <span class="w">  </span><span class="nt">show</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;greatminds</span><span class="nv"> </span><span class="s">inbox</span><span class="nv"> </span><span class="s">show</span><span class="nv"> </span><span class="s">&lt;path&gt;&quot;</span>
 <span class="w">  </span><span class="nt">ack</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;greatminds</span><span class="nv"> </span><span class="s">inbox</span><span class="nv"> </span><span class="s">ack</span><span class="nv"> </span><span class="s">&lt;path&gt;&quot;</span><span class="w">     </span><span class="c1"># after acting on the message</span>
@@ -2428,7 +2428,7 @@ task needs another amendment or review cycle.</p>
 <span class="w">      </span><span class="nt">operations</span><span class="p">:</span>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">stand_probe_*</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">requires holder of active_lease&#39;s lease_id</span>
 <span class="w">      </span><span class="nt">enforcement_layer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cli</span>
-<span class="w">    </span><span class="nt">state_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.stand/state.yaml</span><span class="w">       </span><span class="c1"># under coordination/</span>
+<span class="w">    </span><span class="nt">state_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.stand/state.yaml</span><span class="w">       </span><span class="c1"># under .greatminds/</span>
 <span class="w">    </span><span class="c1"># Profile names are project-defined in coordination/stand-profiles.yaml.</span>
 <span class="w">    </span><span class="c1"># The lease CLI accepts a profile only when the registry contains that</span>
 <span class="w">    </span><span class="c1"># profile and the referenced YAML playbook exists.</span>
