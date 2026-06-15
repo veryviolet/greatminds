@@ -1412,7 +1412,7 @@
 
 <h1 id="roles">Roles<a class="headerlink" href="#roles" title="Permanent link">&para;</a></h1>
 <p>Each role owns a small part of the pipeline. Ownership is defined by queue
-location and encoded in <code>coordination/schema.yaml</code>.</p>
+location and encoded in the packaged schema copied to <code>.greatminds/schema.yaml</code>.</p>
 <p>Product roles:</p>
 <ul>
 <li><code>ARCHITECT-PLANNER</code>: intake, triage, planning, and routing. Lifecycle:
@@ -1437,7 +1437,7 @@ location and encoded in <code>coordination/schema.yaml</code>.</p>
   rather than direct chat. It handles daemon and agent recovery, venv repair,
   canon cutover, and escalation of FSM stalls to the planner.</li>
 </ul>
-<p>Every active role has a heartbeat file under <code>coordination/</code>. Stale heartbeats
+<p>Every active role has a heartbeat file under <code>.greatminds/</code>. Stale heartbeats
 are reported by <code>greatminds watchdog</code>.</p>
 <p>For lifecycle mechanics across tools, see
 <a href="../../architecture/lifecycle/">Lifecycle Model</a>.</p>

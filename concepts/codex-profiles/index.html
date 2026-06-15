@@ -1414,22 +1414,23 @@
 <p>Codex roles use generated per-role profile sources instead of Claude plugin
 directories. During <code>greatminds setup</code>, greatminds creates one profile source
 directory for each shipped Codex role:</p>
-<div class="highlight"><pre><span></span><code>coordination/
-  .codex-home/
-    developer/
-      config.toml
-    tester/
-      config.toml
-    technical-writer/
-      config.toml
+<div class="highlight"><pre><span></span><code>&lt;project&gt;/
+  .greatminds/
+    .codex-home/
+      developer/
+        config.toml
+      tester/
+        config.toml
+      technical-writer/
+        config.toml
 </code></pre></div>
 <p>Each <code>config.toml</code> is copied from
 <code>src/greatminds/data/codex/profiles/&lt;role&gt;.config.toml</code> and then split for
 Codex profile-v2 loading:</p>
 <ul>
-<li><code>coordination/.codex-home/&lt;role&gt;/config.toml</code> contains the role posture,
+<li><code>.greatminds/.codex-home/&lt;role&gt;/config.toml</code> contains the role posture,
   trusted-project entry, and skill registrations.</li>
-<li><code>coordination/.codex-home/&lt;role&gt;/&lt;role&gt;.config.toml</code> contains the role model
+<li><code>.greatminds/.codex-home/&lt;role&gt;/&lt;role&gt;.config.toml</code> contains the role model
   and execution settings.</li>
 </ul>
 <p>These directories are profile sources only. They are not authentication homes
@@ -1448,7 +1449,7 @@ Codex reads the one valid login and refreshes tokens in one place.</p>
   overrides.</li>
 </ul>
 <p>To inspect or customize a project's Codex posture, edit the generated
-<code>coordination/.codex-home/&lt;role&gt;/</code> files after setup. Do not copy or symlink
+<code>.greatminds/.codex-home/&lt;role&gt;/</code> files after setup. Do not copy or symlink
 machine auth into those directories. To change the defaults for future
 projects, update the canon templates under
 <code>src/greatminds/data/codex/profiles/</code> before running <code>greatminds setup</code> in

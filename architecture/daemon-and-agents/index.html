@@ -1580,14 +1580,15 @@
 <h1 id="daemon-and-agents">Daemon and Agents<a class="headerlink" href="#daemon-and-agents" title="Permanent link">&para;</a></h1>
 <p><code>greatminds launch</code> starts the configured agent windows from the environment
 where greatminds is installed, for example <code>greatminds launch --target tmux</code>.
-Each window is defined in <code>coord.yaml</code> with:</p>
+Each window is defined in <code>coordination/coord.yaml</code> with:</p>
 <ul>
 <li>window name</li>
 <li>role</li>
 <li>tool (<code>claude</code>, <code>codex</code>, <code>cursor</code>, or <code>bash</code>)</li>
 <li>mode (<code>chat</code>, <code>loop</code>, <code>dashboard</code>, <code>logs</code>, <code>staged</code>, or <code>driven</code>)</li>
 </ul>
-<p>The role's lifecycle is declared in <code>coordination/schema.yaml</code>:</p>
+<p>The role's lifecycle is declared in the packaged schema copied to
+<code>.greatminds/schema.yaml</code>:</p>
 <ul>
 <li><code>interactive</code>: human-paced chat. <code>ARCHITECT-PLANNER</code> is the normal
   user-facing planner.</li>
@@ -1596,19 +1597,18 @@ Each window is defined in <code>coord.yaml</code> with:</p>
 <li><code>driven</code>: no persistent agent loop. The pane is idle between turns; <code>coordd</code>
   runs one turn when an inbox, queue, or stand-state event lands.</li>
 </ul>
-<p>Driven dispatch requires both <code>coordination/schema.yaml</code> lifecycle and the installed
-<code>coord.yaml</code> window mode to be <code>driven</code>. That gate lets existing fleets migrate
-role by role.</p>
+<p>Driven dispatch requires both the schema lifecycle and the installed
+<code>coordination/coord.yaml</code> window mode to be <code>driven</code>.</p>
 <h2 id="coordd">coordd<a class="headerlink" href="#coordd" title="Permanent link">&para;</a></h2>
-<p><code>coordd</code> watches <code>coordination/</code> for inbox, queue-file, and stand-state
+<p><code>coordd</code> watches <code>.greatminds/</code> for inbox, queue-file, and stand-state
 activity. It does not own the task FSM and does not decide task transitions.
 Its job is turn delivery: when a producer moves work into another role's queue,
 the consumer can react immediately.</p>
 <p>On Linux, <code>coordd</code> arms an inotify watcher. New inbox files under
-<code>coordination/inbox/&lt;role&gt;/</code> and new task files landing in watched queues trigger
+<code>.greatminds/inbox/&lt;role&gt;/</code> and new task files landing in watched queues trigger
 the owning role's event path. For non-driven roles, the wake mechanism is
-selected from <code>coordination/schema.yaml</code> under <code>event_wake.by_tool</code>, keyed by the role
-window's <code>coord.yaml</code> <code>tool:</code> value:</p>
+selected from <code>.greatminds/schema.yaml</code> under <code>event_wake.by_tool</code>, keyed by
+the role window's <code>coordination/coord.yaml</code> <code>tool:</code> value:</p>
 <ul>
 <li><code>codex</code> and <code>cursor</code>: <code>coordd</code> finds the role's deepest sleeping descendant
   and sends <code>SIGINT</code>. That interrupts the long sleep wrapper so the next tick
@@ -1633,7 +1633,7 @@ window's <code>coord.yaml</code> <code>tool:</code> value:</p>
 persistent <code>/loop</code>; their next turn comes from the next inbox, queue, or stand
 event.</p>
 <p><code>coordd</code> also writes a best-effort chronological driven-agent event stream to
-<code>coordination/.events/driven.ndjson</code>. The stream is read-only operator
+<code>.greatminds/.events/driven.ndjson</code>. The stream is read-only operator
 observability, not FSM authority: task files, locks, stand state, and turn logs
 remain the source of truth. A fresh tmux launch includes a role-less <code>logs</code>
 window that runs <code>greatminds driven-log --follow</code> and shows accepted turns,
@@ -1648,18 +1648,19 @@ send, the agent ends its own chat reply with the matching marker line.</p>
 <p>If a role does not react to new work, check these in order:</p>
 <ol>
 <li>Confirm the daemon is running for the project with <code>greatminds daemon status</code>.</li>
-<li>Confirm the role exists in <code>coord.yaml</code>, has the expected <code>tool:</code>, and has a
-   live agent registry entry.</li>
-<li>Confirm the role's <code>coordination/schema.yaml</code> lifecycle and <code>coord.yaml</code> mode agree with
-   the expected model. Driven roles require both values to be <code>driven</code>.</li>
+<li>Confirm the role exists in <code>coordination/coord.yaml</code>, has the expected
+   <code>tool:</code>, and has a live agent registry entry.</li>
+<li>Confirm the role's schema lifecycle and <code>coordination/coord.yaml</code> mode agree
+   with the expected model. Driven roles require both values to be <code>driven</code>.</li>
 <li>For a driven role, inspect coordd logs for the driven spawn result and check
-   the per-role run lock under <code>coordination/.locks/</code>.</li>
-<li>Confirm <code>coordination/schema.yaml</code> still maps that tool in <code>event_wake.by_tool</code> for
+   the per-role run lock under <code>.greatminds/.locks/</code>.</li>
+<li>Confirm <code>.greatminds/schema.yaml</code> maps that tool in <code>event_wake.by_tool</code> for
    non-driven roles.</li>
 <li>For non-driven <code>codex</code> or <code>cursor</code>, inspect whether the agent is actually inside a sleep
    descendant. <code>coordd</code> does not signal the agent process itself when no sleeping
    child exists.</li>
-<li>For non-driven <code>claude</code>, confirm the tmux session and window name match <code>coord.yaml</code>.
+<li>For non-driven <code>claude</code>, confirm the tmux session and window name match
+   <code>coordination/coord.yaml</code>.
    Chat-mode wakes are rate-limited by
    <code>event_wake.tmux_send_keys.rate_limit_seconds</code>, so a burst of messages may
    coalesce into one prompt.</li>
@@ -1676,9 +1677,9 @@ send, the agent ends its own chat reply with the matching marker line.</p>
 </ol>
 <h2 id="visual-event-markers">Visual event markers<a class="headerlink" href="#visual-event-markers" title="Permanent link">&para;</a></h2>
 <p>Operators can scan live tmux panes by the marker at the end of an agent reply.
-The templates live in <code>coordination/schema.yaml</code> under <code>visual_events</code>; docs and prompts
-describe the contract, but the schema is the source of truth for the exact emoji
-and markdown shape.</p>
+The templates live in <code>.greatminds/schema.yaml</code> under <code>visual_events</code>; docs and
+prompts describe the contract, but the schema is the source of truth for the
+exact emoji and markdown shape.</p>
 <ul>
 <li><code>CLAIMED</code>: an agent moved a task into an implementation or ownership queue it
   is taking over.</li>

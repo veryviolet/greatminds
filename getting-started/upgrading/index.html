@@ -1536,9 +1536,9 @@ of <code>greatminds daemon install</code> when the template unit is missing. Ope
 not need a separate manual daemon-install step during a normal update.</p>
 <h2 id="update-notifications">Update notifications<a class="headerlink" href="#update-notifications" title="Permanent link">&para;</a></h2>
 <p>When <code>coordd</code> is running, it periodically checks PyPI for a newer greatminds
-release. The interval and target live in <code>coordination/schema.yaml</code> under <code>auto_update</code>;
-the default interval is <code>14400</code> seconds, and the default target is
-<code>MAINTAINER</code>.</p>
+release. The interval and target come from the packaged schema under
+<code>auto_update</code>; the default interval is <code>14400</code> seconds, and the default target
+is <code>MAINTAINER</code>.</p>
 <p>The current mode is <code>notify_only</code>. If PyPI has a newer version, <code>coordd</code> sends
 one inbox <code>info</code> message to MAINTAINER with the installed version, latest
 version, release link, and the command to run. It does not upgrade the fleet by

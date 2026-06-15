@@ -1522,8 +1522,8 @@ Do not bypass planning by moving a task directly into an implementer queue.</p>
 <h2 id="upstream-issues">Upstream issues<a class="headerlink" href="#upstream-issues" title="Permanent link">&para;</a></h2>
 <p>For suspected bugs in greatminds itself, route the report through
 <code>MAINTAINER</code>. <code>greatminds report-upstream</code> is gated to the MAINTAINER role by
-<code>coordination/schema.yaml</code> under <code>report_upstream.permissions.invoke</code>; other roles should not
-file directly.</p>
+the packaged schema under <code>report_upstream.permissions.invoke</code>; other roles
+should not file directly.</p>
 <p>If you are an agent role and you find a likely upstream bug, send MAINTAINER an
 ask with the repro and diagnostics:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>inbox<span class="w"> </span>send<span class="w"> </span>MAINTAINER<span class="w"> </span><span class="se">\</span>

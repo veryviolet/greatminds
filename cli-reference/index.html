@@ -3290,8 +3290,8 @@ greatminds check-git-permission push
      write wake-up messages to inbox/<role>/. (If PostToolUse hooks
      already did this, the call is a cheap no-op since state advances
      monotonically.)</li>
-<li>Scan coordination/inbox/<role>/ for new files. For each new file,
-     find the role's active TTY from coordination/.agent_registry/<role>.json
+<li>Scan .greatminds/inbox/<role>/ for new files. For each new file,
+     find the role's active TTY from .greatminds/.agent_registry/<role>.json
      and write "check inbox and continue your tick
 " to that TTY. The sleeping
      agent wakes, reads the inbox, and continues the tick.</li>
@@ -3305,8 +3305,8 @@ state. Its only side effects are:
     inbox messages),
   - writing wake-up text to known agent TTYs.</p>
 <p>State sources (read-only):
-  - coordination/inbox/<role>/*.md   — new files to react to
-  - coordination/.agent_registry/<role>.json — written by
+  - .greatminds/inbox/<role>/*.md   — new files to react to
+  - .greatminds/.agent_registry/<role>.json — written by
     <code>greatminds start-agent</code>
     with {role, tool, pid, tty, started_at}</p>
 <p>Usage:
@@ -3316,7 +3316,7 @@ state. Its only side effects are:
 <div class="highlight"><pre><span></span><code>greatminds coordd [OPTIONS]
 </code></pre></div>
 <p><strong>Options:</strong></p>
-<div class="highlight"><pre><span></span><code>  --project-dir DIRECTORY  project root containing coordination/ (default: cwd
+<div class="highlight"><pre><span></span><code>  --project-dir DIRECTORY  project root containing .greatminds/ (default: cwd
                            or registry lookup via --project)
   --project TEXT           project name; resolved to project_dir via
                            ~/.config/greatminds/projects.json. Used by the
@@ -3581,8 +3581,8 @@ filtered by <code>--role</code> and/or <code>--task</code>.</p>
 </code></pre></div>
 <h3 id="greatminds-launch">greatminds launch<a class="headerlink" href="#greatminds-launch" title="Permanent link">&para;</a></h3>
 <p>greatminds launch — start the fleet (tmux | vscode | cursor-ide).</p>
-<p>Reads <code>&lt;project&gt;/coord.yaml</code>, detects the project's Python env via
-<code>greatminds.core.env</code>, and:</p>
+<p>Reads <code>&lt;project&gt;/coordination/coord.yaml</code>, detects the project's Python env
+via <code>greatminds.core.env</code>, and:</p>
 <p><code>--target tmux</code>        creates a tmux session with one window per
                            role. Each window pre-types the env activation
                            command (so bare <code>greatminds start-agent</code>
@@ -3611,7 +3611,7 @@ detection (useful when no marker files describe the env).</p>
 <div class="highlight"><pre><span></span><code>  --target [tmux|vscode|cursor-ide]
                                   frontend (default: tmux)
   --config FILE                   path to coord.yaml (default:
-                                  &lt;project&gt;/coord.yaml)
+                                  &lt;project&gt;/coordination/coord.yaml)
   --project-dir DIRECTORY         override config.project_dir / cwd
   --venv DIRECTORY                explicit venv to activate (skips auto-
                                   detect)
@@ -3663,13 +3663,13 @@ by <code>---</code>, optionally interleaved with free prose.
     "<kind>_block" name are progress blocks;
   * everything else (prose, headings) becomes the task's <code>description</code> field.</p>
 <p>New format: single YAML file with header fields at top level and an
-ordered <code>blocks:</code> list. See <code>greatminds task show</code> output and
-<code>coordination/schema.yaml</code> for the exact shape.</p>
+ordered <code>blocks:</code> list. See <code>greatminds task show</code> output and the packaged
+schema for the exact shape.</p>
 <p>Usage:
   greatminds migrate-task --file path/to/task.md   one file
   greatminds migrate-task --queue feature_dev      all active in a queue
   greatminds migrate-task --all                    every .md task in
-                                                   coordination/ (active queues
+                                                   .greatminds/ (active queues
                                                    only by default; pass
                                                    --include-terminal to also
                                                    touch verified/, archive/,
@@ -3806,7 +3806,7 @@ coordd knows where to push.</p>
                  requires <code>gh auth login</code> already done.
   <code>api-token</code>  POST to the GitHub REST API directly, using a PAT read
                  from <code>$&lt;token_env&gt;</code> first, then
-                 <code>coordination/PROJECT.env</code>. No token is bundled in the
+                 <code>.greatminds/PROJECT.env</code>. No token is bundled in the
                  PyPI artifact.</p>
 <p>Designed for MAINTAINER use only — other roles file inbox/maintainer/
 asks; MAINTAINER triages "our bug vs upstream" and invokes this command
@@ -3838,7 +3838,7 @@ eligible loop/chat agents whose registry entry is missing or dead.</p>
 <li><code>tmux has-session -t &lt;session&gt;</code>; if missing, shell out to
      <code>greatminds launch --target tmux</code>.</li>
 <li>For each window in <code>coord.yaml</code> with a non-empty <code>role</code>,
-     resolve <code>coordination/.agent_registry/&lt;role-lowercase&gt;.json</code>:<ul>
+     resolve <code>.greatminds/.agent_registry/&lt;role-lowercase&gt;.json</code>:<ul>
 <li>missing / pid dead / no pid → relaunch eligible loop/chat panes with
      <code>greatminds start-agent</code>.</li>
 <li>driven and staged roles are skipped because coordd or the operator
@@ -3858,10 +3858,11 @@ eligible loop/chat agents whose registry entry is missing or dead.</p>
 <div class="highlight"><pre><span></span><code>greatminds restart [OPTIONS]
 </code></pre></div>
 <p><strong>Options:</strong></p>
-<div class="highlight"><pre><span></span><code>  --config FILE            path to coord.yaml (default: &lt;project&gt;/coord.yaml)
+<div class="highlight"><pre><span></span><code>  --config FILE            path to coord.yaml (default:
+                           &lt;project&gt;/coordination/coord.yaml)
   --project-dir DIRECTORY  override config.project_dir / cwd
   --bootstrap              soft canon refresh for alive agents. Pastes the
-                           static `coordination/bootstrap.md` into the live
+                           static `.greatminds/bootstrap.md` into the live
                            tmux pane via bracketed paste, then submits with
                            Enter. The agent keeps running — session-id files
                            are NOT touched, pid is NOT killed, claude --resume
@@ -3887,7 +3888,7 @@ directory, plus the inbox + plugin-overlay layout.</p>
 <p>After this command, the project has everything it needs to run the
 fleet. Next steps:</p>
 <ol>
-<li>edit <code>&lt;project&gt;/coord.yaml</code> to confirm project_dir + window list</li>
+<li>edit <code>&lt;project&gt;/coordination/coord.yaml</code> to confirm project_dir + window list</li>
 <li>fill in <code>&lt;project&gt;/coordination/PROJECT.md</code> tokens (project name,
      stand hosts, env paths, etc.)</li>
 <li>run <code>greatminds launch --target tmux</code> to start the fleet</li>
@@ -4058,7 +4059,7 @@ the queue entry; no state transition).</p>
 </code></pre></div>
 <h4 id="greatminds-stand-status">greatminds stand status<a class="headerlink" href="#greatminds-stand-status" title="Permanent link">&para;</a></h4>
 <p>Print the singleton stand resource state.</p>
-<p>Reads <code>coordination/.stand/state.yaml</code> (creates a synthetic
+<p>Reads <code>.greatminds/.stand/state.yaml</code> (creates a synthetic
 empty-state view when the file doesn't exist yet) and prints a
 compact human-readable summary: state, active lease (if any),
 queue contents, and the last few transitions.</p>
@@ -4097,13 +4098,13 @@ After setup, the selected tool process replaces this script via <code>os.execvp<
 <li>Resolve project root from <code>$GREATMINDS_PROJECT_DIR</code> (or cwd).</li>
 <li>Resolve canon (packaged <code>greatminds.data</code>) via <code>find_canon_dir</code>.</li>
 <li>Export <code>GREATMINDS_ROLE</code>, <code>PROJECT_ROOT</code> and source the optional
-   <code>$PROJECT/coordination/PROJECT.env</code> (gitignored secrets file).</li>
+   <code>$PROJECT/.greatminds/PROJECT.env</code> (gitignored secrets file).</li>
 <li>Manage the per-role registry under
-   <code>$PROJECT/coordination/.agent_registry/&lt;role&gt;.{json,session-id}</code>:
+   <code>$PROJECT/.greatminds/.agent_registry/&lt;role&gt;.{json,session-id}</code>:
    refuse to start if another agent is alive (unless <code>GREATMINDS_FORCE=1</code>);
    reuse the persistent session UUID for <code>--resume</code> semantics;
    rotate the UUID when <code>GREATMINDS_FRESH=1</code>.</li>
-<li>Use the single static system prompt <code>coordination/bootstrap.md</code>
+<li>Use the single static system prompt <code>.greatminds/bootstrap.md</code>
    (seeded from canon by setup) as the prompt; the agent reads its own
    contract from <code>schema.roles.&lt;GREATMINDS_ROLE&gt;</code>. On resume, replace
    it with a short "continue your tick" nudge.</li>
@@ -4121,7 +4122,7 @@ After setup, the selected tool process replaces this script via <code>os.execvp<
        Uses the single machine Codex home for authentication
        (<code>GREATMINDS_CODEX_HOME</code>, inherited non-per-role <code>CODEX_HOME</code>, or
        <code>~/.codex</code>). Reads role model/settings from
-       <code>coordination/.codex-home/&lt;role&gt;/</code> as config source material and
+       <code>.greatminds/.codex-home/&lt;role&gt;/</code> as config source material and
        passes them as <code>-c</code> overrides; it does not use <code>--profile</code> or a
        per-role auth home.</p>
 <p><code>cursor</code>
@@ -4305,7 +4306,7 @@ greatminds update --major          # allow major-version bump
 <p>Report blocked tasks ready to wake, malformed deps, and deadlock cycles.</p>
 <p>Usage:
     greatminds wake-check [--project-dir <dir>] [--canon-dir <dir>] [--quiet]</p>
-<p>Scans <project-dir>/coordination/feature_blocked/*.{yaml,md}. For each:
+<p>Scans <project-dir>/.greatminds/feature_blocked/*.{yaml,md}. For each:
   - parses the latest <code>blocked</code> block;
   - validates dependency entries match <code>&lt;queue&gt;/&lt;id&gt;.{yaml,md}</code>;
   - checks each referenced file actually exists;
@@ -4325,8 +4326,7 @@ never moves files.</p>
 <div class="highlight"><pre><span></span><code>greatminds wake-check [OPTIONS]
 </code></pre></div>
 <p><strong>Options:</strong></p>
-<div class="highlight"><pre><span></span><code>  --project-dir DIRECTORY  project root containing coordination/ (default:
-                           cwd)
+<div class="highlight"><pre><span></span><code>  --project-dir DIRECTORY  project root containing .greatminds/ (default: cwd)
   --canon-dir DIRECTORY    canon data dir (default: packaged greatminds.data)
   --quiet                  suppress no-findings output
   -h, --help               Show this message and exit.
@@ -4346,8 +4346,7 @@ with findings.</p>
 <div class="highlight"><pre><span></span><code>greatminds watchdog [OPTIONS]
 </code></pre></div>
 <p><strong>Options:</strong></p>
-<div class="highlight"><pre><span></span><code>  --project-dir DIRECTORY  project root containing coordination/ (default:
-                           cwd)
+<div class="highlight"><pre><span></span><code>  --project-dir DIRECTORY  project root containing .greatminds/ (default: cwd)
   --canon-dir DIRECTORY    canon data directory (default: packaged
                            greatminds.data)
   --quiet                  only print sections with findings

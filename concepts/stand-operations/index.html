@@ -1598,7 +1598,7 @@ restart, a Vite dev server, or any other Ansible-native deployment sequence.
 greatminds owns the lease/state/evidence protocol; the project owns the
 playbook content.</p>
 <h2 id="project-environment">Project Environment<a class="headerlink" href="#project-environment" title="Permanent link">&para;</a></h2>
-<p>Put stand-specific values in <code>coordination/PROJECT.env</code>:</p>
+<p>Put machine-local stand values in <code>.greatminds/PROJECT.env</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="nv">STAND_HOST</span><span class="o">=</span>localhost
 <span class="nv">STAND_USER</span><span class="o">=</span>violet
 </code></pre></div>
@@ -1638,16 +1638,17 @@ that convention.</p>
 <p><code>used_for</code> is the capability list for the profile. <code>default_for</code> assigns common
 role intents such as <code>feature_test</code>, <code>explorer</code>, <code>reviewer</code>,
 <code>live_developer</code>, <code>production_deploy</code>, and <code>production_review</code> to a profile.
-The vocabulary is defined in <code>coordination/schema.yaml</code> under
-<code>stand_profile_registry</code>. Each <code>default_for</code> token can belong to only one
-profile, so automated role selection is unambiguous.</p>
+The vocabulary is defined in the packaged schema copied to
+<code>.greatminds/schema.yaml</code> under <code>stand_profile_registry</code>. Each <code>default_for</code>
+token can belong to only one profile, so automated role selection is
+unambiguous.</p>
 <p>Use the registry commands after edits:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>profiles<span class="w"> </span>list
 greatminds<span class="w"> </span>stand<span class="w"> </span>profiles<span class="w"> </span>doctor
 </code></pre></div>
 <p><code>coordd</code> runs the profile with Ansible and injects:</p>
 <ul>
-<li>every key from <code>coordination/PROJECT.env</code>;</li>
+<li>every key from <code>.greatminds/PROJECT.env</code>;</li>
 <li>the active lease id as <code>lease_id</code>;</li>
 <li>the task id as <code>task_id</code>;</li>
 <li>the isolated task worktree path as <code>worktree</code>.</li>
@@ -1697,7 +1698,7 @@ Register additional project profiles in <code>coordination/stand-profiles.yaml</
 </code></pre></div>
 <h2 id="state-file">State File<a class="headerlink" href="#state-file" title="Permanent link">&para;</a></h2>
 <p>The source of truth is:</p>
-<div class="highlight"><pre><span></span><code>coordination/.stand/state.yaml
+<div class="highlight"><pre><span></span><code>.greatminds/.stand/state.yaml
 </code></pre></div>
 <p><code>greatminds stand status</code> reads that file and prints the current state, active
 lease, pending FIFO queue, and recent transition history. Use the CLI output as
@@ -1746,7 +1747,7 @@ Pending leases wait in FIFO order in the same state file.</p>
 <p>If the stand is <code>free</code>, the lease becomes active and the state moves to
 <code>preparing</code>. If another lease is active, the new lease is appended to the FIFO
 queue. The command prints the <code>lease_id</code>; the requester must keep that token.</p>
-<p><code>coordd</code> watches <code>coordination/.stand/state.yaml</code> and runs the active lease
+<p><code>coordd</code> watches <code>.greatminds/.stand/state.yaml</code> and runs the active lease
 profile file selected by <code>active_lease.profile</code>. Operators can inspect progress
 with:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>status
@@ -1766,9 +1767,9 @@ the prepared stand and releases the lease:</p>
 <p>Only the lease holder can release an active lease. Releasing moves the stand
 back to <code>free</code>; <code>coordd</code> promotes the next queued lease on a later tick.</p>
 <h2 id="ttl-and-recovery">TTL And Recovery<a class="headerlink" href="#ttl-and-recovery" title="Permanent link">&para;</a></h2>
-<p>Leases have a default TTL from <code>coordination/schema.yaml</code>
-(<code>stand.resource.lease</code>), currently
-four hours, with a warning window before automatic release. The TTL is a
+<p>Leases have a default TTL from the packaged schema copied to
+<code>.greatminds/schema.yaml</code> (<code>stand.resource.lease</code>), currently four hours, with
+a warning window before automatic release. The TTL is a
 safety valve for abandoned leases; it is not a substitute for explicitly
 releasing a lease after probes finish.</p>
 <p>If deployment fails or the stand has an infrastructure incident,
@@ -1789,7 +1790,7 @@ including <code>stand_evidence.lease_id</code>, result, commit, worktree fingerp
 its own <code>functional_probes</code> plus <code>stand_evidence.tester_observations</code>.
 <code>greatminds gate-check &lt;task-id&gt;</code> reads that tests-block evidence first.</p>
 <p>Use the lease commands for all stand operations. Stand readiness belongs in
-<code>coordination/.stand/state.yaml</code>, and product validation evidence belongs in
+<code>.greatminds/.stand/state.yaml</code>, and product validation evidence belongs in
 the task's <code>tests</code> block.</p>
 
 

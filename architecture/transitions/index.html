@@ -1411,8 +1411,8 @@
 
 
 <h1 id="transitions">Transitions<a class="headerlink" href="#transitions" title="Permanent link">&para;</a></h1>
-<p>Allowed transitions are encoded in <code>coordination/schema.yaml</code> in an installed
-project. The CLI enforces the current
+<p>Allowed transitions are encoded in the packaged schema copied to
+<code>.greatminds/schema.yaml</code> in an installed project. The CLI enforces the current
 role, current queue, target queue, and required readiness evidence.</p>
 <p><code>verified/</code> is not an absolute sink. If later review finds that verified work
 is wrong, invalid, or already reverted, <code>ARCHITECT-REVIEWER</code> can append a
@@ -2264,21 +2264,21 @@ task needs another amendment or review cycle.</p>
 <span class="w">    </span><span class="nt">stand_profile</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vite-dev</span>
 
 <span class="c1"># ---------------------------------------------------------------------------</span>
-<span class="c1"># Coordination access</span>
+<span class="c1"># Runtime access</span>
 <span class="c1">#</span>
-<span class="c1"># Hard rule for EVERY role (incl. ARCHITECT-PLANNER): access to</span>
-<span class="c1"># coordination/ is ONLY via the greatminds CLI; raw ls/cat/grep/sed/edit</span>
-<span class="c1"># on coordination/ is forbidden. Why: a raw relative coordination/ path</span>
-<span class="c1"># breaks from a per-task worktree cwd (the worktree has no</span>
-<span class="c1"># coordination/); the CLI resolves the project root regardless of cwd;</span>
+<span class="c1"># Hard rule for EVERY role (incl. ARCHITECT-PLANNER): mutation and queue</span>
+<span class="c1"># inspection for .greatminds/ runtime state is ONLY via the greatminds CLI;</span>
+<span class="c1"># raw ls/cat/grep/sed/edit on runtime queues/inbox/stand state is forbidden.</span>
+<span class="c1"># Why: a raw relative path breaks from a per-task worktree cwd; the CLI</span>
+<span class="c1"># resolves the project root regardless of cwd;</span>
 <span class="c1"># and a direct task-yaml edit bypasses FSM validation. Every agent</span>
 <span class="c1"># reads this rule from canon at tick start (machine-readable, no prose).</span>
 <span class="c1"># ---------------------------------------------------------------------------</span>
-<span class="nt">coordination_access</span><span class="p">:</span>
+<span class="nt">runtime_access</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">cli_only</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<span class="w">  </span><span class="nt">rule</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coordination_access_via_greatminds_cli_only</span>
+<span class="w">  </span><span class="nt">rule</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">runtime_access_via_greatminds_cli_only</span>
 <span class="w">  </span><span class="nt">forbidden</span><span class="p">:</span>
-<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_ls_cat_grep_sed_edit_on_coordination</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">raw_ls_cat_grep_sed_edit_on_runtime_state</span>
 <span class="w">  </span><span class="nt">surfaces</span><span class="p">:</span>
 <span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">greatminds inbox list|show|ack|send</span>
 <span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">greatminds task list|show|mv|append-block</span>
@@ -2290,7 +2290,7 @@ task needs another amendment or review cycle.</p>
 <span class="c1"># heartbeat is NOT a periodic liveness signal. Between turns a driven</span>
 <span class="c1"># pane is idle bash — that is normal, not &quot;stale&quot;. heartbeat matters in</span>
 <span class="c1"># exactly one situation: coordd dispatched a turn to an agent and holds</span>
-<span class="c1"># that role&#39;s run-lock. The agent touches coordination/heartbeat.&lt;role&gt;</span>
+<span class="c1"># that role&#39;s run-lock. The agent touches .greatminds/heartbeat.&lt;role&gt;</span>
 <span class="c1"># as a side effect of every greatminds CLI call, so a progressing turn</span>
 <span class="c1"># keeps it fresh. If a turn is in-flight (run-lock held) AND the</span>
 <span class="c1"># heartbeat has not advanced for `hang_threshold_seconds`, the turn is</span>
@@ -2722,7 +2722,7 @@ task needs another amendment or review cycle.</p>
 <span class="w">  </span><span class="nt">upstream_repo_required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 
 <span class="c1"># Canonical list of system variables greatminds reads out of</span>
-<span class="c1"># the box. ``setup`` generates ``coordination/PROJECT.env`` from this</span>
+<span class="c1"># the box. ``setup`` generates ``.greatminds/PROJECT.env`` from this</span>
 <span class="c1"># section, pre-populating each var with its description / acquire</span>
 <span class="c1"># instructions. Users add their own KEY=value to PROJECT.env after</span>
 <span class="c1"># setup; only the entries listed here come from canon.</span>
