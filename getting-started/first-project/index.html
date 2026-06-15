@@ -600,6 +600,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#agent-tools-and-role-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent tools and role mapping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#claude-local-settings" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -615,6 +626,28 @@
     <span class="md-ellipsis">
       
         Claude marketplace plugins
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#project-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Project environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#minimal-stand-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minimal stand profile
       
     </span>
   </a>
@@ -1491,6 +1524,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#agent-tools-and-role-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent tools and role mapping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#claude-local-settings" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1506,6 +1550,28 @@
     <span class="md-ellipsis">
       
         Claude marketplace plugins
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#project-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Project environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#minimal-stand-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minimal stand profile
       
     </span>
   </a>
@@ -1574,6 +1640,114 @@ greatminds<span class="w"> </span>setup<span class="w"> </span>--session<span cl
 local agent configuration files, and copies the canon project templates. It does
 not overwrite an existing <code>coord.yaml</code>; edit that file when you want different
 tools, windows, or launch modes.</p>
+<h2 id="agent-tools-and-role-mapping">Agent tools and role mapping<a class="headerlink" href="#agent-tools-and-role-mapping" title="Permanent link">&para;</a></h2>
+<p>The documented quickstart path uses two agent tools:</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Use it for</th>
+<th>Setup requirement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>claude</code></td>
+<td>Claude Code chat, loop, and driven roles.</td>
+<td>Install Claude Code, authenticate it for the OS user that runs the fleet, and keep the <code>claude</code> binary reachable from daemon shells.</td>
+</tr>
+<tr>
+<td><code>codex</code></td>
+<td>OpenAI Codex chat and driven roles.</td>
+<td>Run <code>codex login</code> once for the machine account; optionally set <code>GREATMINDS_CODEX_HOME</code> when the login is not under <code>~/.codex</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Role-to-tool assignment lives in <code>coord.yaml</code>. The default template mixes
+Claude and Codex roles, but it is ordinary project config. Change <code>tool:</code> per
+role, then restart the daemon and launch session:</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Default tool</th>
+<th>Default mode</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ARCHITECT-PLANNER</code></td>
+<td><code>codex</code></td>
+<td><code>chat</code></td>
+</tr>
+<tr>
+<td><code>MAINTAINER</code></td>
+<td><code>claude</code></td>
+<td><code>loop</code></td>
+</tr>
+<tr>
+<td><code>LIVE-DEVELOPER</code></td>
+<td><code>claude</code></td>
+<td><code>staged</code></td>
+</tr>
+<tr>
+<td><code>ARCHITECT-REVIEWER</code></td>
+<td><code>codex</code></td>
+<td><code>driven</code></td>
+</tr>
+<tr>
+<td><code>DEVELOPER</code></td>
+<td><code>claude</code></td>
+<td><code>driven</code></td>
+</tr>
+<tr>
+<td><code>UI-DEVELOPER</code></td>
+<td><code>claude</code></td>
+<td><code>driven</code></td>
+</tr>
+<tr>
+<td><code>TECHNICAL-WRITER</code></td>
+<td><code>codex</code></td>
+<td><code>driven</code></td>
+</tr>
+<tr>
+<td><code>TESTER</code></td>
+<td><code>claude</code></td>
+<td><code>driven</code></td>
+</tr>
+<tr>
+<td><code>READER</code></td>
+<td><code>claude</code></td>
+<td><code>driven</code></td>
+</tr>
+<tr>
+<td><code>EXPLORER</code></td>
+<td><code>codex</code></td>
+<td><code>driven</code></td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><span class="nt">windows</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">planner</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ARCHITECT-PLANNER</span>
+<span class="w">    </span><span class="nt">tool</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">codex</span>
+<span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">chat</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">maintainer</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MAINTAINER</span>
+<span class="w">    </span><span class="nt">tool</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claude</span>
+<span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">loop</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dev</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DEVELOPER</span>
+<span class="w">    </span><span class="nt">tool</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claude</span>
+<span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">driven</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reviewer</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ARCHITECT-REVIEWER</span>
+<span class="w">    </span><span class="nt">tool</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">codex</span>
+<span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">driven</span>
+</code></pre></div>
+<p><code>mode: chat</code> and <code>mode: loop</code> create live tmux panes. <code>mode: driven</code> creates no
+agent pane; <code>coordd</code> starts one Claude or Codex turn when queue, inbox, or stand
+events arrive.</p>
 <h2 id="claude-local-settings">Claude local settings<a class="headerlink" href="#claude-local-settings" title="Permanent link">&para;</a></h2>
 <p>During setup, greatminds writes or extends
 <code>.claude/settings.local.json</code>. New files include the Stop hook,
@@ -1630,6 +1804,67 @@ launch path.</p>
 <p>After setup, verify the installed Claude plugins with:</p>
 <div class="highlight"><pre><span></span><code>claude<span class="w"> </span>plugin<span class="w"> </span>list
 </code></pre></div>
+<h2 id="project-environment">Project environment<a class="headerlink" href="#project-environment" title="Permanent link">&para;</a></h2>
+<p><code>coordination/PROJECT.env</code> is the minimal place for project-specific values.
+It is gitignored, loaded before each agent starts, and passed to stand profiles
+as Ansible extra vars.</p>
+<p>For a local smoke stand:</p>
+<div class="highlight"><pre><span></span><code>cat<span class="w"> </span>&gt;<span class="w"> </span>coordination/PROJECT.env<span class="w"> </span><span class="s">&lt;&lt;&#39;EOF&#39;</span>
+<span class="s">STAND_HOST=localhost</span>
+<span class="s">STAND_USER=violet</span>
+<span class="s">EOF</span>
+</code></pre></div>
+<p>For a remote stand, make <code>STAND_HOST</code> an SSH config alias or comma-separated
+aliases, and set <code>STAND_USER</code> to the remote account whose PATH should be used
+by the stand playbook:</p>
+<div class="highlight"><pre><span></span><code>cat<span class="w"> </span>&gt;<span class="w"> </span>coordination/PROJECT.env<span class="w"> </span><span class="s">&lt;&lt;&#39;EOF&#39;</span>
+<span class="s">STAND_HOST=app-stand</span>
+<span class="s">STAND_USER=deploy</span>
+<span class="s">EOF</span>
+</code></pre></div>
+<p>Add product-specific values there as well, such as service URLs, ports,
+database names, deploy paths, or feature flags. Reference them in
+<code>coordination/PROJECT.md</code>, MCP configs, skills, and stand profiles.</p>
+<h2 id="minimal-stand-profile">Minimal stand profile<a class="headerlink" href="#minimal-stand-profile" title="Permanent link">&para;</a></h2>
+<p>A stand is the live environment that agents lease for deployed validation.
+The lease does not deploy by itself; <code>coordd</code> prepares the active lease by
+running an Ansible YAML profile from <code>coordination/stand-profiles/</code>.</p>
+<p>Setup copies reference profiles:</p>
+<ul>
+<li><code>smoke-only</code>: reachability probe, useful first.</li>
+<li><code>full-deploy</code>: rsync and install pattern for backend-style deployment.</li>
+<li><code>vite-dev</code>: backend plus a Vite dev server for live UI iteration.</li>
+</ul>
+<p>The smallest useful <code>coordination/stand-profiles/smoke-only.yaml</code> is:</p>
+<div class="highlight"><pre><span></span><code><span class="nn">---</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">register stand node</span>
+<span class="w">  </span><span class="nt">hosts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">localhost</span>
+<span class="w">  </span><span class="nt">gather_facts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">add configured stand host</span>
+<span class="w">      </span><span class="nt">ansible.builtin.add_host</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">STAND_HOST</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">default(&#39;localhost&#39;)</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w">        </span><span class="nt">groups</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stand_nodes</span>
+<span class="w">        </span><span class="nt">ansible_connection</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;-</span>
+<span class="w">          </span><span class="no">{{ &#39;local&#39; if (STAND_HOST | default(&#39;localhost&#39;)) == &#39;localhost&#39;</span>
+<span class="w">             </span><span class="no">else &#39;ssh&#39; }}</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smoke stand</span>
+<span class="w">  </span><span class="nt">hosts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stand_nodes</span>
+<span class="w">  </span><span class="nt">gather_facts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">remote shell works</span>
+<span class="w">      </span><span class="nt">ansible.builtin.command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/bin/true</span>
+<span class="w">      </span><span class="nt">changed_when</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</code></pre></div>
+<p>When a task needs live validation, the holder leases a profile:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>lease<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--task<span class="w"> </span>&lt;task-id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--worktree<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>greatminds<span class="w"> </span>worktree<span class="w"> </span>path<span class="w"> </span>&lt;task-id&gt;<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--profile<span class="w"> </span>smoke-only
+</code></pre></div>
+<p>Use <a href="../../concepts/stand-operations/">Stand Operations</a> for the complete lease,
+profile, and evidence flow.</p>
 <h2 id="start-the-daemon">Start the daemon<a class="headerlink" href="#start-the-daemon" title="Permanent link">&para;</a></h2>
 <p>The daemon is the process that watches inboxes and pushes wake text into idle
 agents:</p>

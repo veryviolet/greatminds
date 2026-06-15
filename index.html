@@ -497,10 +497,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#start-here" class="md-nav__link">
+  <a href="#quickstart" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Start here
+        Quickstart
       
     </span>
   </a>
@@ -1462,10 +1462,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#start-here" class="md-nav__link">
+  <a href="#quickstart" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Start here
+        Quickstart
       
     </span>
   </a>
@@ -1513,14 +1513,109 @@ heartbeats, and a launcher for tmux-based fleets.</p>
 <li>A per-project daemon that watches inboxes, queue files, and stand state,
   then wakes or drives the owning role.</li>
 </ul>
-<h2 id="start-here">Start here<a class="headerlink" href="#start-here" title="Permanent link">&para;</a></h2>
-<p>Install the package, bootstrap a project, start the daemon, then launch the
-agent windows:</p>
+<h2 id="quickstart">Quickstart<a class="headerlink" href="#quickstart" title="Permanent link">&para;</a></h2>
+<p>Install the package and bootstrap a project:</p>
 <div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>greatminds
 mkdir<span class="w"> </span>-p<span class="w"> </span>/tmp/greatminds-demo
 <span class="nb">cd</span><span class="w"> </span>/tmp/greatminds-demo
 greatminds<span class="w"> </span>setup<span class="w"> </span>--session<span class="w"> </span>myproject
-greatminds<span class="w"> </span>daemon<span class="w"> </span>install
+</code></pre></div>
+<p>greatminds uses two primary agent tools:</p>
+<ul>
+<li><code>claude</code>: Claude Code, including project-local settings and configured
+  Claude marketplace plugins.</li>
+<li><code>codex</code>: OpenAI Codex, using the single machine Codex login plus generated
+  per-role profile sources under <code>coordination/.codex-home/&lt;role&gt;/</code>.</li>
+</ul>
+<p>Choose which tool runs each role in <code>coord.yaml</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Default tool</th>
+<th>Default mode</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ARCHITECT-PLANNER</code></td>
+<td><code>codex</code></td>
+<td><code>chat</code></td>
+</tr>
+<tr>
+<td><code>MAINTAINER</code></td>
+<td><code>claude</code></td>
+<td><code>loop</code></td>
+</tr>
+<tr>
+<td><code>LIVE-DEVELOPER</code></td>
+<td><code>claude</code></td>
+<td><code>staged</code></td>
+</tr>
+<tr>
+<td><code>ARCHITECT-REVIEWER</code></td>
+<td><code>codex</code></td>
+<td><code>driven</code></td>
+</tr>
+<tr>
+<td><code>DEVELOPER</code></td>
+<td><code>claude</code></td>
+<td><code>driven</code></td>
+</tr>
+<tr>
+<td><code>UI-DEVELOPER</code></td>
+<td><code>claude</code></td>
+<td><code>driven</code></td>
+</tr>
+<tr>
+<td><code>TECHNICAL-WRITER</code></td>
+<td><code>codex</code></td>
+<td><code>driven</code></td>
+</tr>
+<tr>
+<td><code>TESTER</code></td>
+<td><code>claude</code></td>
+<td><code>driven</code></td>
+</tr>
+<tr>
+<td><code>READER</code></td>
+<td><code>claude</code></td>
+<td><code>driven</code></td>
+</tr>
+<tr>
+<td><code>EXPLORER</code></td>
+<td><code>codex</code></td>
+<td><code>driven</code></td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><span class="nt">windows</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">planner</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ARCHITECT-PLANNER</span>
+<span class="w">    </span><span class="nt">tool</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">codex</span>
+<span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">chat</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dev</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DEVELOPER</span>
+<span class="w">    </span><span class="nt">tool</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claude</span>
+<span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">driven</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reviewer</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ARCHITECT-REVIEWER</span>
+<span class="w">    </span><span class="nt">tool</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">codex</span>
+<span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">driven</span>
+</code></pre></div>
+<p>Put local project and stand variables in <code>coordination/PROJECT.env</code>:</p>
+<div class="highlight"><pre><span></span><code>cat<span class="w"> </span>&gt;<span class="w"> </span>coordination/PROJECT.env<span class="w"> </span><span class="s">&lt;&lt;&#39;EOF&#39;</span>
+<span class="s">STAND_HOST=localhost</span>
+<span class="s">STAND_USER=violet</span>
+<span class="s">EOF</span>
+</code></pre></div>
+<p>The stand is a singleton live environment. <code>coordd</code> prepares it by running an
+Ansible stand profile from <code>coordination/stand-profiles/&lt;profile&gt;.yaml</code> for the
+active lease. Start with <code>smoke-only</code> for reachability, then replace
+<code>full-deploy</code> or <code>vite-dev</code> with a project-specific playbook when the product
+needs real live validation.</p>
+<p>Start the daemon and launch the tmux fleet:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>daemon<span class="w"> </span>install
 greatminds<span class="w"> </span>daemon<span class="w"> </span>start
 greatminds<span class="w"> </span>launch<span class="w"> </span>--target<span class="w"> </span>tmux
 tmux<span class="w"> </span>a<span class="w"> </span>-t<span class="w"> </span>myproject
