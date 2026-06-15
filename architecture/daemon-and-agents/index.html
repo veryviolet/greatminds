@@ -1585,7 +1585,7 @@ Each window is defined in <code>coord.yaml</code> with:</p>
 <li>window name</li>
 <li>role</li>
 <li>tool (<code>claude</code>, <code>codex</code>, <code>cursor</code>, or <code>bash</code>)</li>
-<li>mode (<code>chat</code>, <code>loop</code>, or <code>driven</code>)</li>
+<li>mode (<code>chat</code>, <code>loop</code>, <code>dashboard</code>, <code>logs</code>, <code>staged</code>, or <code>driven</code>)</li>
 </ul>
 <p>The role's lifecycle is declared in <code>coordination/schema.yaml</code>:</p>
 <ul>
@@ -1632,6 +1632,12 @@ window's <code>coord.yaml</code> <code>tool:</code> value:</p>
 <p>Driven roles do one tick, then exit. They do not schedule long sleeps or run a
 persistent <code>/loop</code>; their next turn comes from the next inbox, queue, or stand
 event.</p>
+<p><code>coordd</code> also writes a best-effort chronological driven-agent event stream to
+<code>coordination/.events/driven.ndjson</code>. The stream is read-only operator
+observability, not FSM authority: task files, locks, stand state, and turn logs
+remain the source of truth. A fresh tmux launch includes a role-less <code>logs</code>
+window that runs <code>greatminds driven-log --follow</code> and shows accepted turns,
+pending markers, completions, retries, and errors in color.</p>
 <p>This reactive path replaces short idle polling for normal queue and inbox
 changes. Reaction time should be the daemon watcher interval plus one driven
 spawn or wake signal, not a role's fallback sleep value.</p>

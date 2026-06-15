@@ -1102,6 +1102,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#greatminds-driven-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        driven-log
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#greatminds-gate-check" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2063,6 +2074,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#greatminds-driven-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        driven-log
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#greatminds-gate-check" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2369,6 +2391,10 @@ day-to-day coordination, use these groups instead of editing files under
 <td><code>greatminds agent status [ROLE]</code></td>
 </tr>
 <tr>
+<td>Watch chronological driven-agent turn events</td>
+<td><code>greatminds driven-log --follow</code></td>
+</tr>
+<tr>
 <td>Check stand-gate evidence</td>
 <td><code>greatminds gate-check &lt;task-id&gt;</code></td>
 </tr>
@@ -2614,6 +2640,18 @@ survive-logout behavior.</p>
   --log-lines INTEGER   lines to show per driven-agent log when --logs is set.
                         [default: 8]
   -h, --help            Show this message and exit.
+</code></pre></div>
+<h3 id="greatminds-driven-log">greatminds driven-log<a class="headerlink" href="#greatminds-driven-log" title="Permanent link">&para;</a></h3>
+<p>read-only driven-agent event stream. Ctrl-C to exit.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds driven-log [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --lines INTEGER         initial events to print.  [default: 200]
+  --follow / --no-follow  follow new events.  [default: follow]
+  --interval FLOAT        poll interval while following.  [default: 1.0]
+  --color / --no-color    ANSI color. Default: auto (on when stdout is a TTY).
+  -h, --help              Show this message and exit.
 </code></pre></div>
 <h3 id="greatminds-gate-check">greatminds gate-check<a class="headerlink" href="#greatminds-gate-check" title="Permanent link">&para;</a></h3>
 <p>Check stand-evidence gate for a product task.</p>
