@@ -17,3 +17,13 @@ Configuration:
 
 - `greatminds.cliPath`: path to the `greatminds` executable. Defaults to
   `greatminds`.
+
+Development checks:
+
+```bash
+npm test
+```
+
+The test harness runs under Node.js and mocks the VS Code API. It verifies the
+CLI backend invocation, Agent Tools tree rendering, and cockpit terminal
+commands without requiring a graphical VS Code session.

@@ -77,8 +77,30 @@ def test_cursor_driver_marks_logical_registry_tool(tmp_path: Path,
     argv = driver.build_argv(ctx)
 
     assert argv[0] == "systemd-run"
+    assert "--slice=cursor.slice" in argv
+    assert "-p" in argv
+    assert "MemoryMax=4G" in argv
     assert "cursor-agent" in argv
     assert os.environ["GREATMINDS_REGISTRY_TOOL"] == "cursor"
+
+
+def test_cursor_driver_honors_resource_limit_environment(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("GREATMINDS_CURSOR_SLICE", "limited-cursor.slice")
+    monkeypatch.setenv("GREATMINDS_CURSOR_MEM_HIGH", "1536M")
+    monkeypatch.setenv("GREATMINDS_CURSOR_MEM_MAX", "2G")
+    monkeypatch.setenv("GREATMINDS_CURSOR_CPU", "175%")
+    ctx = _ctx(tmp_path)
+    driver = get_start_driver("cursor")
+
+    argv = driver.build_argv(ctx)
+
+    assert "--slice=limited-cursor.slice" in argv
+    assert "MemoryHigh=1536M" in argv
+    assert "MemoryMax=2G" in argv
+    assert "CPUQuota=175%" in argv
 
 
 def test_generic_start_driver_builds_cline_argv(tmp_path: Path,

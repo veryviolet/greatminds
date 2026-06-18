@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import asdict, dataclass
 from typing import Literal
 
@@ -56,7 +57,7 @@ _TOOL_SPECS: tuple[AgentToolSpec, ...] = (
         driven=True,
         driven_transport="cursor-agent headless subprocess",
         headless_style="cursor",
-        notes="Paned support is wrapped with systemd-run; driven support is one-shot headless.",
+        notes="Paned and driven support are wrapped with systemd-run resource limits.",
     ),
     AgentToolSpec(
         name="cline",
@@ -113,6 +114,23 @@ def driven_tool_names() -> tuple[str, ...]:
     return tuple(spec.name for spec in _TOOL_SPECS if spec.driven)
 
 
+def cursor_systemd_prefix() -> list[str]:
+    """Return the systemd scope wrapper used for Cursor agent processes."""
+    cursor_slice = os.environ.get("GREATMINDS_CURSOR_SLICE", "cursor.slice")
+    return [
+        "systemd-run", "--user", f"--slice={cursor_slice}",
+        "--scope", "--quiet", "--collect",
+        "-p", f"MemoryHigh={os.environ.get('GREATMINDS_CURSOR_MEM_HIGH', '3G')}",
+        "-p", f"MemoryMax={os.environ.get('GREATMINDS_CURSOR_MEM_MAX', '4G')}",
+        "-p", f"CPUQuota={os.environ.get('GREATMINDS_CURSOR_CPU', '300%')}",
+    ]
+
+
+def build_cursor_agent_argv(args: list[str]) -> list[str]:
+    """Wrap ``cursor-agent`` in a constrained systemd user scope."""
+    return [*cursor_systemd_prefix(), "cursor-agent", *args]
+
+
 def build_headless_argv(tool: str, prompt: str) -> list[str]:
     """Build a one-shot headless argv for generic driven subprocess tools."""
     spec = get_tool_spec(tool)
@@ -125,7 +143,9 @@ def build_headless_argv(tool: str, prompt: str) -> list[str]:
     if spec.headless_style == "openhands":
         return [spec.binary, "--headless", "--json", "-t", prompt]
     if spec.headless_style == "cursor":
-        return [spec.binary, "--yolo", "--approve-mcps", "-p", prompt]
+        return build_cursor_agent_argv(
+            ["--yolo", "--approve-mcps", "-p", prompt]
+        )
     raise ValueError(f"unsupported headless style: {spec.headless_style}")
 
 

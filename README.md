@@ -48,6 +48,10 @@ The packaged adapters support:
   once for the machine account; generated files under
   `.greatminds/.codex-home/{role}/` are role config sources, not auth homes.
 - `cursor`: Cursor agent. Used for chat/loop panes and one-shot driven turns.
+  Greatminds runs `cursor-agent` through a `systemd-run --user` scope in
+  `cursor.slice` by default; tune `GREATMINDS_CURSOR_MEM_HIGH`,
+  `GREATMINDS_CURSOR_MEM_MAX`, `GREATMINDS_CURSOR_CPU`, or
+  `GREATMINDS_CURSOR_SLICE` when the machine needs different resource limits.
 - `cline`: Cline CLI. Used for chat/loop panes and one-shot driven turns.
 - `gemini`: Gemini CLI. Used for chat/loop panes and one-shot driven turns.
 - `openhands`: OpenHands CLI. Used for chat panes and one-shot driven turns;

@@ -4,6 +4,23 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 2.5.0 — 2026-06-18
+
+### Added
+
+- Added a Node.js VS Code extension test harness that mocks the VS Code API,
+  verifies CLI invocation, validates the Agent Tools tree provider, and checks
+  cockpit terminal commands.
+- CI now runs the VS Code extension tests with Node 20 alongside the Python
+  regression suite.
+
+### Fixed
+
+- Cursor driven turns now use the same constrained systemd user scope as
+  interactive Cursor panes. Both paths run through `cursor.slice` by default
+  and honor `GREATMINDS_CURSOR_MEM_HIGH`, `GREATMINDS_CURSOR_MEM_MAX`,
+  `GREATMINDS_CURSOR_CPU`, and `GREATMINDS_CURSOR_SLICE`.
+
 ## 2.4.0 — 2026-06-18
 
 ### Added

@@ -27,7 +27,7 @@ The packaged adapters support these tools:
 | --- | --- | --- |
 | `claude` | Claude Code chat, loop, and driven roles. | Install Claude Code, authenticate it for the OS user that runs the fleet, and keep the `claude` binary reachable from daemon shells. |
 | `codex` | OpenAI Codex chat and driven roles. | Run `codex login` once for the machine account; optionally set `GREATMINDS_CODEX_HOME` when the login is not under `~/.codex`. |
-| `cursor` | Cursor agent chat/loop panes and one-shot driven roles. | Install Cursor CLI / `cursor-agent`, authenticate it for the OS user, and keep it on `PATH`. |
+| `cursor` | Cursor agent chat/loop panes and one-shot driven roles. | Install Cursor CLI / `cursor-agent`, authenticate it for the OS user, and keep it on `PATH`. Greatminds runs `cursor-agent` through a `systemd-run --user` scope in `cursor.slice` by default; tune `GREATMINDS_CURSOR_MEM_HIGH`, `GREATMINDS_CURSOR_MEM_MAX`, `GREATMINDS_CURSOR_CPU`, or `GREATMINDS_CURSOR_SLICE` when needed. |
 | `cline` | Cline CLI chat/loop panes and one-shot driven roles. | Install and configure Cline CLI for the OS user that runs the fleet. |
 | `gemini` | Gemini CLI chat/loop panes and one-shot driven roles. | Install Gemini CLI, authenticate/configure it for the OS user, and keep `gemini` on `PATH`. |
 | `openhands` | OpenHands CLI chat panes and one-shot driven roles. | Install OpenHands CLI and configure its LLM/runtime environment before assigning driven roles. |

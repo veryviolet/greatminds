@@ -180,13 +180,7 @@ def build_cursor_argv(
 
     os.environ["GREATMINDS_REGISTRY_TOOL"] = "cursor"
 
-    sdr = [
-        "systemd-run", "--user", "--scope", "--quiet", "--collect",
-        "-p", f"MemoryHigh={os.environ.get('GREATMINDS_CURSOR_MEM_HIGH', '3G')}",
-        "-p", f"MemoryMax={os.environ.get('GREATMINDS_CURSOR_MEM_MAX', '4G')}",
-        "-p", f"CPUQuota={os.environ.get('GREATMINDS_CURSOR_CPU', '300%')}",
-    ]
-    return [*sdr, "cursor-agent", *cursor_args, *extra, prompt]
+    return tool_specs.build_cursor_agent_argv([*cursor_args, *extra, prompt])
 
 
 class ClaudeStartDriver:

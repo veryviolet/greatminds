@@ -148,3 +148,26 @@ def test_generic_headless_driver_builds_tool_argv(tmp_path: Path) -> None:
     assert args[1] == "tester"
     assert args[2] == "gemini"
     assert args[3] == ["gemini", "--yolo", "-p", "role contract"]
+
+
+def test_cursor_headless_driver_uses_systemd_resource_scope(
+    tmp_path: Path,
+) -> None:
+    ctx, calls = _ctx(
+        tmp_path,
+        role="REVIEWER",
+        bootstrap_text="review contract",
+    )
+
+    ok, diag = get_driven_driver("cursor").drive(ctx)  # type: ignore[union-attr]
+
+    assert ok is True
+    assert diag == "headless ok"
+    args, _kwargs = calls["headless"]
+    argv = args[3]
+    assert args[2] == "cursor"
+    assert argv[:2] == ["systemd-run", "--user"]
+    assert "--slice=cursor.slice" in argv
+    assert "MemoryMax=4G" in argv
+    assert "cursor-agent" in argv
+    assert argv[-4:] == ["--yolo", "--approve-mcps", "-p", "review contract"]

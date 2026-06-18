@@ -49,8 +49,8 @@ What it does:
        per-role auth home.
 
    ``cursor``
-       Wrapped in ``systemd-run --user --scope`` with memory/CPU caps
-       (cursor-agent leaks memory in long sessions). Sets
+       Wrapped in ``systemd-run --user --slice=cursor.slice --scope`` with
+       memory/CPU caps (cursor-agent leaks memory in long sessions). Sets
        ``GREATMINDS_REGISTRY_TOOL=cursor`` so ``pty-launch`` records the
        logical tool, not ``systemd-run``.
 

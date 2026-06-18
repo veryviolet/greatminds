@@ -55,10 +55,12 @@ For driven roles, `coordd` starts one turn instead of waking an existing loop:
 - `codex` driven roles run one fresh `codex app-server` stdio process for the
   turn; the app-server thread id is persisted for continuity.
 - `cursor`, `cline`, `gemini`, and `openhands` driven roles run one headless
-  subprocess turn using the tool's own one-shot CLI mode. These adapters are
-  stateless from greatminds' point of view: the full role bootstrap is supplied
-  each turn, and the tool's machine-level auth/configuration must already be
-  valid for the OS user running `coordd`.
+  subprocess turn using the tool's own one-shot CLI mode. Cursor turns are
+  wrapped in the same `systemd-run --user --slice=cursor.slice --scope`
+  resource boundary as interactive Cursor panes. These adapters are stateless
+  from greatminds' point of view: the full role bootstrap is supplied each
+  turn, and the tool's machine-level auth/configuration must already be valid
+  for the OS user running `coordd`.
 
 Driven roles do one tick, then exit. They do not schedule long sleeps or run a
 persistent `/loop`; their next turn comes from the next inbox, queue, or stand

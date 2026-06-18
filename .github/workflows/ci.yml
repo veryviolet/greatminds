@@ -28,6 +28,11 @@ jobs:
       - name: install uv
         run: pip install --quiet uv
 
+      - name: set up node for VS Code extension tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: build wheel + sdist
         run: uv build
 
@@ -81,3 +86,6 @@ jobs:
         run: |
           .venv-test/bin/pip install --quiet pytest pyyaml
           .venv-test/bin/pytest tests/ -v
+
+      - name: test VS Code extension harness
+        run: npm test --prefix vscode-extension
