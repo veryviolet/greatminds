@@ -4,6 +4,29 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 2.6.0 — 2026-06-18
+
+### Fixed
+
+- Gemini driven turns now include `--skip-trust`, and Gemini live-pane launches
+  use `--prompt-interactive` instead of the headless `-p` prompt mode.
+- Cursor driven turns now include `--trust` with `--print` mode so headless
+  workspace trust prompts do not wedge unattended dispatch.
+- Generic driven outcome classification now treats known auth/setup messages
+  in stdout or stderr as failed turns even when a tool exits with code 0.
+  This prevents OpenHands headless setup failures from being recorded as
+  successful driven turns.
+
+### Verified
+
+- Local real-agent CLI turns completed for Claude Code, OpenAI Codex, Cursor
+  agent, and Cline CLI.
+- Gemini CLI reached provider authentication and failed with the account's
+  `UNSUPPORTED_LOCATION` eligibility response after workspace trust was
+  bypassed.
+- OpenHands CLI was installed and reached headless startup, then correctly
+  reported missing LLM settings for the machine.
+
 ## 2.5.0 — 2026-06-18
 
 ### Added

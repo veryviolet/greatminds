@@ -54,8 +54,11 @@ The packaged adapters support:
   `GREATMINDS_CURSOR_SLICE` when the machine needs different resource limits.
 - `cline`: Cline CLI. Used for chat/loop panes and one-shot driven turns.
 - `gemini`: Gemini CLI. Used for chat/loop panes and one-shot driven turns.
-- `openhands`: OpenHands CLI. Used for chat panes and one-shot driven turns;
-  configure OpenHands/LiteLLM credentials on the machine before using it.
+- `openhands`: OpenHands CLI. Used for chat panes and one-shot driven turns.
+  Install the `openhands` command, run `openhands` or `openhands login` once
+  to create machine settings, and configure its LLM provider before assigning
+  driven roles. `agent-canvas` is a separate OpenHands UI launcher and is not
+  the CLI entrypoint used by the greatminds adapter.
 
 Window modes in `coordination/coord.yaml`:
 

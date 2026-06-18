@@ -1028,13 +1028,16 @@ _RETRY_LOCK = threading.Lock()
 _DRIVEN_RETRY: dict[str, dict] = {}
 
 
-def _classify_turn_outcome(rc, stdout, *, timed_out: bool = False) -> str:
+def _classify_turn_outcome(rc, stdout, *, stderr: str = "",
+                           timed_out: bool = False) -> str:
     """Classify a finished driven turn: ``ok`` | ``rate_limit`` |
     ``auth`` | ``error`` | ``timeout``. claude emits a JSON result object
-    (``--output-format json``) carrying ``is_error`` / ``api_error_status``;
-    a non-zero rc with no parseable success JSON is a hard error. When
-    unsure we return ``error`` (bounded retry + escalate) — never a silent
-    ``ok`` (would drop the work) nor ``rate_limit`` (would retry forever)."""
+    (``--output-format json``) carrying ``is_error`` / ``api_error_status``.
+    Generic headless CLIs usually signal failure with a non-zero rc, but some
+    tool setup failures can be printed with rc=0; recognize the known auth and
+    setup messages before accepting success. When unsure we return ``error``
+    (bounded retry + escalate) — never a silent ``ok`` (would drop the work)
+    nor ``rate_limit`` (would retry forever)."""
     if timed_out:
         return "timeout"
     obj = None
@@ -1055,6 +1058,23 @@ def _classify_turn_outcome(rc, stdout, *, timed_out: bool = False) -> str:
                 or "temporarily limiting" in blob:
             return "rate_limit"
         return "error"
+    blob = f"{stdout or ''}\n{stderr or ''}".lower()
+    if any(m in blob for m in (
+        "headless mode requires existing settings",
+        "please run: openhands to configure your settings",
+        "not logged in",
+        "unauthorized",
+        "authentication failed",
+        "error authenticating",
+    )):
+        return "auth"
+    if any(m in blob for m in (
+        "rate limit",
+        "rate-limit",
+        "overloaded",
+        "temporarily limiting",
+    )):
+        return "rate_limit"
     if rc not in (0, None):
         return "error"
     return "ok"
@@ -1607,7 +1627,9 @@ def _spawn_driven_turn(
                            else None) or None
             except (ValueError, TypeError, AttributeError):
                 new_sid = None
-            klass = _classify_turn_outcome(proc.returncode, proc.stdout)
+            klass = _classify_turn_outcome(
+                proc.returncode, proc.stdout, stderr=proc.stderr
+            )
             detail = (proc.stderr or proc.stdout or "")[:300]
         except subprocess.TimeoutExpired:
             klass = "timeout"
@@ -1742,8 +1764,13 @@ def _spawn_driven_headless_turn(
                 )
             except OSError:
                 pass
-            klass = _classify_turn_outcome(proc.returncode, proc.stdout)
-            detail = (proc.stderr or proc.stdout or "")[:300]
+            klass = _classify_turn_outcome(
+                proc.returncode, proc.stdout, stderr=proc.stderr
+            )
+            detail_source = (
+                proc.stdout if klass != "ok" and proc.stdout else proc.stderr
+            ) or proc.stdout or ""
+            detail = detail_source[:300]
         except subprocess.TimeoutExpired:
             klass = "timeout"
             detail = f"turn exceeded {DRIVEN_TURN_TIMEOUT_SEC:.0f}s"

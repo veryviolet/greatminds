@@ -68,6 +68,16 @@ def test_classify_timeout_flag():
     assert cd._classify_turn_outcome(0, "", timed_out=True) == "timeout"
 
 
+def test_classify_openhands_missing_settings_as_auth():
+    out = "Headless mode requires existing settings.\nPlease run: openhands"
+    assert cd._classify_turn_outcome(0, out) == "auth"
+
+
+def test_classify_generic_auth_text_in_stderr():
+    err = "Error authenticating: token expired"
+    assert cd._classify_turn_outcome(0, "", stderr=err) == "auth"
+
+
 # ---------------- backoff ----------------
 
 

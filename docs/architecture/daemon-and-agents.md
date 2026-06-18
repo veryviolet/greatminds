@@ -57,10 +57,13 @@ For driven roles, `coordd` starts one turn instead of waking an existing loop:
 - `cursor`, `cline`, `gemini`, and `openhands` driven roles run one headless
   subprocess turn using the tool's own one-shot CLI mode. Cursor turns are
   wrapped in the same `systemd-run --user --slice=cursor.slice --scope`
-  resource boundary as interactive Cursor panes. These adapters are stateless
-  from greatminds' point of view: the full role bootstrap is supplied each
-  turn, and the tool's machine-level auth/configuration must already be valid
-  for the OS user running `coordd`.
+  resource boundary as interactive Cursor panes and include `--trust` in
+  print mode. Gemini driven turns include `--skip-trust`. OpenHands driven
+  turns require the `openhands` CLI settings and LLM provider to be configured
+  before `coordd` starts the turn. These adapters are stateless from
+  greatminds' point of view: the full role bootstrap is supplied each turn,
+  and the tool's machine-level auth/configuration must already be valid for
+  the OS user running `coordd`.
 
 Driven roles do one tick, then exit. They do not schedule long sleeps or run a
 persistent `/loop`; their next turn comes from the next inbox, queue, or stand

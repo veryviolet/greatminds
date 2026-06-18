@@ -84,7 +84,7 @@ def test_driven_generic_headless_role_is_driven(tmp_path, monkeypatch):
     assert res is True
     assert calls["role"] == "technical-writer"
     assert calls["tool"] == "gemini"
-    assert calls["argv"][:3] == ["gemini", "--yolo", "-p"]
+    assert calls["argv"][:4] == ["gemini", "--skip-trust", "--yolo", "-p"]
 
 
 def test_driven_claude_role_is_driven(tmp_path, monkeypatch):

@@ -117,3 +117,18 @@ def test_generic_start_driver_builds_cline_argv(tmp_path: Path,
         "cline", "--auto-approve", "true", "bootstrap prompt",
     ]
     assert os.environ["GREATMINDS_REGISTRY_TOOL"] == "cline"
+
+
+def test_generic_start_driver_builds_gemini_interactive_argv(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("GREATMINDS_START_AGENT_SAFE", "0")
+    ctx = _ctx(tmp_path)
+    driver = get_start_driver("gemini")
+
+    argv = driver.build_argv(ctx)
+
+    assert argv == [
+        "gemini", "--yolo", "--prompt-interactive", "bootstrap prompt",
+    ]

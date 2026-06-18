@@ -29,8 +29,8 @@ The packaged adapters support these tools:
 | `codex` | OpenAI Codex chat and driven roles. | Run `codex login` once for the machine account; optionally set `GREATMINDS_CODEX_HOME` when the login is not under `~/.codex`. |
 | `cursor` | Cursor agent chat/loop panes and one-shot driven roles. | Install Cursor CLI / `cursor-agent`, authenticate it for the OS user, and keep it on `PATH`. Greatminds runs `cursor-agent` through a `systemd-run --user` scope in `cursor.slice` by default; tune `GREATMINDS_CURSOR_MEM_HIGH`, `GREATMINDS_CURSOR_MEM_MAX`, `GREATMINDS_CURSOR_CPU`, or `GREATMINDS_CURSOR_SLICE` when needed. |
 | `cline` | Cline CLI chat/loop panes and one-shot driven roles. | Install and configure Cline CLI for the OS user that runs the fleet. |
-| `gemini` | Gemini CLI chat/loop panes and one-shot driven roles. | Install Gemini CLI, authenticate/configure it for the OS user, and keep `gemini` on `PATH`. |
-| `openhands` | OpenHands CLI chat panes and one-shot driven roles. | Install OpenHands CLI and configure its LLM/runtime environment before assigning driven roles. |
+| `gemini` | Gemini CLI chat/loop panes and one-shot driven roles. | Install Gemini CLI, authenticate/configure it for the OS user, and keep `gemini` on `PATH`. Driven turns run with `--skip-trust` for unattended workspaces. |
+| `openhands` | OpenHands CLI chat panes and one-shot driven roles. | Install the `openhands` command, run `openhands` or `openhands login` once to create machine settings, and configure its LLM provider before assigning driven roles. `agent-canvas` is a separate OpenHands UI launcher and is not the CLI entrypoint used by the adapter. |
 
 Window modes in `coordination/coord.yaml`:
 

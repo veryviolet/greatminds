@@ -77,7 +77,7 @@ _TOOL_SPECS: tuple[AgentToolSpec, ...] = (
         driven=True,
         driven_transport="gemini -p subprocess",
         headless_style="gemini",
-        notes="Driven support is one-shot headless prompt mode.",
+        notes="Driven support is one-shot headless prompt mode with workspace trust bypass.",
     ),
     AgentToolSpec(
         name="openhands",
@@ -88,7 +88,7 @@ _TOOL_SPECS: tuple[AgentToolSpec, ...] = (
         start_modes=("chat",),
         driven_transport="openhands --headless subprocess",
         headless_style="openhands",
-        notes="Driven support is one-shot headless and requires OpenHands/LiteLLM configuration on the machine.",
+        notes="Driven support is one-shot headless and requires the OpenHands CLI settings on the machine.",
     ),
 )
 
@@ -139,12 +139,12 @@ def build_headless_argv(tool: str, prompt: str) -> list[str]:
     if spec.headless_style == "cline":
         return [spec.binary, "--json", "--auto-approve", "true", prompt]
     if spec.headless_style == "gemini":
-        return [spec.binary, "--yolo", "-p", prompt]
+        return [spec.binary, "--skip-trust", "--yolo", "-p", prompt]
     if spec.headless_style == "openhands":
         return [spec.binary, "--headless", "--json", "-t", prompt]
     if spec.headless_style == "cursor":
         return build_cursor_agent_argv(
-            ["--yolo", "--approve-mcps", "-p", prompt]
+            ["--yolo", "--approve-mcps", "--trust", "-p", prompt]
         )
     raise ValueError(f"unsupported headless style: {spec.headless_style}")
 
@@ -159,7 +159,7 @@ def build_interactive_argv(tool: str, prompt: str,
     if tool == "cline":
         return [spec.binary, *extra, prompt]
     if tool == "gemini":
-        return [spec.binary, *extra, "-p", prompt]
+        return [spec.binary, *extra, "--prompt-interactive", prompt]
     if tool == "openhands":
         return [spec.binary, *extra, "-t", prompt]
     raise ValueError(f"{tool} has no generic interactive argv")

@@ -147,7 +147,9 @@ def test_generic_headless_driver_builds_tool_argv(tmp_path: Path) -> None:
     assert args[0] == ctx.coord
     assert args[1] == "tester"
     assert args[2] == "gemini"
-    assert args[3] == ["gemini", "--yolo", "-p", "role contract"]
+    assert args[3] == [
+        "gemini", "--skip-trust", "--yolo", "-p", "role contract",
+    ]
 
 
 def test_cursor_headless_driver_uses_systemd_resource_scope(
@@ -170,4 +172,6 @@ def test_cursor_headless_driver_uses_systemd_resource_scope(
     assert "--slice=cursor.slice" in argv
     assert "MemoryMax=4G" in argv
     assert "cursor-agent" in argv
-    assert argv[-4:] == ["--yolo", "--approve-mcps", "-p", "review contract"]
+    assert argv[-5:] == [
+        "--yolo", "--approve-mcps", "--trust", "-p", "review contract",
+    ]
