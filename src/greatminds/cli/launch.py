@@ -452,9 +452,14 @@ def launch(target: str, config_path: Path | None, project_dir: Path | None,
            venv: Path | None, recreate: bool) -> None:
     # Locate coord.yaml.
     if config_path is None:
-        p = coord_yaml_path(Path.cwd())
-        if p.is_file():
-            config_path = p
+        candidates = []
+        if project_dir is not None:
+            candidates.append(coord_yaml_path(project_dir.resolve()))
+        candidates.append(coord_yaml_path(Path.cwd()))
+        for p in candidates:
+            if p.is_file():
+                config_path = p
+                break
     if config_path is None or not config_path.is_file():
         err("coord.yaml not found (pass --config or run from project root)")
         raise click.exceptions.Exit(1)

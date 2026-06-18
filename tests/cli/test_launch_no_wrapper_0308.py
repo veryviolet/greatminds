@@ -23,6 +23,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from click.testing import CliRunner
 
 from greatminds.cli import launch as launch_mod
 from greatminds.cli import restart as restart_mod
@@ -31,6 +32,50 @@ from greatminds.cli import restart as restart_mod
 def _env_setup() -> launch_mod.gm_env.EnvSetup:
     return launch_mod.gm_env.EnvSetup(
         env_type=None, activation="", source="(test)")
+
+
+def test_launch_project_dir_locates_coord_yaml_from_outside_cwd(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """``--project-dir`` must make launch find that project's coord.yaml
+    even when the command is invoked from a different directory."""
+    project = tmp_path / "project"
+    (project / "coordination").mkdir(parents=True)
+    (project / ".greatminds").mkdir()
+    (project / "coordination" / "coord.yaml").write_text(
+        yaml.safe_dump({
+            "session": "launch-project-dir",
+            "project_dir": str(project),
+            "windows": [
+                {"name": "dev", "role": "DEVELOPER",
+                 "tool": "claude", "mode": "loop"},
+            ],
+        }),
+        encoding="utf-8",
+    )
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    monkeypatch.chdir(outside)
+    monkeypatch.setattr(
+        launch_mod.gm_env,
+        "detect",
+        lambda project_dir, venv_override=None: _env_setup(),
+    )
+    monkeypatch.setattr(
+        launch_mod.gm_env,
+        "verify",
+        lambda setup: (True, "greatminds"),
+    )
+
+    result = CliRunner().invoke(
+        launch_mod.launch,
+        ["--target", "vscode", "--project-dir", str(project)],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 0, result.output
+    assert (project / ".vscode" / "tasks.json").is_file()
+    assert (project / "launch-project-dir.code-workspace").is_file()
 
 
 @pytest.fixture

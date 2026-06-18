@@ -50,6 +50,8 @@ from pathlib import Path
 import click
 
 from greatminds.cli import codex_auth, driven_log
+from greatminds.agents import driven_drivers
+from greatminds.agents.driven_drivers import DrivenDispatchContext
 from greatminds.core.paths import (
     coord_yaml_path,
     find_canon_dir,
@@ -2512,43 +2514,30 @@ def _maybe_drive_driven_role(coord: Path, canon_dir: Path,
         # clear any prior-failure backoff/escalation so genuinely new work
         # gets a clean chance (the retry path passes trigger=" (retry)").
         _clear_retry_state(role.lower(), coord)
-    if tool == "claude":
-        reg = read_registry(coord / REGISTRY_DIR, role.lower())
-        session_id = (reg or {}).get("session_id") or ""
-        session_name = (coord_yaml_doc.get("session") or "").strip() \
-            if coord_yaml_doc else ""
-        pane = (located[0] if located else "").strip()
-        bootstrap_file = _driven_bootstrap_path(coord, role.lower())
-        bf = (bootstrap_file if bootstrap_file and
-              Path(bootstrap_file).is_file() else None)
-        ok, diag = _spawn_driven_turn(
-            coord, role.lower(), session_id, pane, session_name,
-            bf, verbose, reg=reg, force_fresh=(not session_id),
-        )
-        if verbose:
-            print(f"  0315/0318/0347: driven dispatch for {role}"
-                  f"{trigger}: {diag}", file=sys.stderr)
-        return ok
-    if tool == "codex":
-        reg = read_registry(coord / REGISTRY_DIR, role.lower())
-        bootstrap_file = _driven_bootstrap_path(coord, role.lower())
-        base_instructions = None
-        try:
-            bp = Path(bootstrap_file)
-            if bp.is_file():
-                base_instructions = bp.read_text(encoding="utf-8")
-        except OSError:
-            base_instructions = None
-        ok, diag = _spawn_driven_codex_turn(
-            coord, role.lower(), base_instructions,
-            str(coord.parent), verbose, reg=reg,
-        )
-        if verbose:
-            print(f"  0321/0347: codex dispatch for {role}"
-                  f"{trigger}: {diag}", file=sys.stderr)
-        return ok
-    # Driven but an unknown tool — no driver; let the caller fall back.
-    return None
+    driver = driven_drivers.get_driven_driver(tool)
+    if driver is None:
+        # Driven but an unknown tool — no driver; let the caller fall back.
+        return None
+    ctx = DrivenDispatchContext(
+        coord=coord,
+        coord_yaml_doc=coord_yaml_doc,
+        located=located,
+        role=role,
+        role_lower=role.lower(),
+        verbose=verbose,
+        trigger=trigger,
+        registry_dir_name=REGISTRY_DIR,
+        read_registry=read_registry,
+        driven_bootstrap_path=_driven_bootstrap_path,
+        spawn_claude_turn=_spawn_driven_turn,
+        spawn_codex_turn=_spawn_driven_codex_turn,
+    )
+    ok, diag = driver.drive(ctx)
+    if verbose:
+        prefix = "0315/0318/0347" if tool == "claude" else "0321/0347"
+        print(f"  {prefix}: {tool} dispatch for {role}"
+              f"{trigger}: {diag}", file=sys.stderr)
+    return ok
 
 
 def _role_pending_signature(coord: Path, role_meta: dict,

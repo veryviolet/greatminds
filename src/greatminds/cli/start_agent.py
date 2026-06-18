@@ -73,8 +73,8 @@ from pathlib import Path
 
 import click
 
-from greatminds.cli import codex_auth
-
+from greatminds.agents import start_drivers
+from greatminds.agents.start_drivers import StartAgentContext
 from greatminds.core.errors import GreatMindsError
 from greatminds.core.paths import (
     find_canon_dir,
@@ -241,19 +241,13 @@ def discover_codex_session(role: str,
 
 
 # ---------------------------------------------------------------------------
-# Tool-specific argv builders — return (cmd, env_overrides) where env_overrides
-# is applied to os.environ before exec. Each builder may mutate cwd if needed.
+# Tool-specific argv builders. These wrappers preserve the historical import
+# surface while the implementation lives behind the agent driver registry.
 # ---------------------------------------------------------------------------
 
 
 def _yolo_args(tool: str) -> list[str]:
-    if os.environ.get("GREATMINDS_START_AGENT_SAFE", "0") == "1":
-        return []
-    return {
-        "claude": ["--permission-mode", "auto"],
-        "codex":  ["-a", "never", "-s", "danger-full-access"],
-        "cursor": ["--yolo", "--approve-mcps"],
-    }.get(tool, [])
+    return start_drivers.yolo_args(tool)
 
 
 def build_claude_argv(
@@ -265,56 +259,9 @@ def build_claude_argv(
     extra: list[str],
     prompt: str,
 ) -> list[str]:
-    """Compose ``claude --name R --session-id|--resume X [plugins] [mcp] -- PROMPT``.
-
-    0390 Claude audit: Claude has NO per-role auth-home split — there is no
-    ``CLAUDE_HOME``-per-role equivalent of the Codex ``CODEX_HOME`` path
-    that caused the paned-Codex auth-prompt wedge. Claude authenticates
-    against ONE global login (``~/.claude`` / ``claude setup-token`` /
-    ``ANTHROPIC_API_KEY``) regardless of role; the role identity rides
-    ``--name`` + the bootstrap prompt + per-role plugin dirs (config, not
-    auth). So a Claude login/limit failure is inherently a GLOBAL auth
-    problem, never a misleading per-role-setup failure, and needs no
-    machine-vs-role home disambiguation here. (Global login/limit failures
-    surface in claude's own startup output / exit; this launcher sets no
-    per-role auth home to confuse them with.)"""
-    # Plugin dirs are kebab-case. GREATMINDS_ROLE in this project is already
-    # kebab-case (e.g. ARCHITECT-PLANNER, UI-DEVELOPER), so just lowercase.
-    role_plugin_suffix = role.lower().replace("_", "-")
-    plugin_dirs = [canon_dir / "plugins" / "coordination-protocol"]
-    role_plugin = canon_dir / "plugins" / f"role-{role_plugin_suffix}"
-    if role_plugin.is_dir():
-        plugin_dirs.append(role_plugin)
-    proj_overrides = (
-        project_config_dir(project_dir) / "plugins.local" / "project-overrides"
+    return start_drivers.build_claude_argv(
+        role, canon_dir, project_dir, session_id, session_new, extra, prompt
     )
-    if proj_overrides.is_dir():
-        plugin_dirs.append(proj_overrides)
-
-    mcp_files = [canon_dir / "mcp" / "canon.json"]
-    mcp_local = project_config_dir(project_dir) / "mcp.local.json"
-    if mcp_local.is_file():
-        mcp_files.append(mcp_local)
-
-    canon_args: list[str] = []
-    for d in plugin_dirs:
-        canon_args += ["--plugin-dir", str(d)]
-    # claude's --mcp-config is variadic — it consumes following positional
-    # args until the next --flag. We append a ``--`` separator below before
-    # the prompt so PROMPT isn't misinterpreted as another config file.
-    for f in mcp_files:
-        canon_args += ["--mcp-config", str(f)]
-
-    yolo = _yolo_args("claude")
-
-    if session_new:
-        session_args = ["--session-id", session_id]
-    else:
-        session_args = ["--resume", session_id]
-
-    # The ``--`` separator goes AFTER user-supplied extra args so they
-    # remain positional to claude itself; PROMPT then sits cleanly past it.
-    return ["claude", "--name", role, *session_args, *yolo, *canon_args, *extra, "--", prompt]
 
 
 def build_codex_argv(
@@ -324,70 +271,10 @@ def build_codex_argv(
     extra: list[str],
     prompt: str,
 ) -> list[str]:
-    """Compose ``codex [resume <SID>|] [profile] EXTRA PROMPT``.
-
-    Two-branch design driven by ``codex_sid`` (the per-role codex rollout
-    UUID), NOT by ``session_new`` (which is the claude session-id concept;
-    irrelevant to codex's own session storage):
-
-      - codex_sid found → ``codex resume <sid> [yolo] [profile] EXTRA PROMPT``
-        (resume the prior conversation; PROMPT is the wake nudge).
-      - codex_sid empty → ``codex [yolo] [profile] EXTRA PROMPT``
-        (fresh session; PROMPT is the full bootstrap).
-
-    Task 0043 — EXPLORER avatar dogfood on codex 0.133.0 caught a stale
-    ``codex resume --last`` fallback that codex 0.133.0 silently rejected:
-    ``--last`` was parsed as an unknown flag, then the bootstrap prompt
-    text (next positional) was treated as the missing session-id, causing
-    ``No saved session found with ID continue your tick as DEVELOPER…``.
-    Removed. When codex_sid is missing we now start a fresh session and
-    let the role's bootstrap prompt (the full role intro) re-establish
-    context — the agent re-bootstraps from canon role files instead of
-    relying on a session continuity that codex couldn't provide anyway.
-    """
-    role_lower = role.lower()
-    codex_session_file = registry_dir / f"{role_lower}.codex-session-id"
-
-    codex_sid = ""
-    if codex_session_file.is_file() and codex_session_file.stat().st_size > 0:
-        codex_sid = codex_session_file.read_text(encoding="utf-8").strip()
-    else:
-        # 0164: pass project_dir so discover walks the per-role
-        # post-0158 codex home FIRST. Without this, pre-0158
-        # ``~/.codex/sessions/`` rollouts can leak into the cache and
-        # the next launch fails ``codex resume <stale-sid>``.
-        project_dir = registry_dir.parent.parent
-        codex_sid = discover_codex_session(role, project_dir=project_dir)
-        if codex_sid:
-            codex_session_file.write_text(codex_sid + "\n", encoding="utf-8")
-
-    # 0390: paned Codex now authenticates against the SINGLE machine Codex
-    # home (CODEX_HOME set to it in the codex launch arm below) so the pane
-    # never wedges at the sign-in UI when ~/.codex/auth.json exists. That
-    # means we can NO LONGER select the role's model via ``--profile
-    # <role>``: ``--profile`` only resolves a ``[profiles.<role>]`` section
-    # inside the per-role ``CODEX_HOME`` — exactly the per-role-home-as-auth
-    # path 0375 (driven) and 0390 (paned) remove. Mirror the 0375 driven
-    # model instead: read the role's model from the per-role config SOURCE
-    # and inject it as a ``-c model="..."`` override. The per-role home stays
-    # a config source (model); the bootstrap prompt + canon carry the rest
-    # of the role contract. No --profile, no per-role CODEX_HOME for auth.
-    project_dir = registry_dir.parent.parent
-    role_home = project_runtime_dir(project_dir) / ".codex-home" / role_lower
-    codex_model_args = codex_auth.codex_model_config_args(role_home, role_lower)
-
-    yolo = _yolo_args("codex")
-
-    if codex_sid:
-        codex_args = ["resume", codex_sid, *yolo, *codex_model_args]
-    else:
-        # No prior rollout found (e.g. first launch, or codex storage was
-        # rotated/cleared, or codex self-updated and dropped the cache).
-        # Start a fresh session — the bootstrap prompt carries everything
-        # the role needs to re-establish context.
-        codex_args = [*yolo, *codex_model_args]
-
-    return ["codex", *codex_args, *extra, prompt]
+    return start_drivers.build_codex_argv(
+        role, registry_dir, session_new, extra, prompt,
+        discover_session=lambda r, p: discover_codex_session(r, project_dir=p),
+    )
 
 
 def build_cursor_argv(
@@ -395,29 +282,7 @@ def build_cursor_argv(
     extra: list[str],
     prompt: str,
 ) -> list[str]:
-    """Compose ``systemd-run … cursor-agent [--continue] --model M EXTRA PROMPT``.
-
-    The systemd-run wrapper isolates cursor's memory/CPU so its known
-    long-session leaks OOM-kill only itself, not the host.
-    """
-    yolo = _yolo_args("cursor")
-    cursor_model = os.environ.get("GREATMINDS_CURSOR_MODEL", "composer-2.5-fast")
-    if session_new:
-        cursor_args = ["--model", cursor_model, *yolo]
-    else:
-        cursor_args = ["--continue", "--model", cursor_model, *yolo]
-
-    # pty-launch sees argv[2]=systemd-run; tell it the logical tool so the
-    # registry says cursor (coordd picks the cursor submit sequence).
-    os.environ["GREATMINDS_REGISTRY_TOOL"] = "cursor"
-
-    sdr = [
-        "systemd-run", "--user", "--scope", "--quiet", "--collect",
-        "-p", f"MemoryHigh={os.environ.get('GREATMINDS_CURSOR_MEM_HIGH', '3G')}",
-        "-p", f"MemoryMax={os.environ.get('GREATMINDS_CURSOR_MEM_MAX', '4G')}",
-        "-p", f"CPUQuota={os.environ.get('GREATMINDS_CURSOR_CPU', '300%')}",
-    ]
-    return [*sdr, "cursor-agent", *cursor_args, *extra, prompt]
+    return start_drivers.build_cursor_argv(session_new, extra, prompt)
 
 
 # ---------------------------------------------------------------------------
@@ -527,7 +392,7 @@ def _shell_quote(arg: str) -> str:
     context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
 )
 @click.argument("role")
-@click.argument("tool", type=click.Choice(["claude", "codex", "cursor"]))
+@click.argument("tool", type=click.Choice(start_drivers.available_start_tools()))
 @click.option("--mode", default="loop", type=click.Choice(["loop", "chat"]),
               help="loop = self-driving tick loop; chat = interactive")
 @click.option("--dry-run", is_flag=True, default=False,
@@ -666,52 +531,27 @@ def start_agent(role: str, tool: str, mode: str,
     # ScheduleWakeup brings it back).
     use_pty = os.environ.get("GREATMINDS_START_AGENT_NOPTY", "0") != "1"
 
-    # Build the per-tool command.
-    if tool == "claude":
-        cmd = build_claude_argv(role, canon_dir, project_dir, session_id,
-                                session_new, extra, prompt)
-    elif tool == "codex":
-        cmd = build_codex_argv(role, registry_dir, session_new, extra, prompt)
-        # 0390: paned/interactive Codex authenticates against the SINGLE
-        # machine Codex home — the one place codex 0.137 finds a usable
-        # auth.json. The pre-0390 path pointed CODEX_HOME at the per-role
-        # ``.greatminds/.codex-home/<role>`` home; that home holds config
-        # ONLY (no auth.json), so codex 0.137 — which reads auth from
-        # ``$CODEX_HOME/auth.json`` — ignored the machine login in
-        # ``~/.codex/auth.json`` and wedged the pane at the sign-in UI
-        # (USABLE=NO(pane:auth_prompt)) even though the host user was
-        # already logged in.
-        #
-        # Mirror the 0375 driven model so the two paths can't drift:
-        #   * CODEX_HOME = the machine home (auth.json lives there);
-        #   * the role model rides a ``-c model="..."`` override
-        #     (build_codex_argv via codex_auth.codex_model_config_args),
-        #     NOT ``--profile`` — ``--profile`` only selects config INSIDE
-        #     a per-role CODEX_HOME, i.e. exactly the per-role-auth path we
-        #     remove;
-        #   * the role contract / identity rides the bootstrap prompt + canon.
-        # The per-role home stays a config SOURCE only; auth.json is NEVER
-        # copied or symlinked into it. Home selection is shared with the
-        # driven path through codex_auth.machine_codex_home.
-        machine_home = codex_auth.machine_codex_home()
-        os.environ["CODEX_HOME"] = machine_home
-        # Fail fast + actionable when the machine login is missing or
-        # unusable, rather than letting the pane sit silently at the Codex
-        # sign-in UI. The message names the effective machine home and
-        # states that per-role homes are config sources, not login targets.
-        if not dry_run and not codex_auth.machine_codex_auth_present(machine_home):
-            raise GreatMindsError(
-                codex_auth.machine_codex_auth_error(machine_home, role),
-                exit_code=2,
-            )
-    elif tool == "cursor":
-        cmd = build_cursor_argv(session_new, extra, prompt)
-        # cursor-agent operates on cwd — change into the project root.
-        if not dry_run:
-            os.chdir(project_dir)
-    else:
-        # click.Choice already validates; defensive guard for type-checkers.
-        raise GreatMindsError(f"unknown TOOL: {tool}", exit_code=2)
+    # Build the per-tool command through the driver registry. Tool-specific
+    # cwd/env/auth preparation happens after argv composition, preserving the
+    # historical ordering used by the inline branches.
+    driver = start_drivers.get_start_driver(
+        tool,
+        discover_codex_session=lambda r, p: discover_codex_session(
+            r, project_dir=p
+        ),
+    )
+    start_ctx = StartAgentContext(
+        role=role,
+        canon_dir=canon_dir,
+        project_dir=project_dir,
+        registry_dir=registry_dir,
+        session_id=session_id,
+        session_new=session_new,
+        extra=extra,
+        prompt=prompt,
+    )
+    cmd = driver.build_argv(start_ctx)
+    driver.prepare_environment(start_ctx, dry_run=dry_run)
 
     cmd_with_pty = (
         [sys.executable, "-m", "greatminds.cli.pty_launch", role, *cmd]
