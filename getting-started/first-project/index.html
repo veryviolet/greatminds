@@ -1641,7 +1641,11 @@ state under <code>.greatminds/</code>, and local agent configuration files. It d
 overwrite an existing <code>coordination/coord.yaml</code>; edit that file when you want
 different tools, windows, or launch modes.</p>
 <h2 id="agent-tools-and-role-mapping">Agent tools and role mapping<a class="headerlink" href="#agent-tools-and-role-mapping" title="Permanent link">&para;</a></h2>
-<p>The documented quickstart path uses two agent tools:</p>
+<p>List the installed tool capabilities at any time:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>agent<span class="w"> </span>tools
+greatminds<span class="w"> </span>agent<span class="w"> </span>tools<span class="w"> </span>--json
+</code></pre></div>
+<p>The packaged adapters support these tools:</p>
 <table>
 <thead>
 <tr>
@@ -1660,6 +1664,26 @@ different tools, windows, or launch modes.</p>
 <td><code>codex</code></td>
 <td>OpenAI Codex chat and driven roles.</td>
 <td>Run <code>codex login</code> once for the machine account; optionally set <code>GREATMINDS_CODEX_HOME</code> when the login is not under <code>~/.codex</code>.</td>
+</tr>
+<tr>
+<td><code>cursor</code></td>
+<td>Cursor agent chat/loop panes and one-shot driven roles.</td>
+<td>Install Cursor CLI / <code>cursor-agent</code>, authenticate it for the OS user, and keep it on <code>PATH</code>.</td>
+</tr>
+<tr>
+<td><code>cline</code></td>
+<td>Cline CLI chat/loop panes and one-shot driven roles.</td>
+<td>Install and configure Cline CLI for the OS user that runs the fleet.</td>
+</tr>
+<tr>
+<td><code>gemini</code></td>
+<td>Gemini CLI chat/loop panes and one-shot driven roles.</td>
+<td>Install Gemini CLI, authenticate/configure it for the OS user, and keep <code>gemini</code> on <code>PATH</code>.</td>
+</tr>
+<tr>
+<td><code>openhands</code></td>
+<td>OpenHands CLI chat panes and one-shot driven roles.</td>
+<td>Install OpenHands CLI and configure its LLM/runtime environment before assigning driven roles.</td>
 </tr>
 </tbody>
 </table>
@@ -1686,7 +1710,7 @@ different tools, windows, or launch modes.</p>
 </tr>
 <tr>
 <td><code>driven</code></td>
-<td>No live pane; <code>coordd</code> starts one Claude or Codex turn when work lands in the role's queue, inbox, or stand event stream.</td>
+<td>No live pane; <code>coordd</code> starts one driven turn when work lands in the role's queue, inbox, or stand event stream. Claude and Codex use stateful drivers; Cursor, Cline, Gemini, and OpenHands use one-shot headless subprocess drivers.</td>
 </tr>
 </tbody>
 </table>
@@ -1772,9 +1796,9 @@ Change <code>tool:</code> per role, then restart the daemon and launch session:<
 <span class="w">    </span><span class="nt">tool</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">codex</span>
 <span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">driven</span>
 </code></pre></div>
-<p><code>mode: chat</code> and <code>mode: loop</code> create live tmux panes. <code>mode: driven</code> creates no
-agent pane; <code>coordd</code> starts one Claude or Codex turn when queue, inbox, or stand
-events arrive.</p>
+<p><code>mode: chat</code> and <code>mode: loop</code> create live panes. <code>mode: driven</code> creates no
+agent pane; <code>coordd</code> starts one driven turn when queue, inbox, or stand events
+arrive.</p>
 <h2 id="claude-local-settings">Claude local settings<a class="headerlink" href="#claude-local-settings" title="Permanent link">&para;</a></h2>
 <p>During setup, greatminds writes or extends
 <code>.claude/settings.local.json</code>. New files include the Stop hook,

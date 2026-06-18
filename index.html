@@ -1511,7 +1511,7 @@ heartbeats, and a launcher for tmux-based fleets.</p>
   <code>feature_review/</code>, and <code>verified/</code>.</li>
 <li>A <code>greatminds</code> CLI for task moves, inbox messages, stand leases, role
   rendering, journal views, agent diagnostics, watchdog checks, and fleet
-  launch.</li>
+  launch, plus VS Code workspace/cockpit tasks.</li>
 <li>A per-project daemon that watches inboxes, queue files, and stand state,
   then wakes or drives the owning role.</li>
 </ul>
@@ -1522,12 +1522,21 @@ mkdir<span class="w"> </span>-p<span class="w"> </span>/tmp/greatminds-demo
 <span class="nb">cd</span><span class="w"> </span>/tmp/greatminds-demo
 greatminds<span class="w"> </span>setup<span class="w"> </span>--session<span class="w"> </span>myproject
 </code></pre></div>
-<p>greatminds uses two primary agent tools:</p>
+<p>List supported agent tools and their execution modes:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>agent<span class="w"> </span>tools
+greatminds<span class="w"> </span>agent<span class="w"> </span>tools<span class="w"> </span>--json
+</code></pre></div>
+<p>The packaged adapters support:</p>
 <ul>
 <li><code>claude</code>: Claude Code, including project-local settings and configured
   Claude marketplace plugins.</li>
 <li><code>codex</code>: OpenAI Codex, using the single machine Codex login plus generated
   per-role profile sources under <code>.greatminds/.codex-home/&lt;role&gt;/</code>.</li>
+<li><code>cursor</code>: Cursor agent for live panes and one-shot driven turns.</li>
+<li><code>cline</code>: Cline CLI for live panes and one-shot driven turns.</li>
+<li><code>gemini</code>: Gemini CLI for live panes and one-shot driven turns.</li>
+<li><code>openhands</code>: OpenHands CLI for live panes and one-shot driven turns, after
+  its machine-level LLM/runtime configuration is in place.</li>
 </ul>
 <p>Window modes in <code>coordination/coord.yaml</code>:</p>
 <ul>
@@ -1535,8 +1544,10 @@ greatminds<span class="w"> </span>setup<span class="w"> </span>--session<span cl
 <li><code>loop</code>: a resident watchdog pane that wakes on its own timer.</li>
 <li><code>staged</code>: a tmux pane with the start command pre-typed, so the operator
   starts that role manually when needed.</li>
-<li><code>driven</code>: no live pane; <code>coordd</code> starts one Claude or Codex turn when work
-  lands in the role's queue, inbox, or stand event stream.</li>
+<li><code>driven</code>: no live pane; <code>coordd</code> starts one driven turn when work lands in
+  the role's queue, inbox, or stand event stream. Claude and Codex use
+  stateful drivers; Cursor, Cline, Gemini, and OpenHands use one-shot
+  headless subprocess drivers.</li>
 </ul>
 <p>Choose which tool runs each role in <code>coordination/coord.yaml</code>:</p>
 <table>
@@ -1631,6 +1642,13 @@ greatminds<span class="w"> </span>daemon<span class="w"> </span>start
 greatminds<span class="w"> </span>launch<span class="w"> </span>--target<span class="w"> </span>tmux
 tmux<span class="w"> </span>a<span class="w"> </span>-t<span class="w"> </span>myproject
 </code></pre></div>
+<p>For VS Code, generate a workspace and cockpit tasks:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>launch<span class="w"> </span>--target<span class="w"> </span>vscode
+</code></pre></div>
+<p>This writes <code>.vscode/tasks.json</code> and <code>&lt;session&gt;.code-workspace</code> with agent
+terminals plus operator tasks for dashboard, driven logs, coordd, agent status,
+agent tools, and stand status. The repository also ships a <code>vscode-extension/</code>
+cockpit that calls the same <code>greatminds</code> CLI backend.</p>
 <p>Next: <a href="getting-started/installation/">Installation</a> and
 <a href="getting-started/first-project/">First Project</a>.</p>
 

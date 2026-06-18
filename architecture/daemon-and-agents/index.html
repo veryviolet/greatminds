@@ -1584,7 +1584,8 @@ Each window is defined in <code>coordination/coord.yaml</code> with:</p>
 <ul>
 <li>window name</li>
 <li>role</li>
-<li>tool (<code>claude</code>, <code>codex</code>, <code>cursor</code>, or <code>bash</code>)</li>
+<li>tool (<code>claude</code>, <code>codex</code>, <code>cursor</code>, <code>cline</code>, <code>gemini</code>, <code>openhands</code>, or
+  <code>bash</code>)</li>
 <li>mode (<code>chat</code>, <code>loop</code>, <code>dashboard</code>, <code>logs</code>, <code>staged</code>, or <code>driven</code>)</li>
 </ul>
 <p>The role's lifecycle is declared in the packaged schema copied to
@@ -1628,6 +1629,11 @@ the role window's <code>coordination/coord.yaml</code> <code>tool:</code> value:
   <code>$HOME/.local/bin</code>.</li>
 <li><code>codex</code> driven roles run one fresh <code>codex app-server</code> stdio process for the
   turn; the app-server thread id is persisted for continuity.</li>
+<li><code>cursor</code>, <code>cline</code>, <code>gemini</code>, and <code>openhands</code> driven roles run one headless
+  subprocess turn using the tool's own one-shot CLI mode. These adapters are
+  stateless from greatminds' point of view: the full role bootstrap is supplied
+  each turn, and the tool's machine-level auth/configuration must already be
+  valid for the OS user running <code>coordd</code>.</li>
 </ul>
 <p>Driven roles do one tick, then exit. They do not schedule long sleeps or run a
 persistent <code>/loop</code>; their next turn comes from the next inbox, queue, or stand
@@ -1638,6 +1644,10 @@ observability, not FSM authority: task files, locks, stand state, and turn logs
 remain the source of truth. A fresh tmux launch includes a role-less <code>logs</code>
 window that runs <code>greatminds driven-log --follow</code> and shows accepted turns,
 pending markers, completions, retries, and errors in color.</p>
+<p><code>greatminds launch --target vscode</code> writes VS Code tasks for the same operator
+surfaces: dashboard, driven log, coordd foreground, agent status, agent tools,
+stand status, and stand profiles. The <code>vscode-extension/</code> package provides a
+VS Code cockpit that calls the same CLI backend.</p>
 <p>This reactive path replaces short idle polling for normal queue and inbox
 changes. Reaction time should be the daemon watcher interval plus one driven
 spawn or wake signal, not a role's fallback sleep value.</p>

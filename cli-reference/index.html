@@ -947,6 +947,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#greatminds-agent-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tools
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2328,6 +2339,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#greatminds-agent-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tools
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3262,6 +3284,15 @@ task pipeline, agent launcher.</p>
   --no-pane   skip tmux pane inspection.
   -h, --help  Show this message and exit.
 </code></pre></div>
+<h4 id="greatminds-agent-tools">greatminds agent tools<a class="headerlink" href="#greatminds-agent-tools" title="Permanent link">&para;</a></h4>
+<p>list supported agent tools and execution modes.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds agent tools [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --json      emit a machine-readable JSON array.
+  -h, --help  Show this message and exit.
+</code></pre></div>
 <h3 id="greatminds-check-git-permission">greatminds check-git-permission<a class="headerlink" href="#greatminds-check-git-permission" title="Permanent link">&para;</a></h3>
 <p>greatminds check-git-permission — gate <code>git commit</code> / <code>git push</code> by role.</p>
 <p>Installed by <code>greatminds setup</code> as a pre-commit hook. Reads
@@ -4092,7 +4123,7 @@ After setup, the selected tool process replaces this script via <code>os.execvp<
     Role key from <code>schema.yaml &gt; roles</code> (DEVELOPER, ARCHITECT-PLANNER,
     UI-DEVELOPER, EXPLORER, TESTER, …).</p>
 <p>TOOL
-    One of <code>claude</code> | <code>codex</code> | <code>cursor</code>.</p>
+    One of the tools reported by <code>greatminds agent tools</code>.</p>
 <p>What it does:</p>
 <ol>
 <li>Resolve project root from <code>$GREATMINDS_PROJECT_DIR</code> (or cwd).</li>
@@ -4134,7 +4165,8 @@ After setup, the selected tool process replaces this script via <code>os.execvp<
 which records an input socket so <code>coordd</code> can inject keystrokes from outside
 the terminal emulator. Disable with <code>GREATMINDS_START_AGENT_NOPTY=1</code>.</p>
 <p><strong>Usage:</strong></p>
-<div class="highlight"><pre><span></span><code>greatminds start-agent [OPTIONS] ROLE {claude|codex|cursor} [EXTRA]...
+<div class="highlight"><pre><span></span><code>greatminds start-agent [OPTIONS] ROLE
+                       {claude|codex|cursor|cline|gemini|openhands} [EXTRA]...
 </code></pre></div>
 <p><strong>Options:</strong></p>
 <div class="highlight"><pre><span></span><code>  --mode [loop|chat]  loop = self-driving tick loop; chat = interactive
