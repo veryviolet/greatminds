@@ -1678,12 +1678,12 @@ greatminds<span class="w"> </span>agent<span class="w"> </span>tools<span class=
 <tr>
 <td><code>gemini</code></td>
 <td>Gemini CLI chat/loop panes and one-shot driven roles.</td>
-<td>Install Gemini CLI, authenticate/configure it for the OS user, and keep <code>gemini</code> on <code>PATH</code>.</td>
+<td>Install Gemini CLI, authenticate/configure it for the OS user, and keep <code>gemini</code> on <code>PATH</code>. Driven turns run with <code>--skip-trust</code> for unattended workspaces.</td>
 </tr>
 <tr>
 <td><code>openhands</code></td>
 <td>OpenHands CLI chat panes and one-shot driven roles.</td>
-<td>Install OpenHands CLI and configure its LLM/runtime environment before assigning driven roles.</td>
+<td>Install the <code>openhands</code> command, run <code>openhands</code> or <code>openhands login</code> once to create machine settings, and configure its LLM provider before assigning driven roles. <code>agent-canvas</code> is a separate OpenHands UI launcher and is not the CLI entrypoint used by the adapter.</td>
 </tr>
 </tbody>
 </table>
