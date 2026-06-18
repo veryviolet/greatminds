@@ -1668,7 +1668,7 @@ greatminds<span class="w"> </span>agent<span class="w"> </span>tools<span class=
 <tr>
 <td><code>cursor</code></td>
 <td>Cursor agent chat/loop panes and one-shot driven roles.</td>
-<td>Install Cursor CLI / <code>cursor-agent</code>, authenticate it for the OS user, and keep it on <code>PATH</code>.</td>
+<td>Install Cursor CLI / <code>cursor-agent</code>, authenticate it for the OS user, and keep it on <code>PATH</code>. Greatminds runs <code>cursor-agent</code> through a <code>systemd-run --user</code> scope in <code>cursor.slice</code> by default; tune <code>GREATMINDS_CURSOR_MEM_HIGH</code>, <code>GREATMINDS_CURSOR_MEM_MAX</code>, <code>GREATMINDS_CURSOR_CPU</code>, or <code>GREATMINDS_CURSOR_SLICE</code> when needed.</td>
 </tr>
 <tr>
 <td><code>cline</code></td>

@@ -4157,8 +4157,8 @@ After setup, the selected tool process replaces this script via <code>os.execvp<
        passes them as <code>-c</code> overrides; it does not use <code>--profile</code> or a
        per-role auth home.</p>
 <p><code>cursor</code>
-       Wrapped in <code>systemd-run --user --scope</code> with memory/CPU caps
-       (cursor-agent leaks memory in long sessions). Sets
+       Wrapped in <code>systemd-run --user --slice=cursor.slice --scope</code> with
+       memory/CPU caps (cursor-agent leaks memory in long sessions). Sets
        <code>GREATMINDS_REGISTRY_TOOL=cursor</code> so <code>pty-launch</code> records the
        logical tool, not <code>systemd-run</code>.</p>
 <p>By default the tool is wrapped through <code>python -m greatminds.cli.pty_launch</code>,

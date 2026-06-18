@@ -1630,10 +1630,12 @@ the role window's <code>coordination/coord.yaml</code> <code>tool:</code> value:
 <li><code>codex</code> driven roles run one fresh <code>codex app-server</code> stdio process for the
   turn; the app-server thread id is persisted for continuity.</li>
 <li><code>cursor</code>, <code>cline</code>, <code>gemini</code>, and <code>openhands</code> driven roles run one headless
-  subprocess turn using the tool's own one-shot CLI mode. These adapters are
-  stateless from greatminds' point of view: the full role bootstrap is supplied
-  each turn, and the tool's machine-level auth/configuration must already be
-  valid for the OS user running <code>coordd</code>.</li>
+  subprocess turn using the tool's own one-shot CLI mode. Cursor turns are
+  wrapped in the same <code>systemd-run --user --slice=cursor.slice --scope</code>
+  resource boundary as interactive Cursor panes. These adapters are stateless
+  from greatminds' point of view: the full role bootstrap is supplied each
+  turn, and the tool's machine-level auth/configuration must already be valid
+  for the OS user running <code>coordd</code>.</li>
 </ul>
 <p>Driven roles do one tick, then exit. They do not schedule long sleeps or run a
 persistent <code>/loop</code>; their next turn comes from the next inbox, queue, or stand
