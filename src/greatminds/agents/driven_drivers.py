@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
+from greatminds.agents import tool_specs
+
 
 ReadRegistry = Callable[[Path, str], dict | None]
 DrivenBootstrapPath = Callable[[Path, str], str | None]
@@ -49,7 +51,7 @@ class DrivenDriver(Protocol):
 
 def available_driven_tools() -> tuple[str, ...]:
     """Tools with a coordd-managed driven execution driver."""
-    return ("claude", "codex")
+    return tool_specs.driven_tool_names()
 
 
 class ClaudeDrivenDriver:

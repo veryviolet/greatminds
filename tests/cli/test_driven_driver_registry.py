@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from greatminds.agents import tool_specs
 from greatminds.agents.driven_drivers import (
     DrivenDispatchContext,
     available_driven_tools,
@@ -59,6 +60,7 @@ def _ctx(
 
 
 def test_available_driven_tools_are_registry_backed() -> None:
+    assert available_driven_tools() == tool_specs.driven_tool_names()
     assert available_driven_tools() == ("claude", "codex")
 
 

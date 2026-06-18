@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from greatminds.agents import tool_specs
 from greatminds.agents.start_drivers import (
     StartAgentContext,
     available_start_tools,
@@ -37,6 +38,7 @@ def _ctx(tmp_path: Path, *, role: str = "DEVELOPER") -> StartAgentContext:
 
 
 def test_available_start_tools_are_registry_backed() -> None:
+    assert available_start_tools() == tool_specs.start_tool_names()
     assert available_start_tools() == ("claude", "codex", "cursor")
 
 

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Callable, Protocol
 
 from greatminds.cli import codex_auth
+from greatminds.agents import tool_specs
 from greatminds.core.errors import GreatMindsError
 from greatminds.core.paths import project_config_dir, project_runtime_dir
 
@@ -50,7 +51,7 @@ class StartAgentDriver(Protocol):
 
 def available_start_tools() -> tuple[str, ...]:
     """Tools supported by ``greatminds start-agent``."""
-    return ("claude", "codex", "cursor")
+    return tool_specs.start_tool_names()
 
 
 def yolo_args(tool: str) -> list[str]:

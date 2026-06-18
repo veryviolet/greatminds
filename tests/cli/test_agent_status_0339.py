@@ -49,6 +49,39 @@ def _run(args, cwd):
                               )
 
 
+def test_agent_tools_json_reports_current_capabilities(tmp_path):
+    from greatminds.cli import main as main_mod
+
+    result = CliRunner().invoke(
+        main_mod.cli, ["agent", "tools", "--json"],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    by_name = {item["name"]: item for item in data}
+    assert set(by_name) == {"claude", "codex", "cursor"}
+    assert by_name["claude"]["start_agent"] is True
+    assert by_name["claude"]["driven"] is True
+    assert by_name["codex"]["driven_transport"] == "codex app-server stdio"
+    assert by_name["cursor"]["start_agent"] is True
+    assert by_name["cursor"]["driven"] is False
+
+
+def test_agent_tools_human_reports_modes() -> None:
+    from greatminds.cli import main as main_mod
+
+    result = CliRunner().invoke(
+        main_mod.cli, ["agent", "tools"],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 0
+    assert "claude" in result.output
+    assert "start_agent=loop,chat" in result.output
+    assert "driven=claude -p subprocess" in result.output
+
+
 # ---------- collect_agent_status (core) ----------
 
 

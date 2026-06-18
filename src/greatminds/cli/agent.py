@@ -43,6 +43,7 @@ from typing import Any, NamedTuple
 
 import click
 
+from greatminds.agents import tool_specs
 from greatminds.core.errors import GreatMindsError
 from greatminds.core.paths import find_coord_dir, project_runtime_dir
 from greatminds.cli.coordd import (
@@ -478,6 +479,24 @@ def _render_human(rec: dict[str, Any]) -> str:
              help="per-agent process diagnostics.")
 def agent() -> None:
     pass
+
+
+@agent.command(name="tools",
+               help="list supported agent tools and execution modes.")
+@click.option("--json", "as_json", is_flag=True, default=False,
+              help="emit a machine-readable JSON array.")
+def agent_tools(as_json: bool) -> None:
+    specs = [spec.to_dict() for spec in tool_specs.all_tool_specs()]
+    if as_json:
+        click.echo(json.dumps(specs, indent=2))
+        return
+    for spec in tool_specs.all_tool_specs():
+        start = ",".join(spec.start_modes) if spec.start_agent else "no"
+        driven = spec.driven_transport if spec.driven else "no"
+        click.echo(
+            f"{spec.name}\tlabel={spec.label}\t"
+            f"start_agent={start}\tdriven={driven}"
+        )
 
 
 @agent.command(name="status",
