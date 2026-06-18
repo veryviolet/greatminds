@@ -42,6 +42,10 @@ def _ctx(
         calls["codex"] = (args, kwargs)
         return True, "codex ok"
 
+    def spawn_headless_turn(*args, **kwargs):
+        calls["headless"] = (args, kwargs)
+        return True, "headless ok"
+
     role_lower = role.lower()
     return DrivenDispatchContext(
         coord=coord,
@@ -56,16 +60,19 @@ def _ctx(
         driven_bootstrap_path=driven_bootstrap_path,
         spawn_claude_turn=spawn_claude_turn,
         spawn_codex_turn=spawn_codex_turn,
+        spawn_headless_turn=spawn_headless_turn,
     ), calls
 
 
 def test_available_driven_tools_are_registry_backed() -> None:
     assert available_driven_tools() == tool_specs.driven_tool_names()
-    assert available_driven_tools() == ("claude", "codex")
+    assert available_driven_tools() == (
+        "claude", "codex", "cursor", "cline", "gemini", "openhands",
+    )
 
 
 def test_unknown_driven_tool_returns_none() -> None:
-    assert get_driven_driver("cursor") is None
+    assert get_driven_driver("unknown-tool") is None
 
 
 def test_claude_driver_dispatches_existing_session(tmp_path: Path) -> None:
@@ -123,3 +130,21 @@ def test_codex_driver_reads_bootstrap_as_base_instructions(
         False,
     )
     assert kwargs["reg"] == {"thread_id": "thread-1"}
+
+
+def test_generic_headless_driver_builds_tool_argv(tmp_path: Path) -> None:
+    ctx, calls = _ctx(
+        tmp_path,
+        role="TESTER",
+        bootstrap_text="role contract",
+    )
+
+    ok, diag = get_driven_driver("gemini").drive(ctx)  # type: ignore[union-attr]
+
+    assert ok is True
+    assert diag == "headless ok"
+    args, _kwargs = calls["headless"]
+    assert args[0] == ctx.coord
+    assert args[1] == "tester"
+    assert args[2] == "gemini"
+    assert args[3] == ["gemini", "--yolo", "-p", "role contract"]

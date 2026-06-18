@@ -1,0 +1,79 @@
+{
+  "name": "greatminds",
+  "displayName": "greatminds",
+  "description": "VS Code cockpit for greatminds agent fleets.",
+  "version": "0.1.0",
+  "publisher": "veryviolet",
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.92.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:greatminds.tools",
+    "onCommand:greatminds.refresh",
+    "onCommand:greatminds.openDashboard",
+    "onCommand:greatminds.openDrivenLog",
+    "onCommand:greatminds.openCoordd",
+    "onCommand:greatminds.showAgentTools",
+    "onCommand:greatminds.showStandStatus"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "greatminds.refresh",
+        "title": "greatminds: Refresh"
+      },
+      {
+        "command": "greatminds.openDashboard",
+        "title": "greatminds: Open Dashboard"
+      },
+      {
+        "command": "greatminds.openDrivenLog",
+        "title": "greatminds: Follow Driven Log"
+      },
+      {
+        "command": "greatminds.openCoordd",
+        "title": "greatminds: Run coordd"
+      },
+      {
+        "command": "greatminds.showAgentTools",
+        "title": "greatminds: Show Agent Tools"
+      },
+      {
+        "command": "greatminds.showStandStatus",
+        "title": "greatminds: Show Stand Status"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "greatminds",
+          "title": "greatminds",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "greatminds": [
+        {
+          "id": "greatminds.tools",
+          "name": "Agent Tools"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "greatminds",
+      "properties": {
+        "greatminds.cliPath": {
+          "type": "string",
+          "default": "greatminds",
+          "description": "Path to the greatminds CLI executable."
+        }
+      }
+    }
+  }
+}

@@ -6,7 +6,8 @@ Each window is defined in `coordination/coord.yaml` with:
 
 - window name
 - role
-- tool (`claude`, `codex`, `cursor`, or `bash`)
+- tool (`claude`, `codex`, `cursor`, `cline`, `gemini`, `openhands`, or
+  `bash`)
 - mode (`chat`, `loop`, `dashboard`, `logs`, `staged`, or `driven`)
 
 The role's lifecycle is declared in the packaged schema copied to
@@ -53,6 +54,11 @@ For driven roles, `coordd` starts one turn instead of waking an existing loop:
   `$HOME/.local/bin`.
 - `codex` driven roles run one fresh `codex app-server` stdio process for the
   turn; the app-server thread id is persisted for continuity.
+- `cursor`, `cline`, `gemini`, and `openhands` driven roles run one headless
+  subprocess turn using the tool's own one-shot CLI mode. These adapters are
+  stateless from greatminds' point of view: the full role bootstrap is supplied
+  each turn, and the tool's machine-level auth/configuration must already be
+  valid for the OS user running `coordd`.
 
 Driven roles do one tick, then exit. They do not schedule long sleeps or run a
 persistent `/loop`; their next turn comes from the next inbox, queue, or stand
@@ -64,6 +70,11 @@ observability, not FSM authority: task files, locks, stand state, and turn logs
 remain the source of truth. A fresh tmux launch includes a role-less `logs`
 window that runs `greatminds driven-log --follow` and shows accepted turns,
 pending markers, completions, retries, and errors in color.
+
+`greatminds launch --target vscode` writes VS Code tasks for the same operator
+surfaces: dashboard, driven log, coordd foreground, agent status, agent tools,
+stand status, and stand profiles. The `vscode-extension/` package provides a
+VS Code cockpit that calls the same CLI backend.
 
 This reactive path replaces short idle polling for normal queue and inbox
 changes. Reaction time should be the daemon watcher interval plus one driven

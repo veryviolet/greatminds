@@ -702,7 +702,18 @@ role is launched on:
   role-specific procedural posture into every codex session.
 - **Cursor** — currently no per-role plugin/profile mechanism is
   wired; cursor roles get the bootstrap prompt only (which already
-  contains the full role brief rendered from `<role>.md`).
+  contains the full role brief rendered from `<role>.md`). Driven cursor
+  roles run through the one-shot `cursor-agent` headless subprocess adapter.
+- **Cline** — currently no per-role plugin/profile mechanism is wired;
+  Cline roles get the bootstrap prompt. Driven Cline roles run through
+  `cline --json --auto-approve true` as a one-shot subprocess.
+- **Gemini CLI** — currently no per-role plugin/profile mechanism is wired;
+  Gemini roles get the bootstrap prompt. Driven Gemini roles run through
+  `gemini --yolo -p` as a one-shot subprocess.
+- **OpenHands CLI** — currently no per-role plugin/profile mechanism is wired;
+  OpenHands roles get the bootstrap prompt. Driven OpenHands roles run through
+  `openhands --headless --json -t` as a one-shot subprocess and require the
+  machine's OpenHands/LiteLLM configuration to be valid for the daemon user.
 
 See also: `plugins/README.md` for plugin layout; `mcp/canon.json`
 for canon-wide MCP server set; `greatminds start-agent` for how plugins

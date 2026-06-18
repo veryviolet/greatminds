@@ -60,12 +60,17 @@ def test_agent_tools_json_reports_current_capabilities(tmp_path):
     assert result.exit_code == 0
     data = json.loads(result.output)
     by_name = {item["name"]: item for item in data}
-    assert set(by_name) == {"claude", "codex", "cursor"}
+    assert set(by_name) == {
+        "claude", "codex", "cursor", "cline", "gemini", "openhands",
+    }
     assert by_name["claude"]["start_agent"] is True
     assert by_name["claude"]["driven"] is True
     assert by_name["codex"]["driven_transport"] == "codex app-server stdio"
     assert by_name["cursor"]["start_agent"] is True
-    assert by_name["cursor"]["driven"] is False
+    assert by_name["cursor"]["driven"] is True
+    assert by_name["cline"]["driven_transport"] == "cline --json subprocess"
+    assert by_name["gemini"]["driven_transport"] == "gemini -p subprocess"
+    assert by_name["openhands"]["start_modes"] == ["chat"]
 
 
 def test_agent_tools_human_reports_modes() -> None:

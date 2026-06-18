@@ -1667,6 +1667,131 @@ def _spawn_driven_turn(
                   f"{' (session reset)' if reset else ''}")
 
 
+def _spawn_driven_headless_turn(
+    coord: Path,
+    role_lower: str,
+    tool: str,
+    argv: list[str],
+    verbose: bool,
+    *,
+    spawn: "callable | None" = None,
+    run_async: bool = True,
+) -> tuple[bool, str]:
+    """Run one generic headless driven turn as a coordd subprocess.
+
+    Used for tools with a one-shot headless CLI but no greatminds-specific
+    stateful resume API. Claude and Codex keep their specialized drivers.
+    """
+    lock = _driven_run_lock_path(coord, role_lower)
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    if lock.exists():
+        _driven_pending_path(coord, role_lower).touch()
+        driven_log.append_event(
+            coord, event="turn_pending", role=role_lower, tool=tool,
+            task=_driven_event_task_refs(coord, role_lower),
+            message="turn already running; pending marker set",
+        )
+        if verbose:
+            print(
+                f"  driven {tool} turn for {role_lower} already running; "
+                f"marked pending",
+                file=sys.stderr,
+            )
+        return (False, "run-lock held; pending set")
+
+    turn_log = _turn_log_path(coord, role_lower)
+    _write_driven_run_lock(lock, role_lower, driver=tool,
+                           log_path=str(turn_log))
+    task_refs = _driven_event_task_refs(coord, role_lower)
+    driven_log.append_event(
+        coord, event="turn_start", role=role_lower, tool=tool,
+        task=task_refs, message="accepted task", log_path=str(turn_log),
+    )
+
+    if spawn is not None:
+        try:
+            spawn(argv)
+            driven_log.append_event(
+                coord, event="turn_finish", role=role_lower, tool=tool,
+                task=task_refs, message="completed", log_path=str(turn_log),
+            )
+            return (True, f"{tool} turn spawned for {role_lower}")
+        finally:
+            try:
+                lock.unlink()
+            except OSError:
+                pass
+
+    def _worker() -> None:
+        klass = "error"
+        detail = ""
+        try:
+            proc = subprocess.run(
+                argv, cwd=str(coord.parent),
+                capture_output=True, text=True,
+                env=_driven_subprocess_env(role_lower),
+                timeout=DRIVEN_TURN_TIMEOUT_SEC,
+            )
+            try:
+                turn_log.write_text(
+                    f"$ {' '.join(argv)}\n\n"
+                    f"=== stdout ===\n{proc.stdout}\n"
+                    f"=== stderr ===\n{proc.stderr}\n"
+                    f"=== rc={proc.returncode} ===\n",
+                    encoding="utf-8",
+                )
+            except OSError:
+                pass
+            klass = _classify_turn_outcome(proc.returncode, proc.stdout)
+            detail = (proc.stderr or proc.stdout or "")[:300]
+        except subprocess.TimeoutExpired:
+            klass = "timeout"
+            detail = f"turn exceeded {DRIVEN_TURN_TIMEOUT_SEC:.0f}s"
+            try:
+                turn_log.write_text(
+                    f"$ {' '.join(argv)}\n\n=== TIMEOUT after "
+                    f"{DRIVEN_TURN_TIMEOUT_SEC:.0f}s ===\n",
+                    encoding="utf-8")
+            except OSError:
+                pass
+        except Exception as exc:  # noqa: BLE001 — log, never crash coordd
+            msg = str(exc)
+            low = msg.lower()
+            if "timeout" in low:
+                klass = "timeout"
+            elif any(m in low for m in ("rate limit", "rate-limit",
+                                        "overloaded", "429", "529")):
+                klass = "rate_limit"
+            elif any(m in low for m in ("auth", "login", "unauthorized")):
+                klass = "auth"
+            else:
+                klass = "error"
+            detail = msg[:300]
+        finally:
+            driven_log.append_event(
+                coord,
+                event="turn_finish" if klass == "ok" else "error",
+                role=role_lower,
+                tool=tool,
+                task=task_refs,
+                message="completed" if klass == "ok" else klass,
+                detail="" if klass == "ok" else detail,
+                log_path=str(turn_log),
+            )
+            _finalize_driven_turn(
+                coord, role_lower, lock, klass, detail, verbose,
+                refire=lambda: _spawn_driven_headless_turn(
+                    coord, role_lower, tool, argv, verbose),
+            )
+
+    if not run_async:
+        _worker()
+        return (True, f"{tool} turn driven for {role_lower}")
+    threading.Thread(target=_worker, daemon=True,
+                     name=f"{tool}-turn-{role_lower}").start()
+    return (True, f"{tool} turn dispatched (async) for {role_lower}")
+
+
 # ---------------------------------------------------------------------------
 # 0321 (0311 Phase 3b): codex driver via the codex app-server protocol.
 #
@@ -2531,6 +2656,7 @@ def _maybe_drive_driven_role(coord: Path, canon_dir: Path,
         driven_bootstrap_path=_driven_bootstrap_path,
         spawn_claude_turn=_spawn_driven_turn,
         spawn_codex_turn=_spawn_driven_codex_turn,
+        spawn_headless_turn=_spawn_driven_headless_turn,
     )
     ok, diag = driver.drive(ctx)
     if verbose:

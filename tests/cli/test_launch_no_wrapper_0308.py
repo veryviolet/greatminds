@@ -18,6 +18,7 @@ watchdog (per-role attempt-count tracking across invocations).
 """
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -76,6 +77,53 @@ def test_launch_project_dir_locates_coord_yaml_from_outside_cwd(
     assert result.exit_code == 0, result.output
     assert (project / ".vscode" / "tasks.json").is_file()
     assert (project / "launch-project-dir.code-workspace").is_file()
+
+
+def test_vscode_target_adds_operator_cockpit_tasks(tmp_path: Path) -> None:
+    cfg = {
+        "session": "cockpit",
+        "windows": [
+            {"name": "planner", "role": "ARCHITECT-PLANNER",
+             "tool": "codex", "mode": "chat"},
+        ],
+    }
+    launch_mod._emit_vscode(tmp_path, cfg, _env_setup(), ide_label="VS Code")
+
+    data = json.loads((tmp_path / ".vscode" / "tasks.json").read_text())
+    labels = {task["label"] for task in data["tasks"]}
+
+    for label in (
+        "ops: dashboard",
+        "ops: driven-log",
+        "ops: agent status",
+        "ops: agent tools",
+        "ops: stand status",
+        "ops: stand profiles",
+        "ops: coordd foreground",
+        "agent: planner",
+    ):
+        assert label in labels
+
+
+def test_vscode_target_does_not_start_agent_for_driven_roles(
+    tmp_path: Path,
+) -> None:
+    cfg = {
+        "session": "driven-vscode",
+        "windows": [
+            {"name": "dev", "role": "DEVELOPER",
+             "tool": "gemini", "mode": "driven"},
+        ],
+    }
+    launch_mod._emit_vscode(tmp_path, cfg, _env_setup(), ide_label="VS Code")
+
+    data = json.loads((tmp_path / ".vscode" / "tasks.json").read_text())
+    commands = "\n".join(task["command"] for task in data["tasks"])
+    labels = {task["label"] for task in data["tasks"]}
+
+    assert "driven: dev" in labels
+    assert "start-agent DEVELOPER gemini --mode driven" not in commands
+    assert "greatminds driven-log" in commands
 
 
 @pytest.fixture

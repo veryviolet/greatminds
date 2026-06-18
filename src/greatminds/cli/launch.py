@@ -355,6 +355,60 @@ def _emit_vscode(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
     tasks: list[dict] = []
     launcher = "greatminds start-agent"
 
+    def _shell_task(label: str, command: str, *, detail: str = "",
+                    group: str = "agents", env: dict | None = None,
+                    clear: bool = False) -> dict:
+        if setup.activation:
+            full_cmd = f"bash -c '{setup.activation}; {command}'"
+        else:
+            full_cmd = f"bash -c '{command}'"
+        task = {
+            "label": label,
+            "type": "shell",
+            "command": full_cmd,
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "GREATMINDS_PROJECT_DIR": "${workspaceFolder}",
+                    **(env or {}),
+                },
+            },
+            "presentation": {
+                "echo": True, "reveal": "always", "panel": "dedicated",
+                "group": group, "showReuseMessage": False, "clear": clear,
+            },
+            "problemMatcher": [],
+        }
+        if detail:
+            task["detail"] = detail
+        return task
+
+    tasks.extend([
+        _shell_task("ops: dashboard", "greatminds dashboard",
+                    detail="Live fleet dashboard", group="greatminds-ops"),
+        _shell_task("ops: driven-log", "greatminds driven-log",
+                    detail="Follow driven-agent event stream",
+                    group="greatminds-ops"),
+        _shell_task("ops: agent status",
+                    "greatminds agent status --no-pane",
+                    detail="Read per-agent process state",
+                    group="greatminds-ops"),
+        _shell_task("ops: agent tools", "greatminds agent tools",
+                    detail="List supported agent tool capabilities",
+                    group="greatminds-ops"),
+        _shell_task("ops: stand status", "greatminds stand status",
+                    detail="Read singleton stand state",
+                    group="greatminds-stand"),
+        _shell_task("ops: stand profiles",
+                    "greatminds stand profiles list",
+                    detail="List configured stand profiles",
+                    group="greatminds-stand"),
+        _shell_task("ops: coordd foreground",
+                    "greatminds coordd --verbose",
+                    detail="Run coordd in a visible terminal",
+                    group="greatminds-ops"),
+    ])
+
     for i, w in enumerate(windows):
         name = w.get("name") or ""
         role = (w.get("role") or "").upper()
@@ -382,35 +436,25 @@ def _emit_vscode(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
             tasks.append(task)
             continue
 
+        if mode == "driven":
+            tasks.append(_shell_task(
+                f"driven: {name}",
+                "greatminds driven-log",
+                detail=f"{role} via {tool}; coordd runs turns on events",
+                group="greatminds-driven",
+            ))
+            continue
+
         bare_launch = _launch_command(launcher, role, tool, mode)
-        # Wrap launcher in `bash -c '<activation>; <launcher>'` so the env is
-        # active for the child shell (works uniformly across pixi/uv/poetry/
-        # conda/venv/external/system).
-        if setup.activation:
-            full_cmd = f"bash -c '{setup.activation}; {bare_launch}'"
-        else:
-            full_cmd = f"bash -c '{bare_launch}'"
 
         colour = VSCODE_PANEL_COLOURS[i % len(VSCODE_PANEL_COLOURS)]
-        task = {
-            "label": f"agent: {name}",
-            "detail": f"{role} via {tool}" + (f" ({mode})" if mode else ""),
-            "type": "shell",
-            "command": full_cmd,
-            "options": {
-                "cwd": "${workspaceFolder}",
-                "env": {
-                    "GREATMINDS_PROJECT_DIR": "${workspaceFolder}",
-                    "GREATMINDS_ROLE": role,
-                },
-            },
-            "presentation": {
-                "echo": True, "reveal": "always", "panel": "dedicated",
-                "group": "agents", "showReuseMessage": False, "clear": False,
-            },
-            "problemMatcher": [],
-            "icon": {"id": "terminal", "color": colour},
-        }
+        task = _shell_task(
+            f"agent: {name}",
+            bare_launch,
+            detail=f"{role} via {tool}" + (f" ({mode})" if mode else ""),
+            env={"GREATMINDS_ROLE": role},
+        )
+        task["icon"] = {"id": "terminal", "color": colour}
         tasks.append(task)
 
     tasks_doc = {"version": "2.0.0", "tasks": tasks}

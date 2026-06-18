@@ -20,7 +20,7 @@ heartbeats, and a launcher for tmux-based fleets.
   `feature_review/`, and `verified/`.
 - A `greatminds` CLI for task moves, inbox messages, stand leases, role
   rendering, journal views, agent diagnostics, watchdog checks, and fleet
-  launch.
+  launch, plus VS Code workspace/cockpit tasks.
 - A per-project daemon that watches inboxes, queue files, and stand state,
   then wakes or drives the owning role.
 
@@ -35,12 +35,24 @@ cd /tmp/greatminds-demo
 greatminds setup --session myproject
 ```
 
-greatminds uses two primary agent tools:
+List supported agent tools and their execution modes:
+
+```bash
+greatminds agent tools
+greatminds agent tools --json
+```
+
+The packaged adapters support:
 
 - `claude`: Claude Code, including project-local settings and configured
   Claude marketplace plugins.
 - `codex`: OpenAI Codex, using the single machine Codex login plus generated
   per-role profile sources under `.greatminds/.codex-home/<role>/`.
+- `cursor`: Cursor agent for live panes and one-shot driven turns.
+- `cline`: Cline CLI for live panes and one-shot driven turns.
+- `gemini`: Gemini CLI for live panes and one-shot driven turns.
+- `openhands`: OpenHands CLI for live panes and one-shot driven turns, after
+  its machine-level LLM/runtime configuration is in place.
 
 Window modes in `coordination/coord.yaml`:
 
@@ -48,8 +60,10 @@ Window modes in `coordination/coord.yaml`:
 - `loop`: a resident watchdog pane that wakes on its own timer.
 - `staged`: a tmux pane with the start command pre-typed, so the operator
   starts that role manually when needed.
-- `driven`: no live pane; `coordd` starts one Claude or Codex turn when work
-  lands in the role's queue, inbox, or stand event stream.
+- `driven`: no live pane; `coordd` starts one driven turn when work lands in
+  the role's queue, inbox, or stand event stream. Claude and Codex use
+  stateful drivers; Cursor, Cline, Gemini, and OpenHands use one-shot
+  headless subprocess drivers.
 
 Choose which tool runs each role in `coordination/coord.yaml`:
 
@@ -105,6 +119,17 @@ greatminds daemon start
 greatminds launch --target tmux
 tmux a -t myproject
 ```
+
+For VS Code, generate a workspace and cockpit tasks:
+
+```bash
+greatminds launch --target vscode
+```
+
+This writes `.vscode/tasks.json` and `<session>.code-workspace` with agent
+terminals plus operator tasks for dashboard, driven logs, coordd, agent status,
+agent tools, and stand status. The repository also ships a `vscode-extension/`
+cockpit that calls the same `greatminds` CLI backend.
 
 Next: [Installation](getting-started/installation.md) and
 [First Project](getting-started/first-project.md).

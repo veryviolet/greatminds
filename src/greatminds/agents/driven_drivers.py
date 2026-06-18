@@ -20,6 +20,7 @@ ReadRegistry = Callable[[Path, str], dict | None]
 DrivenBootstrapPath = Callable[[Path, str], str | None]
 SpawnClaudeTurn = Callable[..., tuple[bool, str]]
 SpawnCodexTurn = Callable[..., tuple[bool, str]]
+SpawnHeadlessTurn = Callable[..., tuple[bool, str]]
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,7 @@ class DrivenDispatchContext:
     driven_bootstrap_path: DrivenBootstrapPath
     spawn_claude_turn: SpawnClaudeTurn
     spawn_codex_turn: SpawnCodexTurn
+    spawn_headless_turn: SpawnHeadlessTurn
 
 
 class DrivenDriver(Protocol):
@@ -106,10 +108,32 @@ class CodexDrivenDriver:
         return ok, diag
 
 
+class GenericHeadlessDrivenDriver:
+    def __init__(self, name: str):
+        self.name = name
+
+    def drive(self, ctx: DrivenDispatchContext) -> tuple[bool, str]:
+        bootstrap_file = ctx.driven_bootstrap_path(ctx.coord, ctx.role_lower)
+        prompt = "continue your tick"
+        try:
+            bp = Path(bootstrap_file)
+            if bp.is_file():
+                prompt = bp.read_text(encoding="utf-8")
+        except (OSError, TypeError):
+            pass
+        argv = tool_specs.build_headless_argv(self.name, prompt)
+        return ctx.spawn_headless_turn(
+            ctx.coord, ctx.role_lower, self.name, argv, ctx.verbose
+        )
+
+
 def get_driven_driver(tool: str) -> DrivenDriver | None:
     """Return the driven driver for ``tool``, or ``None`` when unsupported."""
     if tool == "claude":
         return ClaudeDrivenDriver()
     if tool == "codex":
         return CodexDrivenDriver()
+    spec = tool_specs.get_tool_spec(tool)
+    if spec is not None and spec.driven and spec.headless_style is not None:
+        return GenericHeadlessDrivenDriver(tool)
     return None

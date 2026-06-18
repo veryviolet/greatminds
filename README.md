@@ -11,8 +11,8 @@ File-based multi-agent coordination for agent fleets and task pipelines.
   <a href="https://veryviolet.github.io/greatminds/"><img alt="Docs" src="https://img.shields.io/badge/docs-github_pages-blue.svg"></a>
 </p>
 
-greatminds runs a fleet of Claude Code and OpenAI Codex agents on a shared
-filesystem-based finite state machine. Tasks flow through queues such as
+greatminds runs a fleet of coding agents on a shared filesystem-based finite
+state machine. Tasks flow through queues such as
 `feature_inbox/`, `feature_plan/`, `feature_dev/`, `feature_test/`, and
 `verified/`; a small `coordd` daemon nudges agents when input appears. There is
 no central broker and no database. Per-project setup writes editable project
@@ -32,7 +32,14 @@ cd /tmp/greatminds-demo
 greatminds setup --session myproject
 ```
 
-greatminds supports two primary agent tools:
+List supported agent tools and their execution modes:
+
+```bash
+greatminds agent tools
+greatminds agent tools --json
+```
+
+The packaged adapters support:
 
 - `claude`: Claude Code. Used for chat, loop, and driven roles. Setup writes
   `.claude/settings.local.json` and installs configured Claude marketplace
@@ -40,6 +47,11 @@ greatminds supports two primary agent tools:
 - `codex`: OpenAI Codex. Used for chat and driven roles. Run `codex login`
   once for the machine account; generated files under
   `.greatminds/.codex-home/{role}/` are role config sources, not auth homes.
+- `cursor`: Cursor agent. Used for chat/loop panes and one-shot driven turns.
+- `cline`: Cline CLI. Used for chat/loop panes and one-shot driven turns.
+- `gemini`: Gemini CLI. Used for chat/loop panes and one-shot driven turns.
+- `openhands`: OpenHands CLI. Used for chat panes and one-shot driven turns;
+  configure OpenHands/LiteLLM credentials on the machine before using it.
 
 Window modes in `coordination/coord.yaml`:
 
@@ -47,8 +59,10 @@ Window modes in `coordination/coord.yaml`:
 - `loop`: a resident watchdog pane that wakes on its own timer.
 - `staged`: a tmux pane with the start command pre-typed, so the operator
   starts that role manually when needed.
-- `driven`: no live pane; `coordd` starts one Claude or Codex turn when work
-  lands in the role's queue, inbox, or stand event stream.
+- `driven`: no live pane; `coordd` starts one driven turn when work lands in
+  the role's queue, inbox, or stand event stream. Claude and Codex use
+  stateful drivers; Cursor, Cline, Gemini, and OpenHands use one-shot
+  headless subprocess drivers.
 
 Role-to-tool assignment lives in `coordination/coord.yaml`. Edit it after
 setup when you want different tools for different roles:
@@ -180,14 +194,18 @@ Then start the fleet:
 greatminds daemon install
 greatminds daemon start
 
-# launch agents
+# launch agents in tmux
 greatminds launch --target tmux
 tmux a -t myproject
+
+# or generate a VS Code workspace and cockpit tasks
+greatminds launch --target vscode
 ```
 
-The windows defined in `coord.yaml` boot inside one tmux session. Roles with
-`mode: driven` do not keep live panes; `coordd` starts one Claude or Codex turn
-when their queue, inbox, or stand-state event changes.
+The VS Code target writes `.vscode/tasks.json` and a `.code-workspace` file
+with agent terminals plus operator tasks for dashboard, driven logs, coordd,
+agent status, agent tools, and stand status. The repository also ships a
+`vscode-extension/` cockpit that calls the `greatminds` CLI as its backend.
 
 ## Key Concepts
 

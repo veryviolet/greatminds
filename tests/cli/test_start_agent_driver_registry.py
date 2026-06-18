@@ -39,12 +39,14 @@ def _ctx(tmp_path: Path, *, role: str = "DEVELOPER") -> StartAgentContext:
 
 def test_available_start_tools_are_registry_backed() -> None:
     assert available_start_tools() == tool_specs.start_tool_names()
-    assert available_start_tools() == ("claude", "codex", "cursor")
+    assert available_start_tools() == (
+        "claude", "codex", "cursor", "cline", "gemini", "openhands",
+    )
 
 
 def test_unknown_start_tool_is_rejected() -> None:
     with pytest.raises(GreatMindsError):
-        get_start_driver("cline")
+        get_start_driver("unknown-tool")
 
 
 def test_codex_driver_uses_injected_session_discoverer(tmp_path: Path) -> None:
@@ -77,3 +79,19 @@ def test_cursor_driver_marks_logical_registry_tool(tmp_path: Path,
     assert argv[0] == "systemd-run"
     assert "cursor-agent" in argv
     assert os.environ["GREATMINDS_REGISTRY_TOOL"] == "cursor"
+
+
+def test_generic_start_driver_builds_cline_argv(tmp_path: Path,
+                                                monkeypatch) -> None:
+    monkeypatch.delenv("GREATMINDS_REGISTRY_TOOL", raising=False)
+    monkeypatch.setenv("GREATMINDS_START_AGENT_SAFE", "0")
+    ctx = _ctx(tmp_path)
+    driver = get_start_driver("cline")
+
+    argv = driver.build_argv(ctx)
+    driver.prepare_environment(ctx, dry_run=True)
+
+    assert argv == [
+        "cline", "--auto-approve", "true", "bootstrap prompt",
+    ]
+    assert os.environ["GREATMINDS_REGISTRY_TOOL"] == "cline"

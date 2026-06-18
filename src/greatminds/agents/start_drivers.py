@@ -61,6 +61,8 @@ def yolo_args(tool: str) -> list[str]:
         "claude": ["--permission-mode", "auto"],
         "codex":  ["-a", "never", "-s", "danger-full-access"],
         "cursor": ["--yolo", "--approve-mcps"],
+        "cline": ["--auto-approve", "true"],
+        "gemini": ["--yolo"],
     }.get(tool, [])
 
 
@@ -236,6 +238,22 @@ class CursorStartDriver:
             os.chdir(ctx.project_dir)
 
 
+class GenericStartDriver:
+    def __init__(self, name: str):
+        self.name = name
+
+    def build_argv(self, ctx: StartAgentContext) -> list[str]:
+        return tool_specs.build_interactive_argv(
+            self.name, ctx.prompt, [*yolo_args(self.name), *ctx.extra]
+        )
+
+    def prepare_environment(self, ctx: StartAgentContext, *,
+                            dry_run: bool) -> None:
+        os.environ["GREATMINDS_REGISTRY_TOOL"] = self.name
+        if not dry_run:
+            os.chdir(ctx.project_dir)
+
+
 def get_start_driver(
     tool: str,
     *,
@@ -248,4 +266,6 @@ def get_start_driver(
         return CodexStartDriver(discover_codex_session)
     if tool == "cursor":
         return CursorStartDriver()
+    if tool in {"cline", "gemini", "openhands"}:
+        return GenericStartDriver(tool)
     raise GreatMindsError(f"unknown TOOL: {tool}", exit_code=2)

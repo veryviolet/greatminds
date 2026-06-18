@@ -67,6 +67,26 @@ def test_driven_codex_role_is_driven(tmp_path, monkeypatch):
     assert calls["codex"] == "technical-writer"
 
 
+def test_driven_generic_headless_role_is_driven(tmp_path, monkeypatch):
+    canon, coord = _proj(tmp_path, writer_tool="gemini")
+    doc, located = _located(coord, "TECHNICAL-WRITER")
+    calls = {}
+
+    def fake_spawn(c, r, tool, argv, v, **kw):
+        calls["role"] = r
+        calls["tool"] = tool
+        calls["argv"] = argv
+        return (True, "ok")
+
+    monkeypatch.setattr(cd, "_spawn_driven_headless_turn", fake_spawn)
+    res = cd._maybe_drive_driven_role(coord, canon, doc, located,
+                                      "TECHNICAL-WRITER", False)
+    assert res is True
+    assert calls["role"] == "technical-writer"
+    assert calls["tool"] == "gemini"
+    assert calls["argv"][:3] == ["gemini", "--yolo", "-p"]
+
+
 def test_driven_claude_role_is_driven(tmp_path, monkeypatch):
     canon, coord = _proj(tmp_path)
     doc, located = _located(coord, "DEVELOPER")

@@ -4,6 +4,29 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 2.4.0 — 2026-06-18
+
+### Added
+
+- Added a machine-readable agent tool capability registry exposed through
+  `greatminds agent tools` and `greatminds agent tools --json`.
+- Added adapters for Cursor, Cline, Gemini CLI, and OpenHands CLI alongside
+  Claude Code and OpenAI Codex. Claude and Codex keep their stateful driven
+  drivers; Cursor, Cline, Gemini, and OpenHands use one-shot headless
+  subprocess driven turns.
+- Added VS Code cockpit tasks to `greatminds launch --target vscode`:
+  dashboard, driven log, coordd foreground, agent status, agent tools, stand
+  status, and stand profile list.
+- Added a bundled `vscode-extension/` cockpit scaffold that calls the
+  `greatminds` CLI as its backend.
+
+### Fixed
+
+- `launch --target vscode` no longer emits invalid `start-agent --mode driven`
+  tasks for driven roles.
+- `launch --project-dir` locates `coordination/coord.yaml` in the requested
+  project even when invoked from another working directory.
+
 ## 2.1.0 — 2026-06-15
 
 ### Added

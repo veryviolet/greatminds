@@ -35,7 +35,7 @@ glossary:
   lifecycles:
     interactive: "Human-paced chat in a tmux pane; the USER drives each turn. coordd never runs its turns. The agent waits for USER input between turns — it does not self-schedule."
     self-loop: "Runs its own loop in a tmux pane. After each tick it MUST re-arm its next wake (sleep / ScheduleWakeup) for roles.<ROLE>.self_loop_wake_seconds (default 3600s = 1h) so it ticks again on that cadence — a shorter delay is allowed ONLY while actively mid-recovery, then return to the configured cadence; the agent must NOT invent a faster interval. coordd may nudge it (tmux_send_keys) but never runs its turns."
-    driven: "No tmux pane; coordd runs each turn as a managed subprocess (claude -p / codex app-server) on queue / inbox / .stand events, holding the per-role run-lock for the full turn. The turn MUST return promptly — NEVER sleep / ScheduleWakeup / loop, or the run-lock never releases and the hang detector flags the turn."
+    driven: "No tmux pane; coordd runs each turn as a managed subprocess on queue / inbox / .stand events, holding the per-role run-lock for the full turn. Claude and Codex use stateful drivers; Cursor, Cline, Gemini, and OpenHands use one-shot headless subprocess drivers. The turn MUST return promptly — NEVER sleep / ScheduleWakeup / loop, or the run-lock never releases and the hang detector flags the turn."
   wake_mechanisms:
     tmux_send_keys: "Wake by typing WAKE_TEXT then Enter into the role's tmux pane. The only safe mechanism for interactive / self-loop roles (SIGINT to a live TUI is Ctrl-C → quit); also claude's default."
     sigint_deepest_descendant: "Wake a loop agent blocked on a bash sleep by sending SIGINT to its deepest descendant (the sleep). Safe only when that descendant is not a live TUI — never for interactive / self-loop."
@@ -1076,6 +1076,9 @@ event_wake:
     codex:  sigint_deepest_descendant
     cursor: sigint_deepest_descendant
     claude: tmux_send_keys
+    cline: tmux_send_keys
+    gemini: tmux_send_keys
+    openhands: tmux_send_keys
   tmux_send_keys:
     keys: "check inbox and continue your tick"
     enter: true

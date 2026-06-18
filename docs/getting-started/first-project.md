@@ -14,12 +14,23 @@ different tools, windows, or launch modes.
 
 ## Agent tools and role mapping
 
-The documented quickstart path uses two agent tools:
+List the installed tool capabilities at any time:
+
+```bash
+greatminds agent tools
+greatminds agent tools --json
+```
+
+The packaged adapters support these tools:
 
 | Tool | Use it for | Setup requirement |
 | --- | --- | --- |
 | `claude` | Claude Code chat, loop, and driven roles. | Install Claude Code, authenticate it for the OS user that runs the fleet, and keep the `claude` binary reachable from daemon shells. |
 | `codex` | OpenAI Codex chat and driven roles. | Run `codex login` once for the machine account; optionally set `GREATMINDS_CODEX_HOME` when the login is not under `~/.codex`. |
+| `cursor` | Cursor agent chat/loop panes and one-shot driven roles. | Install Cursor CLI / `cursor-agent`, authenticate it for the OS user, and keep it on `PATH`. |
+| `cline` | Cline CLI chat/loop panes and one-shot driven roles. | Install and configure Cline CLI for the OS user that runs the fleet. |
+| `gemini` | Gemini CLI chat/loop panes and one-shot driven roles. | Install Gemini CLI, authenticate/configure it for the OS user, and keep `gemini` on `PATH`. |
+| `openhands` | OpenHands CLI chat panes and one-shot driven roles. | Install OpenHands CLI and configure its LLM/runtime environment before assigning driven roles. |
 
 Window modes in `coordination/coord.yaml`:
 
@@ -28,7 +39,7 @@ Window modes in `coordination/coord.yaml`:
 | `chat` | A live tmux pane for an operator-facing conversation. |
 | `loop` | A resident watchdog pane that wakes on its own timer. |
 | `staged` | A tmux pane with the start command pre-typed; the operator starts it manually when needed. |
-| `driven` | No live pane; `coordd` starts one Claude or Codex turn when work lands in the role's queue, inbox, or stand event stream. |
+| `driven` | No live pane; `coordd` starts one driven turn when work lands in the role's queue, inbox, or stand event stream. Claude and Codex use stateful drivers; Cursor, Cline, Gemini, and OpenHands use one-shot headless subprocess drivers. |
 
 Role-to-tool assignment lives in `coordination/coord.yaml`. The default
 template mixes Claude and Codex roles, but it is ordinary project config.
@@ -67,9 +78,9 @@ windows:
     mode: driven
 ```
 
-`mode: chat` and `mode: loop` create live tmux panes. `mode: driven` creates no
-agent pane; `coordd` starts one Claude or Codex turn when queue, inbox, or stand
-events arrive.
+`mode: chat` and `mode: loop` create live panes. `mode: driven` creates no
+agent pane; `coordd` starts one driven turn when queue, inbox, or stand events
+arrive.
 
 ## Claude local settings
 

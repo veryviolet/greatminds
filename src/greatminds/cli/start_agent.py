@@ -12,7 +12,7 @@ ROLE
     UI-DEVELOPER, EXPLORER, TESTER, …).
 
 TOOL
-    One of ``claude`` | ``codex`` | ``cursor``.
+    One of the tools reported by ``greatminds agent tools``.
 
 What it does:
 
@@ -387,7 +387,7 @@ def _shell_quote(arg: str) -> str:
 
 @click.command(
     name="start-agent",
-    short_help="launch ROLE as a TOOL agent (claude|codex|cursor)",
+    short_help="launch ROLE as a supported TOOL agent",
     help=__doc__,
     context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
 )
