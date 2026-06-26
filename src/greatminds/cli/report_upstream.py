@@ -33,8 +33,8 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-import webbrowser
 from pathlib import Path
+import webbrowser
 
 import click
 import yaml
@@ -206,6 +206,17 @@ def _venv_layout() -> str:
     return f"{sys.prefix} ({_venv_install_kind()})"
 
 
+def _python_executable_layout() -> str:
+    exe = Path(sys.executable)
+    try:
+        prefix = Path(sys.prefix)
+        if ".venv-coord" in exe.parts and ".venv-coord" not in prefix.parts:
+            return str(prefix / "bin" / exe.name)
+    except Exception:
+        pass
+    return str(exe)
+
+
 def _journal_tail(coord_dir: Path, n: int = JOURNAL_TAIL_LINES) -> str:
     p = coord_dir / "journal.ndjson"
     if not p.is_file():
@@ -276,7 +287,7 @@ def _build_body(
         sections.append(("Environment",
                          f"- platform: {platform.platform()}\n"
                          f"- python: {sys.version.split()[0]} "
-                         f"({sys.executable})\n"
+                         f"({_python_executable_layout()})\n"
                          f"- venv: {_venv_layout()}\n"))
 
     body_text = user_body.strip() or "(no symptom body provided)"

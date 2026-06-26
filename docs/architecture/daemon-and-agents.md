@@ -149,8 +149,18 @@ instead of writing display text to a terminal.
 
 ## Heartbeats
 
-Most CLI calls update the caller role's heartbeat as a side effect. Watchdog
-reports stale heartbeats, orphaned intents, dead pids, and stale tasks:
+Most CLI calls update the caller role's heartbeat as a side effect. Driven
+Claude and Codex turns also refresh the heartbeat from driver-observed progress:
+subprocess output, Codex app-server activity, and source worktree writes. This
+keeps long active turns from looking stuck merely because the agent has not made
+another `greatminds` CLI call.
+
+Driven subprocesses use a progress-based timeout. A turn can run for an
+extended period while it is producing output or changing the lease worktree;
+coordd kills and retries only after the idle progress window is exceeded, or
+after the larger absolute ceiling.
+
+Watchdog reports stale heartbeats, orphaned intents, dead pids, and stale tasks:
 
 ```bash
 greatminds watchdog

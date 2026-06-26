@@ -543,6 +543,7 @@ def dispatch_profile(
     *,
     ansible_playbook: str | None = None,
     timeout_seconds: float | None = None,
+    extra_argv: list[str] | None = None,
 ) -> tuple[int, str]:
     """Single entrypoint that delegates per ``spec.format``.
 
@@ -580,4 +581,5 @@ def dispatch_profile(
         spec, lease_meta,
         ansible_playbook=ansible_playbook,
         timeout_seconds=timeout_seconds,
+        extra_argv=extra_argv,
     )

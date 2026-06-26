@@ -236,7 +236,7 @@ def test_product_task_does_not_check_unrelated_verified_commits(tmp_path):
 
 def test_stale_deploy_message_names_truthful_refresh_path(
         tmp_path, monkeypatch):
-    """0393: STALE DEPLOYMENT down_reason must name the sanctioned
+    """0393: STALE DEPLOYMENT failure reason must name the sanctioned
     command sequence that refreshes review-session branches."""
     coord = _coord(tmp_path)
     sent: list[tuple[str, str, str]] = []
@@ -268,8 +268,9 @@ def test_stale_deploy_message_names_truthful_refresh_path(
     assert "greatminds worktree create <id>" in log
     assert "greatminds stand up --reason stale-worktree-refreshed" in log
     state = ss.read_stand_state(coord)
-    assert state["state"] == "down"
+    assert state["state"] == "free"
     assert state["active_lease"] is None
-    assert "worktree create" in state["down_reason"]
+    assert state.get("down_reason") is None
+    assert "worktree create" in state["last_deploy_failure"]["reason"]
     assert sent and {row[0] for row in sent} == {
         "EXPLORER", "ARCHITECT-PLANNER"}

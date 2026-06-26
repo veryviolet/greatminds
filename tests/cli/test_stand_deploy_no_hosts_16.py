@@ -5,8 +5,8 @@ Root cause: with lease host=None the deploy play's hosts pattern matched no
 host, ansible exited rc=0 having run ZERO tasks, and coordd treated rc=0 as
 deploy success → stand `preparing → ready` without anything being
 provisioned (silently invalidating stand_required validation). The deploy
-path now defensively converts such a vacuous rc=0 run into a failure so the
-stand transitions `down` instead.
+path now defensively converts such a vacuous rc=0 run into a lease failure so
+the stand never transitions `ready`.
 """
 from __future__ import annotations
 
@@ -141,5 +141,6 @@ def test_deploy_lease_goes_down_on_vacuous_run(tmp_path, monkeypatch):
 
     assert rc == se.DEPLOY_NO_HOSTS_RC
     st = yaml.safe_load((coord / ".stand" / "state.yaml").read_text())
-    assert st["state"] == "down"
+    assert st["state"] == "free"
     assert st["active_lease"] is None
+    assert "matched no hosts" in st["last_deploy_failure"]["reason"]

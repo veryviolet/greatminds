@@ -1,6 +1,8 @@
-"""1.6.0 deploy engine: `deploy_lease` runs the lease's YAML profile and
-transitions the stand ready (rc==0) / down (rc!=0). The deterministic,
-sanctioned deploy path used by coordd (auto) and `stand deploy` (manual).
+"""1.6.0 deploy engine: `deploy_lease` runs the lease's YAML profile.
+
+Successful deploys transition the stand ready. Non-zero deploys fail the lease
+and return the singleton stand to free, preserving failure evidence in
+last_deploy_failure.
 """
 from __future__ import annotations
 
@@ -56,7 +58,7 @@ def test_deploy_lease_ready_on_success(tmp_path, monkeypatch):
     assert msgs, "holder should get a ready inbox-info"
 
 
-def test_deploy_lease_down_on_failure(tmp_path, monkeypatch):
+def test_deploy_lease_frees_stand_on_failure(tmp_path, monkeypatch):
     coord = tmp_path / "coordination"
     _prepare(coord)
     _patch(monkeypatch, rc=2)
@@ -65,8 +67,9 @@ def test_deploy_lease_down_on_failure(tmp_path, monkeypatch):
 
     assert rc == 2
     st = _state(coord)
-    assert st["state"] == "down"
-    assert "rc=2" in (st.get("down_reason") or "")
+    assert st["state"] == "free"
+    assert st.get("down_reason") is None
+    assert "rc=2" in st["last_deploy_failure"]["reason"]
     assert st["active_lease"] is None
 
 

@@ -121,6 +121,12 @@ then run readiness probes. The shipped `full-deploy.yaml`, `vite-dev.yaml`, and
 `smoke-only.yaml` files are reference profiles, not hidden deployment logic.
 Register additional project profiles in `coordination/stand-profiles.yaml`.
 
+Profiles that start long-lived processes should also include cleanup tasks
+tagged `teardown`. Greatminds runs those tasks best-effort when a lease is
+released, reclaimed, manually downed, recovered with `stand up`, or fails during
+deploy. This is the profile-owned place to stop dev servers, containers, and
+ports that the deploy started.
+
 For a production deployment or post-deploy review, create a profile with:
 
 ```yaml
@@ -211,6 +217,13 @@ That moves the state to `ready` and files an inbox-info message to the holder:
 `stand lease <lease-id> ready; task=<task-id>`. The ready transition is valid
 only after the configured stand profile has run and left its deploy marker.
 
+If the deploy profile exits non-zero, Greatminds fails that lease, records the
+full ansible output under `.greatminds/.stand/deploy-<lease-id>.log`, stores a
+compact `last_deploy_failure` summary, runs teardown best-effort, and returns
+the singleton stand to `free` so unrelated queued work can continue. The
+failure is sent to the lease holder through inbox info; the holder decides
+whether to fix and re-lease the task.
+
 The holder, usually `TESTER` or `EXPLORER`, then runs its own probes against
 the prepared stand and releases the lease:
 
@@ -229,20 +242,23 @@ a warning window before automatic release. The TTL is a
 safety valve for abandoned leases; it is not a substitute for explicitly
 releasing a lease after probes finish.
 
-If deployment fails or the stand has an infrastructure incident,
+If the stand has an infrastructure incident that is not scoped to one lease,
 the operator or maintainer runs:
 
 ```bash
 greatminds stand down --reason "<operational reason>"
 ```
 
-`down` pauses queue processing. After recovery:
+`down` pauses queue processing for global recovery. After recovery:
 
 ```bash
 greatminds stand up --reason "<recovery note>"
 ```
 
-That returns the stand to `free` so queued work can resume.
+That returns the stand to `free` so queued work can resume. `coordd` treats the
+stand becoming free as a dispatch event and re-scans stand-dependent queues, so
+tasks already parked in `feature_test` or review queues do not require a manual
+wake after recovery.
 
 ## Evidence Boundary
 

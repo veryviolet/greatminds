@@ -218,7 +218,9 @@ RETRY_HARD_BASE_SEC = float(os.environ.get("COORDD_RETRY_HARD_BASE_SEC", "30"))
 RETRY_HARD_CAP_SEC  = float(os.environ.get("COORDD_RETRY_HARD_CAP_SEC", "120"))
 RETRY_HARD_MAX      = int(os.environ.get("COORDD_RETRY_HARD_MAX",         "3"))
 DRIVEN_TURN_TIMEOUT_SEC = float(
-    os.environ.get("COORDD_DRIVEN_TURN_TIMEOUT_SEC", "1800"))
+    os.environ.get("COORDD_DRIVEN_TURN_TIMEOUT_SEC", "14400"))
+DRIVEN_TURN_IDLE_TIMEOUT_SEC = float(
+    os.environ.get("COORDD_DRIVEN_TURN_IDLE_TIMEOUT_SEC", "1800"))
 # Codex app-server may stay alive while emitting no turn events. A held
 # run-lock with no .turns log is indistinguishable from progress to the
 # operator, so fail a silent turn much earlier than the hard turn cap.
@@ -953,6 +955,135 @@ def _driven_subprocess_env(role_lower: str) -> dict[str, str]:
     return _agent_tool_env(env)
 
 
+def _touch_role_heartbeat(coord: Path, role_lower: str) -> None:
+    try:
+        (coord / f"heartbeat.{role_lower}").touch()
+    except OSError:
+        pass
+
+
+def _latest_worktree_mtime(project_dir: Path) -> float | None:
+    root = project_dir / ".worktrees"
+    if not root.is_dir():
+        return None
+    latest: float | None = None
+    skip_dirs = {".git", ".venv", "venv", "node_modules", "__pycache__",
+                 ".mypy_cache", ".pytest_cache", ".ruff_cache"}
+    try:
+        for base, dirs, files in os.walk(root):
+            dirs[:] = [d for d in dirs if d not in skip_dirs and
+                       not d.endswith(".egg-info")]
+            for name in files:
+                try:
+                    mt = (Path(base) / name).stat().st_mtime
+                except OSError:
+                    continue
+                latest = mt if latest is None else max(latest, mt)
+    except OSError:
+        return latest
+    return latest
+
+
+def _run_progress_subprocess(
+    argv: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str],
+    coord: Path,
+    role_lower: str,
+    absolute_timeout: float,
+    idle_timeout: float,
+) -> tuple[int | None, str, str, bool, str]:
+    """Run a driven subprocess with progress-based timeout.
+
+    Output activity and source worktree writes count as progress and refresh
+    the role heartbeat. A process is killed only when it exceeds the idle
+    progress window, or the much larger absolute ceiling.
+    """
+    import selectors
+    proc = subprocess.Popen(
+        argv, cwd=str(cwd), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        env=env,
+    )
+    sel = selectors.DefaultSelector()
+    if proc.stdout is not None:
+        sel.register(proc.stdout, selectors.EVENT_READ, "stdout")
+    if proc.stderr is not None:
+        sel.register(proc.stderr, selectors.EVENT_READ, "stderr")
+    stdout_parts: list[str] = []
+    stderr_parts: list[str] = []
+    start = time.monotonic()
+    last_progress = start
+    last_wt_mtime = _latest_worktree_mtime(cwd)
+    timed_out = False
+    timeout_detail = ""
+    _touch_role_heartbeat(coord, role_lower)
+    try:
+        while True:
+            for key, _mask in sel.select(timeout=1.0):
+                try:
+                    chunk = os.read(key.fileobj.fileno(), 65536)
+                except OSError:
+                    chunk = b""
+                if not chunk:
+                    try:
+                        sel.unregister(key.fileobj)
+                    except Exception:
+                        pass
+                    continue
+                text = chunk.decode("utf-8", errors="replace")
+                if key.data == "stdout":
+                    stdout_parts.append(text)
+                else:
+                    stderr_parts.append(text)
+                last_progress = time.monotonic()
+                _touch_role_heartbeat(coord, role_lower)
+            wt_mtime = _latest_worktree_mtime(cwd)
+            if (wt_mtime is not None and
+                    (last_wt_mtime is None or wt_mtime > last_wt_mtime)):
+                last_wt_mtime = wt_mtime
+                last_progress = time.monotonic()
+                _touch_role_heartbeat(coord, role_lower)
+            rc = proc.poll()
+            if rc is not None:
+                break
+            now = time.monotonic()
+            if absolute_timeout > 0 and now - start >= absolute_timeout:
+                timed_out = True
+                timeout_detail = (
+                    f"turn exceeded absolute ceiling "
+                    f"{absolute_timeout:.0f}s")
+                proc.kill()
+                break
+            if idle_timeout > 0 and now - last_progress >= idle_timeout:
+                timed_out = True
+                timeout_detail = (
+                    f"turn made no observed progress for "
+                    f"{idle_timeout:.0f}s")
+                proc.kill()
+                break
+        try:
+            out, err = proc.communicate(timeout=5)
+            if out:
+                stdout_parts.append(out.decode("utf-8", errors="replace"))
+            if err:
+                stderr_parts.append(err.decode("utf-8", errors="replace"))
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            out, err = proc.communicate()
+            if out:
+                stdout_parts.append(out.decode("utf-8", errors="replace"))
+            if err:
+                stderr_parts.append(err.decode("utf-8", errors="replace"))
+        return (proc.returncode, "".join(stdout_parts), "".join(stderr_parts),
+                timed_out, timeout_detail)
+    finally:
+        try:
+            sel.close()
+        except Exception:
+            pass
+
+
 # 0317: session-reset policy. ``claude --resume`` accumulates
 # history across driven turns; past a threshold the context gets
 # expensive + noisy. The driver tracks a per-role turn count in
@@ -1601,48 +1732,42 @@ def _spawn_driven_turn(
         klass = "error"
         detail = ""
         try:
-            proc = subprocess.run(
-                run_argv, cwd=str(coord.parent),
-                capture_output=True, text=True,
-                # coordd has no role of its own; export the driven role
-                # so the agent's greatminds CLI resolves caller_role and
-                # the static bootstrap's $GREATMINDS_ROLE is set (mirrors
-                # the codex driver's _codex_appserver_env).
-                env=_driven_subprocess_env(role_lower),
-                timeout=DRIVEN_TURN_TIMEOUT_SEC,
+            rc, stdout, stderr, timed_out, timeout_detail = (
+                _run_progress_subprocess(
+                    run_argv,
+                    cwd=coord.parent,
+                    env=_driven_subprocess_env(role_lower),
+                    coord=coord,
+                    role_lower=role_lower,
+                    absolute_timeout=DRIVEN_TURN_TIMEOUT_SEC,
+                    idle_timeout=DRIVEN_TURN_IDLE_TIMEOUT_SEC,
+                )
             )
             try:
                 turn_log.write_text(
                     f"$ {' '.join(run_argv)}\n\n"
-                    f"=== stdout ===\n{proc.stdout}\n"
-                    f"=== stderr ===\n{proc.stderr}\n"
-                    f"=== rc={proc.returncode} ===\n",
+                    f"=== stdout ===\n{stdout}\n"
+                    f"=== stderr ===\n{stderr}\n"
+                    f"=== rc={rc} ===\n",
                     encoding="utf-8",
                 )
             except OSError:
                 pass
-            try:
-                obj = json.loads(proc.stdout)
-                new_sid = (obj.get("session_id") if isinstance(obj, dict)
-                           else None) or None
-            except (ValueError, TypeError, AttributeError):
-                new_sid = None
-            klass = _classify_turn_outcome(
-                proc.returncode, proc.stdout, stderr=proc.stderr
-            )
-            detail = (proc.stderr or proc.stdout or "")[:300]
-        except subprocess.TimeoutExpired:
-            klass = "timeout"
-            detail = f"turn exceeded {DRIVEN_TURN_TIMEOUT_SEC:.0f}s"
-            try:
-                turn_log.write_text(
-                    f"$ {' '.join(run_argv)}\n\n=== TIMEOUT after "
-                    f"{DRIVEN_TURN_TIMEOUT_SEC:.0f}s ===\n", encoding="utf-8")
-            except OSError:
-                pass
-            if verbose:
-                print(f"  driven claude turn for {role_lower} timed out",
-                      file=sys.stderr)
+            if timed_out:
+                klass = "timeout"
+                detail = timeout_detail
+                if verbose:
+                    print(f"  driven claude turn for {role_lower} timed out: "
+                          f"{timeout_detail}", file=sys.stderr)
+            else:
+                try:
+                    obj = json.loads(stdout)
+                    new_sid = (obj.get("session_id") if isinstance(obj, dict)
+                               else None) or None
+                except (ValueError, TypeError, AttributeError):
+                    new_sid = None
+                klass = _classify_turn_outcome(rc, stdout, stderr=stderr)
+                detail = (stderr or stdout or "")[:300]
         except Exception as exc:  # noqa: BLE001 — log, never crash coordd
             klass = "error"
             detail = str(exc)[:300]
@@ -1748,39 +1873,36 @@ def _spawn_driven_headless_turn(
         klass = "error"
         detail = ""
         try:
-            proc = subprocess.run(
-                argv, cwd=str(coord.parent),
-                capture_output=True, text=True,
-                env=_driven_subprocess_env(role_lower),
-                timeout=DRIVEN_TURN_TIMEOUT_SEC,
+            rc, stdout, stderr, timed_out, timeout_detail = (
+                _run_progress_subprocess(
+                    argv,
+                    cwd=coord.parent,
+                    env=_driven_subprocess_env(role_lower),
+                    coord=coord,
+                    role_lower=role_lower,
+                    absolute_timeout=DRIVEN_TURN_TIMEOUT_SEC,
+                    idle_timeout=DRIVEN_TURN_IDLE_TIMEOUT_SEC,
+                )
             )
             try:
                 turn_log.write_text(
                     f"$ {' '.join(argv)}\n\n"
-                    f"=== stdout ===\n{proc.stdout}\n"
-                    f"=== stderr ===\n{proc.stderr}\n"
-                    f"=== rc={proc.returncode} ===\n",
+                    f"=== stdout ===\n{stdout}\n"
+                    f"=== stderr ===\n{stderr}\n"
+                    f"=== rc={rc} ===\n",
                     encoding="utf-8",
                 )
             except OSError:
                 pass
-            klass = _classify_turn_outcome(
-                proc.returncode, proc.stdout, stderr=proc.stderr
-            )
-            detail_source = (
-                proc.stdout if klass != "ok" and proc.stdout else proc.stderr
-            ) or proc.stdout or ""
-            detail = detail_source[:300]
-        except subprocess.TimeoutExpired:
-            klass = "timeout"
-            detail = f"turn exceeded {DRIVEN_TURN_TIMEOUT_SEC:.0f}s"
-            try:
-                turn_log.write_text(
-                    f"$ {' '.join(argv)}\n\n=== TIMEOUT after "
-                    f"{DRIVEN_TURN_TIMEOUT_SEC:.0f}s ===\n",
-                    encoding="utf-8")
-            except OSError:
-                pass
+            if timed_out:
+                klass = "timeout"
+                detail = timeout_detail
+            else:
+                klass = _classify_turn_outcome(rc, stdout, stderr=stderr)
+                detail_source = (
+                    stdout if klass != "ok" and stdout else stderr
+                ) or stdout or ""
+                detail = detail_source[:300]
         except Exception as exc:  # noqa: BLE001 — log, never crash coordd
             msg = str(exc)
             low = msg.lower()
@@ -2289,6 +2411,7 @@ def _drive_codex_turn_stdio(
 
         try:
             _write_turn_log("running")
+            _touch_role_heartbeat(coord, role_lower)
         except Exception:
             pass
         hs_deadline = _time.monotonic() + handshake_timeout
@@ -2338,9 +2461,12 @@ def _drive_codex_turn_stdio(
         work_items, transcript = sess.consume_turn(
             thread_id, _time.monotonic() + turn_timeout,
             idle_timeout=no_progress,
-            progress=lambda n, tr: _write_turn_log(
-                "running_active", work_items=n, transcript=tr,
-                reported_home=reported_home))
+            progress=lambda n, tr: (
+                _touch_role_heartbeat(coord, role_lower),
+                _write_turn_log(
+                    "running_active", work_items=n, transcript=tr,
+                    reported_home=reported_home),
+            ))
         # Per-turn record (driven roles have no pane). 0375: record the
         # codexHome (machine home, not a per-role auth copy) + whether the
         # turn did non-zero work — the avatar-gate evidence (#14/#21/#22).
@@ -2927,8 +3053,9 @@ def _maybe_auto_deploy_stand(coord: Path, verbose: bool,
         try:
             from greatminds.cli.stand import deploy_lease
             rc, _log = deploy_lease(coord, lease_id=lease_id)
-            # deploy_lease transitioned the stand (ready on rc==0, down on
-            # rc!=0) — the attempt completed. Clear the retry counter.
+            # deploy_lease transitioned the stand (ready on rc==0, free on
+            # rc!=0 lease failure) — the attempt completed. Clear the retry
+            # counter.
             _DEPLOY_ATTEMPTS.pop(lease_id, None)
             if verbose:
                 print(f"  coordd auto-deploy lease {lease_id} rc={rc}",
@@ -2950,7 +3077,7 @@ def _maybe_auto_deploy_stand(coord: Path, verbose: bool,
                     f"lease {lease_id} profile {profile}: {detail}")
                 try:
                     from greatminds.cli import stand_state as ss
-                    reason = f"coordd auto-deploy failed {n}x: {detail}"
+                    reason = f"coordd auto-deploy raised {n}x: {detail}"
 
                     def _down(state: dict) -> None:
                         prev = state.get("state") or "preparing"
@@ -3011,7 +3138,20 @@ def _route_queue_event(coord: Path, canon_dir: Path,
     # A `.stand` state change (→ preparing) runs the deterministic deploy
     # engine directly — no LLM role to wake.
     if queue == ".stand":
-        return _maybe_auto_deploy_stand(coord, verbose)
+        deployed = _maybe_auto_deploy_stand(coord, verbose)
+        if deployed:
+            return True
+        try:
+            from greatminds.cli.stand_state import read_stand_state
+            stand_state = read_stand_state(coord)
+        except Exception:
+            stand_state = {}
+        if (stand_state or {}).get("state") == "free":
+            _reconcile_driven_backlog(
+                coord, canon_dir, verbose, seen=None,
+                trigger=" (stand-free)")
+            return True
+        return False
     if queue == "feature_blocked":
         blocked_path = coord / queue / filename
         if blocked_path.exists() and not _feature_blocked_is_actionable(
@@ -3928,12 +4068,12 @@ def coordd(project_dir: Path | None, project_name: str | None,
                 # (e.g. a 6-min task or a TESTER turn awaiting a multi-minute
                 # remote compute) → a flood of bogus "hung-<role>" asks to
                 # MAINTAINER. coordd already KILLS a driven turn at
-                # DRIVEN_TURN_TIMEOUT_SEC, so a run-lock older than that means
+                # DRIVEN_TURN_IDLE_TIMEOUT_SEC, so a run-lock older than that means
                 # the kill did not release it = a GENUINE stuck turn. Use that
                 # as the bound for driven locks; heartbeat is just an early-out
                 # for any tool that happens to refresh it.
                 driven_hang_threshold = max(hang_threshold,
-                                            DRIVEN_TURN_TIMEOUT_SEC)
+                                            DRIVEN_TURN_IDLE_TIMEOUT_SEC)
                 if locks_dir.is_dir():
                     for lk in sorted(locks_dir.glob("driven-*.lock")):
                         role_lower = lk.name[len("driven-"):-len(".lock")]

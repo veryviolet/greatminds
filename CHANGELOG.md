@@ -4,6 +4,41 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 2.7.0 — 2026-06-26
+
+### Changed
+
+- Stand deploy failures are now lease-scoped instead of globally downing the
+  singleton stand. A non-zero profile run fails the active lease, records
+  `last_deploy_failure`, runs teardown best-effort, returns the stand to
+  `free`, and promotes queued work when present. This prevents one profile or
+  task failure from blocking unrelated stand work.
+- Driven Claude and generic headless turns now use progress-based timeout
+  handling. Output activity and worktree writes refresh the role heartbeat and
+  keep the turn alive; coordd kills only after the idle progress window or the
+  larger absolute ceiling is exceeded.
+
+### Fixed
+
+- `coordd` treats a `.stand` transition to `free` as a dispatch event and
+  re-scans driven backlog immediately, so tasks parked in `feature_test` or
+  review queues resume after stand recovery without a manual wake.
+- Stand profile teardown is now supported through Ansible tasks tagged
+  `teardown` and is invoked best-effort on release, reclaim, down/up recovery,
+  and deploy failure. This gives profiles a first-class cleanup path for
+  dev-server ports and other long-lived processes.
+- Deploy failure diagnostics now persist the full Ansible output under
+  `.greatminds/.stand/deploy-<lease-id>.log` and surface that path from
+  `greatminds stand status`, avoiding mid-command truncation of the real
+  stderr/stdout cause.
+- Active lease deploys continue to resolve stand profiles from the lease
+  worktree first, preserving validation of in-flight profile fixes before
+  merge.
+
+### Issues
+
+- Fixes #23, #24, #25, #26, #27, #28, and #29.
+
 ## 2.6.0 — 2026-06-18
 
 ### Fixed

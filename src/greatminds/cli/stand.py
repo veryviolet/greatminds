@@ -507,6 +507,12 @@ def stand_release(lease_id: str, result: str) -> None:
     holder = _holder_role()
 
     captured: dict[str, Any] = {}
+    pre_state = ss.read_stand_state(coord)
+    pre_active = pre_state.get("active_lease") or {}
+    if pre_active and pre_active.get("lease_id") == lease_id:
+        if pre_active.get("holder_role") == holder:
+            _teardown_lease(coord, dict(pre_active),
+                            reason=f"release-{result}")
 
     def mutator(state):
         active = state.get("active_lease") or {}
@@ -519,6 +525,7 @@ def stand_release(lease_id: str, result: str) -> None:
                     exit_code=3,
                 )
             captured["task"] = active.get("task")
+            captured["lease"] = dict(active)
             captured["was_active"] = True
             state["active_lease"] = None
             ss.record_transition(
@@ -621,6 +628,7 @@ def stand_reclaim(lease_id: str | None) -> None:
             )
         captured["lease_id"] = active.get("lease_id")
         captured["holder"] = hr
+        captured["lease"] = dict(active)
         state["active_lease"] = None
         ss.record_transition(
             state, state.get("state") or "preparing", "free", role,
@@ -634,6 +642,7 @@ def stand_reclaim(lease_id: str | None) -> None:
         captured["promoted"] = ss.promote_head_on_free(state, role)
 
     ss.update_stand_state(coord, mutator)
+    _teardown_lease(coord, captured.get("lease"), reason="reclaim")
     msg = (f"reclaimed expired lease {captured['lease_id']} "
            f"(holder {captured['holder']} not alive); stand → free")
     if captured.get("promoted"):
@@ -667,10 +676,14 @@ def stand_down(reason: str) -> None:
         active = state.get("active_lease") or {}
         captured["task"] = active.get("task", "")
         captured["lease_id"] = active.get("lease_id", "")
+        captured["lease"] = dict(active) if active else None
+        if active:
+            state["last_failed_lease"] = dict(active)
         state["active_lease"] = None
         ss.record_transition(state, prev, "down", role, reason=reason)
 
     ss.update_stand_state(coord, mutator)
+    _teardown_lease(coord, captured.get("lease"), reason="stand-down")
     # 0291: auto-notify PLANNER on down so they don't need to poll
     # state.yaml. Best-effort — failure to send doesn't block the
     # transition (state.yaml is the FSM source-of-truth; the inbox
@@ -699,6 +712,18 @@ def stand_up(reason: str) -> None:
     coord = find_coord_dir()
 
     captured: dict[str, Any] = {}
+    state_before = ss.read_stand_state(coord)
+    last_failed_lease = state_before.get("last_failed_lease")
+    last_deploy_failure = state_before.get("last_deploy_failure") or {}
+    if not last_failed_lease and isinstance(last_deploy_failure, dict):
+        last_failed_lease = {
+            "lease_id": last_deploy_failure.get("lease_id"),
+            "task": last_deploy_failure.get("task"),
+            "profile": last_deploy_failure.get("profile"),
+            "profile_file": last_deploy_failure.get("profile_file"),
+            "worktree": last_deploy_failure.get("worktree"),
+        }
+    _teardown_lease(coord, last_failed_lease, reason="stand-up")
 
     def mutator(state):
         if state.get("state") != "down":
@@ -708,6 +733,7 @@ def stand_up(reason: str) -> None:
                 exit_code=2,
             )
         state["down_reason"] = None
+        state["last_failed_lease"] = None
         # 0289: down→free is a clean slate for the next lease.
         # Make sure no orphan active_lease lingers (stand_down should
         # already have cleared it; this is the second-line defense
@@ -736,6 +762,7 @@ def stand_up(reason: str) -> None:
 # NOT enter the 5× retry loop — the staleness is deterministic and a
 # retry would only re-discover it.
 DEPLOY_STALE_RC = 117
+DEPLOY_FAILED_RC = 118
 
 
 def _git_capture(worktree: Path, args: list[str]):
@@ -875,6 +902,75 @@ def stale_verified_deps_for_lease(
     return stale
 
 
+def _deploy_failure_reason(rc: int, log: str, marker: Path) -> str:
+    """Compact stored reason for a failed deploy.
+
+    The full ansible stdout/stderr is already persisted in the per-lease deploy
+    marker. Keep ``down_reason``/history readable, but include enough tail
+    context and a durable log path so operators do not lose the actual stderr
+    behind a mid-command truncation.
+    """
+    tail = (log or "").strip()
+    if len(tail) > 1600:
+        tail = tail[-1600:]
+    tail = " ".join(tail.split())
+    if tail:
+        return f"deploy rc={rc}; full log: {marker}; tail: {tail}"
+    return f"deploy rc={rc}; full log: {marker}"
+
+
+def _teardown_lease(coord: Path, lease: dict[str, Any] | None,
+                    *, reason: str) -> tuple[int, str] | None:
+    """Best-effort profile teardown for a lease.
+
+    Profiles that start long-lived processes can tag cleanup tasks with
+    ``teardown``. Lease release, reclaim, deploy failure, and recovery call this
+    helper before freeing/reusing the singleton. Missing teardown-tagged tasks
+    are harmless; ansible exits normally after selecting no cleanup tasks.
+    """
+    if not lease:
+        return None
+    profile = lease.get("profile")
+    if not profile:
+        return None
+    try:
+        from greatminds.cli.stand_executor import dispatch_profile
+        from greatminds.cli.stand_profile import load_profile
+        profile_file = lease.get("profile_file")
+        if not profile_file:
+            try:
+                from greatminds.cli.stand_profile_registry import load_registry
+                profile_file = load_registry(
+                    coord, worktree=lease.get("worktree")
+                ).require(profile).file
+            except GreatMindsError:
+                profile_file = None
+        spec = load_profile(
+            coord, profile, worktree=lease.get("worktree"),
+            file_name=profile_file,
+        )
+        lease_meta = {
+            "coord": str(coord),
+            "lease_id": (
+                f"{lease.get('lease_id')}-teardown"
+                if lease.get("lease_id") else None
+            ),
+            "source_lease_id": lease.get("lease_id"),
+            "profile": profile,
+            "profile_file": profile_file or Path(spec.path).name,
+            "profile_source": spec.source,
+            "profile_path": str(spec.path),
+            "worktree": lease.get("worktree"),
+            "host": lease.get("host") or getattr(spec, "host", None) or profile,
+            "task_id": lease.get("task"),
+            "task": lease.get("task"),
+            "teardown_reason": reason,
+        }
+        return dispatch_profile(spec, lease_meta, extra_argv=["--tags", "teardown"])
+    except Exception:
+        return None
+
+
 def deploy_lease(coord: Path, *, lease_id: str | None = None,
                  ansible_playbook: str | None = None,
                  timeout_seconds: float | None = None) -> tuple[int, str]:
@@ -893,7 +989,10 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
     playbook, not LLM-executed prose. Returns ``(rc, combined_log)``.
     """
     from greatminds.cli import stand_state as ss
-    from greatminds.cli.stand_executor import dispatch_profile
+    from greatminds.cli.stand_executor import (
+        deploy_marker_path,
+        dispatch_profile,
+    )
     from greatminds.cli.stand_profile import load_profile
 
     cap: dict[str, Any] = {}
@@ -941,14 +1040,25 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
             f"verified dependency."
         )
 
-        def _down_stale(state):
-            prev = state.get("state") or "preparing"
-            state["down_reason"] = reason
-            state["active_lease"] = None
-            ss.record_transition(state, prev, "down", "COORDD",
-                                 lease_id=lid, reason=reason)
+        _teardown_lease(coord, cap, reason="stale-deployment")
 
-        ss.update_stand_state(coord, _down_stale)
+        def _fail_stale(state):
+            prev = state.get("state") or "preparing"
+            state["last_deploy_failure"] = {
+                "lease_id": lid,
+                "task": task_ref,
+                "profile": cap.get("profile"),
+                "worktree": cap.get("worktree"),
+                "reason": reason,
+            }
+            state["last_failed_lease"] = dict(cap)
+            state["down_reason"] = None
+            state["active_lease"] = None
+            ss.record_transition(state, prev, "free", "COORDD",
+                                 lease_id=lid, reason=reason)
+            cap["promoted"] = ss.promote_head_on_free(state, "COORDD")
+
+        ss.update_stand_state(coord, _fail_stale)
         # Notify the lease holder (so the resumed session sees the block
         # instead of silently retrying) and PLANNER (who decides whether
         # to refresh the worktree or keep the session blocked).
@@ -1035,16 +1145,35 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
                 f"profile={profile!r} from {spec.source}",
                 task_ref=ready_cap.get("task", ""))
     else:
-        reason = f"deploy rc={rc}: {(log or '').strip()[:400]}"
+        marker = deploy_marker_path(coord, str(lid))
+        reason = _deploy_failure_reason(rc, log or "", marker)
+        _teardown_lease(coord, cap, reason=f"deploy-rc-{rc}")
 
-        def _down(state):
+        def _fail_lease(state):
             prev = state.get("state") or "preparing"
-            state["down_reason"] = reason
+            state["last_deploy_failure"] = {
+                "lease_id": lid,
+                "task": cap.get("task"),
+                "profile": profile,
+                "profile_file": profile_file or Path(spec.path).name,
+                "profile_source": spec.source,
+                "profile_path": str(spec.path),
+                "worktree": lease_worktree,
+                "deploy_log": str(marker),
+                "reason": reason,
+            }
+            state["last_failed_lease"] = dict(cap)
+            state["down_reason"] = None
             state["active_lease"] = None
-            ss.record_transition(state, prev, "down", "COORDD",
+            ss.record_transition(state, prev, "free", "COORDD",
                                  lease_id=lid, reason=reason)
+            cap["promoted"] = ss.promote_head_on_free(state, "COORDD")
 
-        ss.update_stand_state(coord, _down)
+        ss.update_stand_state(coord, _fail_lease)
+        holder = cap.get("holder_role")
+        if holder:
+            _file_inbox_info(coord, holder, reason,
+                             task_ref=cap.get("task", ""))
     return rc, (log or "")
 
 
@@ -1062,11 +1191,11 @@ def stand_deploy(lease_id: str, timeout: float | None) -> None:
     coord = find_coord_dir()
     rc, _log = deploy_lease(coord, lease_id=lease_id, timeout_seconds=timeout)
     click.echo(
-        f"deploy rc={rc}; stand → {'ready' if rc == 0 else 'down'} "
+        f"deploy rc={rc}; stand → {'ready' if rc == 0 else 'free'} "
         f"(lease {lease_id})")
     if rc != 0:
         raise GreatMindsError(
-            f"deploy failed rc={rc}; stand → down",
+            f"deploy failed rc={rc}; lease failed; stand → free",
             exit_code=(rc if 0 < rc < 256 else 1))
 
 
@@ -1216,6 +1345,14 @@ def stand_status() -> None:
     down_reason = state.get("down_reason")
     if down_reason:
         click.echo(f"down_reason: {down_reason}")
+    last_failure = state.get("last_deploy_failure")
+    if isinstance(last_failure, dict) and last_failure:
+        click.echo("last_deploy_failure:")
+        for k in ("lease_id", "task", "profile", "profile_source",
+                  "deploy_log", "reason"):
+            v = last_failure.get(k)
+            if v:
+                click.echo(f"  {k}: {v}")
 
     history = state.get("history") or []
     if history:
