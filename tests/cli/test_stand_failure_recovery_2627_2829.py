@@ -160,3 +160,30 @@ def test_stand_up_emits_available_event_for_coordd(tmp_path, monkeypatch):
     events = list((coord / ".stand").glob("available-*.yaml"))
     assert events
     assert "stand-up: clean" in events[0].read_text(encoding="utf-8")
+
+
+def test_generic_vite_cleanup_runs_without_profile_teardown_tags(
+        tmp_path, monkeypatch):
+    coord = _coord(tmp_path)
+    (coord / "PROJECT.env").write_text(
+        "STAND_HOST=lattice-a\nVITE_DEV_PORT=4173\n", encoding="utf-8")
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append((cmd, kwargs))
+        class CP:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+        return CP()
+
+    monkeypatch.setattr(stand_mod.subprocess, "run", fake_run)
+
+    stand_mod._generic_teardown_lease_resources(
+        coord, {"profile": "vite-dev", "lease_id": "l1"},
+        reason="test")
+
+    assert calls
+    assert calls[0][0][0] == "ssh"
+    assert calls[0][0][1] == "lattice-a"
+    assert "4173/tcp" in calls[0][0][-1]

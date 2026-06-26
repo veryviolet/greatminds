@@ -22,6 +22,7 @@ direct function imports (``create_task``, ``move_task``, ``append_block``)
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess
 import sys
 import uuid
@@ -988,9 +989,82 @@ def _teardown_lease(coord: Path, lease: dict[str, Any] | None,
             "task": lease.get("task"),
             "teardown_reason": reason,
         }
-        return dispatch_profile(spec, lease_meta, extra_argv=["--tags", "teardown"])
+        result = dispatch_profile(spec, lease_meta, extra_argv=["--tags", "teardown"])
+        _generic_teardown_lease_resources(coord, lease, reason=reason)
+        return result
     except Exception:
+        _generic_teardown_lease_resources(coord, lease, reason=reason)
         return None
+
+
+def _generic_teardown_lease_resources(
+    coord: Path,
+    lease: dict[str, Any] | None,
+    *,
+    reason: str,
+) -> None:
+    """Best-effort cleanup for known shipped long-running profile resources.
+
+    This intentionally stays narrow. It cleans Vite dev-server ports declared
+    by the lease/profile environment even when an older project profile lacks
+    teardown-tagged tasks. It does not scan or kill arbitrary project ports.
+    """
+    if not lease:
+        return
+    profile = str(lease.get("profile") or "")
+    try:
+        from greatminds.cli.stand_executor import read_project_env
+        env = read_project_env(coord)
+    except Exception:
+        env = {}
+    port = (
+        env.get("VITE_DEV_PORT")
+        or env.get("vite_port")
+        or lease.get("vite_port")
+    )
+    if not port and profile == "vite-dev":
+        port = "5173"
+    if not port:
+        return
+    port_s = str(port).strip()
+    if not port_s.isdigit():
+        return
+    if profile and profile != "vite-dev" and not env.get("VITE_DEV_PORT"):
+        return
+    hosts = [
+        h.strip() for h in str(env.get("STAND_HOST") or "localhost").split(",")
+        if h.strip()
+    ] or ["localhost"]
+    for host in hosts:
+        _cleanup_vite_port(host, port_s)
+
+
+def _cleanup_vite_port(host: str, port: str) -> None:
+    script = f"""
+set +e
+pidfile="/tmp/greatminds-vite-{port}.pid"
+if [ -f "$pidfile" ]; then
+  pid="$(cat "$pidfile" 2>/dev/null || true)"
+  if [ -n "$pid" ]; then kill "$pid" 2>/dev/null || true; fi
+  rm -f "$pidfile"
+fi
+if command -v fuser >/dev/null 2>&1; then
+  fuser -k "{port}/tcp" >/dev/null 2>&1 || true
+fi
+pids="$(pgrep -f 'npm.*run dev.*--port[ =]{port}|vite.*--port[ =]{port}' 2>/dev/null || true)"
+if [ -n "$pids" ]; then kill $pids 2>/dev/null || true; fi
+sleep 1
+if command -v fuser >/dev/null 2>&1; then
+  fuser -k -9 "{port}/tcp" >/dev/null 2>&1 || true
+fi
+"""
+    cmd = ["sh", "-lc", script]
+    if host not in ("localhost", "127.0.0.1", "::1"):
+        cmd = ["ssh", host, "sh -lc " + shlex.quote(script)]
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+    except Exception:
+        pass
 
 
 def deploy_lease(coord: Path, *, lease_id: str | None = None,
@@ -1078,7 +1152,8 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
             state["active_lease"] = None
             ss.record_transition(state, prev, "free", "COORDD",
                                  lease_id=lid, reason=reason)
-            cap["promoted"] = ss.promote_head_on_free(state, "COORDD")
+            cap["promoted"] = ss.promote_head_on_free(
+                state, "COORDD", poison=dict(cap))
 
         ss.update_stand_state(coord, _fail_stale)
         if not cap.get("promoted"):
@@ -1191,7 +1266,8 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
             state["active_lease"] = None
             ss.record_transition(state, prev, "free", "COORDD",
                                  lease_id=lid, reason=reason)
-            cap["promoted"] = ss.promote_head_on_free(state, "COORDD")
+            cap["promoted"] = ss.promote_head_on_free(
+                state, "COORDD", poison=dict(cap))
 
         ss.update_stand_state(coord, _fail_lease)
         if not cap.get("promoted"):

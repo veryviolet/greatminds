@@ -90,7 +90,10 @@ auto-deploy thread returns the singleton to `free` after a failed deploy, it
 immediately reconciles driven backlog. External stand commands such as
 `stand up` and `stand release` write a `.stand/available-*.yaml` event so the
 watcher re-drives roles whose tasks were already parked in stand-dependent
-queues.
+queues. A separate level-triggered backstop handles the case where coordd
+starts after the stand is already free: while `state=free`, no active lease is
+present, and stand-consumer queues still contain work, coordd periodically
+re-drives only those consumer roles.
 
 `coordd` does not push visual status markers into chat panes. Those markers are
 per-agent utterances: after a successful task move, task block append, or inbox

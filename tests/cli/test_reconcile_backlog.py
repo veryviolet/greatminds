@@ -149,6 +149,28 @@ def test_periodic_reconcile_drives_once_per_backlog(tmp_path, monkeypatch):
     assert len(calls) == 3
 
 
+def test_stand_free_level_redrive_resets_seen_for_stand_consumers(
+        tmp_path, monkeypatch):
+    """If the stand is already free and TESTER work is already parked,
+    coordd must redrive by resource level, not only by a fresh .stand event."""
+    coord = _mk_coord(tmp_path)
+    (coord / ".stand").mkdir()
+    (coord / ".stand" / "state.yaml").write_text(
+        "state: free\nactive_lease: null\nqueue: []\n", encoding="utf-8")
+    (coord / "feature_test" / "0001-verify.yaml").write_text("id: x\n")
+    calls: list = []
+    _patch_driven_tester(monkeypatch, calls)
+    seen = {"tester": cd._role_pending_signature(
+        coord, {"claims_from": ["feature_test"]}, "tester")}
+
+    assert cd._stand_free_level_redrive(
+        coord, tmp_path / "canon", verbose=False, seen=seen) is True
+
+    assert len(calls) == 1
+    assert calls[0][1] == " (stand-free-level)"
+    assert "tester" in seen
+
+
 def test_periodic_reconcile_does_not_drive_processed_only_inbox(
         tmp_path, monkeypatch):
     """End-to-end of the compounding bug: a role whose ONLY inbox content is

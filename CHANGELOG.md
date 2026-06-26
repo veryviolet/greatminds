@@ -4,6 +4,33 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 2.7.2 — 2026-06-27
+
+### Fixed
+
+- Stand-free recovery now has a level-triggered backstop. If the singleton is
+  already `free`, has no active lease, and stand-consumer queues such as
+  `feature_test`, `feature_live`, or `review_sessions` still contain work,
+  `coordd` periodically re-drives only those consumer roles instead of waiting
+  for a fresh `down -> free` or release event.
+- Vite teardown now has a narrow generic cleanup path in addition to
+  profile-tagged `teardown` tasks. For `vite-dev` leases, or fleets that set
+  `VITE_DEV_PORT`, Greatminds clears the pidfile and kills the process holding
+  that TCP port on the configured stand host. This covers orphaned Vite
+  processes left by pre-upgrade or killed leases whose profile had no teardown
+  tags.
+- Deploy-failure auto-promotion is poison-aware. A queued lease matching the
+  just-failed `task` / `profile` / `worktree` is not immediately promoted again;
+  unrelated queued leases can still advance, avoiding the obvious singleton
+  stand loop where one bad lease keeps being re-deployed.
+
+### Note
+
+- Greatminds still cannot deploy uncommitted profile edits from another
+  project. A lease worktree is cut from committed content; local uncommitted
+  fixes must be committed by that project before any Greatminds version can
+  deploy them.
+
 ## 2.7.1 — 2026-06-26
 
 ### Fixed

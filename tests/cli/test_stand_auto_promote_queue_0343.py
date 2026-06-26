@@ -61,6 +61,27 @@ def test_promote_head_on_free_activates_head(tmp_path):
     assert [q["lease_id"] for q in state["queue"]] == ["l2"]
 
 
+def test_promote_head_on_free_skips_poisoned_duplicate(tmp_path):
+    state = {
+        "state": "free", "active_lease": None,
+        "queue": [
+            _q_entry("bad-again", "0400"),
+            _q_entry("good-next", "0401"),
+        ],
+        "history": [],
+    }
+    state["queue"][0]["worktree"] = "/wt/0400"
+    promoted = ss.promote_head_on_free(
+        state, "COORDD",
+        poison={"task": "0400", "profile": "full-deploy",
+                "worktree": "/wt/0400"},
+    )
+
+    assert promoted == "good-next"
+    assert state["active_lease"]["lease_id"] == "good-next"
+    assert [q["lease_id"] for q in state["queue"]] == ["bad-again"]
+
+
 def test_promote_head_on_free_noop_when_queue_empty(tmp_path):
     coord = _coord(tmp_path)
     ss.update_stand_state(coord, lambda s: s.update({

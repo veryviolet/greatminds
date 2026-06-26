@@ -129,6 +129,10 @@ ports that the deploy started. The shipped `vite-dev.yaml` includes a teardown
 task that stops the saved Vite pid and clears any older orphan process still
 holding the configured port. Existing projects with an unedited shipped
 `vite-dev.yaml` are refreshed by `greatminds migrate` / `greatminds update`.
+For `vite-dev` leases, Greatminds also runs a narrow generic cleanup for the
+declared Vite port (`VITE_DEV_PORT`, `vite_port`, or the profile default) so
+orphan processes on that declared port can be cleared even when profile-tagged
+teardown did not run.
 
 For a production deployment or post-deploy review, create a profile with:
 
@@ -228,6 +232,11 @@ failure is sent to the lease holder through inbox info; the holder decides
 whether to fix and re-lease the task. When no queued lease is promoted,
 Greatminds also emits an explicit stand-available event so `coordd` re-scans
 stand-dependent queues instead of waiting for a new task-file move.
+
+Queued work promotion after a deploy failure is poison-aware: a queued lease
+with the same task, profile, and worktree as the failed lease is not
+immediately promoted again. That lets unrelated queued leases advance instead
+of looping the same failing deploy on the singleton stand.
 
 The holder, usually `TESTER` or `EXPLORER`, then runs its own probes against
 the prepared stand and releases the lease:

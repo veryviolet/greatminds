@@ -266,6 +266,8 @@ DEPLOY_RETRY_INTERVAL_SEC = float(
 # gently (it is lock-safe: skips roles with a turn in flight).
 RECONCILE_INTERVAL_SEC = float(
     os.environ.get("COORDD_RECONCILE_INTERVAL_SEC", "90"))
+STAND_FREE_REDRIVE_INTERVAL_SEC = float(
+    os.environ.get("COORDD_STAND_FREE_REDRIVE_INTERVAL_SEC", "300"))
 # 0376: ENOSPC / low-disk resilience. A full root disk silently breaks
 # driven turns: codex/claude obtains a refreshed auth token but cannot
 # persist auth.json (ENOSPC), so the next turn reuses an already-consumed
@@ -336,6 +338,12 @@ INOTIFY_QUEUE_DIRS: tuple[str, ...] = (
     # tick.
     ".stand",
 )
+
+STAND_CONSUMER_QUEUES: frozenset[str] = frozenset({
+    "feature_test",
+    "feature_live",
+    "review_sessions",
+})
 
 
 class _InotifyWatcher:
@@ -3011,6 +3019,68 @@ def _reconcile_driven_backlog(coord: Path, canon_dir: Path,
                       f"failed: {exc}", file=sys.stderr)
 
 
+def _stand_free_consumer_roles_with_pending(
+    coord: Path,
+    canon_dir: Path,
+) -> set[str]:
+    """Roles that should be level-re-driven while the singleton is free.
+
+    Normal periodic reconcile is edge-like by design: unchanged backlog is
+    driven once. Stand availability is different because the external resource
+    level ("free") is itself the condition that unblocks parked work. If coordd
+    starts after the stand is already free, or misses the freeing event, these
+    consumers still need a fresh turn.
+    """
+    try:
+        from greatminds.cli.stand_state import read_stand_state
+        stand_state = read_stand_state(coord)
+    except Exception:
+        return set()
+    if (stand_state or {}).get("state") != "free":
+        return set()
+    if (stand_state or {}).get("active_lease"):
+        return set()
+    schema_roles = load_schema_roles(canon_dir)
+    if not schema_roles:
+        return set()
+    pending: set[str] = set()
+    for role_upper, meta in schema_roles.items():
+        if not isinstance(meta, dict):
+            continue
+        claims = {
+            q for q in (meta.get("claims_from") or [])
+            if isinstance(q, str)
+        }
+        if not (claims & STAND_CONSUMER_QUEUES):
+            continue
+        role_lower = str(role_upper).lower()
+        if _role_pending_signature(coord, meta, role_lower):
+            pending.add(role_lower)
+    return pending
+
+
+def _stand_free_level_redrive(
+    coord: Path,
+    canon_dir: Path,
+    verbose: bool,
+    seen: dict,
+) -> bool:
+    """Level-triggered stand-free recovery for parked stand consumers."""
+    roles = _stand_free_consumer_roles_with_pending(coord, canon_dir)
+    if not roles:
+        return False
+    for role_lower in roles:
+        seen.pop(role_lower, None)
+    if verbose:
+        joined = ", ".join(sorted(roles))
+        print(f"coordd: stand-free level redrive for {joined}",
+              file=sys.stderr)
+    _reconcile_driven_backlog(
+        coord, canon_dir, verbose, seen=seen,
+        trigger=" (stand-free-level)")
+    return True
+
+
 # 1.6.0: leases currently being deployed by coordd (dedup so concurrent
 # `.stand` events don't spawn a second deploy for the same lease).
 _DEPLOYING_LEASES: set[str] = set()
@@ -3908,6 +3978,7 @@ def coordd(project_dir: Path | None, project_name: str | None,
 
     _last_deploy_retry = time.monotonic()
     _last_reconcile = time.monotonic()
+    _last_stand_free_redrive = time.monotonic()
     while not stop["flag"]:
         try:
             events = poll_or_event_wait(interval) or []
@@ -3937,6 +4008,18 @@ def coordd(project_dir: Path | None, project_name: str | None,
                 except Exception as exc:  # noqa: BLE001
                     if verbose:
                         print(f"coordd: periodic reconcile error: {exc}",
+                              file=sys.stderr)
+
+            _now_sf = time.monotonic()
+            if (_now_sf - _last_stand_free_redrive
+                    >= STAND_FREE_REDRIVE_INTERVAL_SEC):
+                _last_stand_free_redrive = _now_sf
+                try:
+                    _stand_free_level_redrive(
+                        coord, canon_dir, verbose, _reconcile_seen)
+                except Exception as exc:  # noqa: BLE001
+                    if verbose:
+                        print(f"coordd: stand-free redrive error: {exc}",
                               file=sys.stderr)
 
             # Re-attempt a stand deploy stuck in `preparing` (the deploy

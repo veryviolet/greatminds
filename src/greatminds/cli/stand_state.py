@@ -208,8 +208,16 @@ def record_transition(state: dict[str, Any], from_s: str, to_s: str,
     state["last_state_change_by"] = by_role
 
 
+def _matches_poison(entry: dict[str, Any], poison: dict[str, Any]) -> bool:
+    for key in ("task", "profile", "worktree"):
+        if poison.get(key) and entry.get(key) != poison.get(key):
+            return False
+    return any(poison.get(key) for key in ("task", "profile", "worktree"))
+
+
 def promote_head_on_free(state: dict[str, Any], by_role: str,
-                         reason: str | None = None) -> str | None:
+                         reason: str | None = None,
+                         poison: dict[str, Any] | None = None) -> str | None:
     """0343: auto-promote the next FIFO-queued lease when the stand is
     free.
 
@@ -232,11 +240,20 @@ def promote_head_on_free(state: dict[str, Any], by_role: str,
     queue = state.get("queue") or []
     if not queue:
         return None
-    head = dict(queue[0])
+    idx = 0
+    if poison:
+        for i, candidate in enumerate(queue):
+            if isinstance(candidate, dict) and not _matches_poison(
+                    candidate, poison):
+                idx = i
+                break
+        else:
+            return None
+    head = dict(queue[idx])
     head["granted_at"] = now_iso()
     head["ready_at"] = None
     state["active_lease"] = head
-    state["queue"] = list(queue[1:])
+    state["queue"] = list(queue[:idx]) + list(queue[idx + 1:])
     # A fresh grant is a clean slate — never carry a prior incident's
     # down_reason into the promoted lease's preparing cycle.
     state["down_reason"] = None
