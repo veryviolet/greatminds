@@ -1683,7 +1683,10 @@ Register additional project profiles in <code>coordination/stand-profiles.yaml</
 tagged <code>teardown</code>. Greatminds runs those tasks best-effort when a lease is
 released, reclaimed, manually downed, recovered with <code>stand up</code>, or fails during
 deploy. This is the profile-owned place to stop dev servers, containers, and
-ports that the deploy started.</p>
+ports that the deploy started. The shipped <code>vite-dev.yaml</code> includes a teardown
+task that stops the saved Vite pid and clears any older orphan process still
+holding the configured port. Existing projects with an unedited shipped
+<code>vite-dev.yaml</code> are refreshed by <code>greatminds migrate</code> / <code>greatminds update</code>.</p>
 <p>For a production deployment or post-deploy review, create a profile with:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">profiles</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">production</span><span class="p">:</span>
@@ -1770,7 +1773,9 @@ full ansible output under <code>.greatminds/.stand/deploy-&lt;lease-id&gt;.log</
 compact <code>last_deploy_failure</code> summary, runs teardown best-effort, and returns
 the singleton stand to <code>free</code> so unrelated queued work can continue. The
 failure is sent to the lease holder through inbox info; the holder decides
-whether to fix and re-lease the task.</p>
+whether to fix and re-lease the task. When no queued lease is promoted,
+Greatminds also emits an explicit stand-available event so <code>coordd</code> re-scans
+stand-dependent queues instead of waiting for a new task-file move.</p>
 <p>The holder, usually <code>TESTER</code> or <code>EXPLORER</code>, then runs its own probes against
 the prepared stand and releases the lease:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>release<span class="w"> </span>--lease-id<span class="w"> </span>&lt;lease-id&gt;<span class="w"> </span>--result<span class="w"> </span>pass<span class="p">|</span>fail<span class="p">|</span>partial
