@@ -1679,6 +1679,11 @@ greatminds<span class="w"> </span>stand<span class="w"> </span>profiles<span cla
 then run readiness probes. The shipped <code>full-deploy.yaml</code>, <code>vite-dev.yaml</code>, and
 <code>smoke-only.yaml</code> files are reference profiles, not hidden deployment logic.
 Register additional project profiles in <code>coordination/stand-profiles.yaml</code>.</p>
+<p>Profiles that start long-lived processes should also include cleanup tasks
+tagged <code>teardown</code>. Greatminds runs those tasks best-effort when a lease is
+released, reclaimed, manually downed, recovered with <code>stand up</code>, or fails during
+deploy. This is the profile-owned place to stop dev servers, containers, and
+ports that the deploy started.</p>
 <p>For a production deployment or post-deploy review, create a profile with:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">profiles</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">production</span><span class="p">:</span>
@@ -1760,6 +1765,12 @@ stand to ready, equivalent to:</p>
 <p>That moves the state to <code>ready</code> and files an inbox-info message to the holder:
 <code>stand lease &lt;lease-id&gt; ready; task=&lt;task-id&gt;</code>. The ready transition is valid
 only after the configured stand profile has run and left its deploy marker.</p>
+<p>If the deploy profile exits non-zero, Greatminds fails that lease, records the
+full ansible output under <code>.greatminds/.stand/deploy-&lt;lease-id&gt;.log</code>, stores a
+compact <code>last_deploy_failure</code> summary, runs teardown best-effort, and returns
+the singleton stand to <code>free</code> so unrelated queued work can continue. The
+failure is sent to the lease holder through inbox info; the holder decides
+whether to fix and re-lease the task.</p>
 <p>The holder, usually <code>TESTER</code> or <code>EXPLORER</code>, then runs its own probes against
 the prepared stand and releases the lease:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>release<span class="w"> </span>--lease-id<span class="w"> </span>&lt;lease-id&gt;<span class="w"> </span>--result<span class="w"> </span>pass<span class="p">|</span>fail<span class="p">|</span>partial
@@ -1772,14 +1783,17 @@ back to <code>free</code>; <code>coordd</code> promotes the next queued lease on
 a warning window before automatic release. The TTL is a
 safety valve for abandoned leases; it is not a substitute for explicitly
 releasing a lease after probes finish.</p>
-<p>If deployment fails or the stand has an infrastructure incident,
+<p>If the stand has an infrastructure incident that is not scoped to one lease,
 the operator or maintainer runs:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>down<span class="w"> </span>--reason<span class="w"> </span><span class="s2">&quot;&lt;operational reason&gt;&quot;</span>
 </code></pre></div>
-<p><code>down</code> pauses queue processing. After recovery:</p>
+<p><code>down</code> pauses queue processing for global recovery. After recovery:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>up<span class="w"> </span>--reason<span class="w"> </span><span class="s2">&quot;&lt;recovery note&gt;&quot;</span>
 </code></pre></div>
-<p>That returns the stand to <code>free</code> so queued work can resume.</p>
+<p>That returns the stand to <code>free</code> so queued work can resume. <code>coordd</code> treats the
+stand becoming free as a dispatch event and re-scans stand-dependent queues, so
+tasks already parked in <code>feature_test</code> or review queues do not require a manual
+wake after recovery.</p>
 <h2 id="evidence-boundary">Evidence Boundary<a class="headerlink" href="#evidence-boundary" title="Permanent link">&para;</a></h2>
 <p>The coordd deploy step only proves infrastructure readiness: process status, health
 endpoint availability, remote reachability, GPU availability when requested,

@@ -1713,8 +1713,16 @@ successfully completes the CLI action and replies. Daemon status belongs in
 agent registry. The socket lets <code>coordd</code> send actual input to the agent process
 instead of writing display text to a terminal.</p>
 <h2 id="heartbeats">Heartbeats<a class="headerlink" href="#heartbeats" title="Permanent link">&para;</a></h2>
-<p>Most CLI calls update the caller role's heartbeat as a side effect. Watchdog
-reports stale heartbeats, orphaned intents, dead pids, and stale tasks:</p>
+<p>Most CLI calls update the caller role's heartbeat as a side effect. Driven
+Claude and Codex turns also refresh the heartbeat from driver-observed progress:
+subprocess output, Codex app-server activity, and source worktree writes. This
+keeps long active turns from looking stuck merely because the agent has not made
+another <code>greatminds</code> CLI call.</p>
+<p>Driven subprocesses use a progress-based timeout. A turn can run for an
+extended period while it is producing output or changing the lease worktree;
+coordd kills and retries only after the idle progress window is exceeded, or
+after the larger absolute ceiling.</p>
+<p>Watchdog reports stale heartbeats, orphaned intents, dead pids, and stale tasks:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>watchdog
 </code></pre></div>
 
