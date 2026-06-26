@@ -4,6 +4,33 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 2.7.1 — 2026-06-26
+
+### Fixed
+
+- `coordd` now runs the stand-free backlog reconcile directly after its own
+  background auto-deploy thread returns the singleton to `free`. This closes
+  the gap where a failed deploy changed state inside coordd but no reliable
+  watcher event re-drove tasks already parked in `feature_test` or review
+  queues.
+- `stand up`, `stand release`, `stand reclaim`, and deploy-failure paths now
+  emit a small `.stand/available-*.yaml` event when the singleton becomes
+  `free` without promoting a queued lease, giving the daemon an explicit
+  dispatch event for waiting stand consumers.
+- The shipped `vite-dev.yaml` profile now has real `teardown` tasks. Teardown
+  stops the saved Vite pid when available and also clears old orphan processes
+  holding the configured port, including pristine 2.7.0 profiles reseeded by
+  `greatminds migrate` / `greatminds update`.
+- `vite-dev.yaml` now accepts `VITE_DEV_PORT` from `PROJECT.env` in addition to
+  the lower-case `vite_port` extra-var, so cleanup targets the same port as the
+  deployed dev server in common fleet configs.
+
+### Note
+
+- This release corrects the incomplete 2.7.0 implementation of #24, #27, and
+  #28. Version 2.7.0 added supporting infrastructure but did not fully close
+  the real daemon/profile failure modes.
+
 ## 2.7.0 — 2026-06-26
 
 ### Changed

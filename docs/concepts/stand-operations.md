@@ -125,7 +125,10 @@ Profiles that start long-lived processes should also include cleanup tasks
 tagged `teardown`. Greatminds runs those tasks best-effort when a lease is
 released, reclaimed, manually downed, recovered with `stand up`, or fails during
 deploy. This is the profile-owned place to stop dev servers, containers, and
-ports that the deploy started.
+ports that the deploy started. The shipped `vite-dev.yaml` includes a teardown
+task that stops the saved Vite pid and clears any older orphan process still
+holding the configured port. Existing projects with an unedited shipped
+`vite-dev.yaml` are refreshed by `greatminds migrate` / `greatminds update`.
 
 For a production deployment or post-deploy review, create a profile with:
 
@@ -222,7 +225,9 @@ full ansible output under `.greatminds/.stand/deploy-<lease-id>.log`, stores a
 compact `last_deploy_failure` summary, runs teardown best-effort, and returns
 the singleton stand to `free` so unrelated queued work can continue. The
 failure is sent to the lease holder through inbox info; the holder decides
-whether to fix and re-lease the task.
+whether to fix and re-lease the task. When no queued lease is promoted,
+Greatminds also emits an explicit stand-available event so `coordd` re-scans
+stand-dependent queues instead of waiting for a new task-file move.
 
 The holder, usually `TESTER` or `EXPLORER`, then runs its own probes against
 the prepared stand and releases the lease:

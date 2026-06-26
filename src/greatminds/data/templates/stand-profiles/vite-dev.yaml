@@ -25,7 +25,7 @@
       loop: >-
         {{ (STAND_HOST | default('localhost')).split(',')
            | map('trim') | reject('equalto', '') | list }}
-      tags: [prerequisite]
+      tags: [prerequisite, teardown]
 
 - name: greatminds vite-dev stand
   hosts: stand_nodes
@@ -33,7 +33,7 @@
   become: false
   vars:
     deploy_path: "/srv/greatminds"
-    vite_port: "5173"
+    vite_port: "{{ VITE_DEV_PORT | default('5173') }}"
     ui_dir: "ui"
 
   tasks:
@@ -93,8 +93,9 @@
       # Idempotent: skip if a dev server is already answering on vite_port.
       ansible.builtin.shell: >
         curl -fsS "http://localhost:{{ vite_port }}/" >/dev/null 2>&1 ||
-        nohup npm run dev -- --host --port {{ vite_port }}
+        (nohup npm run dev -- --host --port {{ vite_port }}
         >"/tmp/vite-{{ lease_id | default('dev') }}.log" 2>&1 &
+        echo $! >"/tmp/greatminds-vite-{{ vite_port }}.pid")
       args:
         chdir: "{{ deploy_path }}/{{ ui_dir }}"
       changed_when: true
@@ -107,3 +108,28 @@
       delay: 2
       until: vite_ready.rc == 0
       changed_when: false
+
+    - name: teardown — stop Vite dev server for this profile port
+      ansible.builtin.shell: |
+        set +e
+        pidfile="/tmp/greatminds-vite-{{ vite_port }}.pid"
+        if [ -f "$pidfile" ]; then
+          pid="$(cat "$pidfile" 2>/dev/null || true)"
+          if [ -n "$pid" ]; then
+            kill "$pid" 2>/dev/null || true
+          fi
+          rm -f "$pidfile"
+        fi
+        if command -v fuser >/dev/null 2>&1; then
+          fuser -k "{{ vite_port }}/tcp" >/dev/null 2>&1 || true
+        fi
+        pids="$(pgrep -f "npm.*run dev.*--port[ =]{{ vite_port }}|vite.*--port[ =]{{ vite_port }}" 2>/dev/null || true)"
+        if [ -n "$pids" ]; then
+          kill $pids 2>/dev/null || true
+        fi
+        sleep 1
+        if command -v fuser >/dev/null 2>&1; then
+          fuser -k -9 "{{ vite_port }}/tcp" >/dev/null 2>&1 || true
+        fi
+      changed_when: true
+      tags: [teardown]

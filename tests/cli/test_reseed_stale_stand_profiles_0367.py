@@ -45,6 +45,10 @@ def test_stale_fixture_hashes_are_registered() -> None:
         setup_mod._STALE_SHIPPED_PROFILE_HASHES["full-deploy.yaml"]
     assert setup_mod._sha256(so) in \
         setup_mod._STALE_SHIPPED_PROFILE_HASHES["smoke-only.yaml"]
+    assert (
+        "1c633c32c1bfd05671494e41ac6faf1ca771d52f751e958408f1fa73385b5adf"
+        in setup_mod._STALE_SHIPPED_PROFILE_HASHES["vite-dev.yaml"]
+    )
 
 
 def test_stale_fixtures_lack_add_host_topology() -> None:

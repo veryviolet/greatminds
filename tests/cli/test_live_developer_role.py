@@ -112,6 +112,9 @@ def test_vite_dev_profile_preset_ships() -> None:
     text = p.read_text(encoding="utf-8")
     assert "npm run dev" in text  # HMR dev server
     assert "vite_port" in text
+    assert "VITE_DEV_PORT" in text
+    assert "tags: [teardown]" in text
+    assert "fuser -k" in text
 
 
 # ---------- coord.yaml template: staged pane ----------

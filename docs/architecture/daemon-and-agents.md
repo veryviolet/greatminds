@@ -85,6 +85,13 @@ This reactive path replaces short idle polling for normal queue and inbox
 changes. Reaction time should be the daemon watcher interval plus one driven
 spawn or wake signal, not a role's fallback sleep value.
 
+Stand availability is also treated as a dispatch event. When coordd's own
+auto-deploy thread returns the singleton to `free` after a failed deploy, it
+immediately reconciles driven backlog. External stand commands such as
+`stand up` and `stand release` write a `.stand/available-*.yaml` event so the
+watcher re-drives roles whose tasks were already parked in stand-dependent
+queues.
+
 `coordd` does not push visual status markers into chat panes. Those markers are
 per-agent utterances: after a successful task move, task block append, or inbox
 send, the agent ends its own chat reply with the matching marker line.

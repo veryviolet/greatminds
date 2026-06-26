@@ -78,6 +78,23 @@ def task_exists_in_active(coord: Path, task_id: str) -> bool:
     return False
 
 
+def _emit_stand_available_event(coord: Path, *, reason: str) -> None:
+    """Best-effort event file for coordd stand-free redrive.
+
+    The daemon also watches the stand state file, but external CLI commands
+    such as ``stand up`` and ``stand release`` should not depend on one
+    particular atomic-write event shape. A small YAML event under ``.stand/``
+    gives coordd another normal queue event to notice and reconcile.
+    """
+    try:
+        stand_dir = coord / ".stand"
+        stand_dir.mkdir(parents=True, exist_ok=True)
+        target = stand_dir / f"available-{uuid.uuid4().hex}.yaml"
+        target.write_text(f"reason: {reason}\n", encoding="utf-8")
+    except OSError:
+        pass
+
+
 _REQUEST_TYPES = ["deploy", "restart", "rebuild", "smoke",
                   "remote_sync", "gpu_check", "teardown"]
 
@@ -569,6 +586,8 @@ def stand_release(lease_id: str, result: str) -> None:
         if captured.get("promoted"):
             msg += (f"; auto-promoted queued lease "
                     f"{captured['promoted']} → preparing")
+        else:
+            _emit_stand_available_event(coord, reason=f"release-{result}")
         click.echo(msg)
     elif captured.get("was_cancelled"):
         click.echo(f"cancelled queued lease {lease_id}")
@@ -648,6 +667,8 @@ def stand_reclaim(lease_id: str | None) -> None:
     if captured.get("promoted"):
         msg += (f"; auto-promoted queued lease "
                 f"{captured['promoted']} → preparing")
+    else:
+        _emit_stand_available_event(coord, reason="reclaim")
     click.echo(msg)
 
 
@@ -750,6 +771,7 @@ def stand_up(reason: str) -> None:
             f"state → free: {reason}; auto-promoted queued lease "
             f"{captured['promoted']} → preparing")
     else:
+        _emit_stand_available_event(coord, reason=f"stand-up: {reason}")
         click.echo(f"state → free: {reason}")
 
 
@@ -1059,6 +1081,8 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
             cap["promoted"] = ss.promote_head_on_free(state, "COORDD")
 
         ss.update_stand_state(coord, _fail_stale)
+        if not cap.get("promoted"):
+            _emit_stand_available_event(coord, reason="stale-deployment")
         # Notify the lease holder (so the resumed session sees the block
         # instead of silently retrying) and PLANNER (who decides whether
         # to refresh the worktree or keep the session blocked).
@@ -1170,6 +1194,8 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
             cap["promoted"] = ss.promote_head_on_free(state, "COORDD")
 
         ss.update_stand_state(coord, _fail_lease)
+        if not cap.get("promoted"):
+            _emit_stand_available_event(coord, reason=f"deploy-rc-{rc}")
         holder = cap.get("holder_role")
         if holder:
             _file_inbox_info(coord, holder, reason,

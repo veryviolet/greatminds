@@ -431,6 +431,10 @@ _STALE_SHIPPED_PROFILE_HASHES: dict[str, frozenset[str]] = {
         # 2.0.1 template before local-loopback hosts were registered with
         # ansible_connection=local and local rsync avoided SSH.
         "a94e77a9c4ae4a766bbc5e98e6960f2369af46ca018372f9149a205037bff64a",
+        # 2.7.0 template before vite-dev had actual teardown-tagged cleanup.
+        # The executor called --tags teardown, but this shipped profile had no
+        # matching task, so orphan Vite processes kept their port.
+        "1c633c32c1bfd05671494e41ac6faf1ca771d52f751e958408f1fa73385b5adf",
     }),
 }
 

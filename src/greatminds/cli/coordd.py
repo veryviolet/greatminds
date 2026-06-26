@@ -3060,6 +3060,25 @@ def _maybe_auto_deploy_stand(coord: Path, verbose: bool,
             if verbose:
                 print(f"  coordd auto-deploy lease {lease_id} rc={rc}",
                       file=sys.stderr)
+            try:
+                from greatminds.cli.stand_state import read_stand_state
+                current = read_stand_state(coord)
+            except Exception:
+                current = {}
+            if (current or {}).get("state") == "free":
+                # A deploy failure can free the singleton inside this
+                # background thread. Do not rely on the filesystem watcher
+                # seeing coordd's own atomic state write; treat stand-free as
+                # a dispatch event immediately so parked stand consumers are
+                # re-driven without a manual inbox wake.
+                try:
+                    _reconcile_driven_backlog(
+                        coord, find_canon_dir(), verbose, seen=None,
+                        trigger=" (stand-free)")
+                except Exception as exc:  # noqa: BLE001
+                    if verbose:
+                        print(f"coordd: stand-free reconcile failed: {exc}",
+                              file=sys.stderr)
         except Exception as exc:  # noqa: BLE001 — never crash coordd
             # The deploy RAISED before transitioning → the stand is still
             # `preparing`. Count the attempt; retry until DEPLOY_MAX_ATTEMPTS,

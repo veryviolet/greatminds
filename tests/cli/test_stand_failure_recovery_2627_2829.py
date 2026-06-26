@@ -108,3 +108,55 @@ def test_stand_free_event_reconciles_driven_backlog(tmp_path, monkeypatch):
     assert cd._route_queue_event(coord, tmp_path, ".stand", "state.yaml",
                                  verbose=False) is True
     assert calls
+
+
+def test_coordd_auto_deploy_free_reconciles_without_watcher(
+        tmp_path, monkeypatch):
+    coord = _coord(tmp_path)
+    lease = _lease(coord)
+    ss.update_stand_state(coord, lambda s: s.update({
+        "state": "preparing",
+        "active_lease": lease,
+        "queue": [],
+    }))
+    calls = []
+
+    def fake_deploy(coord_arg, *, lease_id=None, **_kwargs):
+        assert coord_arg == coord
+        assert lease_id == "l1"
+
+        def free(state):
+            state["state"] = "free"
+            state["active_lease"] = None
+        ss.update_stand_state(coord, free)
+        return 118, "failed"
+
+    monkeypatch.setattr("greatminds.cli.stand.deploy_lease", fake_deploy)
+    monkeypatch.setattr(cd, "find_canon_dir", lambda: tmp_path / "canon")
+    monkeypatch.setattr(cd, "_reconcile_driven_backlog",
+                        lambda *a, **k: calls.append((a, k)))
+
+    assert cd._maybe_auto_deploy_stand(coord, verbose=False,
+                                       run_async=False) is True
+    assert calls
+    assert calls[0][1]["seen"] is None
+    assert calls[0][1]["trigger"] == " (stand-free)"
+
+
+def test_stand_up_emits_available_event_for_coordd(tmp_path, monkeypatch):
+    coord = _coord(tmp_path)
+    ss.update_stand_state(coord, lambda s: s.update({
+        "state": "down",
+        "down_reason": "fixed",
+        "queue": [],
+    }))
+    monkeypatch.chdir(coord.parent)
+    monkeypatch.setenv("GREATMINDS_ROLE", "MAINTAINER")
+    monkeypatch.setattr(stand_mod, "_teardown_lease", lambda *a, **k: None)
+
+    res = CliRunner().invoke(stand_mod.stand, ["up", "--reason", "clean"])
+
+    assert res.exit_code == 0, res.output
+    events = list((coord / ".stand").glob("available-*.yaml"))
+    assert events
+    assert "stand-up: clean" in events[0].read_text(encoding="utf-8")
