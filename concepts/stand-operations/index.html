@@ -1690,7 +1690,9 @@ holding the configured port. Existing projects with an unedited shipped
 For <code>vite-dev</code> leases, Greatminds also runs a narrow generic cleanup for the
 declared Vite port (<code>VITE_DEV_PORT</code>, <code>vite_port</code>, or the profile default) so
 orphan processes on that declared port can be cleared even when profile-tagged
-teardown did not run.</p>
+teardown did not run. When the stand is already <code>free</code> and no lease owns it,
+coordd runs the declared-port cleanup on startup and on the stand-free periodic
+hook.</p>
 <p>For a production deployment or post-deploy review, create a profile with:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">profiles</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">production</span><span class="p">:</span>
