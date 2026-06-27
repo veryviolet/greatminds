@@ -171,6 +171,10 @@ def test_stand_free_level_redrive_resets_seen_for_stand_consumers(
     assert "tester" in seen
 
 
+def test_stand_free_redrive_default_is_fast_enough_for_recovery():
+    assert cd.STAND_FREE_REDRIVE_INTERVAL_SEC <= 60
+
+
 def test_periodic_reconcile_does_not_drive_processed_only_inbox(
         tmp_path, monkeypatch):
     """End-to-end of the compounding bug: a role whose ONLY inbox content is

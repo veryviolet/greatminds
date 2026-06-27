@@ -1039,6 +1039,31 @@ def _generic_teardown_lease_resources(
         _cleanup_vite_port(host, port_s)
 
 
+def cleanup_free_stand_orphans(coord: Path) -> bool:
+    """Clean declared Vite resources when the singleton is already free.
+
+    If stand state says no lease owns the singleton, a process still holding
+    the declared Vite port is orphaned from Greatminds' perspective. This is
+    deliberately limited to PROJECT.env-declared Vite ports.
+    """
+    try:
+        from greatminds.cli.stand_state import read_stand_state
+        from greatminds.cli.stand_executor import read_project_env
+        state = read_stand_state(coord)
+        env = read_project_env(coord)
+    except Exception:
+        return False
+    if (state or {}).get("state") != "free":
+        return False
+    if (state or {}).get("active_lease"):
+        return False
+    if not (env.get("VITE_DEV_PORT") or env.get("vite_port")):
+        return False
+    _generic_teardown_lease_resources(
+        coord, {"profile": "vite-dev"}, reason="stand-free-orphan")
+    return True
+
+
 def _cleanup_vite_port(host: str, port: str) -> None:
     script = f"""
 set +e

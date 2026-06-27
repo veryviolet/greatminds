@@ -187,3 +187,37 @@ def test_generic_vite_cleanup_runs_without_profile_teardown_tags(
     assert calls[0][0][0] == "ssh"
     assert calls[0][0][1] == "lattice-a"
     assert "4173/tcp" in calls[0][0][-1]
+
+
+def test_cleanup_free_stand_orphans_clears_declared_vite_port(
+        tmp_path, monkeypatch):
+    coord = _coord(tmp_path)
+    ss.update_stand_state(coord, lambda s: s.update({
+        "state": "free",
+        "active_lease": None,
+    }))
+    (coord / "PROJECT.env").write_text(
+        "STAND_HOST=lattice-a\nVITE_DEV_PORT=4173\n", encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(stand_mod, "_cleanup_vite_port",
+                        lambda host, port: calls.append((host, port)))
+
+    assert stand_mod.cleanup_free_stand_orphans(coord) is True
+
+    assert calls == [("lattice-a", "4173")]
+
+
+def test_cleanup_free_stand_orphans_skips_active_lease(tmp_path, monkeypatch):
+    coord = _coord(tmp_path)
+    ss.update_stand_state(coord, lambda s: s.update({
+        "state": "ready",
+        "active_lease": {"lease_id": "l1"},
+    }))
+    (coord / "PROJECT.env").write_text("VITE_DEV_PORT=4173\n", encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(stand_mod, "_cleanup_vite_port",
+                        lambda host, port: calls.append((host, port)))
+
+    assert stand_mod.cleanup_free_stand_orphans(coord) is False
+
+    assert calls == []

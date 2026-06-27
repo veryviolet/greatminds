@@ -93,7 +93,9 @@ watcher re-drives roles whose tasks were already parked in stand-dependent
 queues. A separate level-triggered backstop handles the case where coordd
 starts after the stand is already free: while `state=free`, no active lease is
 present, and stand-consumer queues still contain work, coordd periodically
-re-drives only those consumer roles.
+re-drives only those consumer roles. The same startup and periodic hook also
+cleans a declared Vite dev-server port when the stand is free and no lease owns
+it.
 
 `coordd` does not push visual status markers into chat panes. Those markers are
 per-agent utterances: after a successful task move, task block append, or inbox

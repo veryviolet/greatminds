@@ -4,6 +4,18 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 2.7.3 — 2026-06-27
+
+### Fixed
+
+- Stand-free level redrive now runs immediately during coordd startup and then
+  every 60 seconds by default. A daemon that starts after the stand is already
+  free no longer waits five minutes before re-driving parked stand consumers.
+- `coordd` now runs free-stand Vite orphan cleanup on startup and on the
+  stand-free periodic hook. If the stand is `free`, no active lease exists, and
+  `PROJECT.env` declares `VITE_DEV_PORT` or `vite_port`, Greatminds clears that
+  declared port even when no current lease lifecycle event occurs.
+
 ## 2.7.2 — 2026-06-27
 
 ### Fixed

@@ -267,7 +267,7 @@ DEPLOY_RETRY_INTERVAL_SEC = float(
 RECONCILE_INTERVAL_SEC = float(
     os.environ.get("COORDD_RECONCILE_INTERVAL_SEC", "90"))
 STAND_FREE_REDRIVE_INTERVAL_SEC = float(
-    os.environ.get("COORDD_STAND_FREE_REDRIVE_INTERVAL_SEC", "300"))
+    os.environ.get("COORDD_STAND_FREE_REDRIVE_INTERVAL_SEC", "60"))
 # 0376: ENOSPC / low-disk resilience. A full root disk silently breaks
 # driven turns: codex/claude obtains a refreshed auth token but cannot
 # persist auth.json (ENOSPC), so the next turn reuses an already-consumed
@@ -3081,6 +3081,22 @@ def _stand_free_level_redrive(
     return True
 
 
+def _stand_free_orphan_cleanup(coord: Path, verbose: bool) -> bool:
+    """Cleanup declared stand-free orphan resources, if any."""
+    try:
+        from greatminds.cli.stand import cleanup_free_stand_orphans
+        cleaned = cleanup_free_stand_orphans(coord)
+        if cleaned and verbose:
+            print("coordd: stand-free orphan cleanup ran",
+                  file=sys.stderr)
+        return bool(cleaned)
+    except Exception as exc:  # noqa: BLE001
+        if verbose:
+            print(f"coordd: stand-free orphan cleanup failed: {exc}",
+                  file=sys.stderr)
+        return False
+
+
 # 1.6.0: leases currently being deployed by coordd (dedup so concurrent
 # `.stand` events don't spawn a second deploy for the same lease).
 _DEPLOYING_LEASES: set[str] = set()
@@ -3972,6 +3988,12 @@ def coordd(project_dir: Path | None, project_name: str | None,
         # 1.6.0: a lease left `preparing` when coordd (re)started — e.g.
         # killed mid-deploy — must be picked up; coordd re-runs the deploy.
         _maybe_auto_deploy_stand(coord, verbose)
+        # Stand may already be free before coordd starts. Run both level
+        # recovery hooks immediately instead of waiting for their first
+        # interval.
+        _stand_free_orphan_cleanup(coord, verbose)
+        _stand_free_level_redrive(
+            coord, canon_dir, verbose, _reconcile_seen)
     except Exception as exc:
         if verbose:
             print(f"coordd: startup recovery failed: {exc}", file=sys.stderr)
@@ -4015,6 +4037,7 @@ def coordd(project_dir: Path | None, project_name: str | None,
                     >= STAND_FREE_REDRIVE_INTERVAL_SEC):
                 _last_stand_free_redrive = _now_sf
                 try:
+                    _stand_free_orphan_cleanup(coord, verbose)
                     _stand_free_level_redrive(
                         coord, canon_dir, verbose, _reconcile_seen)
                 except Exception as exc:  # noqa: BLE001
