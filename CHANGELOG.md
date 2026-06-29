@@ -4,6 +4,15 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 2.7.6 — 2026-06-29
+
+### Fixed
+
+- `LIVE-DEVELOPER` can now author the required `implementation` block for
+  scenario-C interactive tasks in `feature_live`, including `scope: ui` and
+  `scope: backend`. The ordinary scope-to-role guard still applies outside the
+  interactive live path.
+
 ## 2.7.5 — 2026-06-29
 
 ### Fixed

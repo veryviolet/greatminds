@@ -1783,7 +1783,11 @@ def role_for_block_kind(role: str, kind: str, queue: str,
     if kind == "implementation":
         scope = data.get("scope")
         expected = IMPL_ROLE_BY_SCOPE.get(scope or "")
-        if expected and expected != role:
+        live_developer_interactive = (
+            role == "LIVE-DEVELOPER"
+            and (queue == "feature_live" or is_interactive_task(data))
+        )
+        if expected and expected != role and not live_developer_interactive:
             return (f"task scope: {scope!r} requires {expected} for "
                     f"implementation, not {role}")
     return None

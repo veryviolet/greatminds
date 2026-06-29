@@ -306,7 +306,7 @@ wheels = [
 
 [[package]]
 name = "greatminds"
-version = "2.7.5"
+version = "2.7.6"
 source = { editable = "." }
 dependencies = [
     { name = "ansible-core" },

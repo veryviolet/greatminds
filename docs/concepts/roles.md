@@ -10,6 +10,9 @@ Product roles:
 - `DEVELOPER`: backend implementation. Lifecycle: `driven`.
 - `UI-DEVELOPER`: UI implementation or direct UI rapid iteration. Pipeline
   lifecycle: `driven`.
+- `LIVE-DEVELOPER`: USER-paced scenario-C work from `feature_live` on a leased
+  stand. For that interactive path it authors the implementation block for
+  backend or UI scope and hands the sprint task to review.
 - `TECHNICAL-WRITER`: documentation implementation. Lifecycle: `driven`.
 - `TESTER`: validates implemented code and records test evidence. Lifecycle:
   `driven`.

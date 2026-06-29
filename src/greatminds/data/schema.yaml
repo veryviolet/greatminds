@@ -337,6 +337,10 @@ roles:
       - work_a_single_task_live_with_user_on_leased_stand
       - deploy_to_own_leased_stand_during_session
       - hand_to_review_as_sprint_on_user_ok
+      # Scenario-C is cross-scope live work: once PLANNER routed an
+      # interactive task to feature_live, LIVE-DEVELOPER owns the live
+      # implementation evidence for backend/ui changes on that leased stand.
+      - append_implementation_block_for_interactive_backend_or_ui_task
     forbidden_actions:
       - claim_outside_feature_live
       - commit_to_main_directly

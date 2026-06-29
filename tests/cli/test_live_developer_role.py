@@ -205,3 +205,45 @@ def test_gate_satisfied_by_approved_sprint() -> None:
     ]}
     assert task_mod._check_gate_for_stand_required(
         data, "feature_review", "verified") is None
+
+
+def test_live_developer_can_author_interactive_ui_implementation() -> None:
+    data = {
+        "stream": "product",
+        "kind": "feature",
+        "scope": "ui",
+        "blocks": [{"kind": "plan", "interactive": True}],
+    }
+
+    assert task_mod.role_for_block_kind(
+        "LIVE-DEVELOPER", "implementation", "feature_live", data,
+        {"kind": "implementation"}) is None
+
+
+def test_live_developer_can_author_interactive_backend_implementation() -> None:
+    data = {
+        "stream": "product",
+        "kind": "feature",
+        "scope": "backend",
+        "blocks": [{"kind": "plan", "interactive": True}],
+    }
+
+    assert task_mod.role_for_block_kind(
+        "LIVE-DEVELOPER", "implementation", "feature_live", data,
+        {"kind": "implementation"}) is None
+
+
+def test_live_developer_scope_bypass_is_limited_to_interactive_path() -> None:
+    data = {
+        "stream": "product",
+        "kind": "feature",
+        "scope": "ui",
+        "blocks": [{"kind": "plan", "interactive": False}],
+    }
+
+    err = task_mod.role_for_block_kind(
+        "LIVE-DEVELOPER", "implementation", "feature_dev", data,
+        {"kind": "implementation"})
+
+    assert err is not None
+    assert "requires UI-DEVELOPER" in err
