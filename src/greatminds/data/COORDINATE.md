@@ -570,7 +570,11 @@ Lifecycle:
   worktree was created.
 - `greatminds task mv ... verified` by REVIEWER merges the task branch
   back with `--no-ff`, preserving an explicit task boundary in git
-  history.
+  history. If `coordination/stand-profiles.yaml` has a profile with
+  `default_for: [production_deploy]`, coordd then creates an internal
+  system lifecycle lease (`holder_role: COORDD`) from the merged default
+  branch and runs that profile. This is not agent/model work; the lease
+  serializes the deploy in stand state and auto-releases after success.
 - A verified product task is normally done, but REVIEWER can append a
   `rollback` block with a non-empty `reason` and move it from `verified`
   to `archive` after a code-level revert, or back to `feature_review` when

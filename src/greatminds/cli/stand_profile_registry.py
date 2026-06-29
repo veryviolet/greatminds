@@ -39,6 +39,7 @@ class ProfileEntry:
     purpose: str
     used_for: tuple[str, ...]
     default_for: tuple[str, ...]
+    restore_profile: str | None = None
     environment: str = "stand"
     requires_explicit_user_approval: bool = False
     allowed_roles: tuple[str, ...] = ()
@@ -218,6 +219,10 @@ def load_registry(coord_dir: Path, *,
             purpose=purpose,
             used_for=tuple(used_for),
             default_for=tuple(default_for),
+            restore_profile=(
+                str(raw.get("restore_profile")).strip()
+                if raw.get("restore_profile") else None
+            ),
             environment=environment,
             requires_explicit_user_approval=bool(
                 raw.get("requires_explicit_user_approval", False)
@@ -236,7 +241,30 @@ def load_registry(coord_dir: Path, *,
                     exit_code=2,
                 )
             default_owner[token] = entry.name
+    for entry in entries.values():
+        if entry.restore_profile and entry.restore_profile not in entries:
+            raise GreatMindsError(
+                f"stand profile registry {path}: profile {entry.name!r} "
+                f"restore_profile {entry.restore_profile!r} is not registered",
+                exit_code=2,
+            )
     return ProfileRegistry(path=path, source=source, profiles=entries)
+
+
+def profile_for_default(coord_dir: Path, token: str, *,
+                        worktree: str | Path | None = None
+                        ) -> tuple[ProfileRegistry, ProfileEntry] | None:
+    """Return the single profile claiming ``default_for: <token>``.
+
+    ``load_registry`` already rejects duplicate default owners, so this helper
+    is a small typed lookup for lifecycle code that needs profile intent rather
+    than a hard-coded profile name.
+    """
+    registry = load_registry(coord_dir, worktree=worktree)
+    for entry in registry.profiles.values():
+        if token in entry.default_for:
+            return registry, entry
+    return None
 
 
 def profile_file_path(coord_dir: Path, entry: ProfileEntry) -> Path:

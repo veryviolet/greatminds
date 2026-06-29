@@ -15,10 +15,12 @@ profiles:
       - explorer_review
       - reviewer_validation
       - full_product_validation
+      - production_deploy
     default_for:
       - feature_test
       - explorer
       - reviewer
+      - production_deploy
 
   vite-dev:
     file: vite-dev.yaml
@@ -26,3 +28,4 @@ profiles:
     environment: stand
     used_for: [live_ui, ui_iteration]
     default_for: [live_developer, ui_iteration]
+    restore_profile: full-deploy

@@ -17,7 +17,10 @@ Common product queues:
 - `feature_blocked/`: tasks parked on explicit dependencies.
 - `verified/`: approved work. This is normally a final state, but
   `ARCHITECT-REVIEWER` may roll it back when later evidence shows the work is
-  wrong or invalid.
+  wrong or invalid. If the project registry declares a
+  `default_for: production_deploy` stand profile, entering `verified/` also
+  queues a coordd-owned system deploy lease from the merged default branch; the
+  lease auto-releases after a successful deploy.
 - `archive/`: abandoned, superseded, or withdrawn work.
 
 A verified task can leave `verified/` only through an explicit reviewer

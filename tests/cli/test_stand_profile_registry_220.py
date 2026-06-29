@@ -44,8 +44,9 @@ def test_setup_seeds_project_stand_profile_registry(tmp_path: Path) -> None:
     registry = reg.load_registry(coord)
     assert set(registry.profiles) == {"smoke-only", "full-deploy", "vite-dev"}
     assert registry.profiles["full-deploy"].default_for == (
-        "feature_test", "explorer", "reviewer",
+        "feature_test", "explorer", "reviewer", "production_deploy",
     )
+    assert registry.profiles["vite-dev"].restore_profile == "full-deploy"
 
 
 def test_registry_maps_profile_name_to_different_yaml_file(tmp_path: Path) -> None:
@@ -107,6 +108,25 @@ def test_registry_rejects_duplicate_default_tokens(tmp_path: Path) -> None:
     with pytest.raises(GreatMindsError) as exc:
         reg.load_registry(coord)
     assert "claimed by both" in str(exc.value)
+
+
+def test_registry_rejects_unknown_restore_profile(tmp_path: Path) -> None:
+    coord = _coord(tmp_path)
+    _write_registry(coord, {
+        "profiles": {
+            "vite-dev": {
+                "file": "vite-dev.yaml",
+                "purpose": "live UI",
+                "used_for": ["live_ui"],
+                "default_for": ["live_developer"],
+                "restore_profile": "full-deploy",
+            }
+        }
+    })
+    with pytest.raises(GreatMindsError) as exc:
+        reg.load_registry(coord)
+    assert "restore_profile" in str(exc.value)
+    assert "not registered" in str(exc.value)
 
 
 def test_stand_profiles_doctor_reports_missing_playbook(tmp_path: Path, monkeypatch) -> None:

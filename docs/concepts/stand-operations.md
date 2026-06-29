@@ -161,7 +161,16 @@ profiles:
     default_for: [production_deploy, production_review]
 ```
 
-The CLI enforces `allowed_roles` and requires an explicit approval marker:
+When a product task moves from `feature_review/` to `verified/`, Greatminds
+looks for the profile whose registry entry includes
+`default_for: [production_deploy]`. If one exists, coordd creates an internal
+system lifecycle lease (`holder_role: COORDD`) from the current merged project
+tree and runs that profile. This is not agent/model work and does not file an
+inbox task. On deploy success the system lease auto-releases, returning the
+singleton to `free` or promoting the next queued lease.
+
+The CLI still enforces `allowed_roles` and requires an explicit approval marker
+for manually requested production leases:
 
 ```bash
 greatminds stand lease \
@@ -169,6 +178,22 @@ greatminds stand lease \
   --profile production \
   --profile-approval USER_APPROVED
 ```
+
+Live or development profiles that displace a public upstream can declare the
+profile that restores it:
+
+```yaml
+profiles:
+  vite-dev:
+    file: vite-dev.yaml
+    used_for: [live_ui]
+    default_for: [live_developer]
+    restore_profile: production
+```
+
+On release, reclaim, or deploy failure of that live profile, Greatminds queues a
+front-of-line system restore lease for the named profile. The restore lease also
+auto-releases after successful deploy.
 
 ## State File
 

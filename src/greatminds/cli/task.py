@@ -2508,6 +2508,26 @@ def _do_move(coord: Path, role: str, task_id: str,
     })
     # 0185: post-move worktree cleanup (archive).
     _worktree_hook_post_move(coord, task_id, data, to_q)
+    if to_q == "verified" and from_q == "feature_review":
+        try:
+            from greatminds.cli.stand import enqueue_default_production_deploy
+            lease_id = enqueue_default_production_deploy(
+                coord,
+                task_id=task_id,
+                reason=f"verified task {task_id} production deploy",
+            )
+        except Exception:
+            lease_id = None
+        if lease_id:
+            journal_append(coord, {
+                "t": now_iso(),
+                "actor": "COORDD",
+                "task": task_id,
+                "from": "verified",
+                "to": ".stand",
+                "reason": "queued production deploy after verification",
+                "lease_id": lease_id,
+            })
     touch_heartbeat(coord, role)
     return from_q
 

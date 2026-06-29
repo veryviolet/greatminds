@@ -245,6 +245,7 @@ def _holder_role() -> str:
 
 
 STAND_GLOBAL_CONTROL_ROLES = frozenset({"MAINTAINER"})
+SYSTEM_HOLDER_ROLE = "COORDD"
 
 
 def _require_stand_global_control_role(command: str) -> str:
@@ -280,6 +281,159 @@ def _lease_expired(lease: dict) -> bool:
     if t0.tzinfo is None:
         t0 = t0.replace(tzinfo=timezone.utc)
     return datetime.now(tz=timezone.utc) >= t0 + timedelta(seconds=int(ttl))
+
+
+def enqueue_system_lease(
+    coord: Path,
+    *,
+    task_id: str,
+    worktree: str | Path,
+    profile: str,
+    profile_file: str,
+    profile_registry: str,
+    profile_registry_source: str,
+    lifecycle: str,
+    reason: str,
+    ttl_seconds: int | None = None,
+    front: bool = False,
+) -> str:
+    """Queue or start an internal lifecycle deploy lease.
+
+    This is not an agent/model lease. It is a coordd-owned serialization
+    record for lifecycle deploys such as verified->production promotion or
+    restoring a service displaced by a live-dev profile. Successful deploys
+    auto-release in ``deploy_lease``.
+    """
+    from greatminds.cli import stand_state as ss
+
+    if ttl_seconds is None:
+        ttl_seconds = 14400
+    new_lease_id = uuid.uuid4().hex
+    lease_obj = {
+        "lease_id": new_lease_id,
+        "task": task_id,
+        "worktree": str(worktree),
+        "profile": profile,
+        "profile_file": profile_file,
+        "profile_registry": profile_registry,
+        "profile_registry_source": profile_registry_source,
+        "holder_role": SYSTEM_HOLDER_ROLE,
+        "ttl_seconds": ttl_seconds,
+        "enqueued_at": ss.now_iso(),
+        "system_lifecycle": lifecycle,
+        "auto_release_on_deploy_success": True,
+    }
+
+    def mutator(state):
+        if state.get("state") == "down":
+            queue = state.get("queue") or []
+            if front:
+                queue.insert(0, lease_obj)
+            else:
+                queue.append(lease_obj)
+            state["queue"] = queue
+            return
+        if state.get("state") == "free":
+            lease_obj["granted_at"] = ss.now_iso()
+            lease_obj["ready_at"] = None
+            state["active_lease"] = lease_obj
+            state["down_reason"] = None
+            ss.record_transition(
+                state, "free", "preparing", SYSTEM_HOLDER_ROLE,
+                lease_id=new_lease_id,
+                reason=reason,
+            )
+            return
+        queue = state.get("queue") or []
+        if front:
+            queue.insert(0, lease_obj)
+        else:
+            queue.append(lease_obj)
+        state["queue"] = queue
+
+    ss.update_stand_state(coord, mutator)
+    _emit_stand_available_event(coord, reason=reason)
+    return new_lease_id
+
+
+def enqueue_default_production_deploy(
+    coord: Path,
+    *,
+    task_id: str,
+    reason: str,
+) -> str | None:
+    """Queue the project's ``default_for: production_deploy`` profile.
+
+    If the project has not opted into a production/default deploy profile,
+    this is a no-op. The deployment source is the current project tree after
+    REVIEWER's merge to the default branch.
+    """
+    try:
+        from greatminds.cli.stand_profile_registry import profile_for_default
+        resolved = profile_for_default(coord, "production_deploy")
+    except GreatMindsError:
+        return None
+    if resolved is None:
+        return None
+    registry, entry = resolved
+    return enqueue_system_lease(
+        coord,
+        task_id=task_id,
+        worktree=coord.parent,
+        profile=entry.name,
+        profile_file=entry.file,
+        profile_registry=str(registry.path),
+        profile_registry_source=registry.source,
+        lifecycle="production_deploy",
+        reason=reason,
+    )
+
+
+def _enqueue_restore_profile_for_lease(
+    coord: Path,
+    lease: dict[str, Any] | None,
+    *,
+    reason: str,
+) -> str | None:
+    if not lease:
+        return None
+    profile = lease.get("profile")
+    if not profile:
+        return None
+    try:
+        from greatminds.cli.stand_profile_registry import load_registry
+        registry = load_registry(coord, worktree=lease.get("worktree"))
+        entry = registry.require(str(profile))
+        if not entry.restore_profile:
+            return None
+        restore = registry.require(entry.restore_profile)
+    except GreatMindsError:
+        return None
+    return enqueue_system_lease(
+        coord,
+        task_id=str(lease.get("task") or "0000-system-restore"),
+        worktree=coord.parent,
+        profile=restore.name,
+        profile_file=restore.file,
+        profile_registry=str(registry.path),
+        profile_registry_source=registry.source,
+        lifecycle="restore_profile",
+        reason=reason,
+        front=True,
+    )
+
+
+def _lease_has_restore_profile(coord: Path,
+                               lease: dict[str, Any] | None) -> bool:
+    if not lease or not lease.get("profile"):
+        return False
+    try:
+        from greatminds.cli.stand_profile_registry import load_registry
+        registry = load_registry(coord, worktree=lease.get("worktree"))
+        entry = registry.require(str(lease.get("profile")))
+        return bool(entry.restore_profile)
+    except GreatMindsError:
+        return False
 
 
 def _holder_alive(coord: Path, holder_role: str) -> bool:
@@ -529,6 +683,8 @@ def stand_release(lease_id: str, result: str) -> None:
     pre_active = pre_state.get("active_lease") or {}
     if pre_active and pre_active.get("lease_id") == lease_id:
         if pre_active.get("holder_role") == holder:
+            captured["needs_restore"] = _lease_has_restore_profile(
+                coord, dict(pre_active))
             _teardown_lease(coord, dict(pre_active),
                             reason=f"release-{result}")
 
@@ -554,7 +710,8 @@ def stand_release(lease_id: str, result: str) -> None:
             # 0343: the documented "pops the next FIFO queue entry"
             # must actually happen — promote the head lease so a queued
             # validation activates without a manual re-lease.
-            captured["promoted"] = ss.promote_head_on_free(state, holder)
+            if not captured.get("needs_restore"):
+                captured["promoted"] = ss.promote_head_on_free(state, holder)
             return
         # Look in queue — cancellation case.
         queue = state.get("queue") or []
@@ -582,11 +739,18 @@ def stand_release(lease_id: str, result: str) -> None:
             )
 
     ss.update_stand_state(coord, mutator)
+    restore_id = None
     if captured.get("was_active"):
+        restore_id = _enqueue_restore_profile_for_lease(
+            coord, captured.get("lease"),
+            reason=f"restore displaced profile after release-{result}",
+        )
         msg = f"released lease {lease_id} (result={result})"
         if captured.get("promoted"):
             msg += (f"; auto-promoted queued lease "
                     f"{captured['promoted']} → preparing")
+        elif restore_id:
+            msg += f"; queued restore lease {restore_id}"
         else:
             _emit_stand_available_event(coord, reason=f"release-{result}")
         click.echo(msg)
@@ -649,6 +813,8 @@ def stand_reclaim(lease_id: str | None) -> None:
         captured["lease_id"] = active.get("lease_id")
         captured["holder"] = hr
         captured["lease"] = dict(active)
+        captured["needs_restore"] = _lease_has_restore_profile(
+            coord, dict(active))
         state["active_lease"] = None
         ss.record_transition(
             state, state.get("state") or "preparing", "free", role,
@@ -659,15 +825,22 @@ def stand_reclaim(lease_id: str | None) -> None:
         # else a reclaimed stand is freed but a queued lease (e.g. TESTER
         # waiting behind a dead holder) is never promoted — the stand stays
         # free-with-pending-queue forever.
-        captured["promoted"] = ss.promote_head_on_free(state, role)
+        if not captured.get("needs_restore"):
+            captured["promoted"] = ss.promote_head_on_free(state, role)
 
     ss.update_stand_state(coord, mutator)
     _teardown_lease(coord, captured.get("lease"), reason="reclaim")
+    restore_id = _enqueue_restore_profile_for_lease(
+        coord, captured.get("lease"),
+        reason="restore displaced profile after reclaim",
+    )
     msg = (f"reclaimed expired lease {captured['lease_id']} "
            f"(holder {captured['holder']} not alive); stand → free")
     if captured.get("promoted"):
         msg += (f"; auto-promoted queued lease "
                 f"{captured['promoted']} → preparing")
+    elif restore_id:
+        msg += f"; queued restore lease {restore_id}"
     else:
         _emit_stand_available_event(coord, reason="reclaim")
     click.echo(msg)
@@ -706,6 +879,10 @@ def stand_down(reason: str) -> None:
 
     ss.update_stand_state(coord, mutator)
     _teardown_lease(coord, captured.get("lease"), reason="stand-down")
+    _enqueue_restore_profile_for_lease(
+        coord, captured.get("lease"),
+        reason="restore displaced profile after stand-down",
+    )
     # 0291: auto-notify PLANNER on down so they don't need to poll
     # state.yaml. Best-effort — failure to send doesn't block the
     # transition (state.yaml is the FSM source-of-truth; the inbox
@@ -1249,10 +1426,15 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
                 state["active_lease"] = None
                 ss.record_transition(state, prev, "free", "COORDD",
                                      lease_id=lid, reason=reason)
-                cap["promoted"] = ss.promote_head_on_free(
-                    state, "COORDD", poison=dict(cap))
+                if not _lease_has_restore_profile(coord, cap):
+                    cap["promoted"] = ss.promote_head_on_free(
+                        state, "COORDD", poison=dict(cap))
 
             ss.update_stand_state(coord, _fail_refresh)
+            _enqueue_restore_profile_for_lease(
+                coord, cap,
+                reason="restore displaced profile after worktree-refresh-failed",
+            )
             if not cap.get("promoted"):
                 _emit_stand_available_event(coord, reason="worktree-refresh")
             for tgt in dict.fromkeys(
@@ -1305,10 +1487,15 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
             state["active_lease"] = None
             ss.record_transition(state, prev, "free", "COORDD",
                                  lease_id=lid, reason=reason)
-            cap["promoted"] = ss.promote_head_on_free(
-                state, "COORDD", poison=dict(cap))
+            if not _lease_has_restore_profile(coord, cap):
+                cap["promoted"] = ss.promote_head_on_free(
+                    state, "COORDD", poison=dict(cap))
 
         ss.update_stand_state(coord, _fail_stale)
+        _enqueue_restore_profile_for_lease(
+            coord, cap,
+            reason="restore displaced profile after stale-deployment",
+        )
         if not cap.get("promoted"):
             _emit_stand_available_event(coord, reason="stale-deployment")
         # Notify the lease holder (so the resumed session sees the block
@@ -1381,15 +1568,32 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
 
         def _ready(state):
             active = state.get("active_lease") or {}
+            auto_release = bool(active.get("auto_release_on_deploy_success"))
             active["ready_at"] = ss.now_iso()
             ready_cap["holder"] = active.get("holder_role", "")
             ready_cap["task"] = active.get("task", "")
+            ready_cap["auto_release"] = auto_release
             ss.record_transition(
                 state, "preparing", "ready", "COORDD", lease_id=lid,
                 reason=f"deploy ok (profile {profile!r} from {spec.source})")
+            if auto_release:
+                state["active_lease"] = None
+                ss.record_transition(
+                    state, "ready", "free", "COORDD", lease_id=lid,
+                    reason=(
+                        "system lifecycle deploy complete "
+                        f"({active.get('system_lifecycle')})"
+                    ),
+                )
+                ready_cap["promoted"] = ss.promote_head_on_free(
+                    state, "COORDD")
 
         ss.update_stand_state(coord, _ready)
-        if ready_cap.get("holder"):
+        if ready_cap.get("auto_release"):
+            if not ready_cap.get("promoted"):
+                _emit_stand_available_event(
+                    coord, reason="system-lifecycle-deploy-ok")
+        elif ready_cap.get("holder"):
             _file_inbox_info(
                 coord, ready_cap["holder"],
                 f"stand lease {lid} ready; "
@@ -1419,10 +1623,15 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
             state["active_lease"] = None
             ss.record_transition(state, prev, "free", "COORDD",
                                  lease_id=lid, reason=reason)
-            cap["promoted"] = ss.promote_head_on_free(
-                state, "COORDD", poison=dict(cap))
+            if not _lease_has_restore_profile(coord, cap):
+                cap["promoted"] = ss.promote_head_on_free(
+                    state, "COORDD", poison=dict(cap))
 
         ss.update_stand_state(coord, _fail_lease)
+        _enqueue_restore_profile_for_lease(
+            coord, cap,
+            reason=f"restore displaced profile after deploy-rc-{rc}",
+        )
         if not cap.get("promoted"):
             _emit_stand_available_event(coord, reason=f"deploy-rc-{rc}")
         holder = cap.get("holder_role")
