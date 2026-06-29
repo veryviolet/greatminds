@@ -1714,12 +1714,32 @@ files into the task overlay.</p>
 <span class="w">    </span><span class="nt">used_for</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">production_deploy</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">production_post_deploy_review</span><span class="p p-Indicator">]</span>
 <span class="w">    </span><span class="nt">default_for</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">production_deploy</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">production_review</span><span class="p p-Indicator">]</span>
 </code></pre></div>
-<p>The CLI enforces <code>allowed_roles</code> and requires an explicit approval marker:</p>
+<p>When a product task moves from <code>feature_review/</code> to <code>verified/</code>, Greatminds
+looks for the profile whose registry entry includes
+<code>default_for: [production_deploy]</code>. If one exists, coordd creates an internal
+system lifecycle lease (<code>holder_role: COORDD</code>) from the current merged project
+tree and runs that profile. This is not agent/model work and does not file an
+inbox task. On deploy success the system lease auto-releases, returning the
+singleton to <code>free</code> or promoting the next queued lease.</p>
+<p>The CLI still enforces <code>allowed_roles</code> and requires an explicit approval marker
+for manually requested production leases:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>lease<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--task<span class="w"> </span>&lt;task-id&gt;<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--profile<span class="w"> </span>production<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--profile-approval<span class="w"> </span>USER_APPROVED
 </code></pre></div>
+<p>Live or development profiles that displace a public upstream can declare the
+profile that restores it:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">profiles</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">vite-dev</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vite-dev.yaml</span>
+<span class="w">    </span><span class="nt">used_for</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">live_ui</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">default_for</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">live_developer</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">restore_profile</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production</span>
+</code></pre></div>
+<p>On release, reclaim, or deploy failure of that live profile, Greatminds queues a
+front-of-line system restore lease for the named profile. The restore lease also
+auto-releases after successful deploy.</p>
 <h2 id="state-file">State File<a class="headerlink" href="#state-file" title="Permanent link">&para;</a></h2>
 <p>The source of truth is:</p>
 <div class="highlight"><pre><span></span><code>.greatminds/.stand/state.yaml

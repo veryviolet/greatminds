@@ -1494,7 +1494,10 @@ role.</p>
 <li><code>feature_blocked/</code>: tasks parked on explicit dependencies.</li>
 <li><code>verified/</code>: approved work. This is normally a final state, but
   <code>ARCHITECT-REVIEWER</code> may roll it back when later evidence shows the work is
-  wrong or invalid.</li>
+  wrong or invalid. If the project registry declares a
+  <code>default_for: production_deploy</code> stand profile, entering <code>verified/</code> also
+  queues a coordd-owned system deploy lease from the merged default branch; the
+  lease auto-releases after a successful deploy.</li>
 <li><code>archive/</code>: abandoned, superseded, or withdrawn work.</li>
 </ul>
 <p>A verified task can leave <code>verified/</code> only through an explicit reviewer
