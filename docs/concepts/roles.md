@@ -12,7 +12,8 @@ Product roles:
   lifecycle: `driven`.
 - `LIVE-DEVELOPER`: USER-paced scenario-C work from `feature_live` on a leased
   stand. For that interactive path it authors the implementation block for
-  backend or UI scope and hands the sprint task to review.
+  backend or UI scope, marks it ready after live USER validation, and hands the
+  sprint task directly to `feature_review`.
 - `TECHNICAL-WRITER`: documentation implementation. Lifecycle: `driven`.
 - `TESTER`: validates implemented code and records test evidence. Lifecycle:
   `driven`.

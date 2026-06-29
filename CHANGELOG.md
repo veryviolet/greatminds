@@ -4,6 +4,14 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 2.7.7 — 2026-06-29
+
+### Fixed
+
+- `feature_live -> feature_review` now uses the latest `implementation` block
+  and its `ready_for_test` flag for readiness, so `LIVE-DEVELOPER` can complete
+  the scenario-C handoff after USER-approved live validation.
+
 ## 2.7.6 — 2026-06-29
 
 ### Fixed

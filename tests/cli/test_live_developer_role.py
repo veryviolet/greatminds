@@ -247,3 +247,38 @@ def test_live_developer_scope_bypass_is_limited_to_interactive_path() -> None:
 
     assert err is not None
     assert "requires UI-DEVELOPER" in err
+
+
+def test_feature_live_to_review_readiness_uses_implementation_block() -> None:
+    data = {
+        "stream": "product",
+        "kind": "feature",
+        "scope": "ui",
+        "blocks": [
+            {"kind": "plan", "interactive": True},
+            {"kind": "implementation", "ready_for_test": True},
+        ],
+    }
+
+    assert task_mod.require_target_readiness(
+        data, "feature_live", "feature_review") is None
+    assert task_mod.can_role_move(
+        "LIVE-DEVELOPER", "feature_live", "feature_review", data) is None
+
+
+def test_feature_live_to_review_requires_ready_implementation() -> None:
+    data = {
+        "stream": "product",
+        "kind": "feature",
+        "scope": "ui",
+        "blocks": [
+            {"kind": "plan", "interactive": True},
+            {"kind": "implementation", "ready_for_test": False},
+        ],
+    }
+
+    with pytest.raises(task_mod.GreatMindsError) as exc:
+        task_mod.require_target_readiness(
+            data, "feature_live", "feature_review")
+
+    assert "implementation.ready_for_test=true" in str(exc.value)

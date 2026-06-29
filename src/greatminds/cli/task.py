@@ -940,6 +940,8 @@ def require_target_readiness(data: dict[str, Any],
             block_kind, flag = "tests", "ready_for_review"
         elif from_q == "feature_docs_review":
             block_kind, flag = "reader_review", "ready_for_architect"
+        elif from_q == "feature_live":
+            block_kind, flag = "implementation", "ready_for_test"
         elif from_q == "feature_blocked":
             return
         elif from_q == "verified":
