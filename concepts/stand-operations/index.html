@@ -1694,7 +1694,10 @@ teardown did not run. When the stand is already <code>free</code> and no lease o
 coordd runs the declared-port cleanup on startup and on the stand-free periodic
 hook. Before deploying any non-<code>vite-dev</code> profile, Greatminds also clears that
 declared Vite port so a leftover live-UI server cannot block a packaged UI
-bind on the same port.</p>
+bind on the same port. Cleanup targets every stand host declared through
+<code>STAND_HOST</code> or <code>STAND_HOST_*</code> (<code>STAND_HOST_A</code>, <code>STAND_HOST_B</code>, and so on), so
+remote multi-node fleets do not accidentally clean localhost while the dev
+server is still running on the stand node.</p>
 <p>Before a stand profile is loaded from a lease worktree, Greatminds refreshes
 that task worktree from the current <code>worktrees.default_branch</code> when the path is
 a real git worktree. This lets old in-flight tasks pick up committed
