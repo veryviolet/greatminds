@@ -143,6 +143,47 @@ def test_create_falls_back_to_main_head_when_no_plan(repo: Path) -> None:
     assert cp.stdout.strip() == main_sha
 
 
+# ---------- worktree_refresh ----------
+
+
+def test_refresh_merges_current_main_and_preserves_overlay(repo: Path) -> None:
+    """An old task worktree can pick up infra/profile fixes committed to
+    default_branch after it was created, without losing uncommitted work."""
+    wt_path = wt_mod.worktree_create(repo, "0185-refresh", base="main")
+    (repo / "profile.yaml").write_text("fixed-profile\n", encoding="utf-8")
+    _git(["add", "profile.yaml"], repo)
+    _git(["commit", "-m", "fix profile"], repo)
+    (wt_path / "feature.txt").write_text("uncommitted overlay\n",
+                                         encoding="utf-8")
+
+    result = wt_mod.worktree_refresh(repo, "0185-refresh")
+
+    assert result.ok is True
+    assert result.changed is True
+    assert (wt_path / "profile.yaml").read_text(
+        encoding="utf-8") == "fixed-profile\n"
+    assert (wt_path / "feature.txt").read_text(
+        encoding="utf-8") == "uncommitted overlay\n"
+    status = _git(["status", "--porcelain"], wt_path).stdout
+    assert "feature.txt" in status
+
+
+def test_cli_refresh_reports_success(repo: Path) -> None:
+    from click.testing import CliRunner
+    wt_mod.worktree_create(repo, "0185-refresh-cli", base="main")
+    (repo / "base.txt").write_text("new\n", encoding="utf-8")
+    _git(["add", "base.txt"], repo)
+    _git(["commit", "-m", "advance main"], repo)
+
+    res = CliRunner().invoke(
+        wt_mod.worktree,
+        ["refresh", "0185-refresh-cli", "--project-dir", str(repo)],
+    )
+
+    assert res.exit_code == 0, res.output
+    assert "refreshed" in res.output
+
+
 # ---------- worktree_remove ----------
 
 

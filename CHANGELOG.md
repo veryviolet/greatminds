@@ -4,6 +4,26 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 2.7.4 — 2026-06-29
+
+### Fixed
+
+- Claude `autoMode.allow` now includes the FSM commands a driven
+  ARCHITECT-REVIEWER must run: `greatminds task mv`, `greatminds worktree`,
+  and `git revert`. Setup propagates these entries into
+  `.claude/settings.local.json`, so a REVIEWER can complete the verified merge
+  path without a manual classifier override.
+- Added `greatminds worktree refresh <task-id>` and made stand deploy refresh
+  a real lease worktree from the current `worktrees.default_branch` before
+  stale-dependency checks and profile loading. In-flight tasks cut before an
+  infra/profile fix landed can now pick up that committed fix without copying
+  files into the worktree or using raw `git rebase`.
+- Non-`vite-dev` deploys now clear the declared Vite dev-server port before
+  dispatching their profile when `PROJECT.env` declares `VITE_DEV_PORT` or
+  `vite_port`. This closes the remaining `vite-dev` -> `full-deploy` port
+  collision where a survived Vite process could block the next packaged UI
+  bind after the new lease was already active.
+
 ## 2.7.3 — 2026-06-27
 
 ### Fixed

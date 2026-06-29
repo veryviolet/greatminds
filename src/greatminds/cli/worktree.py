@@ -9,6 +9,7 @@ that touch the same files.
 Subcommands::
 
     greatminds worktree create <task-id> [--base <sha>]
+    greatminds worktree refresh <task-id>
     greatminds worktree remove <task-id> [--force]
     greatminds worktree merge  <task-id>
     greatminds worktree list
@@ -383,6 +384,104 @@ class MergeResult:
     message: str
 
 
+@dataclass(frozen=True)
+class RefreshResult:
+    """Outcome of refreshing a task branch from the default branch."""
+    ok: bool
+    changed: bool
+    conflicts: tuple[str, ...]
+    message: str
+
+
+def _porcelain_dirty(cwd: Path) -> bool:
+    cp = _run_git(["status", "--porcelain"], cwd=cwd, check=False)
+    return cp.returncode == 0 and bool((cp.stdout or "").strip())
+
+
+def _conflicted_paths(cwd: Path) -> tuple[str, ...]:
+    cp = _run_git(["diff", "--name-only", "--diff-filter=U"],
+                  cwd=cwd, check=False)
+    return tuple(
+        line.strip() for line in (cp.stdout or "").splitlines()
+        if line.strip()
+    )
+
+
+def worktree_refresh(project_dir: Path, task_id: str,
+                     policy: WorktreePolicy | None = None) -> RefreshResult:
+    """Merge the current default_branch into a task worktree branch.
+
+    This is the sanctioned refresh path for in-flight tasks whose worktree was
+    cut before an infrastructure/profile fix landed on the project's base
+    branch. It deliberately uses ``git merge`` instead of ``git rebase``:
+    agents are forbidden from raw rebase, and merge preserves the task branch
+    identity while bringing in the advanced base.
+    """
+    policy = policy or load_worktree_policy(project_dir)
+    task_id = canonical_task_id(project_dir, task_id)
+    wt_path = policy.worktree_path_for(project_dir, task_id)
+    if not (wt_path.is_dir() and (wt_path / ".git").exists()):
+        raise GreatMindsError(
+            f"worktree refresh: no git worktree for {task_id} at {wt_path}",
+            exit_code=2,
+        )
+    target = policy.default_branch
+    _run_git(["fetch", "origin", target], cwd=project_dir, check=False)
+    anc = _run_git(["merge-base", "--is-ancestor", target, "HEAD"],
+                   cwd=wt_path, check=False)
+    if anc.returncode == 0:
+        return RefreshResult(
+            ok=True, changed=False, conflicts=(),
+            message=f"worktree {task_id} already contains {target}",
+        )
+
+    stashed = False
+    if _porcelain_dirty(wt_path):
+        stash = _run_git(
+            ["stash", "push", "--include-untracked",
+             "-m", f"greatminds-refresh-{task_id}"],
+            cwd=wt_path, check=False,
+        )
+        if stash.returncode != 0:
+            raise GreatMindsError(
+                f"worktree refresh: failed to stash overlay for {task_id}: "
+                f"{(stash.stderr or stash.stdout or '').strip()[:300]}",
+                exit_code=3,
+            )
+        stashed = True
+
+    merge = _run_git(["merge", "--no-edit", target],
+                     cwd=wt_path, check=False)
+    if merge.returncode != 0:
+        conflicts = _conflicted_paths(wt_path)
+        _run_git(["merge", "--abort"], cwd=wt_path, check=False)
+        if stashed:
+            _run_git(["stash", "pop"], cwd=wt_path, check=False)
+        return RefreshResult(
+            ok=False, changed=False, conflicts=conflicts,
+            message=f"refresh {task_id} from {target} conflicted on "
+                    f"{len(conflicts)} file(s): "
+                    f"{', '.join(conflicts[:5])}",
+        )
+
+    if stashed:
+        pop = _run_git(["stash", "pop"], cwd=wt_path, check=False)
+        if pop.returncode != 0:
+            conflicts = _conflicted_paths(wt_path)
+            return RefreshResult(
+                ok=False, changed=True, conflicts=conflicts,
+                message=f"refresh {task_id} merged {target}, but restoring "
+                        f"the worktree overlay conflicted on "
+                        f"{len(conflicts)} file(s): "
+                        f"{', '.join(conflicts[:5])}",
+            )
+
+    return RefreshResult(
+        ok=True, changed=True, conflicts=(),
+        message=f"refreshed {task_id} from {target}",
+    )
+
+
 def _commit_worktree_overlay(project_dir: Path, task_id: str,
                              policy: WorktreePolicy) -> bool:
     """0383: commit a per-task worktree's uncommitted overlay onto the
@@ -585,6 +684,27 @@ def cli_remove(task_id: str, force: bool,
         ok(f"removed worktree {task_id}")
     else:
         info(f"no worktree at {task_id} (already gone)")
+
+
+@worktree.command("refresh")
+@click.argument("task_id")
+@click.option("--project-dir", default=None,
+              type=click.Path(file_okay=False, dir_okay=True, path_type=Path))
+def cli_refresh(task_id: str, project_dir: Path | None) -> None:
+    """Refresh TASK_ID's worktree from the current default branch."""
+    pd = project_dir or _default_project_dir()
+    try:
+        result = worktree_refresh(pd, task_id)
+    except GreatMindsError as exc:
+        err(str(exc))
+        raise SystemExit(getattr(exc, "exit_code", 2) or 2)
+    if result.ok:
+        (ok if result.changed else info)(result.message)
+        return
+    warn(result.message)
+    for f in result.conflicts:
+        click.echo(f"  conflict: {f}")
+    raise SystemExit(3)
 
 
 @worktree.command("merge")

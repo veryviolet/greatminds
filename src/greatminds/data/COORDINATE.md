@@ -562,6 +562,12 @@ Lifecycle:
 - The implementer works from `.worktrees/<task-id>/`, so unrelated
   tasks cannot contaminate the main checkout or each other's working
   trees.
+- `greatminds worktree refresh <task-id>` merges the current
+  `worktrees.default_branch` into an existing task branch while preserving the
+  task's uncommitted overlay. Stand deploy runs this automatically for a real
+  lease worktree before loading that worktree's profile, so in-flight tasks can
+  pick up committed infrastructure/profile fixes that landed after the
+  worktree was created.
 - `greatminds task mv ... verified` by REVIEWER merges the task branch
   back with `--no-ff`, preserving an explicit task boundary in git
   history.

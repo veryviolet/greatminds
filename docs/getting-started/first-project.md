@@ -86,9 +86,9 @@ arrive.
 
 During setup, greatminds writes or extends
 `.claude/settings.local.json`. New files include the Stop hook,
-`autoMode.allow: ["$defaults"]`, and the canonical
-`permissions.allow` entries from the packaged schema under
-`claude_settings.permissions.allow`.
+the canonical `autoMode.allow` entries from
+`claude_settings.auto_mode.allow`, and the canonical `permissions.allow`
+entries from the packaged schema under `claude_settings.permissions.allow`.
 
 Those allow rules let unattended Claude roles perform the git operations they
 are authorized to run, such as reviewer commit, tag, push, merge, branch,
@@ -97,9 +97,9 @@ pause on an approval prompt that a driven or self-loop role cannot answer.
 
 Project operators can add their own `permissions.allow` entries directly in
 `.claude/settings.local.json`. Re-running `greatminds setup` unions the schema
-defaults into the existing list, deduplicates them, and preserves operator-added
-rules. For a valid existing file, setup leaves other top-level settings such as
-custom hooks and `autoMode` untouched.
+defaults into the existing permission and auto-mode lists, deduplicates them,
+and preserves operator-added rules. For a valid existing file, setup leaves
+other top-level settings such as custom hooks untouched.
 
 ## Claude marketplace plugins
 

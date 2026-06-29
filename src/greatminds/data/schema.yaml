@@ -1363,6 +1363,14 @@ claude_settings:
       - "Bash(git push origin main:*)"
       - "Bash(git push origin main --follow-tags:*)"
       - "Bash(git push --follow-tags:*)"
+      # REVIEWER's canonical terminal transition is not raw git: it is
+      # `greatminds task mv <id> verified`, which performs the sanctioned
+      # worktree merge. Driven Claude REVIEWER sessions must be able to run
+      # that FSM command, and the related worktree lifecycle commands, under
+      # auto-mode.
+      - "Bash(greatminds task mv:*)"
+      - "Bash(greatminds worktree:*)"
+      - "Bash(git revert:*)"
       # ssh/scp/rsync also need to live in auto_mode.allow, not just
       # permissions.allow — the classifier's auto-mode ceiling is a
       # SEPARATE gate. Without the parallel entries a stand probe from

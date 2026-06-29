@@ -221,3 +221,34 @@ def test_cleanup_free_stand_orphans_skips_active_lease(tmp_path, monkeypatch):
     assert stand_mod.cleanup_free_stand_orphans(coord) is False
 
     assert calls == []
+
+
+def test_pre_deploy_cleanup_clears_vite_before_full_deploy(
+        tmp_path, monkeypatch):
+    coord = _coord(tmp_path)
+    (coord / "PROJECT.env").write_text(
+        "STAND_HOST=lattice-a\nVITE_DEV_PORT=4173\n", encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(stand_mod, "_cleanup_vite_port",
+                        lambda host, port: calls.append((host, port)))
+
+    cleaned = stand_mod.cleanup_conflicting_vite_before_deploy(
+        coord, {"profile": "full-deploy", "lease_id": "l2"})
+
+    assert cleaned is True
+    assert calls == [("lattice-a", "4173")]
+
+
+def test_pre_deploy_cleanup_skips_vite_profile(tmp_path, monkeypatch):
+    coord = _coord(tmp_path)
+    (coord / "PROJECT.env").write_text("VITE_DEV_PORT=4173\n",
+                                        encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(stand_mod, "_cleanup_vite_port",
+                        lambda host, port: calls.append((host, port)))
+
+    cleaned = stand_mod.cleanup_conflicting_vite_before_deploy(
+        coord, {"profile": "vite-dev", "lease_id": "l1"})
+
+    assert cleaned is False
+    assert calls == []

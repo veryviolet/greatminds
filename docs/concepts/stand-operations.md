@@ -134,7 +134,15 @@ declared Vite port (`VITE_DEV_PORT`, `vite_port`, or the profile default) so
 orphan processes on that declared port can be cleared even when profile-tagged
 teardown did not run. When the stand is already `free` and no lease owns it,
 coordd runs the declared-port cleanup on startup and on the stand-free periodic
-hook.
+hook. Before deploying any non-`vite-dev` profile, Greatminds also clears that
+declared Vite port so a leftover live-UI server cannot block a packaged UI
+bind on the same port.
+
+Before a stand profile is loaded from a lease worktree, Greatminds refreshes
+that task worktree from the current `worktrees.default_branch` when the path is
+a real git worktree. This lets old in-flight tasks pick up committed
+infrastructure or profile fixes from the base branch without copying those
+files into the task overlay.
 
 For a production deployment or post-deploy review, create a profile with:
 

@@ -28,6 +28,12 @@ RECOVERY_PATTERNS = (
     "Bash(systemctl --user:*)",
 )
 
+REVIEWER_FSM_PATTERNS = (
+    "Bash(greatminds task mv:*)",
+    "Bash(greatminds worktree:*)",
+    "Bash(git revert:*)",
+)
+
 
 def _schema_auto_mode() -> list[str]:
     doc = yaml.safe_load(
@@ -62,12 +68,22 @@ def test_schema_auto_mode_keeps_existing_entries() -> None:
         assert legacy in allow
 
 
+def test_schema_auto_mode_has_reviewer_fsm_patterns() -> None:
+    """Driven REVIEWER must be able to execute the FSM's own terminal
+    transition and rollback commands under Claude auto-mode."""
+    allow = _schema_auto_mode()
+    for pat in REVIEWER_FSM_PATTERNS:
+        assert pat in allow, (
+            f"auto_mode.allow missing REVIEWER FSM pattern {pat!r}"
+        )
+
+
 def test_helper_returns_recovery_patterns() -> None:
     """``_load_claude_settings_auto_mode_from_canon`` surfaces the
     recovery patterns so setup bakes them into the file."""
     allow = setup_mod._load_claude_settings_auto_mode_from_canon(
         find_canon_dir())
-    for pat in RECOVERY_PATTERNS:
+    for pat in RECOVERY_PATTERNS + REVIEWER_FSM_PATTERNS:
         assert pat in allow
 
 
@@ -81,7 +97,7 @@ def test_fresh_setup_writes_recovery_patterns(tmp_path: Path) -> None:
         tmp_path, canon=find_canon_dir())
     data = json.loads(text)
     allow = (data.get("autoMode") or {}).get("allow") or []
-    for pat in RECOVERY_PATTERNS:
+    for pat in RECOVERY_PATTERNS + REVIEWER_FSM_PATTERNS:
         assert pat in allow, (
             f"0313: settings.local.json autoMode.allow missing "
             f"{pat!r}"
@@ -111,7 +127,7 @@ def test_setup_merge_adds_recovery_to_legacy_file(
         (cclaude / "settings.local.json").read_text(encoding="utf-8")
     )
     allow = data["autoMode"]["allow"]
-    for pat in RECOVERY_PATTERNS:
+    for pat in RECOVERY_PATTERNS + REVIEWER_FSM_PATTERNS:
         assert pat in allow
     # Operator's custom entry survives.
     assert "Bash(custom-op:*)" in allow

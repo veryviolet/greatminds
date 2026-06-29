@@ -1064,6 +1064,33 @@ def cleanup_free_stand_orphans(coord: Path) -> bool:
     return True
 
 
+def cleanup_conflicting_vite_before_deploy(
+    coord: Path,
+    lease: dict[str, Any] | None,
+) -> bool:
+    """Free a declared Vite port before deploying a different profile.
+
+    ``vite-dev`` and a packaged UI profile may intentionally use the same
+    project port. If a previous Vite process survived release, the next
+    full-deploy must clear that declared port immediately before dispatching
+    its playbook, even though the stand is no longer ``free`` by then.
+    """
+    if not lease:
+        return False
+    if str(lease.get("profile") or "") == "vite-dev":
+        return False
+    try:
+        from greatminds.cli.stand_executor import read_project_env
+        env = read_project_env(coord)
+    except Exception:
+        env = {}
+    if not (env.get("VITE_DEV_PORT") or env.get("vite_port")):
+        return False
+    _generic_teardown_lease_resources(
+        coord, {"profile": "vite-dev"}, reason="pre-deploy-port-conflict")
+    return True
+
+
 def _cleanup_vite_port(host: str, port: str) -> None:
     script = f"""
 set +e
@@ -1132,6 +1159,67 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
 
     ss.update_stand_state(coord, _read)
 
+    lease_worktree = cap.get("worktree")
+    task_ref = cap.get("task") or ""
+    refreshable = False
+    if lease_worktree and (Path(str(lease_worktree)) / ".git").exists():
+        git_probe = subprocess.run(
+            ["git", "-C", str(lease_worktree),
+             "rev-parse", "--is-inside-work-tree"],
+            capture_output=True, text=True,
+        )
+        refreshable = (
+            git_probe.returncode == 0
+            and (git_probe.stdout or "").strip() == "true"
+        )
+    if refreshable:
+        try:
+            from greatminds.core.paths import find_project_dir
+            from greatminds.cli.worktree import worktree_refresh
+            refreshed = worktree_refresh(find_project_dir(coord),
+                                         str(task_ref))
+        except GreatMindsError as exc:
+            refreshed = None
+            refresh_error = str(exc)
+        else:
+            refresh_error = ""
+        if refreshed is not None and not refreshed.ok:
+            refresh_error = refreshed.message
+        if refresh_error:
+            lid = cap.get("lease_id")
+            holder = cap.get("holder_role")
+            reason = (
+                f"WORKTREE REFRESH failed before deploy: {refresh_error}. "
+                f"The stand profile was not run from stale worktree "
+                f"{lease_worktree}."
+            )
+            _teardown_lease(coord, cap, reason="worktree-refresh-failed")
+
+            def _fail_refresh(state):
+                prev = state.get("state") or "preparing"
+                state["last_deploy_failure"] = {
+                    "lease_id": lid,
+                    "task": task_ref,
+                    "profile": cap.get("profile"),
+                    "worktree": lease_worktree,
+                    "reason": reason,
+                }
+                state["last_failed_lease"] = dict(cap)
+                state["down_reason"] = None
+                state["active_lease"] = None
+                ss.record_transition(state, prev, "free", "COORDD",
+                                     lease_id=lid, reason=reason)
+                cap["promoted"] = ss.promote_head_on_free(
+                    state, "COORDD", poison=dict(cap))
+
+            ss.update_stand_state(coord, _fail_refresh)
+            if not cap.get("promoted"):
+                _emit_stand_available_event(coord, reason="worktree-refresh")
+            for tgt in dict.fromkeys(
+                    t for t in (holder, "ARCHITECT-PLANNER") if t):
+                _file_inbox_info(coord, tgt, reason, task_ref=task_ref)
+            return DEPLOY_STALE_RC, reason
+
     # 0388: refuse to deploy a STALE lease worktree — one missing the
     # verified-dependency code the leasing task was blocked on. Without
     # this, a resumed review_session redeploys its old base commit and
@@ -1196,7 +1284,6 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
     # (its coordination/stand-profiles/ copy), so a stand-profile fix under
     # review is the one deployed/validated — not the unchanged main-tree
     # copy. Falls back to the main tree when the worktree lacks it.
-    lease_worktree = cap.get("worktree")
     profile_file = cap.get("profile_file")
     if not profile_file:
         try:
@@ -1244,6 +1331,7 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
         if k in cap:
             lease_meta[k] = cap[k]
 
+    cleanup_conflicting_vite_before_deploy(coord, cap)
     rc, log = dispatch_profile(spec, lease_meta,
                                ansible_playbook=ansible_playbook,
                                timeout_seconds=timeout_seconds)
