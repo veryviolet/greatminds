@@ -1802,18 +1802,18 @@ arrive.</p>
 <h2 id="claude-local-settings">Claude local settings<a class="headerlink" href="#claude-local-settings" title="Permanent link">&para;</a></h2>
 <p>During setup, greatminds writes or extends
 <code>.claude/settings.local.json</code>. New files include the Stop hook,
-<code>autoMode.allow: ["$defaults"]</code>, and the canonical
-<code>permissions.allow</code> entries from the packaged schema under
-<code>claude_settings.permissions.allow</code>.</p>
+the canonical <code>autoMode.allow</code> entries from
+<code>claude_settings.auto_mode.allow</code>, and the canonical <code>permissions.allow</code>
+entries from the packaged schema under <code>claude_settings.permissions.allow</code>.</p>
 <p>Those allow rules let unattended Claude roles perform the git operations they
 are authorized to run, such as reviewer commit, tag, push, merge, branch,
 checkout, and worktree commands. Without explicit allow rules, Claude Code can
 pause on an approval prompt that a driven or self-loop role cannot answer.</p>
 <p>Project operators can add their own <code>permissions.allow</code> entries directly in
 <code>.claude/settings.local.json</code>. Re-running <code>greatminds setup</code> unions the schema
-defaults into the existing list, deduplicates them, and preserves operator-added
-rules. For a valid existing file, setup leaves other top-level settings such as
-custom hooks and <code>autoMode</code> untouched.</p>
+defaults into the existing permission and auto-mode lists, deduplicates them,
+and preserves operator-added rules. For a valid existing file, setup leaves
+other top-level settings such as custom hooks untouched.</p>
 <h2 id="claude-marketplace-plugins">Claude marketplace plugins<a class="headerlink" href="#claude-marketplace-plugins" title="Permanent link">&para;</a></h2>
 <p>During setup, greatminds installs curated Claude marketplace plugins for each
 Claude-hosted role from the packaged schema under <code>plugins.claude_marketplace</code>.

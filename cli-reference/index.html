@@ -1766,6 +1766,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#greatminds-worktree-refresh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        refresh
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#greatminds-worktree-remove" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3158,6 +3169,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#greatminds-worktree-refresh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        refresh
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#greatminds-worktree-remove" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4451,6 +4473,15 @@ isolated tree.</p>
 <p>Remove worktrees whose task_id is not in any active queue.</p>
 <p><strong>Usage:</strong></p>
 <div class="highlight"><pre><span></span><code>greatminds worktree prune [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --project-dir DIRECTORY
+  -h, --help               Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-worktree-refresh">greatminds worktree refresh<a class="headerlink" href="#greatminds-worktree-refresh" title="Permanent link">&para;</a></h4>
+<p>Refresh TASK_ID's worktree from the current default branch.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds worktree refresh [OPTIONS] TASK_ID
 </code></pre></div>
 <p><strong>Options:</strong></p>
 <div class="highlight"><pre><span></span><code>  --project-dir DIRECTORY

@@ -2787,6 +2787,14 @@ task needs another amendment or review cycle.</p>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;Bash(git</span><span class="nv"> </span><span class="s">push</span><span class="nv"> </span><span class="s">origin</span><span class="nv"> </span><span class="s">main:*)&quot;</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;Bash(git</span><span class="nv"> </span><span class="s">push</span><span class="nv"> </span><span class="s">origin</span><span class="nv"> </span><span class="s">main</span><span class="nv"> </span><span class="s">--follow-tags:*)&quot;</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;Bash(git</span><span class="nv"> </span><span class="s">push</span><span class="nv"> </span><span class="s">--follow-tags:*)&quot;</span>
+<span class="w">      </span><span class="c1"># REVIEWER&#39;s canonical terminal transition is not raw git: it is</span>
+<span class="w">      </span><span class="c1"># `greatminds task mv &lt;id&gt; verified`, which performs the sanctioned</span>
+<span class="w">      </span><span class="c1"># worktree merge. Driven Claude REVIEWER sessions must be able to run</span>
+<span class="w">      </span><span class="c1"># that FSM command, and the related worktree lifecycle commands, under</span>
+<span class="w">      </span><span class="c1"># auto-mode.</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;Bash(greatminds</span><span class="nv"> </span><span class="s">task</span><span class="nv"> </span><span class="s">mv:*)&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;Bash(greatminds</span><span class="nv"> </span><span class="s">worktree:*)&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;Bash(git</span><span class="nv"> </span><span class="s">revert:*)&quot;</span>
 <span class="w">      </span><span class="c1"># ssh/scp/rsync also need to live in auto_mode.allow, not just</span>
 <span class="w">      </span><span class="c1"># permissions.allow — the classifier&#39;s auto-mode ceiling is a</span>
 <span class="w">      </span><span class="c1"># SEPARATE gate. Without the parallel entries a stand probe from</span>
