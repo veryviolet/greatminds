@@ -4,6 +4,17 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 2.7.5 — 2026-06-29
+
+### Fixed
+
+- Vite teardown now targets remote stand hosts declared as `STAND_HOST_*`
+  (`STAND_HOST_A`, `STAND_HOST_B`, etc.) in addition to `STAND_HOST`. This
+  closes the remaining lease-release orphan case where cleanup fell back to
+  localhost while the dev server was still bound on the remote node.
+- Generic Vite cleanup now verifies the declared port is free after killing
+  pidfile, `pgrep`, and `fuser` matches, retrying force-kill before returning.
+
 ## 2.7.4 — 2026-06-29
 
 ### Fixed

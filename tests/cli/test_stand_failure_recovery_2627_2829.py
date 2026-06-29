@@ -166,7 +166,7 @@ def test_generic_vite_cleanup_runs_without_profile_teardown_tags(
         tmp_path, monkeypatch):
     coord = _coord(tmp_path)
     (coord / "PROJECT.env").write_text(
-        "STAND_HOST=lattice-a\nVITE_DEV_PORT=4173\n", encoding="utf-8")
+        "STAND_HOST=stand-a\nVITE_DEV_PORT=4173\n", encoding="utf-8")
     calls = []
 
     def fake_run(cmd, **kwargs):
@@ -185,8 +185,45 @@ def test_generic_vite_cleanup_runs_without_profile_teardown_tags(
 
     assert calls
     assert calls[0][0][0] == "ssh"
-    assert calls[0][0][1] == "lattice-a"
+    assert calls[0][0][1] == "stand-a"
     assert "4173/tcp" in calls[0][0][-1]
+
+
+def test_generic_vite_cleanup_uses_stand_host_a_when_stand_host_missing(
+        tmp_path, monkeypatch):
+    coord = _coord(tmp_path)
+    (coord / "PROJECT.env").write_text(
+        "STAND_HOST_A=stand-a\nVITE_DEV_PORT=4173\n", encoding="utf-8")
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append((cmd, kwargs))
+        class CP:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+        return CP()
+
+    monkeypatch.setattr(stand_mod.subprocess, "run", fake_run)
+
+    stand_mod._generic_teardown_lease_resources(
+        coord, {"profile": "vite-dev", "lease_id": "l1"},
+        reason="release")
+
+    assert calls
+    assert calls[0][0][0] == "ssh"
+    assert calls[0][0][1] == "stand-a"
+    assert "4173/tcp" in calls[0][0][-1]
+
+
+def test_stand_cleanup_hosts_dedupes_stand_host_variants():
+    hosts = stand_mod._stand_cleanup_hosts({
+        "STAND_HOST": "stand-a,stand-b",
+        "STAND_HOST_A": "stand-a",
+        "STAND_HOST_B": "stand-c",
+    })
+
+    assert hosts == ["stand-a", "stand-b", "stand-c"]
 
 
 def test_cleanup_free_stand_orphans_clears_declared_vite_port(
@@ -197,14 +234,14 @@ def test_cleanup_free_stand_orphans_clears_declared_vite_port(
         "active_lease": None,
     }))
     (coord / "PROJECT.env").write_text(
-        "STAND_HOST=lattice-a\nVITE_DEV_PORT=4173\n", encoding="utf-8")
+        "STAND_HOST=stand-a\nVITE_DEV_PORT=4173\n", encoding="utf-8")
     calls = []
     monkeypatch.setattr(stand_mod, "_cleanup_vite_port",
                         lambda host, port: calls.append((host, port)))
 
     assert stand_mod.cleanup_free_stand_orphans(coord) is True
 
-    assert calls == [("lattice-a", "4173")]
+    assert calls == [("stand-a", "4173")]
 
 
 def test_cleanup_free_stand_orphans_skips_active_lease(tmp_path, monkeypatch):
@@ -227,7 +264,7 @@ def test_pre_deploy_cleanup_clears_vite_before_full_deploy(
         tmp_path, monkeypatch):
     coord = _coord(tmp_path)
     (coord / "PROJECT.env").write_text(
-        "STAND_HOST=lattice-a\nVITE_DEV_PORT=4173\n", encoding="utf-8")
+        "STAND_HOST=stand-a\nVITE_DEV_PORT=4173\n", encoding="utf-8")
     calls = []
     monkeypatch.setattr(stand_mod, "_cleanup_vite_port",
                         lambda host, port: calls.append((host, port)))
@@ -236,7 +273,7 @@ def test_pre_deploy_cleanup_clears_vite_before_full_deploy(
         coord, {"profile": "full-deploy", "lease_id": "l2"})
 
     assert cleaned is True
-    assert calls == [("lattice-a", "4173")]
+    assert calls == [("stand-a", "4173")]
 
 
 def test_pre_deploy_cleanup_skips_vite_profile(tmp_path, monkeypatch):

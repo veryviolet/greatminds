@@ -1031,12 +1031,38 @@ def _generic_teardown_lease_resources(
         return
     if profile and profile != "vite-dev" and not env.get("VITE_DEV_PORT"):
         return
-    hosts = [
-        h.strip() for h in str(env.get("STAND_HOST") or "localhost").split(",")
-        if h.strip()
-    ] or ["localhost"]
+    hosts = _stand_cleanup_hosts(env)
     for host in hosts:
         _cleanup_vite_port(host, port_s)
+
+
+def _stand_cleanup_hosts(env: dict[str, str]) -> list[str]:
+    """Resolve stand hosts for generic cleanup.
+
+    Shipped profiles use ``STAND_HOST``, but older/multi-node fleets commonly
+    carry role-specific keys such as ``STAND_HOST_A``. Cleanup must target the
+    same remote node that the profile can deploy to; falling back straight to
+    localhost leaves remote Vite orphans alive.
+    """
+    raw_hosts: list[str] = []
+    primary = str(env.get("STAND_HOST") or "").strip()
+    if primary:
+        raw_hosts.extend(primary.split(","))
+    for key in sorted(env):
+        if key == "STAND_HOST" or not key.startswith("STAND_HOST_"):
+            continue
+        val = str(env.get(key) or "").strip()
+        if val:
+            raw_hosts.extend(val.split(","))
+    hosts: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_hosts:
+        host = raw.strip()
+        if not host or host in seen:
+            continue
+        seen.add(host)
+        hosts.append(host)
+    return hosts or ["localhost"]
 
 
 def cleanup_free_stand_orphans(coord: Path) -> bool:
@@ -1109,6 +1135,20 @@ sleep 1
 if command -v fuser >/dev/null 2>&1; then
   fuser -k -9 "{port}/tcp" >/dev/null 2>&1 || true
 fi
+for i in 1 2 3; do
+  if command -v fuser >/dev/null 2>&1; then
+    fuser "{port}/tcp" >/dev/null 2>&1 || exit 0
+  elif command -v ss >/dev/null 2>&1; then
+    ss -tlnp 2>/dev/null | grep -q ":{port} " || exit 0
+  else
+    exit 0
+  fi
+  sleep 1
+  if command -v fuser >/dev/null 2>&1; then
+    fuser -k -9 "{port}/tcp" >/dev/null 2>&1 || true
+  fi
+done
+exit 1
 """
     cmd = ["sh", "-lc", script]
     if host not in ("localhost", "127.0.0.1", "::1"):
