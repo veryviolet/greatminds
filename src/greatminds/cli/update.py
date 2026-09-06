@@ -268,48 +268,17 @@ def _step_migrate_project_config() -> None:
     bootstrap(Path.cwd())
 
 
-def _step_migrate_legacy_coordd() -> None:
-    """If the old singleton coordd.service is still enabled, retire it."""
-    from greatminds.cli.daemon import detect_legacy_coordd, _systemctl, SYSTEMD_USER_DIR, LEGACY_UNIT_NAME
-
-    if not detect_legacy_coordd():
-        return
-    info("==> migrating legacy coordd.service...")
-    _systemctl("stop", LEGACY_UNIT_NAME)
-    _systemctl("disable", LEGACY_UNIT_NAME)
-    legacy = SYSTEMD_USER_DIR / LEGACY_UNIT_NAME
-    if legacy.is_file():
-        try:
-            legacy.unlink()
-        except OSError as exc:
-            warn(f"    could not remove {legacy}: {exc}")
-    _systemctl("daemon-reload")
-    ok("    ✓ coordd.service stopped + disabled + removed")
 
 
 def _step_ensure_template_unit_installed() -> None:
-    """0202: install the per-session template unit if missing.
-
-    Migration gap: pre-0008 fleets had ``coordd.service`` (legacy
-    singleton). 0008 introduced ``greatminds-daemon@<session>.service``
-    (template unit). ``greatminds update`` removed the legacy unit
-    but assumed the template unit was already installed — fresh
-    pre-0008 fleets had it absent, so the subsequent restart step
-    failed and operators had to hand-run ``greatminds daemon install``
-    to recover.
-
-    Now ``greatminds update`` detects the missing template and runs
-    ``greatminds daemon install`` automatically before the restart
-    step. Idempotent: already-installed unit → skip without warning.
-    """
+    """Install the common daemon template if missing before service restart."""
     from greatminds.cli.daemon import SYSTEMD_USER_DIR, TEMPLATE_UNIT_NAME
 
     template = SYSTEMD_USER_DIR / TEMPLATE_UNIT_NAME
     if template.is_file():
         return  # already installed; nothing to do
 
-    info("==> template unit not found; running daemon install to "
-         "migrate to per-session daemon model")
+    info("==> template unit not found; running daemon install")
     new_bin = _greatminds_bin().split()
     cp = subprocess.run(new_bin + ["daemon", "install"])
     if cp.returncode != 0:

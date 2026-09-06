@@ -15,7 +15,6 @@ Subcommands::
     greatminds daemon restart  [--project NAME] [--project-dir DIR]
     greatminds daemon status   [--project NAME] [--project-dir DIR]
     greatminds daemon list
-    greatminds daemon migrate  [--yes]
 
 ``install`` is idempotent: it writes the template unit if missing and
 adds the ``{name → project_dir}`` entry to the per-user registry at
@@ -50,12 +49,6 @@ REGISTRY_PATH = REGISTRY_DIR / "projects.json"
 AGENT_ENV_DIR = REGISTRY_DIR / "agent-env"
 SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
 TEMPLATE_UNIT_NAME = "greatminds-daemon@.service"
-LEGACY_UNIT_NAME = "coordd.service"
-# 0320 (0311 Phase 3a): one codex app-server per fleet, hosting all the
-# fleet's driven codex worker threads. Installed + enabled only when the
-# project's coord.yaml has codex roles with schema lifecycle == driven.
-APPSERVER_TEMPLATE_UNIT_NAME = "greatminds-appserver@.service"
-
 AGENT_ENV_NAMES = {
     # Claude direct / proxy / model-router auth.
     "ANTHROPIC_API_KEY",
@@ -159,55 +152,6 @@ def _resolve_tool_exec(tool: str) -> str | None:
         if cand.exists() and os.access(cand, os.X_OK):
             return str(cand)
     return None
-
-
-def _resolved_codex_exec() -> str | None:
-    """0320: resolve the codex binary for the app-server unit's ExecStart.
-
-    Mirrors ``_resolved_greatminds_exec`` but for codex: an nvm /
-    npm-global install puts codex at e.g.
-    ``~/.nvm/versions/node/<v>/bin/codex`` which is NOT on systemd's
-    minimal PATH. We resolve the absolute path via ``shutil.which`` so
-    the unit's ExecStart works regardless of PATH. Returns None when
-    codex is not installed — the caller then skips the app-server unit
-    (a fleet with no codex binary cannot host codex driven roles).
-    """
-    found = _resolve_tool_exec("codex")
-    return str(Path(found).resolve()) if found else None
-
-
-def _resolved_node_exec() -> str | None:
-    """0320-iter2: resolve the absolute ``node`` interpreter for the
-    app-server unit's ExecStart.
-
-    codex's shebang is the RELATIVE ``#!/usr/bin/env node``; systemd
-    --user runs with a minimal PATH that lacks the nvm node bin dir, so
-    ``ExecStart=<codex.js> …`` fails with ``env: node: No such file or
-    directory`` (status=127, restart loop — the GATE failure). We name
-    node explicitly (``<node> <codex.js> …``) so the env-node shebang is
-    bypassed. Returns None when node is not on the install-time PATH —
-    the caller then skips the app-server unit."""
-    found = _resolve_tool_exec("node")
-    return str(Path(found).resolve()) if found else None
-
-
-def appserver_socket_path(project: str) -> Path:
-    """0320: the per-fleet codex app-server UNIX socket path.
-
-    Single source of truth for both the systemd unit (which uses the
-    ``%t/greatminds-appserver-%i.sock`` literal, %t = $XDG_RUNTIME_DIR)
-    and the Phase-3b coordd driver (0321), which connects here to issue
-    ``thread/start`` / ``turn/start``. Resolves %t to $XDG_RUNTIME_DIR,
-    falling back to ``/run/user/<uid>`` then ``/tmp`` so the convention
-    is stable across both sides.
-    """
-    runtime = os.environ.get("XDG_RUNTIME_DIR")
-    if not runtime:
-        try:
-            runtime = f"/run/user/{os.getuid()}"
-        except AttributeError:  # pragma: no cover — non-POSIX
-            runtime = "/tmp"
-    return Path(runtime) / f"greatminds-appserver-{project}.sock"
 
 
 # ---------------------------------------------------------------------------
@@ -617,78 +561,6 @@ def install_project_dropin(name: str, project_dir: Path) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _appserver_unit_body() -> str | None:
-    """Compose the app-server template unit with resolved paths.
-
-    Returns None when codex OR node is not installed (no runnable
-    ExecStart). The shipped canon copy uses ``__NODE_BIN__`` /
-    ``__NODE_DIR__`` / ``__CODEX_BIN__`` placeholders substituted here.
-
-    0320-iter2: ExecStart names node EXPLICITLY (``<node> <codex.js>
-    …``) and sets ``Environment=PATH`` with node's dir first. codex's
-    shebang is the relative ``#!/usr/bin/env node`` and systemd --user
-    has no node on PATH → the iter-1 ``ExecStart=<codex.js> …`` failed
-    with status=127. Naming the absolute node bypasses that shebang.
-    """
-    codex_exec = _resolved_codex_exec()
-    node_exec = _resolved_node_exec()
-    if codex_exec is None or node_exec is None:
-        return None
-    node_dir = str(Path(node_exec).parent)
-    try:
-        src = find_canon_dir() / "systemd" / APPSERVER_TEMPLATE_UNIT_NAME
-        if src.is_file():
-            return (src.read_text(encoding="utf-8")
-                    .replace("__NODE_BIN__", node_exec)
-                    .replace("__NODE_DIR__", node_dir)
-                    .replace("__CODEX_BIN__", codex_exec))
-    except Exception:  # noqa: BLE001
-        pass
-    return (
-        "[Unit]\n"
-        "Description=greatminds codex app-server for project %i\n"
-        "After=default.target\n"
-        "\n"
-        "[Service]\n"
-        "Type=simple\n"
-        f"Environment=PATH={node_dir}:/usr/local/bin:/usr/bin:/bin:"
-        "%h/.local/bin\n"
-        f"ExecStart={node_exec} {codex_exec} app-server --listen "
-        "unix://%t/greatminds-appserver-%i.sock\n"
-        "Restart=on-failure\n"
-        "RestartSec=2\n"
-        "\n"
-        "[Install]\n"
-        "WantedBy=default.target\n"
-    )
-
-
-def install_appserver_unit() -> bool | None:
-    """Idempotent: write the app-server template unit if missing/stale.
-
-    Returns True if newly written, False if already up to date, None
-    when codex is unavailable (unit not installable — caller skips).
-    Same skip-on-identical-body semantics as ``install_template_unit``.
-    """
-    body = _appserver_unit_body()
-    if body is None:
-        return None
-    SYSTEMD_USER_DIR.mkdir(parents=True, exist_ok=True)
-    dest = SYSTEMD_USER_DIR / APPSERVER_TEMPLATE_UNIT_NAME
-    if dest.is_file():
-        try:
-            if dest.read_text(encoding="utf-8") == body:
-                return False
-        except OSError:
-            pass
-    dest.write_text(body, encoding="utf-8")
-    return True
-
-
-def _appserver_instance_unit(name: str) -> str:
-    return f"greatminds-appserver@{name}.service"
-
-
 def _schema_lifecycles(project_dir: Path) -> dict[str, str]:
     """Use the same installed contract as coordd and task validation.
 
@@ -714,46 +586,6 @@ def _safe_yaml(path: Path) -> dict | None:
     except yaml.YAMLError:
         return None
     return data if isinstance(data, dict) else None
-
-
-def has_driven_codex_roles(project_dir: Path) -> bool:
-    """0320: True iff the project's coord.yaml has at least one window
-    with ``tool: codex`` whose schema lifecycle == 'driven'.
-
-    Gates the app-server unit install/enable: a fleet only needs the
-    codex app-server once any codex role is actually driven (Phase 3).
-    Through Phase 2e the codex roles are still loop-mode, so this stays
-    False and the unit is not installed."""
-    lifecycles = _schema_lifecycles(project_dir)
-    doc = _safe_yaml(coord_yaml_path(project_dir))
-    if not doc:
-        return False
-    for win in (doc.get("windows") or []):
-        if not isinstance(win, dict):
-            continue
-        if (win.get("tool") or "").lower() != "codex":
-            continue
-        role = (win.get("role") or "").upper()
-        if (role and lifecycles.get(role) == "driven"
-                and (win.get("mode") or "").lower() == "driven"):
-            return True
-    return False
-
-
-def detect_legacy_coordd() -> bool:
-    """Return True iff the deprecated singleton ``coordd.service`` is enabled.
-
-    Consumed by both ``greatminds daemon install`` (refuses to proceed)
-    and ``greatminds update`` (task 0009, prompts auto-migration).
-    """
-    try:
-        cp = subprocess.run(
-            ["systemctl", "--user", "is-enabled", LEGACY_UNIT_NAME],
-            capture_output=True, text=True,
-        )
-    except FileNotFoundError:
-        return False
-    return cp.returncode == 0
 
 
 # ---------------------------------------------------------------------------
@@ -808,16 +640,6 @@ def install_cmd(name: str | None, project_dir: Path | None) -> None:
         err("--name not given and coord.yaml has no `session:` key")
         raise click.exceptions.Exit(2)
 
-    if detect_legacy_coordd():
-        warn("legacy singleton `coordd.service` detected on this host.")
-        info("Run `greatminds daemon migrate --yes` to remove it, then retry,")
-        info("or do it manually:")
-        info("  systemctl --user stop coordd.service")
-        info("  systemctl --user disable coordd.service")
-        info(f"  rm {SYSTEMD_USER_DIR / LEGACY_UNIT_NAME}")
-        info("  systemctl --user daemon-reload")
-        raise click.exceptions.Exit(2)
-
     wrote_unit = install_template_unit()
     register_project(resolved, pd)
     captured_env = capture_agent_env(resolved)
@@ -857,37 +679,6 @@ def install_cmd(name: str | None, project_dir: Path | None) -> None:
             f"logout. Stderr: {(enable_cp.stderr or '').strip()[:200]}"
         )
 
-    # 0320 (0311 Phase 3a): if this fleet has driven codex roles, install
-    # + enable the per-fleet codex app-server unit alongside coordd. It
-    # hosts the codex worker threads that the Phase-3b driver (0321)
-    # drives via the app-server protocol. Gated on driven codex roles so
-    # claude-only / pre-Phase-3 fleets never get the extra unit.
-    if has_driven_codex_roles(pd):
-        wrote_app = install_appserver_unit()
-        if wrote_app is None:
-            warn(
-                "  driven codex roles present but `codex` is not on PATH "
-                "— skipping app-server unit. Install codex, then re-run "
-                "`greatminds daemon install`."
-            )
-        else:
-            app_instance = _appserver_instance_unit(resolved)
-            if wrote_app:
-                _systemctl("daemon-reload")
-                ok(f"app-server unit installed at "
-                   f"{SYSTEMD_USER_DIR / APPSERVER_TEMPLATE_UNIT_NAME}")
-            else:
-                info("app-server unit already present, no rewrite")
-            app_enable = _systemctl("enable", app_instance)
-            if app_enable.returncode == 0:
-                ok(f"{app_instance} enabled (survives logout / shutdown)")
-            else:
-                warn(
-                    f"`systemctl --user enable {app_instance}` failed "
-                    f"(rc={app_enable.returncode}). Stderr: "
-                    f"{(app_enable.stderr or '').strip()[:200]}"
-                )
-
     info(f"next: `greatminds daemon start --project {resolved}`")
 
 
@@ -917,29 +708,6 @@ def repair_cmd(name: str | None, project_dir: Path | None) -> None:
             f"{(cp.stderr or '').strip()[:300]}"
         )
         raise click.exceptions.Exit(cp.returncode)
-
-
-@daemon.command("migrate", short_help="remove the singleton coordd.service unit")
-@click.option("--yes", is_flag=True,
-              help="confirm removal of coordd.service")
-def migrate_cmd(yes: bool) -> None:
-    if not detect_legacy_coordd():
-        info("no coordd.service detected — nothing to migrate")
-        return
-    if not yes:
-        warn("refusing to remove coordd.service without --yes")
-        info("Run: `greatminds daemon migrate --yes` to confirm.")
-        raise click.exceptions.Exit(2)
-    _systemctl("stop", LEGACY_UNIT_NAME)
-    _systemctl("disable", LEGACY_UNIT_NAME)
-    legacy = SYSTEMD_USER_DIR / LEGACY_UNIT_NAME
-    if legacy.is_file():
-        try:
-            legacy.unlink()
-        except OSError as exc:
-            warn(f"could not remove {legacy}: {exc}")
-    _systemctl("daemon-reload")
-    ok("legacy coordd.service removed.")
 
 
 def _project_options(fn):
@@ -973,24 +741,11 @@ def stop_cmd(project: str | None, project_dir: Path | None) -> None:
 
 def _refresh_units_before_restart(name: str,
                                   project_dir: Path | None) -> bool:
-    """issue #13: re-render + rewrite the on-disk systemd units so a restart
-    always comes up with the CURRENT baked PATH.
-
-    A template unit rendered before PATH-baking (pre-1.6.3) — or rendered
-    when a tool was not yet resolvable — carries no ``Environment=PATH=``,
-    so a plain ``systemctl restart`` brings coordd up with systemd's bare
-    --user PATH and it can no longer exec claude / codex / ansible-playbook
-    (driven turns + stand deploys break). ``install_template_unit`` /
-    ``install_project_dropin`` / ``install_appserver_unit`` are idempotent
-    (they skip the write when the on-disk body already matches the freshly
-    rendered one), so when the units are already current this is a no-op.
-    Returns True if any unit changed (the caller then ``daemon-reload``s)."""
+    """Refresh the common daemon unit and project environment before restart."""
     changed = install_template_unit()
     pd = project_dir.resolve() if project_dir else lookup_project_dir(name)
     if pd is not None:
         if install_project_dropin(name, pd):
-            changed = True
-        if has_driven_codex_roles(pd) and install_appserver_unit():
             changed = True
     capture_agent_env(name)
     if changed:

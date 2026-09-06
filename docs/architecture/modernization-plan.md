@@ -1121,3 +1121,20 @@ Validation: ACP doctor and existing project environment drop-in tests: 9 passed.
 Service app-server removal, manifest-based environment capture and service name
 resolution remain the next cleanup steps. The full modernization plan remains
 in progress.
+
+### Service transport cleanup (2026-09-07)
+
+Removed the native Codex app-server template, its executable/socket resolution,
+installation and enable branches, and restart-time refresh. Service management
+now installs only the common coordd template regardless of old vendor window
+configuration. Removed singleton-service detection, the `daemon migrate` command
+and the unused update migration helper; no installed legacy fleet exists.
+Retired tests for those deleted implementations and kept common daemon service
+and environment tests. Added an explicit install regression asserting the exact
+systemctl calls, single installed template, ACP coordd entrypoint and absence of
+the migration command.
+
+Validation: 31 service/doctor/environment tests passed; full suite collection:
+1626 tests without collection errors. This is not a full-suite execution claim.
+Project naming and environment capture still need conversion from native setup
+assumptions, and update service opt-in behavior remains to be reviewed.

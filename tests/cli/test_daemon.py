@@ -109,21 +109,6 @@ def test_install_is_idempotent(_isolate_paths, fake_systemctl, tmp_path):
     assert reg == {"alpha": str(project_dir.resolve())}
 
 
-def test_install_refuses_when_legacy_coordd_present(_isolate_paths,
-                                                     fake_systemctl,
-                                                     tmp_path):
-    project_dir = tmp_path / "proj"
-    project_dir.mkdir()
-    (project_dir / "coord.yaml").write_text(
-        yaml.safe_dump({"session": "x", "windows": []}), encoding="utf-8")
-    fake_systemctl.set(("systemctl", "--user", "is-enabled", "coordd.service"),
-                       rc=0)  # legacy present
-
-    result = _invoke(["install", "--project-dir", str(project_dir)])
-    assert result.exit_code == 2
-    assert "legacy" in result.output.lower()
-    # Registry NOT touched.
-    assert not daemon_mod.REGISTRY_PATH.is_file()
 
 
 def test_install_errors_if_name_unresolvable(_isolate_paths, fake_systemctl,
@@ -217,40 +202,10 @@ def test_list_when_empty_registry(_isolate_paths, fake_systemctl):
 # ---------------------------------------------------------------------------
 
 
-def test_migrate_without_yes_refuses(_isolate_paths, fake_systemctl):
-    fake_systemctl.set(("systemctl", "--user", "is-enabled", "coordd.service"),
-                       rc=0)
-    result = _invoke(["migrate"])
-    assert result.exit_code == 2
-    assert "--yes" in result.output
 
 
-def test_migrate_with_yes_disables_and_removes_legacy(_isolate_paths,
-                                                       fake_systemctl):
-    # Pretend legacy unit file exists on disk too.
-    legacy_path = daemon_mod.SYSTEMD_USER_DIR / daemon_mod.LEGACY_UNIT_NAME
-    legacy_path.parent.mkdir(parents=True, exist_ok=True)
-    legacy_path.write_text("legacy stub\n", encoding="utf-8")
-    fake_systemctl.set(("systemctl", "--user", "is-enabled", "coordd.service"),
-                       rc=0)
-
-    result = _invoke(["migrate", "--yes"])
-    assert result.exit_code == 0, result.output
-    # File removed.
-    assert not legacy_path.is_file()
-    # stop + disable + daemon-reload all issued.
-    invoked = {tuple(c[:4]) for c in fake_systemctl.calls}
-    assert ("systemctl", "--user", "stop", "coordd.service") in invoked
-    assert ("systemctl", "--user", "disable", "coordd.service") in invoked
 
 
-def test_migrate_when_no_legacy_present_short_circuits(_isolate_paths,
-                                                       fake_systemctl):
-    fake_systemctl.set(("systemctl", "--user", "is-enabled", "coordd.service"),
-                       rc=1)
-    result = _invoke(["migrate", "--yes"])
-    assert result.exit_code == 0
-    assert "nothing to migrate" in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -335,3 +290,22 @@ def test_install_template_unit_idempotent_same_path(_isolate_paths, monkeypatch)
                         lambda name: "/same/venv/bin/greatminds")
     assert daemon_mod.install_template_unit() is True   # first call writes
     assert daemon_mod.install_template_unit() is False  # second is no-op
+
+
+def test_install_manages_only_common_daemon_even_with_old_vendor_config(fake_systemctl, tmp_path):
+    project = tmp_path/'project'
+    project.mkdir()
+    (project/'coord.yaml').write_text(yaml.safe_dump({'session': 'acp-only', 'windows': [
+        {'role': 'DEVELOPER', 'tool': 'codex', 'mode': 'driven'}]}))
+    result = _invoke(['install', '--project-dir', str(project)])
+    assert result.exit_code == 0, result.output
+    service_calls = [c for c in fake_systemctl.calls if c[:2] == ['systemctl', '--user']]
+    assert service_calls == [
+        ['systemctl', '--user', 'daemon-reload'],
+        ['systemctl', '--user', 'enable', 'greatminds-daemon@acp-only.service'],
+    ]
+    units = list(daemon_mod.SYSTEMD_USER_DIR.glob('*.service'))
+    assert [p.name for p in units] == ['greatminds-daemon@.service']
+    assert ' coordd --project %i' in units[0].read_text()
+    assert 'migrate' not in daemon_mod.daemon.commands
+    assert not hasattr(daemon_mod, 'install_appserver_unit')

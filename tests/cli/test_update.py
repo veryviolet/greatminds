@@ -194,8 +194,6 @@ def test_already_up_to_date_still_reconciles_config(fake_pypi, fake_subprocess,
     a stale project config (old coord.yaml etc.) is reconciled even when
     the package needs no bump. No package bump → no self-replace execv."""
     fake_pypi["latest"] = GM_VERSION
-    monkeypatch.setattr(
-        "greatminds.cli.daemon.detect_legacy_coordd", lambda: False)
     from greatminds.cli import update as _update_mod
     monkeypatch.setattr(
         _update_mod, "_resolve_session_from_coord_yaml", lambda: "greatminds")
@@ -220,9 +218,6 @@ def test_already_up_to_date_still_reconciles_config(fake_pypi, fake_subprocess,
 def test_post_pip_invokes_daemon_restart_and_agent_restart(monkeypatch,
                                                             fake_subprocess):
     # No legacy coordd present.
-    monkeypatch.setattr(
-        "greatminds.cli.daemon.detect_legacy_coordd", lambda: False,
-    )
     # 0299: agent restart now gates on tmux session presence.
     # Stub both helpers so the legacy assertion (restart subprocess
     # fires) continues to hold.
@@ -250,24 +245,10 @@ def test_post_pip_invokes_daemon_restart_and_agent_restart(monkeypatch,
     assert len(restart_calls) == 1
 
 
-def test_post_pip_migrates_legacy_coordd_when_detected(monkeypatch,
-                                                       fake_subprocess):
-    monkeypatch.setattr(
-        "greatminds.cli.daemon.detect_legacy_coordd", lambda: True,
-    )
-    result = _invoke(["--post-pip"])
-    assert result.exit_code == 0, result.output
-    # systemctl stop/disable issued against coordd.service.
-    flat = [tuple(c) for c in fake_subprocess]
-    assert any("coordd.service" in c and "stop" in c for c in flat)
-    assert any("coordd.service" in c and "disable" in c for c in flat)
 
 
 def test_post_pip_with_explicit_project_name_passes_flag(monkeypatch,
                                                           fake_subprocess):
-    monkeypatch.setattr(
-        "greatminds.cli.daemon.detect_legacy_coordd", lambda: False,
-    )
     result = _invoke(["--post-pip", "--project", "myproj"])
     assert result.exit_code == 0
     daemon_calls = [c for c in fake_subprocess
@@ -280,9 +261,6 @@ def test_post_pip_with_explicit_project_name_passes_flag(monkeypatch,
 def test_post_pip_daemon_restart_failure_exits_nonzero(monkeypatch,
                                                         fake_subprocess):
     """If `daemon restart` fails, update propagates the rc with a recovery hint."""
-    monkeypatch.setattr(
-        "greatminds.cli.daemon.detect_legacy_coordd", lambda: False,
-    )
 
     real_runs: list[list[str]] = fake_subprocess
 

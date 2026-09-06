@@ -32,7 +32,6 @@ def _project(tmp_path: Path, monkeypatch) -> Path:
 
 
 def _stub_helpers(monkeypatch, *,
-                   legacy: bool = False,
                    wrote_unit: bool = True,
                    enable_rc: int = 0) -> list:
     """Replace daemon's side-effecting helpers with traceable stubs.
@@ -40,8 +39,6 @@ def _stub_helpers(monkeypatch, *,
     Returns a list of recorded ``_systemctl`` invocations for the
     test to assert against.
     """
-    monkeypatch.setattr(daemon_mod, "detect_legacy_coordd",
-                         lambda: legacy)
     monkeypatch.setattr(daemon_mod, "install_template_unit",
                          lambda: wrote_unit)
     monkeypatch.setattr(daemon_mod, "register_project",
@@ -103,21 +100,6 @@ def test_install_reports_enable_failure_as_warning(
         or "failed" in out.lower()
 
 
-def test_install_legacy_coordd_blocks_before_enable(
-    tmp_path: Path, monkeypatch,
-) -> None:
-    """Regression net: when the legacy ``coordd.service`` is
-    detected, install aborts BEFORE the new enable step. Otherwise
-    the operator would silently switch over without the migrate
-    step."""
-    _project(tmp_path, monkeypatch)
-    calls = _stub_helpers(monkeypatch, legacy=True)
-
-    result = CliRunner().invoke(daemon_mod.daemon, ["install"])
-    assert result.exit_code == 2
-    assert not any(c and c[0] == "enable" for c in calls), (
-        "0307: legacy-detected branch must NOT reach enable"
-    )
 
 
 def test_install_passes_resolved_name_from_coord_yaml(
