@@ -30,6 +30,15 @@ bindings:
     account: local-account
     max_running: 1
     timeout_seconds: 1800
+commands:
+  unit-tests:
+    argv: [python, -m, pytest, -q]
+    roles: [DEVELOPER, TESTER]
+    cwd: .
+    timeout_seconds: 600
+    max_output_bytes: 1048576
+    environment_revision: "1"
+    purpose: validation
 ```
 
 This is a configuration example, not an available agent distribution. Actual
@@ -51,6 +60,61 @@ Bindings choose workspace, scheduling, permission, session, model, mode, and
 account independently of the harness. Unknown fields and unsupported values
 fail validation. Workspaces are explicit trusted local paths and must exist
 before a claim can be created.
+
+## Configured commands and evidence
+
+An assigned agent requests `greatminds run command unit-tests --request-id ID
+--wait 60`. The CLI queues a durable request for the daemon; it never executes
+the configured command itself. `--wait` only waits for a receipt and does not
+cancel on expiry. Inspect it later with `greatminds run command-status ID`.
+One unresolved command is allowed per run. Reusing the same request ID for the
+same run/command returns the existing receipt; a different request is rejected
+until the previous one finishes. Request IDs never cause implicit replay.
+
+Commands are pinned with the run's execution contract. They specify literal
+argv, allowed roles, relative cwd, timeout, output limit, environment references,
+and an environment revision. There is no interpolation or implicit shell.
+Like agent manifests, commands accept `environment` and `required_env` names.
+A `purpose: deployment` or `purpose: publication` command additionally requires
+`authorized: true` in project configuration; a validation exit code grants no
+deployment or publication permission. Configured commands are trusted project
+code, so these labels describe project policy rather than sandboxing commands.
+
+Before exec, the daemon records the intent and gated process identity. Each
+receipt retains argv/cwd, task/schema/config identities, start/end times, exit
+status, Git commit and source hash before/after, an environment HMAC, executable
+hash, and bounded stdout/stderr artifact paths/hashes. The HMAC key remains a
+private runtime file; environment values do not enter snapshots. Output files
+are private local artifacts (mode 0600), not embedded in operator JSON.
+
+Git source identity includes tracked and nonignored files, their contents,
+permissions, and internal file symlink targets. Runtime metadata and Git internals
+are excluded. Without Git, source files are scanned directly. External symlinks
+and directory symlinks are not accepted as reproducible source evidence. Respect
+Git ignore rules for generated output; keep result JSON outside the source tree.
+An input change during a command makes its successful exit stale. A later source,
+environment, executable, or output artifact change also invalidates its evidence.
+`environment_revision` must change when relevant external services or installed
+dependencies change; local hashes alone cannot identify a remote stand's state.
+Stand/lease-bound command scheduling remains a subsequent integration.
+
+Typed results can reference completed request IDs in `payload.command_evidence`.
+A tests block may instead specify `command_request_id`; the daemon supplies
+`test_command`, `test_result`, and provenance from the receipt. When validation
+commands are configured for that role, tests blocks must reference a recorded
+command and cannot invent a command/result pair. A recorded nonzero exit supplies
+`test_result: fail` for a gated handback; a timeout or uncertain execution cannot
+pretend to be a completed test. Test files, adequacy, observations,
+readiness, stand gates, and review decisions still pass existing domain validators.
+A command's success never moves a task to verified on its own.
+
+Cancellation cleans up the command group before completing the run. Restart
+cancels requests that never passed the launch gate. A process recorded without
+a final outcome becomes `needs_recovery` after process cleanup and holds task
+retry/result application. No command is replayed automatically. After inspecting
+its effects, an operator can use `greatminds run command-resolve ID --reason TEXT`
+to acknowledge uncertainty. This produces no passing evidence and does not run
+anything; authorizing another task run is a separate explicit retry operation.
 
 ## Persistence and ownership
 

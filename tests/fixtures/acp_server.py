@@ -4,6 +4,7 @@ import json
 import subprocess
 import sys
 import time
+import tempfile
 from pathlib import Path
 
 
@@ -66,19 +67,35 @@ for line in sys.stdin:
                              "options": [{"optionId": "yes", "name": "Allow once", "kind": "allow_once"},
                                          {"optionId": "no", "name": "Reject", "kind": "reject_once"}]}})
         else:
-            if scenario in {"submit", "handoff"}:
+            if scenario in {"submit", "handoff", "command"}:
                 context = json.loads(message["params"]["prompt"][0]["text"].split("\n\n", 1)[1])
                 envelope = context["result_format"]
                 envelope.update(result_id="fixture-result", decision="no_change", payload={})
+                if scenario == "command":
+                    checked = subprocess.run([sys.executable, "-m", "greatminds.cli.main", "run", "command",
+                                              "check", "--request-id", "fixture-command", "--wait", "30"],
+                                             capture_output=True, text=True)
+                    if checked.returncode or json.loads(checked.stdout)["status"] != "succeeded":
+                        send({"id": pending, "error": {"code": -32603, "message": "configured check failed"}})
+                        continue
+                    envelope["payload"] = {"command_evidence": ["fixture-command"]}
                 if scenario == "handoff":
                     Path("implementation.txt").write_text("fixture implementation")
                     envelope.update(decision="handoff", payload={"to_queue": "feature_test", "blocks": [
                         {"kind": "implementation", "base_commit": "fixture-commit", "files": ["implementation.txt"],
                          "ready_for_test": True}], "artifacts": ["implementation.txt"]})
-                Path("result.json").write_text(json.dumps(envelope))
+                # A result envelope is runtime metadata, not a new source file
+                # which should invalidate a just-completed check.
+                result_path = Path("result.json").resolve()
+                if scenario == "command":
+                    with tempfile.NamedTemporaryFile(prefix="greatminds-command-result-", suffix=".json", delete=False) as handle:
+                        result_path = Path(handle.name)
+                result_path.write_text(json.dumps(envelope))
                 submitted = subprocess.run([sys.executable, "-m", "greatminds.cli.main", "run", "submit",
-                                            "--file", str(Path("result.json").resolve())],
+                                            "--file", str(result_path)],
                                            capture_output=True, text=True)
+                if scenario == "command":
+                    result_path.unlink()
                 if submitted.returncode:
                     send({"id": pending, "error": {"code": -32603, "message": submitted.stderr}})
                     continue

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shlex
 from dataclasses import asdict
 from pathlib import Path
 from typing import Callable
@@ -21,8 +22,11 @@ def _digest(raw: bytes) -> str:
 
 
 class ResultService:
-    def __init__(self, store: RunStore, *, checkpoint: Callable[[str], None] | None = None):
+    def __init__(self, store: RunStore, *, checkpoint: Callable[[str], None] | None = None,
+                 environment: dict | None = None):
+        from greatminds.runtime.commands import CommandService
         self.store = store
+        self.commands = CommandService(store, environment=environment)
         self.checkpoint = checkpoint or (lambda stage: None)
 
     def reconcile(self) -> None:
@@ -46,7 +50,7 @@ class ResultService:
             "needs_input": {"question", "artifacts"},
             "no_change": {"reason", "artifacts"},
         }
-        if set(payload) - allowed[decision]:
+        if set(payload) - (allowed[decision] | {"command_evidence"}):
             raise GreatMindsError("unknown fields in decision payload", exit_code=2)
         revision = TaskRevision(run["task_id"], run["task_path"], run["task_revision"])
         self.store._check_revision(revision)
@@ -82,12 +86,35 @@ class ResultService:
                        "dependencies": payload.get("dependencies"), "resume_to": payload.get("resume_to")}]
         if not isinstance(blocks, list) or any(not isinstance(block, dict) for block in blocks):
             raise GreatMindsError("blocks must be an array of typed mappings", exit_code=2)
+        command_ids = payload.get("command_evidence", [])
+        if not isinstance(command_ids, list) or any(not isinstance(item, str) for item in command_ids):
+            raise GreatMindsError("command_evidence must be an array of command request IDs")
+        command_records = {request_id: self.commands.evidence(run, request_id, require_success=False)
+                           for request_id in command_ids}
         with policy.domain_context(document=contract, runtime=self.store.runtime, workspace=workspace):
             for raw in blocks:
                 fields = dict(raw)
                 kind = fields.pop("kind", None)
                 if not isinstance(kind, str):
                     raise GreatMindsError("each block requires a kind", exit_code=2)
+                command_id = fields.pop("command_request_id", None)
+                if kind == "tests" and command_id is None and any(
+                        item.get("purpose", "validation") == "validation" and run["role"] in item["roles"]
+                        for item in self.store.contracts(run["id"])["execution"].get("commands", [])):
+                    raise GreatMindsError("tests block requires recorded command_request_id for this execution contract")
+                if command_id is not None:
+                    if kind != "tests" or not isinstance(command_id, str):
+                        raise GreatMindsError("command_request_id is supported only for a tests block")
+                    evidence = self.commands.evidence(run, command_id, require_success=False)
+                    if self.commands._definition(run["id"], evidence["command_id"]).purpose != "validation":
+                        raise GreatMindsError("a tests block requires a validation command")
+                    command_records[command_id] = evidence
+                    generated = {"test_command": shlex.join(evidence["argv"]),
+                                 "test_result": "pass" if evidence["exit_code"] == 0 else "fail"}
+                    for name, value in generated.items():
+                        if name in fields and fields[name] != value:
+                            raise GreatMindsError(f"{name} conflicts with recorded command evidence")
+                    fields.update(generated)
                 if "worktree_fingerprint" in fields:
                     raise GreatMindsError("worktree fingerprint is recorded by the daemon", exit_code=3)
                 names = {"plan": ("written_by", "written_at"),
@@ -107,6 +134,8 @@ class ResultService:
                     "run_id": run["id"], "result_id": envelope["result_id"],
                     "task_revision": revision.sha256, "schema_sha256": run["schema_sha256"],
                     "applied_by": "SYSTEM"}
+                if command_id:
+                    data["blocks"][-1]["provenance"]["command_request_id"] = command_id
             policy.validate_task(data)
             if target != source_queue:
                 error = policy.can_role_move(run["role"], source_queue, target, data)
@@ -138,7 +167,8 @@ class ResultService:
                 "after": after.decode(), "phase": "prepared", "pre": pre, "post": post,
                 "action_started": None, "actions_done": [], "worktree_policy": asdict(worktree_policy),
                 "at": at, "role": run["role"], "decision": decision, "artifacts": artifact_records,
-                "question": payload.get("question"), "schema_sha256": run["schema_sha256"]}
+                "question": payload.get("question"), "schema_sha256": run["schema_sha256"],
+                "command_evidence": list(command_records)}
 
     def _action(self, operation: dict, kind: str) -> None:
         from greatminds.cli.worktree import WorktreePolicy, worktree_create, worktree_merge, worktree_remove
@@ -189,6 +219,8 @@ class ResultService:
         source = operation["source"].split("/")[0]
         destination = operation["destination"].split("/")[0]
         with policy.domain_context(document=contract, runtime=self.store.runtime, workspace=Path(run["workspace"])):
+            for request_id in operation.get("command_evidence", []):
+                self.commands.evidence(run, request_id, require_success=False)
             policy.validate_task(candidate)
             if source != destination:
                 error = policy.can_role_move(run["role"], source, destination, candidate)
@@ -276,4 +308,5 @@ class ResultService:
                 return self.store.result_status(result_id, "needs_recovery", details={"error": str(exc)})
             return self.store.result_status(result_id, "applied", details={
                 "destination": operation["destination"], "decision": operation["decision"],
-                "artifacts": operation["artifacts"], "question": operation["question"]})
+                "artifacts": operation["artifacts"], "question": operation["question"],
+                "command_evidence": operation.get("command_evidence", [])})

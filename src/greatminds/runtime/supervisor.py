@@ -18,6 +18,7 @@ from .config import ExecutionConfig, RoleBinding
 from .processes import process_identity, terminate_group
 from .store import Claim, RunStore, TERMINAL, TaskRevision
 from .workspaces import prepare_workspace_async
+from .commands import CommandService
 
 
 class Supervisor:
@@ -28,6 +29,7 @@ class Supervisor:
         self.config = config
         self.schema = schema
         self.environment = dict(os.environ if environment is None else environment)
+        self.commands = CommandService(store, environment=self.environment)
         self.id = uuid.uuid4().hex
         self._lease = None
         self._transports: dict[str, AcpTransport] = {}
@@ -46,6 +48,8 @@ class Supervisor:
 
     async def __aexit__(self, *exc):
         try:
+            for run_id in {item["run_id"] for item in self.store.snapshot().get("commands", {}).values()}:
+                await self.commands.finish_run(run_id)
             for transport in list(self._transports.values()):
                 await transport.close()
         finally:
@@ -55,6 +59,7 @@ class Supervisor:
     async def recover(self):
         if self._lease is None:
             raise RuntimeError("recovery requires the exclusive supervisor lease")
+        await self.commands.recover(self.id)
         for run in self.store.snapshot()["runs"].values():
             if run["state"] in TERMINAL or run["owner_id"] == self.id:
                 continue
@@ -209,5 +214,6 @@ class Supervisor:
             reason = "configuration_error" if isinstance(exc, (ValueError, GreatMindsError)) else "transport_failure"
         finally:
             self._transports.pop(run_id, None)
+            await self.commands.finish_run(run_id)
         metrics["elapsed_seconds"] = round(time.monotonic() - started, 6)
         return self._transition(run_id, target, reason=reason, details=metrics)

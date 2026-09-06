@@ -112,11 +112,31 @@ class RoleBinding:
 
 
 @dataclass(frozen=True)
+class CommandDefinition:
+    id: str
+    argv: tuple[str, ...]
+    roles: tuple[str, ...]
+    cwd: str = "."
+    timeout_seconds: int = 600
+    max_output_bytes: int = 1048576
+    environment: tuple[tuple[str, str], ...] = ()
+    required_env: tuple[str, ...] = ()
+    environment_revision: str = "1"
+    purpose: str = "validation"
+    authorized: bool = False
+
+    @property
+    def sha256(self) -> str:
+        return fingerprint(asdict(self))
+
+
+@dataclass(frozen=True)
 class ExecutionConfig:
     agents: tuple[AgentManifest, ...]
     bindings: tuple[RoleBinding, ...]
     max_running: int = 4
     account_limits: tuple[tuple[str, int], ...] = ()
+    commands: tuple[CommandDefinition, ...] = ()
 
     @property
     def sha256(self) -> str:
@@ -128,7 +148,7 @@ class ExecutionConfig:
 
 def parse_execution_config(document: Any, *, roles: set[str]) -> ExecutionConfig:
     root = _mapping(document, "root", {"version", "agents", "bindings", "max_running",
-                                       "account_limits"})
+                                       "account_limits", "commands"})
     if type(root.get("version")) is not int or root["version"] != 1:
         _fail("version must be 1")
     agents = []
@@ -176,10 +196,38 @@ def parse_execution_config(document: Any, *, roles: set[str]) -> ExecutionConfig
             max_running=_positive(item.get("max_running", 1), "max_running"),
             timeout_seconds=_positive(item.get("timeout_seconds", 1800), "timeout_seconds")))
     limits = _mapping(root.get("account_limits", {}), "account_limits")
+    commands = []
+    for name, raw in _mapping(root.get("commands", {}), "commands").items():
+        safe_name(name)
+        item = _mapping(raw, f"command {name}", set(CommandDefinition.__dataclass_fields__) - {"id"})
+        argv = _strings(item.get("argv"), "command argv")
+        allowed_roles = _strings(item.get("roles"), "command roles")
+        if not argv or not allowed_roles or set(allowed_roles) - roles:
+            _fail(f"command {name}: requires argv and known roles")
+        cwd = _string(item.get("cwd", "."), "command cwd")
+        if Path(cwd).is_absolute() or ".." in Path(cwd).parts:
+            _fail("command cwd must be relative to the assigned workspace")
+        env = _mapping(item.get("environment", {}), "command environment")
+        required = _strings(item.get("required_env", []), "command required_env")
+        for ref in [*env, *env.values(), *required]:
+            if not isinstance(ref, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", ref):
+                _fail("command environment entries must reference variable names")
+        authorized = item.get("authorized", False)
+        if type(authorized) is not bool:
+            _fail("command authorized must be boolean")
+        commands.append(CommandDefinition(
+            id=name, argv=argv, roles=allowed_roles, cwd=cwd,
+            timeout_seconds=_positive(item.get("timeout_seconds", 600), "command timeout"),
+            max_output_bytes=_positive(item.get("max_output_bytes", 1048576), "command output limit"),
+            environment=tuple(sorted(env.items())), required_env=required,
+            environment_revision=_string(item.get("environment_revision", "1"), "environment revision"),
+            purpose=_choice(item.get("purpose", "validation"),
+                            {"validation", "deployment", "publication"}, "command purpose"),
+            authorized=authorized))
     return ExecutionConfig(tuple(agents), tuple(bindings),
                            _positive(root.get("max_running", 4), "max_running"),
                            tuple((safe_name(k), _positive(v, "account limit"))
-                                 for k, v in sorted(limits.items())))
+                                 for k, v in sorted(limits.items())), tuple(commands))
 
 
 def load_execution_config(path: Path, *, roles: set[str]) -> ExecutionConfig:

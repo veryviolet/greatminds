@@ -2,6 +2,7 @@
 
 import json
 import os
+import time
 from pathlib import Path
 
 import click
@@ -66,6 +67,47 @@ def retry(run_id):
     """Authorize another attempt after a terminal or waiting run."""
     control = RunStore(project_runtime_dir(find_project_dir())).request_control(run_id, "retry")
     click.echo(json.dumps(control))
+
+
+@run.command("command")
+@click.argument("command_id")
+@click.option("--request-id")
+@click.option("--wait", "wait_seconds", default=0.0, type=click.FloatRange(min=0))
+def command(command_id, request_id, wait_seconds):
+    """Request a configured command from the daemon; optionally wait for its receipt."""
+    from greatminds.runtime.commands import CommandService, UNRESOLVED
+
+    run_id, token = os.environ.get("GREATMINDS_RUN_ID"), os.environ.get("GREATMINDS_RUN_TOKEN")
+    if not run_id or not token:
+        raise GreatMindsError("command execution requires an assigned run credential", exit_code=3)
+    service = CommandService(RunStore(project_runtime_dir(find_project_dir())))
+    receipt = service.request(run_id, command_id, token=token, request_id=request_id)
+    deadline = time.monotonic() + wait_seconds
+    while receipt["status"] in UNRESOLVED - {"needs_recovery"} and time.monotonic() < deadline:
+        time.sleep(min(0.2, max(0, deadline - time.monotonic())))
+        receipt = service.get(receipt["id"])
+    click.echo(json.dumps(receipt, ensure_ascii=False, indent=2))
+
+
+@run.command("command-status")
+@click.argument("request_id")
+def command_status(request_id):
+    """Inspect an executed command and its output artifact paths."""
+    from greatminds.runtime.commands import CommandService
+    service = CommandService(RunStore(project_runtime_dir(find_project_dir())))
+    click.echo(json.dumps(service.get(request_id), ensure_ascii=False, indent=2))
+
+
+@run.command("command-resolve")
+@click.argument("request_id")
+@click.option("--reason", required=True)
+def command_resolve(request_id, reason):
+    """Acknowledge an uncertain command after inspection; grant no passing evidence."""
+    from greatminds.runtime.commands import CommandService
+    if os.environ.get("GREATMINDS_RUN_ID"):
+        raise GreatMindsError("uncertain command resolution requires the operator", exit_code=3)
+    service = CommandService(RunStore(project_runtime_dir(find_project_dir())))
+    click.echo(json.dumps(service.resolve(request_id, reason=reason), ensure_ascii=False, indent=2))
 
 
 @run.command("submit")

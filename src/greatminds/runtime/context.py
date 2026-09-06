@@ -31,6 +31,8 @@ def compile_context(store: RunStore, claim: Claim, schema: SchemaSnapshot) -> st
         "responsibilities": role.get("responsibilities", []),
         "forbidden_actions": role.get("forbidden_actions", []),
         "task": document, "queue": queue, "allowed_transitions": transitions,
+        "configured_commands": [item for item in store.contracts(run["id"])["execution"].get("commands", [])
+                                if run["role"] in item["roles"]],
         "task_contract": contract.get("task_kinds", {}).get(document.get("stream", "product"), {}),
         "result_format": {
             "result_id": "choose-a-unique-result-id", "run_id": run["id"], "task_id": task.task_id,
@@ -47,6 +49,10 @@ def compile_context(store: RunStore, claim: Claim, schema: SchemaSnapshot) -> st
         "Do not edit task-store files directly or claim another role's approval. "
         "Submit one JSON result using `greatminds run submit --file /absolute/path/result.json`. "
         "Submit the structured decision for daemon validation; do not move queues yourself. "
+        "Execute configured checks with `greatminds run command NAME --wait SECONDS`; "
+        "the daemon records command output and source identity. Reference completed request IDs "
+        "in payload.command_evidence, or use command_request_id in a tests block. "
+        "Keep result JSON outside the source workspace so preparing it does not invalidate checks. "
         "An end-of-turn message is not a result. "
         "More contract context is available with `greatminds project schema`.\n\n"
         + json.dumps(context, ensure_ascii=False, indent=2)

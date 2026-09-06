@@ -184,6 +184,9 @@ class RunStore:
                    and receipt["status"] in {"received", "applying", "needs_recovery"}
                    for receipt in state["results"].values()):
                 _error("task has an unresolved domain result")
+            if any(item["task_id"] == task.task_id and item["status"] in {"queued", "starting", "running", "needs_recovery"}
+                   for item in state.get("commands", {}).values()):
+                _error("task has an unresolved command")
             if state["paused"]:
                 _error("dispatch is paused")
             active = [run for run in state["runs"].values() if run["state"] not in TERMINAL]
@@ -330,6 +333,9 @@ class RunStore:
             if kind == "retry" and run["state"] not in TERMINAL | {"waiting_auth", "waiting_input"}:
                 _error("cancel the active run before requesting retry")
             if kind == "retry":
+                if any(item["run_id"] == run_id and item["status"] in {"queued", "starting", "running", "needs_recovery"}
+                       for item in state.get("commands", {}).values()):
+                    _error("resolve the pending command before retrying")
                 if any(other["task_id"] == run["task_id"] and other.get("sequence", 0) > run.get("sequence", 0)
                        for other in state["runs"].values()):
                     _error("a newer run exists for this task; inspect and retry the latest run")
@@ -403,6 +409,9 @@ class RunStore:
                 return copy.deepcopy(existing)
             if run["state"] not in {"running", "waiting_input"}:
                 _error("run is not accepting new results")
+            if any(item["run_id"] == envelope.run_id and item["status"] in {"queued", "starting", "running", "needs_recovery"}
+                   for item in state.get("commands", {}).values()):
+                _error("resolve the pending command before submitting a result")
             self._check_revision(TaskRevision(run["task_id"], run["task_path"], run["task_revision"]))
             if any(receipt["envelope"]["run_id"] == envelope.run_id for receipt in state["results"].values()):
                 _error("run already submitted a result")

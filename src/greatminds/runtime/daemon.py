@@ -56,6 +56,9 @@ def assignments(store, config, schema):
                          and receipt["status"] in {"received", "applying", "needs_recovery"}
                          for receipt in snapshot["results"].values()):
                     reason = "domain_result_unresolved"
+                elif any(item["task_id"] == task.task_id and item["status"] in {"queued", "starting", "running", "needs_recovery"}
+                         for item in snapshot.get("commands", {}).values()):
+                    reason = "command_unresolved"
                 elif any(run["account"] == binding.account and run["state"] == "waiting_auth" for run in active):
                     reason = "account_authentication_required"
                 elif previous and not latest.get("retry_authorized"):
@@ -97,12 +100,16 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
         async with Supervisor(project=project, store=store, schema=schema,
                               config=config, environment=environment) as supervisor:
             active: dict[str, asyncio.Task] = {}
-            results = ResultService(store)
+            results = ResultService(store, environment=supervisor.environment)
+            dispatched_once = False
             try:
                 while not stop.is_set():
                     for run_id, future in list(active.items()):
                         if future.done():
-                            future.result()  # Surface persistence failures; do not silently retry.
+                            if not future.cancelled():
+                                future.result()  # Surface persistence failures; do not silently retry.
+                            else:
+                                await supervisor.commands.finish_run(run_id)
                             del active[run_id]
                     await _domain_reconcile(loop, domain_pool, results)
                     for run in store.snapshot()["runs"].values():
@@ -118,8 +125,9 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                             if run.get("process"):
                                 await terminate_group(run["process"])
                             store.control_status(run["id"], control["id"], completed=True)
+                    await supervisor.commands.poll(supervisor.id)
                     for binding, task, reason in assignments(store, config, schema):
-                        if reason != "ready":
+                        if reason != "ready" or (once and dispatched_once):
                             continue
                         try:
                             claim = supervisor.claim(task, binding)
@@ -129,9 +137,8 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                             continue  # Claims recheck capacity and revision under locks.
                         active[claim.run["id"]] = asyncio.create_task(
                             supervisor.execute(claim, binding=binding))
-                    if once:
-                        if active:
-                            await asyncio.gather(*active.values())
+                    dispatched_once = True
+                    if once and not active:
                         await _domain_reconcile(loop, domain_pool, results)
                         break
                     try:

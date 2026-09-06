@@ -486,7 +486,26 @@ M4 workspace preparation:
   23 passed before the additional workspace fixtures. Real harness testing remains
   pending.
 
-Automatic workflow controllers, deterministic command services, live harness
+M4 configured command service:
+
+- Run-pinned command definitions separate argv, role authorization, workspace,
+  environment references, output/time limits, and deployment/publication policy.
+- The shared CLI submits requests; the daemon records launch intent/process
+  identity and captures bounded output, timing, exit status, source/commit identity,
+  executable hash, and environment identity. No interpreter turn runs the mechanics.
+- Results and tests blocks can reference the recorded command. Source/environment
+  changes invalidate evidence; existing adequacy/readiness/review gates remain.
+- Uncertain execution is held after process cleanup and never replayed. Operator
+  resolution acknowledges the uncertainty without generating passing evidence.
+- Independent ACP fixtures cover request → daemon execution → typed evidence →
+  domain application, and SIGKILL during command execution followed by cleanup,
+  a durable recovery hold, and no repeated agent/command dispatch.
+- Full regression: 1,771 passed, 2 skipped. Subsequent command/domain regression:
+  39 passed, including recorded nonzero exits producing gated test handbacks.
+  Wheel and sdist build succeeded; installed-wheel ACP command/evidence/restart
+  smoke passed. No live model service was used.
+
+Automatic workflow controllers, stand/lease integration, live harness
 compatibility, interactive attach, and complete migration/removal of the
 existing launch paths remain pending. M2 is not complete until the real
 integration campaign and remaining client policies have passed.

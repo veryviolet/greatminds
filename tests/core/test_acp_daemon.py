@@ -43,6 +43,67 @@ def test_idle_daemon_never_starts_an_agent(tmp_path):
     assert not (root / "agent-starts.log").exists()
 
 
+def command_project(tmp_path, script="print('daemon check passed')"):
+    root = project(tmp_path, scenario="command")
+    path = root / "coordination" / "execution.yaml"
+    config = yaml.safe_load(path.read_text())
+    config["bindings"]["implementation"]["timeout_seconds"] = 40
+    config["commands"] = {"check": {"argv": [sys.executable, "-c", script],
+                                      "roles": ["DEVELOPER"], "timeout_seconds": 60}}
+    path.write_text(yaml.safe_dump(config))
+    return root
+
+
+def test_acp_agent_requests_daemon_command_and_submits_its_evidence(tmp_path):
+    root = command_project(tmp_path)
+    snapshot = asyncio.run(serve(root, once=True, interval=0.2, environment={}))
+    command = snapshot["commands"]["fixture-command"]
+    assert command["status"] == "succeeded", command
+    receipt = snapshot["results"]["fixture-result"]
+    assert receipt["status"] == "applied", receipt
+    assert receipt["details"]["command_evidence"] == [command["id"]]
+    assert Path(command["output"]["stdout"]["path"]).read_text() == "daemon check passed\n"
+    restarted = asyncio.run(serve(root, once=True, interval=0.2, environment={}))
+    assert restarted["commands"] == snapshot["commands"]
+    assert (root / "agent-starts.log").read_text().splitlines() == ["command"]
+
+
+def test_sigkill_during_command_holds_uncertain_execution_and_cleans_process(tmp_path):
+    import os
+    import signal
+
+    marker = tmp_path / ".greatminds" / "command-started"
+    root = command_project(tmp_path, f"from pathlib import Path; import time; Path({str(marker)!r}).write_text('started'); time.sleep(60)")
+    child = subprocess.Popen([sys.executable, "-m", "greatminds.cli.main", "coordd", "--project-dir", str(root)],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    command_process = None
+    try:
+        deadline = time.monotonic() + 10
+        store = RunStore(root / ".greatminds")
+        while time.monotonic() < deadline:
+            record = store.snapshot().get("commands", {}).get("fixture-command", {})
+            if record.get("status") == "running" and marker.exists():
+                command_process = record["process"]
+                break
+            assert child.poll() is None
+            time.sleep(0.05)
+        assert command_process is not None
+        child.kill()
+        child.wait(timeout=5)
+        assert process_identity(command_process["pid"]) == command_process
+        snapshot = asyncio.run(serve(root, once=True, interval=0.2, environment={}))
+        assert snapshot["commands"]["fixture-command"]["status"] == "needs_recovery"
+        assert process_identity(command_process["pid"]) is None
+        assert (root / "agent-starts.log").read_text().splitlines() == ["command"]
+        assert next(iter(snapshot["runs"].values()))["state"] == "interrupted"
+    finally:
+        if child.poll() is None:
+            os.killpg(child.pid, signal.SIGKILL)
+            child.wait(timeout=5)
+        if command_process and process_identity(command_process["pid"]):
+            asyncio.run(terminate_group(command_process))
+
+
 def test_coordd_routes_explicit_execution_contract_through_acp(tmp_path):
     root = project(tmp_path)
     runner = CliRunner()
