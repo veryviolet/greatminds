@@ -10,6 +10,7 @@ import asyncio
 import contextlib
 import os
 import signal
+import sys
 from pathlib import Path
 from typing import Awaitable, Callable
 
@@ -94,7 +95,8 @@ class AcpTransport:
     def __init__(self, argv: tuple[str, ...] | list[str], *, workspace: Path,
                  environment: dict[str, str] | None = None,
                  callbacks: Callbacks | None = None, request_timeout: float = 30,
-                 shutdown_timeout: float = 2):
+                 shutdown_timeout: float = 2,
+                 on_spawn: Callable[[asyncio.subprocess.Process], Awaitable[None]] | None = None):
         if not argv:
             raise ValueError("ACP argv must not be empty")
         self.argv = tuple(argv)
@@ -109,14 +111,24 @@ class AcpTransport:
         self._stderr_task = None
         self.stderr_tail = b""
         self._turn_lock = asyncio.Lock()
+        self.on_spawn = on_spawn
 
     async def __aenter__(self):
-        self.process = await asyncio.create_subprocess_exec(
-            *self.argv, cwd=self.workspace, env=self.environment,
-            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE, start_new_session=True, limit=4 * 1024 * 1024)
-        self._stderr_task = asyncio.create_task(self._drain_stderr())
+        gate_read, gate_write = os.pipe()
         try:
+            try:
+                self.process = await asyncio.create_subprocess_exec(
+                    sys.executable, str(Path(__file__).with_name("agent_exec.py")),
+                    str(gate_read), *self.argv, cwd=self.workspace, env=self.environment,
+                    pass_fds=(gate_read,), stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                    start_new_session=True, limit=4 * 1024 * 1024)
+            finally:
+                os.close(gate_read)
+            self._stderr_task = asyncio.create_task(self._drain_stderr())
+            if self.on_spawn:
+                await self.on_spawn(self.process)
+            os.write(gate_write, b"1")
             self.connection = connect_to_agent(self.callbacks, self.process.stdin, self.process.stdout)
             self.initialized = await asyncio.wait_for(self.connection.initialize(
                 protocol_version=PROTOCOL_VERSION, client_capabilities=ClientCapabilities(),
@@ -127,6 +139,8 @@ class AcpTransport:
         except BaseException:
             await self.close()
             raise
+        finally:
+            os.close(gate_write)
 
     async def _drain_stderr(self):
         stream = self.process.stderr

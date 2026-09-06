@@ -165,6 +165,8 @@ class RunStore:
         safe_name(owner_id)
         if binding not in config.bindings or binding.role not in schema.document.get("roles", {}):
             _error("binding is not part of the effective execution contract", 3)
+        if task.path.split("/")[0] not in schema.document["roles"][binding.role].get("claims_from", []):
+            _error(f"role {binding.role} cannot claim the assigned queue", 3)
         workspace = str(binding.workspace_path(project))
         agent = config.agent(binding.agent)
         with task_lock(self.runtime, task.task_id), self._transaction() as state:
@@ -194,6 +196,7 @@ class RunStore:
                 "schema_sha256": schema.sha256, "schema_version": schema.version,
                 "workspace": workspace, "account": binding.account,
                 "permission": binding.permission, "state": "claimed", "created_at": self.clock(),
+                "sequence": len(state["events"]) + 1,
                 "updated_at": self.clock(), "session_id": None, "event_receipts": {},
                 "token_sha256": hashlib.sha256(token.encode()).hexdigest(),
             }
@@ -250,10 +253,13 @@ class RunStore:
         return state["runs"][run_id]
 
     def transition(self, run_id: str, *, owner_id: str, event_id: str,
-                   target: str, reason: str = "", session_id: str | None = None) -> dict:
+                   target: str, reason: str = "", session_id: str | None = None,
+                   details: dict | None = None) -> dict:
         """Apply one supervisor event; duplicate delivery cannot replay it."""
         safe_name(event_id)
         payload = {"target": target, "reason": reason, "session_id": session_id}
+        if details is not None:
+            payload["details"] = details
         digest = fingerprint(payload)
         with self._transaction() as state:
             run = self._run(state, run_id)
@@ -269,9 +275,79 @@ class RunStore:
             run.update(state=target, updated_at=self.clock(), reason=reason)
             if session_id is not None:
                 run["session_id"] = session_id
+            if details is not None:
+                run["outcome"] = copy.deepcopy(details)
             run["event_receipts"][event_id] = digest
             self._event(state, target, run_id, payload)
             return {k: copy.deepcopy(v) for k, v in run.items() if k != "token_sha256"}
+
+    def record_process(self, run_id: str, *, owner_id: str, identity: dict) -> None:
+        with self._transaction() as state:
+            run = self._run(state, run_id)
+            if run["owner_id"] != owner_id or run["state"] != "starting":
+                _error("process can only be recorded by the starting run's supervisor", 3)
+            if run.get("process") is not None and run["process"] != identity:
+                _error("run already has a different process identity")
+            if run.get("process") is None:
+                run["process"] = copy.deepcopy(identity)
+                self._event(state, "process_recorded", run_id, identity)
+
+    def request_control(self, run_id: str, kind: str) -> dict:
+        if kind not in {"cancel", "retry"}:
+            _error("unknown operator control")
+        with self._transaction() as state:
+            run = self._run(state, run_id)
+            if kind == "retry" and run["state"] not in TERMINAL | {"waiting_auth", "waiting_input"}:
+                _error("cancel the active run before requesting retry")
+            if kind == "retry":
+                if any(other["task_id"] == run["task_id"] and other.get("sequence", 0) > run.get("sequence", 0)
+                       for other in state["runs"].values()):
+                    _error("a newer run exists for this task; inspect and retry the latest run")
+                if any(receipt["envelope"]["run_id"] == run_id and receipt["status"] in {"received", "applying"}
+                       for receipt in state["results"].values()):
+                    _error("resolve the pending domain result before retrying")
+            control = run.get("control")
+            if control and control["status"] != "completed":
+                if control["kind"] != kind:
+                    _error("another control is pending for this run")
+                return copy.deepcopy(control)
+            control = {"id": uuid.uuid4().hex, "kind": kind, "status": "pending", "at": self.clock()}
+            run["control"] = control
+            self._event(state, "control_requested", run_id, control)
+            return copy.deepcopy(control)
+
+    def control_status(self, run_id: str, control_id: str, *, completed: bool) -> None:
+        """Called by the exclusive supervisor after cancellation/cleanup."""
+        with self._transaction() as state:
+            run = self._run(state, run_id)
+            control = run.get("control")
+            if not control or control["id"] != control_id or control["status"] == "completed":
+                return
+            control["status"] = "completed" if completed else "processing"
+            if completed:
+                if run["state"] not in TERMINAL:
+                    run.update(state="cancelled", reason="operator_cancelled", updated_at=self.clock())
+                if control["kind"] == "retry":
+                    run["retry_authorized"] = True
+            self._event(state, "control_completed" if completed else "control_processing", run_id, control)
+
+    def recover_run(self, run_id: str, *, previous_owner: str, owner_id: str) -> None:
+        """Record recovery after the exclusive supervisor proves group cleanup.
+
+        This domain-free operation does not retry commands or apply receipts.
+        Authentication/input holds survive restart and still require action.
+        """
+        with self._transaction() as state:
+            run = self._run(state, run_id)
+            if run["owner_id"] != previous_owner or run["state"] in TERMINAL:
+                return
+            previous_state = run["state"]
+            run.update(owner_id=owner_id, process=None, updated_at=self.clock())
+            if previous_state not in {"waiting_auth", "waiting_input"}:
+                run.update(state="interrupted", reason="supervisor_restart")
+            self._event(state, "run_recovered", run_id,
+                        {"previous_owner": previous_owner, "previous_state": previous_state,
+                         "state": run["state"]})
 
     def receive_result(self, envelope: ResultEnvelope, *, token: str) -> dict:
         """Authenticate and durably receive a decision for later domain validation.

@@ -72,6 +72,7 @@ from . import dashboard as _dashboard_mod
 from . import driven_log as _driven_log_mod
 from . import project as _project_mod
 from . import migrate as _migrate_mod
+from . import run as _run_mod
 
 cli.add_command(_task_mod.task)
 cli.add_command(_inbox_mod.inbox)
@@ -104,6 +105,7 @@ cli.add_command(_dashboard_mod.dashboard)
 cli.add_command(_driven_log_mod.driven_log, name="driven-log")
 cli.add_command(_project_mod.project)
 cli.add_command(_migrate_mod.migrate)
+cli.add_command(_run_mod.run)
 
 
 if __name__ == "__main__":

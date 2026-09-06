@@ -120,9 +120,43 @@ the client cancels the request and reports that input is needed. The transport
 does not persist raw updates or stderr; the supervisor must apply diagnostic
 redaction and retention when connecting its event sink.
 
-The contracts and store are implemented and tested independently. Existing
-launch/daemon paths have not yet been cut over to this store. The common ACP
-supervisor will own process lifetime, restart reconciliation, callback policies,
-and capabilities; the filesystem store does not guess process death from a
-missing heartbeat. Until that integration lands, configuring this file alone
-does not change execution behavior.
+`coordd` now selects the common ACP supervisor when the project has
+`coordination/execution.yaml`. Projects without that file still use the existing
+execution path until the migration milestone. `coordd --once` reconciles and
+executes one dispatch batch in an ACP project, then exits. A continuously running
+daemon also processes operator cancellation and retry requests.
+
+The supervisor holds one exclusive project lease. Before exec, a child waits
+on a pipe until its PID, boot identity, and process start time have been saved.
+EOF at this gate means the supervisor died before authorizing launch. Restart
+cleanup checks process identities and uses Linux pidfds, through Python or libc,
+before recording interruption. Unknown process state is an error, not permission
+to dispatch a second agent. Authentication and input holds survive restart.
+
+Dispatch selects concrete tasks from each queue binding's declared role queues.
+Idle, paused, capacity-limited, and already-attempted revisions create no agent
+turn. Blocked dependency sweeps are reserved for the mechanical controller.
+The context compiler provides the assigned task, role, available transitions,
+contract identity, and result format. It removes queue-scanning and heartbeat
+instructions from the assignment. Compatible sessions may be loaded when the
+agent advertises that capability; otherwise context is reconstructed in a new
+session and the strategy is recorded. Model/mode settings must be advertised.
+
+Operator commands:
+
+- `greatminds run status` returns runs and assignment reasons as versioned JSON.
+- `greatminds run pause` and `resume` control new ACP dispatch.
+- `greatminds run cancel RUN_ID` requests bounded cancellation from the daemon.
+- `greatminds run retry RUN_ID` authorizes one further attempt after a terminal
+  or waiting run. A pending domain result must be resolved before retry.
+- `greatminds run submit --file /absolute/path/result.json` receives a decision
+  using the run credential supplied by the supervisor. CLI output reports the
+  durable receipt status; it does not report a task transition.
+
+The daemon records context bytes, protocol update count, activity time, elapsed
+time, session strategy, stop reason, and structured failure codes. It does not
+classify failures from keywords in model output. A successful turn with an
+unchanged task revision is held until an explicit retry, rather than being
+automatically repeated. Typed result application and semantic gates are the next
+domain integration step. A full pipeline is not established by receipt storage
+alone, and live harness compatibility remains unverified at this stage.

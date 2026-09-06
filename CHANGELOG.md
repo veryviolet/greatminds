@@ -11,7 +11,12 @@ follow [SemVer](https://semver.org/) once 1.0.0 ships.
 - ACP execution manifests and independent role bindings, inspected read-only
   with `greatminds project execution`. The new runtime store provides durable
   claims, pinned contracts, concurrency limits, and authenticated result receipts.
-  Daemon/ACP integration is still in progress; this does not change launch paths.
+  Projects with `coordination/execution.yaml` now dispatch through the common
+  ACP supervisor. Domain result application and full cutover remain in progress.
+- ACP run state and assignment reasons via `greatminds run status`, pause/resume,
+  cancellation, explicit retry, and credential-bound CLI result submission.
+- Durable launch gates, process identity checks, bounded restart cleanup, and
+  suppression of repeated turns for unchanged tasks in ACP projects.
 - `greatminds project schema` prints the effective installed contract.
   `--json` includes its source, version, SHA-256 identity, and project-copy
   status; `--check` detects missing, unreadable, or different generated copies

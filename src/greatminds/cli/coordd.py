@@ -3584,8 +3584,10 @@ def push_to_role(coord: Path, role: str, file_path: str, verbose: bool,
               help="polling interval; 1.0 keeps CPU near zero on idle. "
                    "Don't go below 0.2.")
 @click.option("--verbose", "-v", is_flag=True)
+@click.option("--once", is_flag=True,
+              help="for ACP projects, reconcile and execute one dispatch batch, then exit.")
 def coordd(project_dir: Path | None, project_name: str | None,
-           interval_sec: float, verbose: bool) -> None:
+           interval_sec: float, verbose: bool, once: bool = False) -> None:
     if project_dir is None and project_name:
         # Resolve via the per-user project registry written by
         # `greatminds daemon install` (and `greatminds setup` going forward).
@@ -3601,6 +3603,14 @@ def coordd(project_dir: Path | None, project_name: str | None,
         project_dir = resolved
 
     project_dir = project_dir or Path.cwd()
+    if (project_dir / "coordination" / "execution.yaml").is_file():
+        import asyncio
+        from greatminds.runtime.daemon import serve
+
+        asyncio.run(serve(project_dir.resolve(), interval=interval_sec, once=once))
+        return
+    if once:
+        raise click.ClickException("--once requires coordination/execution.yaml (ACP execution contract)")
     coord = find_runtime_dir(project_dir, strict=False)
     if not coord.is_dir():
         click.echo(f"coordd: error: {coord} not found", err=True)

@@ -439,8 +439,25 @@ support, incompatible protocol, disconnect, timeout, and process-group cleanup.
 The client advertises neither filesystem nor terminal callbacks yet; permission
 requests default to cancellation plus an explicit input-needed flag.
 
-ACP execution, process recovery integration, typed domain application, and
-automatic workflow controllers are still pending. The existing daemon has not
-yet been switched to the new store; M1 foundation does not establish cutover.
+M2 supervisor integration:
+
+- `coordd` selects the common supervisor for explicit execution contracts.
+- Concrete task dispatch, compiled assignment context, durable launch gate,
+  process identity checks, restart cleanup, and session capability checks work
+  through the same execution path for all configured roles/manifests.
+- Operator JSON state, pause/resume, cancellation, one-attempt retry, and
+  credential-bound CLI result submission are available.
+- Independent ACP fixtures exercise idle operation, CLI result delivery,
+  daemon SIGKILL recovery, cancellation, and suppression of repeated unchanged
+  work. No real inference or live fleet upgrade is involved in these tests.
+- Verification: full regression run 1,719 passed, 2 skipped; subsequent focused
+  fixtures also cover role/queue ownership, compatible session loading, model
+  confirmation, and scoped permission decisions. Wheel/sdist build and clean
+  wheel dispatch → CLI receipt → restart-hold smoke test passed.
+
+Typed domain application, automatic workflow controllers, live harness
+compatibility, interactive attach, and complete migration/removal of the
+existing launch paths remain pending. M2 is not complete until the real
+integration campaign and remaining client policies have passed.
 This document authorizes no release or migration of existing live fleets by
 itself; those operations are separate from developing and testing the changes.

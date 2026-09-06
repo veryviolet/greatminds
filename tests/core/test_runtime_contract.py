@@ -32,7 +32,7 @@ def contract():
 
 def claim_at(runtime: Path):
     schema, config = contract()
-    task = TaskRevision.capture(runtime, runtime / "todo" / "0001-example.yaml")
+    task = TaskRevision.capture(runtime, runtime / "feature_dev" / "0001-example.yaml")
     return RunStore(runtime).claim(task=task, binding=config.bindings[0], config=config,
                                    schema=schema, project=runtime.parent, owner_id="test-supervisor")
 
@@ -47,7 +47,7 @@ def compete(runtime: str):
 @pytest.fixture
 def runtime(tmp_path):
     runtime = tmp_path / ".greatminds"
-    task = runtime / "todo" / "0001-example.yaml"
+    task = runtime / "feature_dev" / "0001-example.yaml"
     task.parent.mkdir(parents=True)
     task.write_text("title: Example\n")
     return runtime
@@ -90,6 +90,16 @@ def test_claim_pins_identity_and_keeps_credentials_out_of_snapshot(runtime):
     assert claim.token not in (runtime / ".runtime" / "state.json").read_text()
 
 
+def test_role_cannot_claim_another_roles_queue(runtime):
+    schema, config = contract()
+    path = runtime / "feature_review" / "0002-review.yaml"
+    path.parent.mkdir()
+    path.write_text("title: Review\n")
+    with pytest.raises(GreatMindsError, match="cannot claim"):
+        RunStore(runtime).claim(task=TaskRevision.capture(runtime, path), binding=config.bindings[0],
+                                config=config, schema=schema, project=runtime.parent, owner_id="owner")
+
+
 def test_run_can_read_pinned_contract_after_source_changes(runtime, monkeypatch):
     claim = claim_at(runtime)
     store = RunStore(runtime)
@@ -115,10 +125,10 @@ def test_capacity_is_checked_before_publishing_claim(runtime, limit_type):
     store = RunStore(runtime)
     binding = config.bindings[0]
     for number in (1, 2):
-        path = runtime / "todo" / f"{number:04d}-capacity.yaml"
+        path = runtime / "feature_dev" / f"{number:04d}-capacity.yaml"
         path.write_text("title: Capacity\n")
     def claim(number):
-        return store.claim(task=TaskRevision.capture(runtime, runtime / "todo" / f"{number:04d}-capacity.yaml"),
+        return store.claim(task=TaskRevision.capture(runtime, runtime / "feature_dev" / f"{number:04d}-capacity.yaml"),
                            binding=binding, config=config, schema=schema,
                            project=runtime.parent, owner_id="owner")
     claim(1)
@@ -175,7 +185,7 @@ def test_result_receipt_is_idempotent_even_after_task_moves(runtime):
     store, claim, envelope = running(runtime)
     receipt = store.receive_result(envelope, token=claim.token)
     assert receipt["status"] == "received"  # Domain approval is not implied.
-    task = runtime / "todo" / "0001-example.yaml"
+    task = runtime / "feature_dev" / "0001-example.yaml"
     (runtime / "done").mkdir()
     task.rename(runtime / "done" / task.name)
     assert RunStore(runtime).receive_result(envelope, token=claim.token) == receipt
@@ -188,7 +198,7 @@ def test_result_receipt_is_idempotent_even_after_task_moves(runtime):
 @pytest.mark.parametrize("mutation", ["contents", "queue"])
 def test_stale_result_rejected_without_writes(runtime, mutation):
     store, claim, envelope = running(runtime)
-    task = runtime / "todo" / "0001-example.yaml"
+    task = runtime / "feature_dev" / "0001-example.yaml"
     if mutation == "contents":
         task.write_text("title: Changed\n")
     else:
