@@ -105,9 +105,9 @@ class AgentToolsProvider {
   }
 
   getTreeItem(item) {
-    const treeItem = new vscode.TreeItem(item.label || item.name);
-    treeItem.description = `${item.name}`;
-    treeItem.tooltip = `start-agent: ${item.start_agent ? item.start_modes.join(",") : "no"}\ndriven: ${item.driven ? item.driven_transport : "no"}\n${item.notes || ""}`;
+    const treeItem = new vscode.TreeItem(item.id);
+    treeItem.description = "ACP · configured";
+    treeItem.tooltip = `Adapter: ${item.adapter_version}\nHarness: ${item.harness_version}\nBindings: ${(item.bindings || []).join(", ")}\nConfiguration does not prove live compatibility.`;
     treeItem.contextValue = "greatmindsTool";
     return treeItem;
   }

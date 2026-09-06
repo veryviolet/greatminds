@@ -23,30 +23,9 @@ def run():
 @click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path))
 def status(project_dir):
     """Print the versioned run snapshot and assignment reasons as JSON."""
-    from greatminds.runtime.daemon import assignments
-
+    from greatminds.runtime.observation import snapshot
     project = project_dir.resolve() if project_dir else find_project_dir()
-    store = RunStore(project_runtime_dir(project))
-    snapshot = store.snapshot()
-    from greatminds.domain.stand_deployments import DeploymentLedger
-    snapshot["stand_deployments"] = DeploymentLedger(store.runtime).snapshot()
-    from greatminds.domain.stand_leases import StandLeaseService
-    snapshot["stand_lease"] = StandLeaseService(store).inspect()
-    source = project / "coordination" / "execution.yaml"
-    snapshot["assignments"] = []
-    if source.is_file():
-        schema = load_schema_snapshot()
-        config = load_execution_config(source, roles=set(schema.document["roles"]))
-        from greatminds.runtime.stand_scheduler import StandScheduler
-        stand_scheduler = StandScheduler(store, config.stand)
-        snapshot["stand_dispatch"] = stand_scheduler.inspect()
-        snapshot["stand_schedule"] = stand_scheduler.snapshot()
-        from greatminds.domain.maintenance import MaintenanceService
-        snapshot["maintenance_findings"] = MaintenanceService(store, schema).inspect()
-        snapshot["assignments"] = [{"task_id": task.task_id, "binding": binding.id,
-                                    "role": binding.role, "reason": reason}
-                                   for binding, task, reason in assignments(store, config, schema)]
-    click.echo(json.dumps(snapshot, ensure_ascii=False, indent=2))
+    click.echo(json.dumps(snapshot(project), ensure_ascii=False, indent=2))
 
 
 @run.command("pause")

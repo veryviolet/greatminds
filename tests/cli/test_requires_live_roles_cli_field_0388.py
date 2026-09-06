@@ -26,7 +26,7 @@ import yaml
 
 from greatminds.cli import agent as agent_mod
 from greatminds.cli import task as task_mod
-from greatminds.cli.coordd import REGISTRY_DIR
+REGISTRY_DIR = ".agent_registry"  # Fixture data only.
 
 
 CODEX_LOGIN_TIMEOUT_PANE = """\

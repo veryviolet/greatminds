@@ -30,9 +30,9 @@ async def _domain_reconcile(loop, pool, results):
     return future.result()
 
 
-def assignments(store, config, schema):
+def assignments(store, config, schema, *, snapshot=None):
     """Explain each concrete assignment without creating processes or claims."""
-    snapshot = store.snapshot()
+    snapshot = store.snapshot() if snapshot is None else snapshot
     runs = list(snapshot["runs"].values())
     active = [run for run in runs if run["state"] not in TERMINAL]
     for binding in config.bindings:

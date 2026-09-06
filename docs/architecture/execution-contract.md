@@ -710,6 +710,27 @@ artifacts; that belongs to the explicit project migration.
 
 ## ACP defaults and cutover
 
+Operator observations use the same ACP run model across `run status`,
+`agent status --json` and `dashboard --json`. Configured bindings without runs
+are idle; active runs and the latest terminal outcome remain visible, including
+runs whose binding was subsequently changed or deleted. Run lifecycle, recorded
+process identity/liveness, pinned task revision and configuration drift are
+separate fields. A live PID does not turn waiting for authentication or human
+input into readiness, and PID reuse does not identify a live owned process.
+
+`agent tools --json` lists configured ACP manifests and pinned version labels.
+Its `verification: configured` field does not assert live harness compatibility.
+The VS Code agent list displays the same distinction. Dashboard includes task
+queues, assignment reasons, stand state and maintenance findings. These read-only
+views exclude run credential hashes and do not probe harnesses or inspect terminal
+panes. Cross-store observations are best effort; execution admission revalidates
+the state before launching or applying a result.
+
+Tasks that explicitly require live roles can resume only when the target context
+has a running ACP role with a matching live process identity. Missing roles,
+unreadable observations and authentication/input waits hold that explicit gate.
+Tasks without a declared live-role requirement do not acquire one implicitly.
+
 `greatminds setup` initializes an empty explicit ACP execution contract and shared
 runtime directories. Supplying `--execution-config FILE` initializes from reviewed
 manifests and bindings instead. Setup preserves existing contract bytes and task

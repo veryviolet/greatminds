@@ -1031,6 +1031,34 @@ M6 native parent execution exclusion checkpoint:
 
 ## Recovery checkpoint
 
+ACP observation and internal driver removal checkpoint:
+
+- Removed the remaining native Claude subprocess, Codex app-server JSON-RPC,
+  headless driver registry and TTY wake implementation from cli/coordd.py. The
+  module now only resolves the project and invokes the common ACP daemon. The
+  native restart implementation and static native tool registry are deleted.
+- Agent status/tools, dashboard and run status use shared ACP observations.
+  Waiting states, task/configuration revisions, process identity and lifecycle
+  remain distinct. Changed/deleted bindings do not hide existing runs. The
+  dashboard includes task queues and assignment/stand/maintenance observations.
+  VS Code's agent tree now displays configured ACP manifests, not native modes.
+- Explicit required-live-role gates now consume ACP run state, including target
+  contexts, and hold missing/unreadable/unusable required roles. No terminal pane
+  parsing participates in this gate. Native driver/pane-only tests were removed;
+  domain field and stale-deployment tests are retained for continued porting.
+- Validation: ACP conversation/task/operator regression 32 passed; observation,
+  project selection and stale-deployment suite 18 passed; daemon/maintenance/
+  observation/documentation suite 56 passed. VS Code mocked API suite passed.
+  Installed-wheel status surfaces agree without changing project files; native
+  driven modules and dispatch functions are absent. No live provider was invoked.
+  Full test collection succeeds; full offline execution still needs porting of
+  remaining tests that assume native setup or diagnostic APIs.
+- Next: simplify daemon service installation/doctor (including app-server units),
+  remove unused setup/auth/profile code and migration scaffolding, finish
+  watchdog/event-log/extension/documentation cleanup, and complete the remaining
+  deterministic maintenance and compatibility items. No existing installation
+  migration or rollback work is required.
+
 Current owner clarification and direct ACP cutover checkpoint:
 
 - The owner confirmed there are no legacy installations or production deployment.

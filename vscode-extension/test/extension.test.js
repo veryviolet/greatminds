@@ -110,7 +110,7 @@ test("AgentToolsProvider refresh parses CLI JSON and renders tree item", async (
   const harness = loadExtension({
     execImpl(_cmd, _args, _options, cb) {
       cb(null, JSON.stringify([
-        { name: "cline", label: "Cline CLI", start_agent: true, start_modes: ["loop", "chat"], driven: true, driven_transport: "cline --json subprocess", notes: "ok" }
+        { id: "cline", transport: "acp", adapter_version: "fixture-adapter", harness_version: "fixture-harness", bindings: ["developer"], verification: "configured" }
       ]), "");
     }
   });
@@ -120,10 +120,11 @@ test("AgentToolsProvider refresh parses CLI JSON and renders tree item", async (
     const children = await provider.getChildren();
     assert.equal(children.length, 1);
     const item = provider.getTreeItem(children[0]);
-    assert.equal(item.label, "Cline CLI");
-    assert.equal(item.description, "cline");
-    assert.match(item.tooltip, /start-agent: loop,chat/);
-    assert.match(item.tooltip, /driven: cline --json subprocess/);
+    assert.equal(item.label, "cline");
+    assert.equal(item.description, "ACP · configured");
+    assert.match(item.tooltip, /Adapter: fixture-adapter/);
+    assert.match(item.tooltip, /Bindings: developer/);
+    assert.match(item.tooltip, /does not prove live compatibility/);
   } finally {
     harness.cleanup();
   }

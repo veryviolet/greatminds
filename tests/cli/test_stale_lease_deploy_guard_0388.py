@@ -24,7 +24,7 @@ import yaml
 
 from greatminds.cli import stand as stand_mod
 from greatminds.cli import stand_state as ss
-from greatminds.cli.coordd import REGISTRY_DIR
+REGISTRY_DIR = ".agent_registry"  # Fixture data only.
 
 
 # ---------------------------------------------------------------------------
