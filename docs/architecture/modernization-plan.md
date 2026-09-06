@@ -1312,3 +1312,24 @@ follow without replay. Final suite collection: 1553 tests without errors.
 No live provider or extension host session was exercised in this checkpoint.
 Remaining native assets, watchdog/wake fallback code, setup template helpers,
 and full-suite execution remain open.
+
+### First broad post-cutover test audit (2026-09-07)
+
+Ran the whole suite with a 20-failure diagnostic limit rather than relying only
+on targeted checks. The first batches exposed tests calling deleted Codex
+app-server, native Claude turn/reset/retry, SIGINT/tmux wake and native migration
+helpers. Retired those implementation-specific files; this does not establish
+ACP retry/backoff parity, which remains explicitly required by B1/M3. Preserved
+Ansible package checks and git permission checks. Replaced automatic git-hook
+installation assertions with proof that ACP setup preserves a user's hook and
+does not install one. Ported inbox/planning setup fixtures by removing the old
+--lang flag while retaining their domain assertions.
+
+Evidence: ACP supervisor (including real synthetic process cleanup and restart
+claim recovery), git permission/setup and package checks: 31 passed. Inbox and
+planning domain tests: 5 passed. Latest broad attempt stopped at 20 failures,
+319 passed (16.73 seconds); this is NOT a green full-suite claim. Next failures
+are recorded in /tmp/greatminds-modernization-suite-4.txt: obsolete live-developer
+launch, native backlog APIs and pane-based live-role tests. Port live-role
+invariants to durable ACP runs; do not discard the required-live-role gate.
+Other broad logs: /tmp/greatminds-modernization-suite{,-2,-3}.txt.
