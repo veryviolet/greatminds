@@ -73,6 +73,39 @@ def test_claim_is_atomic_across_processes(runtime):
     assert len(state["events"]) == 1
 
 
+def test_compact_decision_gets_stable_identity_and_duplicate_delivery(runtime):
+    store, claim, _ = running(runtime)
+    document = {"decision": "no_change", "payload": {"reason": "needs further analysis"}}
+    receipt = store.submit_decision(document, run_id=claim.run["id"], token=claim.token)
+    assert document == {"decision": "no_change", "payload": {"reason": "needs further analysis"}}
+    envelope = receipt["envelope"]
+    assert envelope["result_id"] == claim.run["id"] + "-result"
+    for name in ("task_id", "task_revision", "schema_sha256"):
+        assert envelope[name] == claim.run[name]
+    store.transition(claim.run["id"], owner_id="test-supervisor", event_id="finished", target="completed")
+    assert store.submit_decision(document, run_id=claim.run["id"], token=claim.token) == receipt
+    with pytest.raises(GreatMindsError, match="different contents"):
+        store.submit_decision({"decision": "no_change", "payload": {}},
+                              run_id=claim.run["id"], token=claim.token)
+
+
+@pytest.mark.parametrize("field", ["run_id", "task_id", "task_revision", "schema_sha256"])
+def test_compact_decision_cannot_override_assignment(runtime, field):
+    store, claim, _ = running(runtime)
+    with pytest.raises(GreatMindsError, match="does not match"):
+        store.submit_decision({"decision": "no_change", "payload": {}, field: "other"},
+                              run_id=claim.run["id"], token=claim.token)
+    assert store.snapshot()["results"] == {}
+
+
+def test_compact_decision_still_requires_the_run_credential(runtime):
+    store, claim, _ = running(runtime)
+    with pytest.raises(GreatMindsError, match="credential"):
+        store.submit_decision({"decision": "no_change", "payload": {}},
+                              run_id=claim.run["id"], token="wrong")
+    assert store.snapshot()["results"] == {}
+
+
 def test_read_only_snapshot_does_not_initialize_runtime(tmp_path):
     assert RunStore(tmp_path).snapshot()["project_id"] is None
     assert not (tmp_path / ".runtime").exists()

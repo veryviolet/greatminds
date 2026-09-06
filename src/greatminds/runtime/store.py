@@ -385,6 +385,32 @@ class RunStore:
                         {"previous_owner": previous_owner, "previous_state": previous_state,
                          "state": run["state"]})
 
+    def submit_decision(self, document: dict, *, run_id: str, token: str) -> dict:
+        """Fill mechanical envelope identity from the authenticated assignment.
+
+        The default result identity is stable across delivery retries. Full
+        envelopes remain accepted, but supplied identities cannot change the
+        credential's assignment. Receipt authentication also permits exact
+        duplicate delivery after the original result has already been applied.
+        """
+        if not isinstance(document, dict) or document.keys() - ResultEnvelope.__dataclass_fields__.keys():
+            _error("decision must contain only supported result envelope fields")
+        if "run_id" in document and document["run_id"] != run_id:
+            _error("result run_id does not match assigned run", 3)
+        run = self._run(self.snapshot(), run_id)
+        fields = copy.deepcopy(document)
+        for name, expected in (("run_id", run_id), ("task_id", run["task_id"]),
+                               ("task_revision", run["task_revision"]), ("schema_sha256", run["schema_sha256"])):
+            if name in fields and fields[name] != expected:
+                _error(f"result {name} does not match assigned run", 3)
+            fields[name] = expected
+        fields.setdefault("result_id", run_id + "-result")
+        try:
+            envelope = ResultEnvelope(**fields)
+        except TypeError as exc:
+            _error(f"incomplete result decision: {exc}")
+        return self.receive_result(envelope, token=token)
+
     def receive_result(self, envelope: ResultEnvelope, *, token: str) -> dict:
         """Authenticate and durably receive a decision for later domain validation.
 

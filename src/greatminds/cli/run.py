@@ -11,7 +11,7 @@ from greatminds.core.errors import GreatMindsError
 from greatminds.core.paths import find_project_dir, project_runtime_dir
 from greatminds.core.schema import load_schema_snapshot
 from greatminds.runtime.config import load_execution_config
-from greatminds.runtime.store import ResultEnvelope, RunStore
+from greatminds.runtime.store import RunStore
 
 
 @click.group()
@@ -120,10 +120,7 @@ def submit(source):
         raise GreatMindsError("result submission requires an assigned run credential", exit_code=3)
     try:
         document = json.loads(source.read_text(encoding="utf-8"))
-        envelope = ResultEnvelope(**document)
     except (OSError, TypeError, ValueError) as exc:
         raise GreatMindsError(f"invalid result envelope: {exc}", exit_code=2) from exc
-    if envelope.run_id != run_id:
-        raise GreatMindsError("result run does not match assigned run", exit_code=3)
-    receipt = RunStore(project_runtime_dir(find_project_dir())).receive_result(envelope, token=token)
+    receipt = RunStore(project_runtime_dir(find_project_dir())).submit_decision(document, run_id=run_id, token=token)
     click.echo(json.dumps(receipt, ensure_ascii=False, indent=2))

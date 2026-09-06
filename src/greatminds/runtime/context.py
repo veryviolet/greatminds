@@ -35,8 +35,6 @@ def compile_context(store: RunStore, claim: Claim, schema: SchemaSnapshot) -> st
                                 if run["role"] in item["roles"]],
         "task_contract": contract.get("task_kinds", {}).get(document.get("stream", "product"), {}),
         "result_format": {
-            "result_id": "choose-a-unique-result-id", "run_id": run["id"], "task_id": task.task_id,
-            "task_revision": task.sha256, "schema_sha256": schema.sha256,
             "decision": "handoff|blocked|needs_input|no_change",
             "payload": {"to_queue": "destination for handoff", "blocks": [], "artifacts": []},
         },
@@ -48,6 +46,7 @@ def compile_context(store: RunStore, claim: Claim, schema: SchemaSnapshot) -> st
         "Do not scan other queues, send heartbeat messages, sleep, or rearm an agent loop. "
         "Do not edit task-store files directly or claim another role's approval. "
         "Submit one JSON result using `greatminds run submit --file /absolute/path/result.json`. "
+        "Supply decision and payload; the CLI fills run/task/schema and a stable result identity. "
         "Submit the structured decision for daemon validation; do not move queues yourself. "
         "Execute configured checks with `greatminds run command NAME --wait SECONDS`; "
         "the daemon records command output and source identity. Reference completed request IDs "

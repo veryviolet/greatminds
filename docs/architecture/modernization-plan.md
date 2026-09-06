@@ -505,6 +505,16 @@ M4 configured command service:
   Wheel and sdist build succeeded; installed-wheel ACP command/evidence/restart
   smoke passed. No live model service was used.
 
+M3 context simplification:
+
+- Agents now submit only decision/payload. The shared CLI fills task/run/schema
+  identity and a stable per-run result ID. Duplicate delivery is deterministic;
+  agents no longer copy hashes or invent delivery identities. Explicit full
+  envelopes remain validated for compatibility.
+- Store/credential regression: 36 passed after the final identity-error fix;
+  the ACP fixtures also submitted compact decisions through the CLI, including
+  command evidence and handoff application.
+
 Automatic workflow controllers, stand/lease integration, live harness
 compatibility, interactive attach, and complete migration/removal of the
 existing launch paths remain pending. M2 is not complete until the real

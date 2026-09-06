@@ -145,6 +145,13 @@ waiters on a different inode and break mutual exclusion.
 
 ## Lifecycle and result receipts
 
+`greatminds run submit --file /absolute/path/result.json` accepts a compact
+decision: `{"decision": "no_change", "payload": {"reason": "..."}}`. The CLI
+fills run/task/schema identity from the current assignment and chooses one stable
+result ID per run. Exact repeated submission returns the existing receipt, even
+after completion; changing its contents is a conflict. Full envelopes and explicit
+result IDs remain supported, but cannot override the assigned run's identity.
+
 Run lifecycle records claimed, starting, running, waiting for input/authentication,
 cancelling, and terminal completed/failed/cancelled/interrupted states. The
 supervisor supplies a unique event ID. Replaying the same event is a no-op;
