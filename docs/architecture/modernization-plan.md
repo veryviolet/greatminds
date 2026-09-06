@@ -1277,3 +1277,20 @@ reload/try-restart calls for installed services, failure propagation, explicit
 root selection, and interpreter/project preservation. No live service was
 restarted and no package upgrade was performed. Full modernization remains open;
 remaining native setup/helper/CLI cleanup and full-suite execution are next.
+
+### Remove dead vendor setup implementations (2026-09-07)
+
+Deleted unused Claude settings/auto-mode generation, plugin installation,
+credential pretrust, per-role Codex homes/skills setup and native git-hook
+installation helpers. Public setup remains the shared ACP bootstrap. Removed the
+suite-wide plugin-install suppression environment flag; the ACP setup regression
+now explicitly runs without that flag, rejects any external subprocess and
+asserts vendor installers are absent. Retired tests specific to removed vendor
+setup implementations, retaining unrelated task, hook and stand behavior checks.
+
+Validation: 54 ACP bootstrap/project-environment/stand-profile tests passed;
+9 retained hook/configuration tests passed; full collection: 1578 tests without
+collection errors. Pure deterministic template/profile helpers remain pending
+module cleanup, including review of obsolete profile migration hashes. Native
+CLI/hooks and full-suite execution remain open; this checkpoint is not completion
+of the modernization plan.

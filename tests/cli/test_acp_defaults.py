@@ -13,6 +13,12 @@ def test_plain_setup_creates_an_empty_explicit_acp_contract_without_external_act
     def forbidden(*args, **kwargs):
         pytest.fail('setup invoked an external process')
     monkeypatch.setattr('subprocess.run', forbidden)
+    monkeypatch.delenv('GREATMINDS_SKIP_PLUGIN_INSTALL', raising=False)
+    from greatminds.cli import setup as setup_module
+    for removed in ('_install_role_plugins_per_host', '_setup_codex_homes_per_role',
+                    '_ensure_claude_settings_local', '_install_claude_pretrust',
+                    '_install_codex_pretrust', '_install_git_pre_commit_hook'):
+        assert not hasattr(setup_module, removed)
     result = CliRunner().invoke(cli, ['setup', '--project-dir', str(tmp_path)])
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)['bindings'] == 0

@@ -149,34 +149,3 @@ def test_stop_phase_unchanged_for_loop_mode_role(tmp_path: Path) -> None:
 
 
 # ---------- settings.local.json carries both hooks ----------
-
-
-def test_settings_local_carries_both_stop_and_user_prompt_submit(
-    tmp_path: Path,
-) -> None:
-    """0236: greenfield ``.claude/settings.local.json`` has BOTH
-    Stop and UserPromptSubmit hook entries pointing at
-    ``greatminds stop-decide`` with the right --phase value."""
-    from greatminds.core.paths import find_canon_dir
-    project = tmp_path / "project"
-    project.mkdir()
-    status = setup_mod._ensure_claude_settings_local(
-        project, find_canon_dir(),
-    )
-    assert status == "written"
-    doc = json.loads(
-        (project / ".claude" / "settings.local.json").read_text(
-            encoding="utf-8",
-        )
-    )
-    hooks = doc.get("hooks") or {}
-    assert "Stop" in hooks
-    assert "UserPromptSubmit" in hooks, (
-        "0236: settings.local.json missing UserPromptSubmit hook"
-    )
-    stop_cmd = hooks["Stop"][0]["hooks"][0]["command"]
-    ups_cmd = hooks["UserPromptSubmit"][0]["hooks"][0]["command"]
-    assert "--phase stop" in stop_cmd
-    assert "--phase user-prompt-submit" in ups_cmd
-    assert "stop-decide" in stop_cmd
-    assert "stop-decide" in ups_cmd
