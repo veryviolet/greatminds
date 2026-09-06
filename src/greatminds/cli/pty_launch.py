@@ -39,7 +39,10 @@ from pathlib import Path
 
 import click
 
-from greatminds.core.paths import find_coord_dir as _strict_find_coord_dir
+from greatminds.core.paths import (
+    find_coord_dir as _strict_find_coord_dir,
+    require_native_execution,
+)
 
 
 def find_coord_dir() -> Path:
@@ -203,6 +206,7 @@ def proxy_loop(master_fd: int, stop_event: threading.Event) -> None:
 @click.argument("exec_binary")
 @click.argument("tool_args", nargs=-1, type=click.UNPROCESSED)
 def pty_launch(role: str, exec_binary: str, tool_args: tuple[str, ...]) -> None:
+    require_native_execution()
     # argv[2] is the binary we exec. When start_agent wraps the agent in
     # ``systemd-run --user --scope ... cursor-agent``, exec_binary is
     # ``systemd-run``, which is useless in the registry (and hides that
@@ -280,6 +284,7 @@ def _pty_launch_impl(role: str, exec_binary: str, tool_args: list[str]) -> None:
     preserved into the child process's argv. claude's ``--mcp-config``
     is variadic and needs ``--`` to terminate it before the prompt.
     """
+    require_native_execution()
     tool = os.environ.get("GREATMINDS_REGISTRY_TOOL") or exec_binary
 
     pid, master_fd = pty.fork()

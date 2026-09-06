@@ -986,6 +986,18 @@ M6 execution observation and ACP launch barrier checkpoint:
   supervisor admission. Installed-wheel exclusive barrier/startup refusal, release,
   and quiet-fixture observation passed without launching an agent.
 
+M6 native launcher routing checkpoint:
+
+- `start-agent` (including dry-run), the Click `pty-launch` command, and its
+  direct Python entrypoint refuse ACP projects before environment loading,
+  registry writes, or process creation. Canonical project discovery covers
+  nested worktrees and explicit project overrides. Invalid contracts, directory
+  placeholders and broken symlinks do not silently select native execution.
+- Native-launch refusal and existing native dry-run/driver regression: 27 passed.
+  This is a routing guard, not lifetime launch exclusion for prior-version
+  processes. Migration apply, service quiescence and native driver retirement
+  remain outstanding; launch exclusion remains unverified in migration reviews.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility

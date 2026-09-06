@@ -70,6 +70,25 @@ def find_config_dir(start: Path | None = None, *, strict: bool = True) -> Path:
     return project / CONFIG_DIR_NAME
 
 
+def require_native_execution(start: Path | None = None) -> None:
+    """Refuse legacy launchers for ACP projects, including invalid contracts.
+
+    This routing check is not migration launch exclusion: it does not hold a
+    lock across a legacy process lifetime.
+    """
+    from .errors import GreatMindsError
+
+    project = find_project_dir(start, strict=False)
+    contract = project / CONFIG_DIR_NAME / "execution.yaml"
+    if contract.exists() or contract.is_symlink():
+        raise GreatMindsError(
+            "Native agent launch is disabled for ACP projects. "
+            "Use greatminds coordd and greatminds chat with --project-dir "
+            f"{project}.",
+            exit_code=2,
+        )
+
+
 def find_runtime_dir(start: Path | None = None, *, strict: bool = True) -> Path:
     """Locate ignored runtime/system state under ``.greatminds/``."""
     project = find_project_dir(start, strict=strict)
