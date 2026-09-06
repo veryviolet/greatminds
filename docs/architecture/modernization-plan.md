@@ -1169,3 +1169,20 @@ Validation: 49 service/doctor/environment tests passed, including repeated
 failed reload, successful retry, blocked restart, missing executable and timeout.
 Updated the old no-reload-on-identical-files assertion to the recovery contract.
 All systemctl interactions in these tests were substituted.
+
+### Manifest-driven environment selection (2026-09-07)
+
+Removed native Claude credential-file diagnostics, driven-role detection and
+service warnings, plus their unused vendor executable helper. Captured service
+environment names now come from agent/command `required_env` and `environment`
+source references. Still-declared captured values survive a maintenance shell
+that lacks them; deleted references are pruned. Writes use the shared durable
+atomic replacement helper with private temporary-file permissions. The schema
+consistency test now compares the shared ACP configuration snapshot instead of
+calling removed native daemon helpers.
+
+Validation: 51 service/environment/schema tests passed. Tests use synthetic
+references and secrets; no provider was launched. Follow-up remains necessary
+for systemd EnvironmentFile quoting/parsing, per-project PATH, registry locking,
+and complete service configuration preflight. This checkpoint establishes
+manifest selection, not full environment serialization parity.

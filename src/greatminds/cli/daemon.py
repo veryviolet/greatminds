@@ -30,19 +30,15 @@ import shlex
 import shutil
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 import click
-import yaml
 
 from greatminds.core.paths import (
-    coord_yaml_path,
     find_canon_dir,
     project_env_file,
 )
-from greatminds.core.schema import load_schema_snapshot
-from greatminds.cli._colors import err, info, ok, warn
+from greatminds.cli._colors import info, ok
 
 
 REGISTRY_DIR = Path.home() / ".config" / "greatminds"
@@ -50,60 +46,11 @@ REGISTRY_PATH = REGISTRY_DIR / "projects.json"
 AGENT_ENV_DIR = REGISTRY_DIR / "agent-env"
 SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
 TEMPLATE_UNIT_NAME = "greatminds-daemon@.service"
-AGENT_ENV_NAMES = {
-    # Claude direct / proxy / model-router auth.
-    "ANTHROPIC_API_KEY",
-    "ANTHROPIC_AUTH_TOKEN",
-    "ANTHROPIC_BASE_URL",
-    # Claude Code alternate providers.
-    "CLAUDE_CONFIG_DIR",
-    "CLAUDE_CODE_OAUTH_TOKEN",
-    "CLAUDE_CODE_HOST_AUTH_ENV_VAR",
-    "CLAUDE_CODE_SDK_HAS_HOST_AUTH_REFRESH",
-    "CLAUDE_CODE_HOST_AUTH_REFRESH_TIMEOUT_MS",
-    "CLAUDE_BRIDGE_OAUTH_TOKEN",
-    "CLAUDE_CODE_USE_BEDROCK",
-    "CLAUDE_CODE_USE_VERTEX",
-    "AWS_ACCESS_KEY_ID",
-    "AWS_SECRET_ACCESS_KEY",
-    "AWS_SESSION_TOKEN",
-    "AWS_PROFILE",
-    "AWS_REGION",
-    "AWS_DEFAULT_REGION",
-    "AWS_BEARER_TOKEN_BEDROCK",
-    "GOOGLE_APPLICATION_CREDENTIALS",
-    "ANTHROPIC_VERTEX_PROJECT_ID",
-    "CLOUD_ML_REGION",
-}
-
-
 def _current_user_home() -> Path:
     try:
         return Path(pwd.getpwuid(os.getuid()).pw_dir)
     except Exception:  # noqa: BLE001
         return Path.home()
-
-
-def _agent_tool_env(env: dict[str, str]) -> dict[str, str]:
-    """Env for non-interactive agent CLI probes.
-
-    Claude Code stores first-party credentials under ``$HOME/.claude`` and is
-    commonly installed in ``$HOME/.local/bin``. A daemon/subprocess must set
-    both explicitly instead of relying on interactive shell inheritance.
-    """
-    home = _current_user_home()
-    out = dict(env)
-    out["HOME"] = str(home)
-    path_parts = [
-        str(home / ".local" / "bin"),
-        str(home / ".npm-global" / "bin"),
-    ]
-    path_parts.extend((out.get("PATH") or os.defpath).split(":"))
-    path_parts.extend(["/usr/local/bin", "/usr/bin", "/bin"])
-    seen: set[str] = set()
-    out["PATH"] = ":".join(
-        p for p in path_parts if p and not (p in seen or seen.add(p)))
-    return out
 
 
 def _resolved_greatminds_exec() -> str:
@@ -121,38 +68,6 @@ def _resolved_greatminds_exec() -> str:
     if found:
         return str(Path(found).resolve())
     return f"{sys.executable} -m greatminds.cli.main"
-
-
-def _resolve_tool_exec(tool: str) -> str | None:
-    """Resolve a user-installed tool from non-login and login-shell paths."""
-    found = shutil.which(tool)
-    if found:
-        return str(Path(found))
-    try:
-        cp = subprocess.run(
-            ["bash", "-lc", f"command -v {shlex.quote(tool)} 2>/dev/null"],
-            capture_output=True, text=True, timeout=10,
-        )
-        for line in reversed((cp.stdout or "").splitlines()):
-            cand = line.strip()
-            if cand and Path(cand).exists():
-                return cand
-    except Exception:  # noqa: BLE001
-        pass
-    home = _current_user_home()
-    candidates = [
-        home / ".local" / "bin" / tool,
-        home / ".npm-global" / "bin" / tool,
-        Path("/usr/local/bin") / tool,
-        Path("/usr/bin") / tool,
-    ]
-    nvm = home / ".nvm" / "versions" / "node"
-    if nvm.is_dir():
-        candidates.extend(sorted(nvm.glob(f"*/bin/{tool}"), reverse=True))
-    for cand in candidates:
-        if cand.exists() and os.access(cand, os.X_OK):
-            return str(cand)
-    return None
 
 
 # ---------------------------------------------------------------------------
@@ -379,47 +294,34 @@ def _agent_env_file(name: str) -> Path:
     return AGENT_ENV_DIR / f"{name}.env"
 
 
-def _selected_agent_env() -> dict[str, str]:
-    env = {
-        k: v for k, v in os.environ.items()
-        if k in AGENT_ENV_NAMES and v
-    }
-    host_auth_name = env.get("CLAUDE_CODE_HOST_AUTH_ENV_VAR")
-    if host_auth_name and host_auth_name in os.environ:
-        host_auth_value = os.environ.get(host_auth_name)
-        if host_auth_value:
-            env[host_auth_name] = host_auth_value
-    return env
+def capture_agent_env(name: str, project_dir: Path | None = None) -> bool:
+    """Capture only environment references declared by ACP agents and commands.
 
-
-def capture_agent_env(name: str) -> bool:
-    """Persist tool auth/session env from the invoking user shell.
-
-    systemd user services do not inherit the interactive shell that made
-    ``claude -p`` or provider-backed Claude work. The project-level
-    ``PROJECT.env`` remains the fleet config source; this private per-session
-    file carries only machine auth/session variables for agent tools.
-
-    If the current shell has none of the allowlisted variables, leave any
-    existing file untouched. That keeps a bare SSH maintenance command from
-    erasing auth captured earlier from a real operator shell.
+    Preserve still-declared captured values absent from a maintenance shell;
+    remove references no longer present in the execution contract.
     """
-    env = _selected_agent_env()
-    if not env:
+    _validate_project_name(name)
+    project_dir = project_dir or lookup_project_dir(name)
+    if project_dir is None or not (project_dir / "coordination/execution.yaml").exists():
         return False
-    AGENT_ENV_DIR.mkdir(parents=True, exist_ok=True)
+    from greatminds.runtime.observation import configuration
+    _, config = configuration(project_dir)
+    names = set()
+    for definition in (*config.agents, *config.commands):
+        names.update(definition.required_env)
+        names.update(ref for _, ref in definition.environment)
     target = _agent_env_file(name)
+    previous = _parse_env_file(target)
+    env = {key: previous[key] for key in names if key in previous}
+    env.update({key: os.environ[key] for key in names if key in os.environ})
+    if not env and not target.exists():
+        return False
     body = "".join(f"{k}={shlex.quote(v)}\n" for k, v in sorted(env.items()))
     old = target.read_text(encoding="utf-8") if target.is_file() else None
     if old == body:
         return False
-    fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        f.write(body)
-    try:
-        target.chmod(0o600)
-    except OSError:
-        pass
+    from greatminds.core.storage import atomic_bytes
+    atomic_bytes(target, body.encode("utf-8"))
     return True
 
 
@@ -465,69 +367,6 @@ def _daemon_candidate_env(name: str, project_dir: Path) -> dict[str, str]:
     return env
 
 
-def _claude_oauth_credential_diagnostic(env: dict[str, str]) -> str | None:
-    """Return a concise diagnostic for Claude Code OAuth credential state."""
-    config_dir = env.get("CLAUDE_CONFIG_DIR")
-    root = Path(config_dir).expanduser() if config_dir else Path.home() / ".claude"
-    path = root / ".credentials.json"
-    if not path.is_file():
-        return f"Claude credentials file missing: {path}"
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, TypeError) as exc:
-        return f"Claude credentials file unreadable: {path} ({exc})"
-    oauth = data.get("claudeAiOauth") if isinstance(data, dict) else None
-    if not isinstance(oauth, dict):
-        return f"Claude credentials file has no claudeAiOauth block: {path}"
-    expires_at = oauth.get("expiresAt")
-    refresh_len = len(oauth.get("refreshToken") or "")
-    access_len = len(oauth.get("accessToken") or "")
-    expired = False
-    if isinstance(expires_at, (int, float)) and not isinstance(expires_at, bool):
-        expired = int(expires_at) <= int(time.time() * 1000)
-    if expired and refresh_len == 0:
-        return (
-            "Claude OAuth credentials are expired and have no refresh token "
-            f"({path}); run `claude setup-token` or `claude auth login` as the "
-            "same OS user, then restart the greatminds daemon."
-        )
-    if access_len == 0:
-        return (
-            f"Claude OAuth credentials have no access token ({path}); run "
-            "`claude setup-token` or `claude auth login` as the same OS user."
-        )
-    return None
-
-
-def has_driven_claude_roles(project_dir: Path) -> bool:
-    lifecycles = _schema_lifecycles(project_dir)
-    doc = _safe_yaml(coord_yaml_path(project_dir))
-    if not doc:
-        return False
-    for win in (doc.get("windows") or []):
-        if not isinstance(win, dict):
-            continue
-        if (win.get("tool") or "").lower() != "claude":
-            continue
-        role = (win.get("role") or "").upper()
-        if role and lifecycles.get(role) == "driven":
-            return True
-    return False
-
-
-def _warn_missing_agent_env_for_claude(name: str, project_dir: Path) -> None:
-    if not has_driven_claude_roles(project_dir):
-        return
-    if _selected_agent_env() or _agent_env_file(name).is_file():
-        return
-    warn(
-        "no Claude/provider auth env captured for this driven-Claude fleet; "
-        "if `claude -p` only works in a specific interactive shell, run "
-        "`greatminds daemon start` from that shell or check "
-        "`greatminds daemon doctor` before relying on driven Claude turns."
-    )
-
-
 def install_project_dropin(name: str, project_dir: Path) -> bool:
     """Per-instance drop-in giving the daemon — and every driven agent it
     spawns, which inherit its process env — the fleet's ``PROJECT.env`` as a
@@ -558,38 +397,6 @@ def install_project_dropin(name: str, project_dir: Path) -> bool:
             pass
     target.write_text(body, encoding="utf-8")
     return True
-
-
-# ---------------------------------------------------------------------------
-# 0320 (0311 Phase 3a): codex app-server template unit
-# ---------------------------------------------------------------------------
-
-
-def _schema_lifecycles(project_dir: Path) -> dict[str, str]:
-    """Use the same installed contract as coordd and task validation.
-
-    Project mirrors can be stale after an upgrade and must not change which
-    services are installed. Explicit canon overrides still apply to all paths.
-    """
-    del project_dir  # Retain the helper signature for existing callers.
-    doc = load_schema_snapshot(find_canon_dir()).document
-    out: dict[str, str] = {}
-    for role, spec in ((doc or {}).get("roles") or {}).items():
-        if isinstance(role, str) and isinstance(spec, dict):
-            lc = spec.get("lifecycle")
-            if isinstance(lc, str):
-                out[role.upper()] = lc
-    return out
-
-
-def _safe_yaml(path: Path) -> dict | None:
-    if not path.is_file():
-        return None
-    try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except yaml.YAMLError:
-        return None
-    return data if isinstance(data, dict) else None
 
 
 # ---------------------------------------------------------------------------
@@ -658,8 +465,7 @@ def install_cmd(name: str | None, project_dir: Path | None) -> None:
 
     wrote_unit = install_template_unit()
     register_project(resolved, pd)
-    captured_env = capture_agent_env(resolved)
-    _warn_missing_agent_env_for_claude(resolved, pd)
+    captured_env = capture_agent_env(resolved, pd)
     # Wire the fleet's PROJECT.env into the daemon (and every driven agent
     # it spawns) as a systemd EnvironmentFile — the single clean injection.
     wrote_dropin = install_project_dropin(resolved, pd)
@@ -718,11 +524,8 @@ def _project_options(fn):
 @_project_options
 def start_cmd(project: str | None, project_dir: Path | None) -> None:
     name = _resolve_project_name(project, project_dir)
-    if capture_agent_env(name):
+    if capture_agent_env(name, project_dir):
         info("agent auth/session env refreshed before daemon start")
-    pd = project_dir.resolve() if project_dir else lookup_project_dir(name)
-    if pd is not None:
-        _warn_missing_agent_env_for_claude(name, pd)
     _run_verb("start", name)
 
 
@@ -740,7 +543,7 @@ def _refresh_units_before_restart(name: str,
     if pd is not None:
         if install_project_dropin(name, pd):
             changed = True
-    capture_agent_env(name)
+    capture_agent_env(name, pd)
     _checked_systemctl("daemon-reload")
     return changed
 
@@ -754,9 +557,6 @@ def restart_cmd(project: str | None, project_dir: Path | None) -> None:
     # systemd's bare PATH (which cannot exec claude / codex / ansible).
     if _refresh_units_before_restart(name, project_dir):
         info("daemon units refreshed (PATH re-baked) before restart")
-    pd = project_dir.resolve() if project_dir else lookup_project_dir(name)
-    if pd is not None:
-        _warn_missing_agent_env_for_claude(name, pd)
     _run_verb("restart", name)
 
 

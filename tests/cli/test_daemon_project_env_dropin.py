@@ -62,58 +62,6 @@ def test_dropin_optional_dash_tolerates_missing_env_file(
     assert "EnvironmentFile=-" in conf.read_text(encoding="utf-8")
 
 
-def test_capture_agent_env_writes_private_allowlisted_env(
-    tmp_path: Path, monkeypatch,
-) -> None:
-    monkeypatch.setattr(dm, "REGISTRY_DIR", tmp_path / "greatminds")
-    monkeypatch.setattr(dm, "AGENT_ENV_DIR",
-                        tmp_path / "greatminds" / "agent-env")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "secret value")
-    monkeypatch.setenv("UNRELATED_SECRET", "must-not-leak")
-
-    assert dm.capture_agent_env("toy") is True
-
-    target = tmp_path / "greatminds" / "agent-env" / "toy.env"
-    body = target.read_text(encoding="utf-8")
-    assert "ANTHROPIC_API_KEY='secret value'" in body
-    assert "UNRELATED_SECRET" not in body
-    assert target.stat().st_mode & 0o777 == 0o600
-
-
-def test_capture_agent_env_follows_claude_host_auth_pointer(
-    tmp_path: Path, monkeypatch,
-) -> None:
-    monkeypatch.setattr(dm, "REGISTRY_DIR", tmp_path / "greatminds")
-    monkeypatch.setattr(dm, "AGENT_ENV_DIR",
-                        tmp_path / "greatminds" / "agent-env")
-    monkeypatch.setenv("CLAUDE_CODE_HOST_AUTH_ENV_VAR", "HOST_AUTH_TOKEN")
-    monkeypatch.setenv("HOST_AUTH_TOKEN", "secret host token")
-
-    assert dm.capture_agent_env("toy") is True
-
-    body = (tmp_path / "greatminds" / "agent-env" / "toy.env").read_text(
-        encoding="utf-8")
-    assert "CLAUDE_CODE_HOST_AUTH_ENV_VAR=HOST_AUTH_TOKEN" in body
-    assert "HOST_AUTH_TOKEN='secret host token'" in body
-
-
-def test_capture_agent_env_empty_shell_preserves_existing_file(
-    tmp_path: Path, monkeypatch,
-) -> None:
-    monkeypatch.setattr(dm, "REGISTRY_DIR", tmp_path / "greatminds")
-    monkeypatch.setattr(dm, "AGENT_ENV_DIR",
-                        tmp_path / "greatminds" / "agent-env")
-    target = tmp_path / "greatminds" / "agent-env" / "toy.env"
-    target.parent.mkdir(parents=True)
-    target.write_text("ANTHROPIC_API_KEY=old\n", encoding="utf-8")
-    target.chmod(0o600)
-    for name in dm.AGENT_ENV_NAMES:
-        monkeypatch.delenv(name, raising=False)
-
-    assert dm.capture_agent_env("toy") is False
-    assert target.read_text(encoding="utf-8") == "ANTHROPIC_API_KEY=old\n"
-
-
 def test_daemon_candidate_env_layers_project_then_agent_env(
     tmp_path: Path, monkeypatch,
 ) -> None:
@@ -142,22 +90,29 @@ def test_daemon_candidate_env_layers_project_then_agent_env(
     assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "secret token"
 
 
-def test_has_driven_claude_roles_detects_only_schema_driven_roles(
-    tmp_path: Path,
-) -> None:
-    project = tmp_path / "proj"
-    (project / "coordination").mkdir(parents=True)
-    (project / "coord.yaml").write_text(
-        "windows:\n"
-        "  - role: DEVELOPER\n"
-        "    tool: claude\n",
-        encoding="utf-8",
-    )
-    (project / "coordination" / "schema.yaml").write_text(
-        "roles:\n"
-        "  DEVELOPER:\n"
-        "    lifecycle: driven\n",
-        encoding="utf-8",
-    )
-
-    assert dm.has_driven_claude_roles(project) is True
+def test_capture_follows_manifest_references_and_prunes_removed_names(tmp_path, monkeypatch):
+    import yaml
+    project = tmp_path/'project'
+    (project/'coordination').mkdir(parents=True)
+    path = project/'coordination/execution.yaml'
+    document = {'version': 1, 'agents': {'fixture': {'transport': 'acp', 'argv': ['/fake/acp'],
+        'adapter_version': 'fixture', 'harness_version': 'fixture',
+        'environment': {'API_KEY': 'FIXTURE_SOURCE'}, 'required_env': ['FIXTURE_REQUIRED']}}, 'bindings': {}}
+    path.write_text(yaml.safe_dump(document))
+    monkeypatch.setenv('FIXTURE_SOURCE', 'synthetic secret')
+    monkeypatch.setenv('FIXTURE_REQUIRED', 'synthetic required')
+    monkeypatch.setenv('UNRELATED_SECRET', 'must not be captured')
+    assert dm.capture_agent_env('fixture', project)
+    target = dm._agent_env_file('fixture')
+    assert dm._parse_env_file(target) == {'FIXTURE_SOURCE': 'synthetic secret', 'FIXTURE_REQUIRED': 'synthetic required'}
+    assert target.stat().st_mode & 0o777 == 0o600
+    monkeypatch.delenv('FIXTURE_SOURCE')
+    assert not dm.capture_agent_env('fixture', project)
+    document['agents']['fixture']['environment'] = {}
+    path.write_text(yaml.safe_dump(document))
+    assert dm.capture_agent_env('fixture', project)
+    assert dm._parse_env_file(target) == {'FIXTURE_REQUIRED': 'synthetic required'}
+    document['agents'] = {}
+    path.write_text(yaml.safe_dump(document))
+    assert dm.capture_agent_env('fixture', project)
+    assert target.read_text() == ''

@@ -3,7 +3,7 @@ import json
 import pytest
 from click.testing import CliRunner
 
-from greatminds.cli import coordd, daemon, task
+from greatminds.cli import task
 from greatminds.cli.main import cli
 from greatminds.core.paths import find_canon_dir
 from greatminds.core.schema import load_schema_snapshot
@@ -22,8 +22,12 @@ def test_agent_and_runtime_read_same_contract_despite_stale_mirror(tmp_path, mon
     report = json.loads(result.output)
     assert report["project_copy"]["status"] == "drifted"
     assert report["schema"] == task.schema()
-    assert report["schema"]["roles"] == coordd.load_schema_roles(find_canon_dir())
-    lifecycle = daemon._schema_lifecycles(tmp_path)["ARCHITECT-REVIEWER"]
+    from greatminds.runtime.observation import configuration
+    (tmp_path / "coordination").mkdir()
+    (tmp_path / "coordination/execution.yaml").write_text("version: 1\nagents: {}\nbindings: {}\n")
+    runtime_schema, _ = configuration(tmp_path)
+    assert report["schema"] == runtime_schema.document
+    lifecycle = runtime_schema.document["roles"]["ARCHITECT-REVIEWER"]["lifecycle"]
     assert lifecycle == report["schema"]["roles"]["ARCHITECT-REVIEWER"]["lifecycle"]
     assert lifecycle == "driven"
     assert (runtime / "schema.yaml").read_text() == stale
@@ -53,13 +57,3 @@ def test_print_schema_works_without_project_and_has_no_side_effects(tmp_path, mo
     assert result.exit_code == 0, result.output
     assert result.output == load_schema_snapshot().text
     assert list(tmp_path.iterdir()) == []
-
-
-@pytest.mark.parametrize("mode", ["chat", "loop", "staged", "", "driven"])
-def test_service_install_uses_dispatch_mode_and_ignores_legacy_schema(tmp_path, mode):
-    (tmp_path / "coord.yaml").write_text(json.dumps({"windows": [{
-        "role": "ARCHITECT-REVIEWER", "tool": "codex", "mode": mode,
-    }]}))
-    (tmp_path / "schema.yaml").write_text(
-        "roles: {ARCHITECT-REVIEWER: {lifecycle: interactive}}\n")
-    assert daemon.has_driven_codex_roles(tmp_path) is (mode == "driven")
