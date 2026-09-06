@@ -206,76 +206,7 @@ def proxy_loop(master_fd: int, stop_event: threading.Event) -> None:
 @click.argument("exec_binary")
 @click.argument("tool_args", nargs=-1, type=click.UNPROCESSED)
 def pty_launch(role: str, exec_binary: str, tool_args: tuple[str, ...]) -> None:
-    require_native_execution()
-    # argv[2] is the binary we exec. When start_agent wraps the agent in
-    # ``systemd-run --user --scope ... cursor-agent``, exec_binary is
-    # ``systemd-run``, which is useless in the registry (and hides that
-    # this is really a cursor agent — coordd needs the logical tool to
-    # pick the right wake/submit sequence). start_agent exports
-    # GREATMINDS_REGISTRY_TOOL with the logical name; prefer it.
-    tool = os.environ.get("GREATMINDS_REGISTRY_TOOL") or exec_binary
-    tool_args = list(tool_args)
-
-    pid, master_fd = pty.fork()
-    if pid == 0:
-        # Child: exec the actual binary (systemd-run wrapper or the tool).
-        try:
-            os.execvp(exec_binary, [exec_binary, *tool_args])
-        except OSError as exc:
-            print(f"pty-launch: exec {exec_binary} failed: {exc}", file=sys.stderr)
-            os._exit(127)
-
-    # Parent: register, then proxy.
-    coord = find_coord_dir()
-    sock_path = coord / ".agent_registry" / f"{role.lower()}.sock"
-    sock_path.parent.mkdir(parents=True, exist_ok=True)
-    tty_path = os.ttyname(sys.stdin.fileno()) if os.isatty(sys.stdin.fileno()) else "none"
-    reg_file = write_registry(role, sock_path, tty_path, tool, pid)
-
-    stop_event = threading.Event()
-
-    sock_thread = threading.Thread(
-        target=serve_input_sock,
-        args=(sock_path, master_fd, stop_event),
-        daemon=True,
-    )
-    sock_thread.start()
-
-    # Propagate terminal resize.
-    def on_winch(signum, frame):
-        try:
-            import fcntl
-            import struct
-            sz = fcntl.ioctl(sys.stdout.fileno(), termios.TIOCGWINSZ, b"\0" * 8)
-            fcntl.ioctl(master_fd, termios.TIOCSWINSZ, sz)
-        except (OSError, ImportError):
-            pass
-
-    signal.signal(signal.SIGWINCH, on_winch)
-    on_winch(None, None)  # initial sync
-
-    try:
-        proxy_loop(master_fd, stop_event)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        stop_event.set()
-        try:
-            os.kill(pid, signal.SIGHUP)
-        except OSError:
-            pass
-        try:
-            os.waitpid(pid, 0)
-        except OSError:
-            pass
-        try:
-            reg_file.unlink()
-        except OSError:
-            pass
-        try:
-            sock_path.unlink()
-        except OSError:
-            pass
+    _pty_launch_impl(role, exec_binary, list(tool_args))
 
 
 def _pty_launch_impl(role: str, exec_binary: str, tool_args: list[str]) -> None:
@@ -284,6 +215,13 @@ def _pty_launch_impl(role: str, exec_binary: str, tool_args: list[str]) -> None:
     preserved into the child process's argv. claude's ``--mcp-config``
     is variadic and needs ``--`` to terminate it before the prompt.
     """
+    from greatminds.runtime.migration_safety import native_execution_scope
+    with native_execution_scope():
+        _run_native_pty(role, exec_binary, tool_args)
+
+
+def _run_native_pty(role: str, exec_binary: str, tool_args: list[str]) -> None:
+    # Preserve the logical tool name when the binary is a systemd-run wrapper.
     require_native_execution()
     tool = os.environ.get("GREATMINDS_REGISTRY_TOOL") or exec_binary
 

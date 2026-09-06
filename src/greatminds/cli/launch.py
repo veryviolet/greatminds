@@ -42,7 +42,7 @@ import click
 import yaml
 
 from greatminds.core import env as gm_env
-from greatminds.core.paths import coord_yaml_path, project_config_dir, project_env_file
+from greatminds.core.paths import coord_yaml_path, project_config_dir, project_env_file, find_project_dir
 from greatminds.cli._colors import err, header, info, ok, warn
 
 
@@ -494,8 +494,10 @@ def _emit_vscode(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
               help="(tmux target only) kill existing session and rebuild")
 def launch(target: str, config_path: Path | None, project_dir: Path | None,
            venv: Path | None, recreate: bool) -> None:
-    acp_project = (project_dir or Path.cwd()).resolve()
-    if (acp_project/'coordination/execution.yaml').is_file():
+    acp_project = find_project_dir(project_dir or Path.cwd(), strict=False,
+                                   use_env=project_dir is None)
+    contract = acp_project/'coordination/execution.yaml'
+    if contract.exists() or contract.is_symlink():
         if config_path is not None:
             raise click.ClickException('ACP launch uses coordination/execution.yaml; --config is not applicable')
         from greatminds.runtime.frontends import launch as launch_acp
@@ -517,7 +519,8 @@ def launch(target: str, config_path: Path | None, project_dir: Path | None,
 
     cfg = _load_coord_yaml(config_path)
     project_dir = (project_dir or Path(cfg.get("project_dir") or ".")).resolve()
-    if (project_dir/'coordination/execution.yaml').is_file():
+    contract = project_dir/'coordination/execution.yaml'
+    if contract.exists() or contract.is_symlink():
         raise click.ClickException('ACP launch requires --project-dir instead of --config')
     if not project_dir.is_dir():
         err(f"project_dir {project_dir} not found")
@@ -525,6 +528,14 @@ def launch(target: str, config_path: Path | None, project_dir: Path | None,
     if not project_config_dir(project_dir).is_dir():
         err(f"{project_config_dir(project_dir)} not found (run greatminds setup first)")
         raise click.exceptions.Exit(1)
+
+    from greatminds.runtime.migration_safety import native_execution_scope
+    with native_execution_scope(project_dir):
+        _launch_native_frontend(project_dir, cfg, target, venv, recreate)
+
+
+def _launch_native_frontend(project_dir: Path, cfg: dict, target: str,
+                            venv: Path | None, recreate: bool) -> None:
 
     # Detect env + verify greatminds-task reachable after activation.
     setup = gm_env.detect(project_dir, venv_override=venv)

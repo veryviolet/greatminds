@@ -55,6 +55,7 @@ from greatminds.agents.driven_drivers import DrivenDispatchContext
 from greatminds.core.paths import (
     coord_yaml_path,
     find_canon_dir,
+    find_project_dir,
     find_runtime_dir,
 )
 
@@ -3610,8 +3611,10 @@ def coordd(project_dir: Path | None, project_name: str | None,
             raise click.exceptions.Exit(2)
         project_dir = resolved
 
-    project_dir = project_dir or Path.cwd()
-    if (project_dir / "coordination" / "execution.yaml").is_file():
+    project_dir = find_project_dir(project_dir or Path.cwd(), strict=False,
+                                   use_env=project_dir is None)
+    contract = project_dir / "coordination" / "execution.yaml"
+    if contract.exists() or contract.is_symlink():
         import asyncio
         from greatminds.runtime.daemon import serve
 
@@ -3619,6 +3622,23 @@ def coordd(project_dir: Path | None, project_name: str | None,
         return
     if once:
         raise click.ClickException("--once requires coordination/execution.yaml (ACP execution contract)")
+    from greatminds.runtime.migration_safety import native_execution_scope
+    with native_execution_scope(project_dir):
+        # Nested legacy helpers and their children use this environment key.
+        # Keep their project identity aligned with the acquired barrier.
+        previous_project = os.environ.get("GREATMINDS_PROJECT_DIR")
+        os.environ["GREATMINDS_PROJECT_DIR"] = str(project_dir)
+        try:
+            _run_native_daemon(project_dir, interval_sec, verbose)
+        finally:
+            if previous_project is None:
+                os.environ.pop("GREATMINDS_PROJECT_DIR", None)
+            else:
+                os.environ["GREATMINDS_PROJECT_DIR"] = previous_project
+
+
+def _run_native_daemon(project_dir: Path, interval_sec: float, verbose: bool) -> None:
+    """Temporary legacy loop; caller holds project execution exclusion."""
     coord = find_runtime_dir(project_dir, strict=False)
     if not coord.is_dir():
         click.echo(f"coordd: error: {coord} not found", err=True)

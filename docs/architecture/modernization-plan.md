@@ -998,6 +998,28 @@ M6 native launcher routing checkpoint:
   processes. Migration apply, service quiescence and native driver retirement
   remain outstanding; launch exclusion remains unverified in migration reviews.
 
+M6 native parent execution exclusion checkpoint:
+
+- Current-version native `coordd`, `pty-launch`, `start-agent` preparation and
+  frontend launch hold the shared project execution barrier. Native routing is
+  rechecked after admission. PTY entrypoints share one implementation; the
+  parent retains the barrier through child wait and registry cleanup.
+- `coordd` and frontend launch resolve the canonical project before choosing
+  ACP, including invocation from nested worktrees. Directory placeholders and
+  broken execution-contract symlinks fail validation instead of selecting the
+  native daemon. Explicit project selection keeps the legacy daemon's child
+  environment and barrier identity aligned.
+- The descriptor does not survive direct `exec`; the standard PTY wrapper
+  reacquires before forking. No-PTY direct launches, detached children, and
+  prior-version services still require independent quiescence verification.
+  Migration review therefore still does not claim complete launch exclusion.
+- Final native/ACP routing, barrier and frontend regression: 61 passed, including
+  a real synthetic child inside a PTY and observed release after cleanup.
+  Worktree/restart path and documentation regression: 12 passed. Installed-wheel
+  checks rejected all four native CLI entrypoints under exclusive exclusion and
+  ran an empty ACP daemon batch from a nested directory. No live harness or
+  existing fleet was launched or migrated.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility

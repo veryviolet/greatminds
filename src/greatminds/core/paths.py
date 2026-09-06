@@ -31,13 +31,15 @@ def _under_worktrees(path: Path) -> bool:
     return ".worktrees" in path.parts
 
 
-def find_project_dir(start: Path | None = None, *, strict: bool = True) -> Path:
+def find_project_dir(start: Path | None = None, *, strict: bool = True,
+                     use_env: bool = True) -> Path:
     """Locate the project root.
 
-    ``$GREATMINDS_PROJECT_DIR`` wins. Otherwise walk upward from ``start`` and
-    look for either the runtime directory or the tracked config directory.
+    ``$GREATMINDS_PROJECT_DIR`` wins unless ``use_env=False`` (an explicit CLI
+    project selection). Otherwise walk upward from ``start`` and look for either
+    the runtime directory or the tracked config directory.
     """
-    env_dir = os.environ.get("GREATMINDS_PROJECT_DIR")
+    env_dir = os.environ.get("GREATMINDS_PROJECT_DIR") if use_env else None
     if env_dir:
         root = Path(env_dir).resolve()
         if (root / RUNTIME_DIR_NAME).is_dir() and not _under_worktrees(root):
@@ -70,7 +72,7 @@ def find_config_dir(start: Path | None = None, *, strict: bool = True) -> Path:
     return project / CONFIG_DIR_NAME
 
 
-def require_native_execution(start: Path | None = None) -> None:
+def require_native_execution(start: Path | None = None, *, use_env: bool = True) -> None:
     """Refuse legacy launchers for ACP projects, including invalid contracts.
 
     This routing check is not migration launch exclusion: it does not hold a
@@ -78,7 +80,7 @@ def require_native_execution(start: Path | None = None) -> None:
     """
     from .errors import GreatMindsError
 
-    project = find_project_dir(start, strict=False)
+    project = find_project_dir(start, strict=False, use_env=use_env)
     contract = project / CONFIG_DIR_NAME / "execution.yaml"
     if contract.exists() or contract.is_symlink():
         raise GreatMindsError(

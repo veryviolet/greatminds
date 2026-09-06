@@ -402,6 +402,13 @@ def _shell_quote(arg: str) -> str:
 @click.argument("extra", nargs=-1, type=click.UNPROCESSED)
 def start_agent(role: str, tool: str, mode: str,
                 dry_run: bool, extra: tuple[str, ...]) -> None:
+    from greatminds.runtime.migration_safety import native_execution_scope
+    with native_execution_scope():
+        _start_native_agent(role, tool, mode, dry_run, extra)
+
+
+def _start_native_agent(role: str, tool: str, mode: str,
+                        dry_run: bool, extra: tuple[str, ...]) -> None:
     extra = list(extra)
     project_dir = Path(os.environ.get("GREATMINDS_PROJECT_DIR") or os.getcwd()).resolve()
     from greatminds.core.paths import require_native_execution

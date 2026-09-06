@@ -6,6 +6,7 @@ exclude new launches and stop prior-version services before publishing a contrac
 import json
 import hashlib
 import os
+from contextlib import contextmanager
 from pathlib import Path
 
 from greatminds.core.paths import project_runtime_dir
@@ -18,6 +19,21 @@ def execution_barrier(project, *, exclusive=False):
     key = hashlib.sha256(str(project.resolve()).encode()).hexdigest()
     return file_lock(Path('/tmp')/f'greatminds-execution-{os.getuid()}-{key}.lock',
                      label='project execution/migration', timeout=0, shared=not exclusive)
+
+
+@contextmanager
+def native_execution_scope(project=None):
+    """Exclude migration through legacy launch/cleanup, and recheck routing.
+
+    The lock is deliberately not inherited across exec. A PTY wrapper reacquires
+    its own scope before forking. Direct exec without that wrapper and binaries
+    from older installations still require independent process quiescence checks.
+    """
+    from greatminds.core.paths import find_project_dir, require_native_execution
+    project = find_project_dir(project, strict=False, use_env=project is None)
+    with execution_barrier(project):
+        require_native_execution(project, use_env=False)
+        yield project
 
 
 def inspect_execution(project):
