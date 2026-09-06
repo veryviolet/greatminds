@@ -878,8 +878,17 @@ def stale_verified_deps_for_lease(
 
 def deploy_lease(coord: Path, *, lease_id: str | None = None,
                  ansible_playbook: str | None = None,
-                 timeout_seconds: float | None = None) -> tuple[int, str]:
+                 timeout_seconds: float | None = None, output_limit: int = 1048576,
+                 cancel_event=None) -> tuple[int, str]:
     """Run at most one deployment per project, including operator invocations."""
+    import math
+    if type(output_limit) is not int or not 1 <= output_limit <= 67108864:
+        raise GreatMindsError("deployment output limit must be 1–67108864 bytes per stream", exit_code=2)
+    if timeout_seconds is not None and (type(timeout_seconds) not in (int, float)
+            or not math.isfinite(timeout_seconds) or timeout_seconds <= 0):
+        raise GreatMindsError("deployment timeout must be finite and positive", exit_code=2)
+    if cancel_event and cancel_event.is_set():
+        raise InterruptedError("deployment cancelled before launch")
     from greatminds.core.storage import file_lock
     with file_lock(coord / ".stand" / "deployment.lock", label="stand deployment", timeout=0):
         from greatminds.domain.stand_deployments import DeploymentLedger
@@ -888,12 +897,14 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
         ledger.require_resolved()
         return _deploy_lease_locked(coord, lease_id=lease_id,
                                     ansible_playbook=ansible_playbook,
-                                    timeout_seconds=timeout_seconds)
+                                    timeout_seconds=timeout_seconds, output_limit=output_limit,
+                                    cancel_event=cancel_event)
 
 
 def _deploy_lease_locked(coord: Path, *, lease_id: str | None = None,
                  ansible_playbook: str | None = None,
-                 timeout_seconds: float | None = None) -> tuple[int, str]:
+                 timeout_seconds: float | None = None, output_limit: int = 1048576,
+                 cancel_event=None) -> tuple[int, str]:
     """Deterministic, sanctioned deploy of the active lease's profile.
 
     The single deploy path (1.6.0): load the active lease's YAML/ansible
@@ -1044,6 +1055,8 @@ def _deploy_lease_locked(coord: Path, *, lease_id: str | None = None,
     ss.update_stand_state(coord, require_same_lease)
     attempt_id = ledger.begin(cap)
     lease_meta["_deployment_attempt_id"] = attempt_id
+    lease_meta["_deployment_output_limit"] = output_limit
+    lease_meta["_deployment_cancel_event"] = cancel_event
     try:
         rc, log = dispatch_profile(spec, lease_meta,
                                    ansible_playbook=ansible_playbook,
@@ -1134,14 +1147,16 @@ def stand_deployment_resolve(attempt_id, reason):
               help="active lease to deploy (must match state.yaml)")
 @click.option("--timeout", "timeout", type=float, default=None,
               help="kill the playbook after N seconds (rc=124)")
-def stand_deploy(lease_id: str, timeout: float | None) -> None:
+@click.option("--output-limit", type=click.IntRange(1, 67108864), default=1048576, show_default=True,
+              help="maximum captured bytes per output stream")
+def stand_deploy(lease_id: str, timeout: float | None, output_limit: int) -> None:
     """Run the active lease's deploy profile and transition ready/down.
 
     Coordd runs this automatically for a preparing lease; this command is the
     manual/operator entry to the same deploy engine.
     """
     coord = find_coord_dir()
-    rc, _log = deploy_lease(coord, lease_id=lease_id, timeout_seconds=timeout)
+    rc, _log = deploy_lease(coord, lease_id=lease_id, timeout_seconds=timeout, output_limit=output_limit)
     click.echo(
         f"deploy rc={rc}; stand → {'ready' if rc == 0 else 'down'} "
         f"(lease {lease_id})")

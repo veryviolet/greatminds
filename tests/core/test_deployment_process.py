@@ -149,3 +149,60 @@ def test_owner_death_after_identity_commit_does_not_authorize_exec(tmp_path):
     assert ledger.snapshot()['attempts'][attempt]['process']
     ledger.recover_process(attempt)
     assert not (tmp_path/'effect').exists()
+
+
+def test_large_stdout_and_stderr_are_drained_with_bounded_capture_and_complete_hashes(tmp_path):
+    import hashlib
+    ledger = DeploymentLedger(tmp_path)
+    attempt = ledger.begin({'lease_id': 'L1'})
+    script = "import os;os.write(1,b'a'*2000000);os.write(2,b'b'*2000000)"
+    result = run_deployment_command([sys.executable, '-c', script], ledger=ledger, attempt_id=attempt, max_output_bytes=1024, timeout=5)
+    assert result.returncode == 0
+    assert result.stdout == 'a'*1024 and result.stderr == 'b'*1024
+    output = ledger.snapshot()['attempts'][attempt]['output']
+    for name, value in [('stdout', b'a'), ('stderr', b'b')]:
+        assert {key: output[name][key] for key in ('bytes','captured_bytes','truncated','sha256')} == {
+            'bytes':2000000, 'captured_bytes':1024, 'truncated':True,
+            'sha256':hashlib.sha256(value*2000000).hexdigest()}
+        assert Path(output[name]['path']).read_bytes() == value*1024
+        assert output[name]['captured_sha256'] == hashlib.sha256(value*1024).hexdigest()
+        assert Path(output[name]['path']).stat().st_mode & 0o777 == 0o600
+    assert 'a'*1024 not in ledger.path.read_text()
+
+
+def test_cancel_event_cleans_group_and_preserves_unknown_result(tmp_path):
+    import threading
+    ledger = DeploymentLedger(tmp_path)
+    attempt = ledger.begin({'lease_id':'L1'})
+    cancel = threading.Event()
+    timer = threading.Timer(.2, cancel.set)
+    timer.start()
+    try:
+        with pytest.raises(InterruptedError):
+            run_deployment_command([sys.executable,'-c','import time;time.sleep(60)'], ledger=ledger, attempt_id=attempt, cancel_event=cancel)
+    finally:
+        timer.cancel()
+        timer.join(timeout=2)
+    record = ledger.snapshot()['attempts'][attempt]
+    if record.get('process'):
+        assert not group_members(record['process'])
+    with pytest.raises(GreatMindsError):
+        ledger.require_resolved()
+
+
+def test_exit_cleans_background_pipe_holder_without_waiting_for_timeout(tmp_path):
+    ledger = DeploymentLedger(tmp_path)
+    attempt = ledger.begin({'lease_id':'L1'})
+    script = "import subprocess,sys;subprocess.Popen([sys.executable,'-c','import time;time.sleep(60)']);print('done')"
+    start = time.monotonic()
+    result = run_deployment_command([sys.executable,'-c',script], ledger=ledger, attempt_id=attempt, timeout=20)
+    assert result.returncode == 0 and result.stdout == 'done\n'
+    assert time.monotonic()-start < 10
+    assert not group_members(ledger.snapshot()['attempts'][attempt]['process'])
+
+
+def test_binary_output_is_bounded_without_text_decode(tmp_path):
+    ledger = DeploymentLedger(tmp_path)
+    attempt = ledger.begin({'lease_id':'L1'})
+    result = run_deployment_command([sys.executable,'-c',"import os;os.write(1,b'\\xff'*100)"], ledger=ledger, attempt_id=attempt, text=False, max_output_bytes=10)
+    assert result.stdout == b'\xff'*10

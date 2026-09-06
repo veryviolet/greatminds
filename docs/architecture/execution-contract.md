@@ -463,3 +463,25 @@ Manual `stand reclaim` uses the same TTL and ACP ownership checks and respects
 the deployment lock and unresolved deployment ledger. Granting/deploying the
 next lease remains a separate operation; automatic profile scheduling in the ACP
 daemon is still pending.
+
+
+## Bounded deployment output
+
+Managed deployment stdout and stderr are drained concurrently with a default
+capture limit of 1 MiB per stream. `stand deploy --output-limit BYTES` accepts
+1–67108864 bytes per stream. Retained prefixes are written atomically to private
+`.stand/deployment-output/ATTEMPT_ID/stdout` and `stderr` files. The ledger records
+stream byte counts, full stream hashes, captured byte counts/hashes, file paths,
+and truncation flags; raw output does not enter the JSON ledger.
+
+A truncated log cannot pass profile result/no-host checks. The process return
+code and bounded artifacts remain available, but the attempt requires operator
+assessment and does not mark the stand ready. Output capture limits do not stop
+draining pipes or hide an incomplete log behind a successful return code.
+
+The process runner also accepts a cooperative cancellation event for daemon
+workers. Cancellation stops the owned process group and preserves external
+uncertainty. Once the main process exits, remaining group members are cleaned
+without waiting for inherited output pipes to hit the deployment timeout. Output
+pipes remaining open beyond bounded cleanup raise a recovery error. Internal
+`_deployment_*` metadata is excluded from playbook variables.

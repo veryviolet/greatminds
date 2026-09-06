@@ -315,7 +315,8 @@ def test_completed_stand_transition_recovers_receipt_without_execution(tmp_path,
     assert ledger.path.read_bytes() == before
 
 
-def test_managed_profile_uses_gated_process_and_excludes_private_context(tmp_path, monkeypatch):
+@pytest.mark.parametrize("large", [False, True])
+def test_managed_profile_uses_gated_process_and_excludes_private_context(tmp_path, monkeypatch, large):
     import sys
     from greatminds.cli import stand_state as ss
     from greatminds.cli.stand_profile import ProfileSpec
@@ -337,6 +338,16 @@ assert '_deployment_attempt_id' not in values
 print('PLAY RECAP\\nsynthetic : ok=1 changed=1')
 ''')
     binary.chmod(0o700)
+    if large:
+        binary.write_text(binary.read_text() + "print('x'*1100000)\n")
+        with pytest.raises(GreatMindsError, match='capture limit'):
+            stand.deploy_lease(coord, lease_id='L1', ansible_playbook=str(binary))
+        attempt = next(iter(DeploymentLedger(coord).snapshot()['attempts'].values()))
+        assert attempt['status'] == 'needs_recovery'
+        assert attempt['process_returncode'] == 0
+        assert attempt['output']['stdout']['truncated']
+        assert _state(coord)['state'] == 'preparing'
+        return
     rc, log = stand.deploy_lease(coord, lease_id='L1', ansible_playbook=str(binary))
     assert rc == 0 and 'ok=1' in log
     attempt = next(iter(DeploymentLedger(coord).snapshot()['attempts'].values()))

@@ -730,6 +730,24 @@ M3/M4 deterministic stand lease expiry checkpoint:
   and source/environment evidence; remaining M3 maintenance and M5–M7 work stays
   open. Lease reclamation alone does not complete stand integration.
 
+M4 bounded deployment capture and cancellation preparation:
+
+- Replaced unbounded process output buffering with concurrent bounded stream
+  draining, full-stream hashes/counts, and private atomic prefix artifacts.
+  Manual deploy accepts an explicit capture limit; truncated output cannot be
+  accepted as a successful stand verdict from an incomplete log.
+- Main-process exit cleans remaining group members promptly; inherited pipes
+  cannot keep a finished command waiting for the full deployment timeout.
+  Cooperative cancellation is available to the upcoming daemon scheduler.
+- Tests exercise multi-megabyte stdout/stderr, complete hashes, private artifact
+  permissions, binary output, cancellation, background pipe holders, and refusal
+  to mark a stand ready after capture truncation.
+- Stand/ACP daemon regression: 266 passed, 1 skipped. Focused executor/output
+  regression: 60 passed; documentation: 8 passed. Installed-wheel capture bound,
+  complete stream hash, and private artifact smoke passed. No remote deploy ran.
+- Next: wire authorized profile dispatch and cancellation into the ACP daemon
+  scheduler; extend source/environment evidence. Full M3/M5–M7 scope remains open.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility

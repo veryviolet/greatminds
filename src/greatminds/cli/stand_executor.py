@@ -160,7 +160,7 @@ def _build_extra_vars(lease_meta: dict[str, Any]) -> dict[str, Any]:
     for k, v in (lease_meta or {}).items():
         if not isinstance(k, str):
             continue
-        if k in legacy_inventory or k == "_deployment_attempt_id":
+        if k in legacy_inventory or k.startswith("_deployment_"):
             continue
         # Stringify None so ansible doesn't see ``null``.
         out[k] = "" if v is None else v
@@ -276,7 +276,9 @@ def execute_yaml_profile(
                 if coord is None:
                     raise GreatMindsError("managed deployment requires runtime directory", exit_code=4)
                 run_command = partial(run_deployment_command, ledger=DeploymentLedger(coord),
-                                      attempt_id=lease_meta["_deployment_attempt_id"])
+                                      attempt_id=lease_meta["_deployment_attempt_id"],
+                                      max_output_bytes=lease_meta.get("_deployment_output_limit", 1048576),
+                                      cancel_event=lease_meta.get("_deployment_cancel_event"))
             cp = run_command(
                 cmd,
                 capture_output=capture_output,
@@ -309,6 +311,12 @@ def execute_yaml_profile(
         if capture_output:
             log = (cp.stdout or "") + (cp.stderr or "")
         rc = cp.returncode
+        if any(item.get("truncated") for item in getattr(cp, "output_metadata", {}).values()):
+            # The no-host/result checks below must not trust an incomplete log.
+            # Child status and complete stream hashes remain in the ledger.
+            raise GreatMindsError(
+                "deployment output exceeded its capture limit; external outcome "
+                "requires operator assessment (see stand deployment-status)", exit_code=4)
         # 0366 / issue #16: a vacuous ansible run (no hosts matched, e.g.
         # host=None) exits rc=0 having deployed nothing. Defensively convert
         # it to a failure so deploy_lease transitions the stand `down`

@@ -121,9 +121,9 @@ class DeploymentLedger:
                            cwd=str(cwd) if cwd is not None else None, launched_at=now_iso())
             atomic_json(self.path, document)
 
-    def process_exited(self, attempt_id, returncode):
+    def process_exited(self, attempt_id, returncode, *, output=None):
         self._update(attempt_id, {'started'}, process_status='exited', process_returncode=returncode,
-                     process_exited_at=now_iso())
+                     process_exited_at=now_iso(), output=output or {})
 
     def recover_process(self, attempt_id):
         """Clean owned children without overlapping a live deployment."""
