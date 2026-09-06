@@ -70,6 +70,7 @@ class AgentManifest:
     required_env: tuple[str, ...] = ()
     required_capabilities: tuple[str, ...] = ()
     optional_capabilities: tuple[str, ...] = ()
+    auth_method: str | None = None
 
     @property
     def sha256(self) -> str:
@@ -156,7 +157,7 @@ def parse_execution_config(document: Any, *, roles: set[str]) -> ExecutionConfig
         safe_name(name)
         item = _mapping(raw, f"agent {name}", {
             "transport", "argv", "adapter_version", "harness_version", "environment",
-            "required_env", "required_capabilities", "optional_capabilities"})
+            "required_env", "required_capabilities", "optional_capabilities", "auth_method"})
         if item.get("transport") != "acp":
             _fail(f"agent {name}: transport must be acp")
         argv = _strings(item.get("argv"), "argv")
@@ -172,7 +173,8 @@ def parse_execution_config(document: Any, *, roles: set[str]) -> ExecutionConfig
             _string(item.get("harness_version"), "harness_version"),
             tuple(sorted(env.items())), required,
             _strings(item.get("required_capabilities", []), "required_capabilities"),
-            _strings(item.get("optional_capabilities", []), "optional_capabilities")))
+            _strings(item.get("optional_capabilities", []), "optional_capabilities"),
+            _string(item["auth_method"], "auth_method") if "auth_method" in item else None))
     bindings = []
     agent_ids = {agent.id for agent in agents}
     for name, raw in _mapping(root.get("bindings"), "bindings").items():

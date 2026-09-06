@@ -148,6 +148,9 @@ class Supervisor:
                         value = value.get(part) if isinstance(value, dict) else None
                     if not value:
                         raise ValueError(f"required ACP capability unavailable: {name}")
+                if agent.auth_method:
+                    await transport.authenticate(agent.auth_method)
+                    metrics["authentication_method"] = agent.auth_method
                 previous = [run for run in self.store.snapshot()["runs"].values()
                             if run["id"] != run_id and run["state"] in TERMINAL
                             and run.get("session_id") and all(run[key] == claim.run[key] for key in (

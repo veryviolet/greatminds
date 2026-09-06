@@ -10,6 +10,7 @@ from pathlib import Path
 
 scenario = sys.argv[1]
 pending = None
+authenticated = False
 with Path("agent-starts.log").open("a") as starts:
     starts.write(scenario + "\n")
 
@@ -35,8 +36,17 @@ for line in sys.stdin:
     if method == "initialize":
         result(request_id, {"protocolVersion": 999 if scenario == "bad-version" else 1,
                             "agentCapabilities": {"loadSession": scenario == "resume"},
-                            "authMethods": []})
+                            "authMethods": ([{"id": "fixture-key", "name": "Fixture key"}] if scenario == "auth" else [])})
+    elif method == "authenticate":
+        if message["params"]["methodId"] == "fixture-key":
+            authenticated = True
+            result(request_id, {})
+        else:
+            send({"id": request_id, "error": {"code": -32000, "message": "Authentication required"}})
     elif method == "session/new":
+        if scenario == "auth" and not authenticated:
+            send({"id": request_id, "error": {"code": -32000, "message": "Authentication required"}})
+            continue
         payload = {"sessionId": "test-session"}
         if scenario.startswith("model"):
             payload["configOptions"] = model_options("default")

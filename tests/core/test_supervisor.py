@@ -166,6 +166,22 @@ def test_missing_auth_waits_before_process_launch(tmp_path):
     asyncio.run(check())
 
 
+@pytest.mark.parametrize("method,expected", [(None, "waiting_auth"), ("fixture-key", "completed"), ("unadvertised", "failed")])
+def test_explicit_authentication_method_is_negotiated_before_session(tmp_path, method, expected):
+    store, schema, config, task = setup(tmp_path, "auth")
+    config = replace(config, agents=(replace(config.agents[0], auth_method=method),))
+    async def check():
+        async with supervisor(tmp_path, store, schema, config) as service:
+            claim = service.claim(task, config.bindings[0])
+            result = await service.execute(claim, binding=config.bindings[0], prompt="work")
+            assert result["state"] == expected, result
+            if expected == "completed":
+                assert result["outcome"]["authentication_method"] == method
+            else:
+                assert not any(event["kind"] == "running" for event in store.snapshot()["events"])
+    asyncio.run(check())
+
+
 def test_required_capability_fails_before_prompt(tmp_path):
     store, schema, config, task = setup(tmp_path)
     config = replace(config, agents=(replace(config.agents[0], required_capabilities=("loadSession",)),))

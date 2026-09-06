@@ -49,6 +49,12 @@ does not verify the executable's version or negotiated protocol capabilities.
 `argv` is an array, never a shell expression. Environment entries map child
 variable names to parent variable names. Secret values are resolved at launch
 time and do not enter the configuration fingerprint or saved contracts.
+An optional agent `auth_method` selects one authentication method advertised by
+the ACP server. The supervisor calls it before creating or loading a session;
+an unknown method fails explicitly. Omitting it leaves authentication to the
+server's existing session behavior. Authentication-required responses retain a
+waiting state. Selecting a method can require interactive login according to the
+server; the daemon does not silently select another account or method.
 For task kinds requiring a worktree in the effective schema, the daemon prepares
 the task worktree before starting ACP. A `workspace: .` binding uses that task
 worktree; an explicit workspace must be inside it. Existing worktrees are checked

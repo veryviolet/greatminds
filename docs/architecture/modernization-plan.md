@@ -540,5 +540,43 @@ Remaining maintenance controllers, stand/lease integration, live harness
 compatibility, interactive attach, and complete migration/removal of the
 existing launch paths remain pending. M2 is not complete until the real
 integration campaign and remaining client policies have passed.
+
+M2 real executable campaign started:
+
+- All nine installed/test-isolated harness endpoints (Codex, Claude, Qwen, Kimi,
+  Grok, Cline, Gemini, OpenHands, Cursor) accepted ACP protocol 1 initialization
+  through the common client. Normal startup access resolved filesystem/OAuth
+  restrictions in the initial probes.
+- The [compatibility matrix](acp-compatibility.md) records exact installations,
+  tested argv, advertised capabilities, explicit Codex binary selection, and
+  the remaining session/tool/inference/recovery stages. Test adapters are pinned
+  by package definition and lockfile; a reproducible repository probe is included.
+- Session creation passed for Codex, Claude, Grok, and Cline. The remaining five
+  returned authentication-required before explicit authentication; this does not
+  establish that cached credentials are absent. The manifest now supports an
+  explicitly selected advertised authentication method before session creation/load.
+- Codex 0.153.4 with adapter 1.10.0, Claude SDK 0.3.257 with adapter 0.75.1,
+  and Grok 1.0.13 passed the same exact synthetic text response through the shared
+  transport. Codex 0.149.1 returned a model-version error as assistant text despite
+  `end_turn`; the response assertion correctly failed it. No global CLI was updated.
+- Supervisor, runtime contract, probe, and public-document regression: 60 passed.
+  The matrix retains separate session/inference evidence. Tools, permissions,
+  session recovery, cancellation during inference, and mixed-agent tasks are pending.
+
+## Recovery checkpoint
+
+The authoritative continuation point is this committed plan and the compatibility
+matrix, not the lifetime of a desktop conversation. Current focus: finish M2 real
+integration and operator policies, then the outstanding M3–M7 items above. The full
+plan is still active. A successful synthetic response is not completion of M2.
+
+Continue by exercising tool/permission events, explicit model configuration,
+session load and cancellation in the common probe, then a typed domain task using
+different harnesses. Keep raw provider logs and authentication material out of the
+repository. Preserve `.codex-solo-handoff/` as an existing user artifact.
+
+The convenient local web interface is the next product phase after this plan;
+its implementation has not started.
+
 This document authorizes no release or migration of existing live fleets by
 itself; those operations are separate from developing and testing the changes.
