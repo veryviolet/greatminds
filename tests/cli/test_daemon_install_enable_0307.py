@@ -82,17 +82,15 @@ def test_install_invokes_systemctl_enable_with_correct_unit(
     assert enable_calls[0][1].endswith("@my-fleet.service")
 
 
-def test_install_reports_enable_failure_as_warning(
+def test_install_reports_enable_failure_as_error(
     tmp_path: Path, monkeypatch,
 ) -> None:
-    """If ``systemctl enable`` returns nonzero, install must NOT
-    fail (the unit is still written + project registered); it must
-    surface the failure as a warning so the operator sees it."""
+    """Partial file installation must not hide manager enable failure."""
     _project(tmp_path, monkeypatch)
     _stub_helpers(monkeypatch, enable_rc=1)
 
     result = CliRunner().invoke(daemon_mod.daemon, ["install"])
-    assert result.exit_code == 0
+    assert result.exit_code != 0
     out = (result.output or "") + (
         str(result.exception) if result.exception else ""
     )

@@ -598,10 +598,24 @@ def _safe_yaml(path: Path) -> dict | None:
 
 
 def _systemctl(*args: str) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["systemctl", "--user", *args],
-        capture_output=True, text=True,
-    )
+    try:
+        return subprocess.run(
+            ["systemctl", "--user", *args],
+            capture_output=True, text=True, timeout=30,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise click.ClickException("systemctl did not finish within 30 seconds; inspect service state before retrying") from exc
+    except OSError as exc:
+        raise click.ClickException(f"cannot run systemctl: {exc}") from exc
+
+
+def _checked_systemctl(*args: str) -> subprocess.CompletedProcess:
+    from greatminds.cli.chat import terminal_text
+    cp = _systemctl(*args)
+    if cp.returncode:
+        detail = terminal_text((cp.stderr or cp.stdout or "").strip())[:500]
+        raise click.ClickException(f"systemctl --user {' '.join(args)} failed (rc={cp.returncode}): {detail}")
+    return cp
 
 
 def _instance_unit(name: str) -> str:
@@ -650,8 +664,8 @@ def install_cmd(name: str | None, project_dir: Path | None) -> None:
     # it spawns) as a systemd EnvironmentFile — the single clean injection.
     wrote_dropin = install_project_dropin(resolved, pd)
 
-    if wrote_unit or wrote_dropin:
-        _systemctl("daemon-reload")
+    # Reload even on an identical retry: the previous manager reload may have failed.
+    _checked_systemctl("daemon-reload")
     if wrote_unit:
         ok(f"template unit installed at {SYSTEMD_USER_DIR / TEMPLATE_UNIT_NAME}")
     else:
@@ -664,22 +678,9 @@ def install_cmd(name: str | None, project_dir: Path | None) -> None:
            f"(0600 {_agent_env_file(resolved)})")
     ok(f"project '{resolved}' registered → {pd}")
 
-    # 0307: enable the per-project instance unit so it lives under
-    # default.target.wants/ and survives KDE logout / shutdown.
-    # Pre-0307 the template install never ran ``systemctl --user
-    # enable`` → ``is-enabled`` stayed ``disabled; preset: enabled``
-    # → coordd was torn down with default.target on logout.
-    # ``enable`` is idempotent — re-installs reruns safely.
     instance = _instance_unit(resolved)
-    enable_cp = _systemctl("enable", instance)
-    if enable_cp.returncode == 0:
-        ok(f"{instance} enabled (survives logout / shutdown)")
-    else:
-        warn(
-            f"`systemctl --user enable {instance}` failed (rc="
-            f"{enable_cp.returncode}); coordd may not restart after "
-            f"logout. Stderr: {(enable_cp.stderr or '').strip()[:200]}"
-        )
+    _checked_systemctl("enable", instance)
+    ok(f"{instance} enabled for the user manager's default target")
 
     info(f"next: `greatminds daemon start --project {resolved}`")
 
@@ -698,16 +699,8 @@ def repair_cmd(name: str | None, project_dir: Path | None) -> None:
     pd = project_dir.resolve() if project_dir else find_project_dir(Path.cwd(), strict=False, use_env=False)
     resolved = _resolve_project_name(name, pd)
     instance = _instance_unit(resolved)
-    cp = _systemctl("enable", instance)
-    if cp.returncode == 0:
-        ok(f"{instance} enabled (survives logout / shutdown)")
-    else:
-        err(
-            f"`systemctl --user enable {instance}` failed "
-            f"(rc={cp.returncode}). Stderr: "
-            f"{(cp.stderr or '').strip()[:300]}"
-        )
-        raise click.exceptions.Exit(cp.returncode)
+    _checked_systemctl("enable", instance)
+    ok(f"{instance} enabled for the user manager's default target")
 
 
 def _project_options(fn):
@@ -748,8 +741,7 @@ def _refresh_units_before_restart(name: str,
         if install_project_dropin(name, pd):
             changed = True
     capture_agent_env(name)
-    if changed:
-        _systemctl("daemon-reload")
+    _checked_systemctl("daemon-reload")
     return changed
 
 

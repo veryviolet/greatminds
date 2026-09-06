@@ -373,3 +373,39 @@ def test_fresh_acp_setup_installs_and_starts_by_registered_identity(tmp_path, fa
     assert started.exit_code == 0, started.output
     assert fake_systemctl.calls[-1] == ['systemctl', '--user', 'start', 'greatminds-daemon@shared-acp.service']
     assert daemon_mod.lookup_project_dir('shared-acp') == project
+
+
+def test_failed_reload_is_retried_before_enable_even_when_files_are_unchanged(fake_systemctl, tmp_path):
+    fake_systemctl.set(('systemctl', '--user', 'daemon-reload'), rc=1, stderr='manager unavailable')
+    args = ['install', '--name', 'reload-test', '--project-dir', str(tmp_path)]
+    for _ in range(2):
+        result = _invoke(args)
+        assert result.exit_code != 0
+        assert 'manager unavailable' in result.output
+    assert not any('enable' in call for call in fake_systemctl.calls)
+    assert sum('daemon-reload' in call for call in fake_systemctl.calls) == 2
+    fake_systemctl.set(('systemctl', '--user', 'daemon-reload'), rc=0)
+    result = _invoke(args)
+    assert result.exit_code == 0, result.output
+    assert fake_systemctl.calls[-1] == ['systemctl', '--user', 'enable', 'greatminds-daemon@reload-test.service']
+
+
+def test_restart_does_not_run_after_failed_reload(fake_systemctl):
+    fake_systemctl.set(('systemctl', '--user', 'daemon-reload'), rc=1)
+    for _ in range(2):
+        result = _invoke(['restart', '--project', 'reload-test'])
+        assert result.exit_code != 0
+    assert not any('restart' in call for call in fake_systemctl.calls)
+
+
+@pytest.mark.parametrize('failure', ['timeout', 'missing'])
+def test_systemctl_errors_are_bounded_and_actionable(monkeypatch, failure):
+    def fail(argv, **kwargs):
+        assert kwargs['timeout'] == 30
+        if failure == 'timeout':
+            raise subprocess.TimeoutExpired(argv, 30)
+        raise FileNotFoundError('systemctl unavailable')
+    monkeypatch.setattr(daemon_mod.subprocess, 'run', fail)
+    result = _invoke(['status', '--project', 'test'])
+    assert result.exit_code != 0
+    assert ('inspect service state' if failure == 'timeout' else 'cannot run systemctl') in result.output

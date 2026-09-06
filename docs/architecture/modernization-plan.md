@@ -1154,3 +1154,18 @@ service registration and nested-directory start without coord.yaml, invalid
 names, collisions and ambiguous aliases. systemctl was substituted in tests;
 no live user services were modified. Environment capture, registry concurrency
 and service/update failure handling remain to be completed.
+
+### Service failure handling (2026-09-07)
+
+Systemctl calls now have a 30-second bound and explicit CLI diagnostics for a
+missing executable or timeout. A timeout reports uncertain service state and
+asks the operator to inspect it; it does not claim the manager job was cancelled.
+Installation fails on enable/reload errors. Restart cannot proceed after a
+failed reload. Both paths reload the manager even when the unit files are
+unchanged, allowing a retry after an earlier failed manager reload. Removed the
+unsupported promise that enabling a user unit alone guarantees logout survival.
+
+Validation: 49 service/doctor/environment tests passed, including repeated
+failed reload, successful retry, blocked restart, missing executable and timeout.
+Updated the old no-reload-on-identical-files assertion to the recovery contract.
+All systemctl interactions in these tests were substituted.

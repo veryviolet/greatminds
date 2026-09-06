@@ -78,9 +78,8 @@ def test_refresh_rewrites_stale_unit_lacking_path(monkeypatch, tmp_path) -> None
     assert ("daemon-reload",) in calls, "must daemon-reload after a rewrite"
 
 
-def test_refresh_noop_when_unit_current(monkeypatch, tmp_path) -> None:
-    """When the on-disk unit already matches the freshly-rendered body,
-    refresh is a no-op: returns False and does NOT daemon-reload."""
+def test_refresh_reloads_manager_even_when_unit_current(monkeypatch, tmp_path) -> None:
+    """Matching disk bytes do not prove the manager accepted an earlier reload."""
     calls = _isolate(monkeypatch, tmp_path)
     dest = daemon_mod.SYSTEMD_USER_DIR / daemon_mod.TEMPLATE_UNIT_NAME
     dest.write_text(daemon_mod._template_unit_body(), encoding="utf-8")
@@ -88,6 +87,4 @@ def test_refresh_noop_when_unit_current(monkeypatch, tmp_path) -> None:
     changed = daemon_mod._refresh_units_before_restart("proj", None)
 
     assert changed is False
-    assert ("daemon-reload",) not in calls, (
-        "a current unit must not trigger a gratuitous daemon-reload"
-    )
+    assert calls == [("daemon-reload",)]
