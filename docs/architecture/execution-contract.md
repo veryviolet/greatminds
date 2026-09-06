@@ -566,6 +566,19 @@ managed receipt and never fall back to a marker or prose.
 
 ## Daemon-owned interactive conversations
 
+For a new ACP project, `greatminds setup --project-dir PATH --execution-config FILE`
+validates and installs the supplied execution contract, creates schema queues,
+adds runtime/worktree ignore entries, and writes a missing runtime schema mirror.
+The contract is published last. Repeating the command preserves existing files;
+an edited schema mirror is reported as drifted and does not override the installed
+schema. This path does not launch an agent, install services, change harness trust,
+or generate native harness configuration. It rejects flags from the other setup
+path that it cannot honor and refuses replacement of an existing execution contract.
+
+An existing fleet without an execution contract requires explicit migration before
+this bootstrap can apply. Preparation of that migration and the default setup switch
+are in progress; the option above is the available ACP-specific bootstrap entrypoint.
+
 `runtime.interactions.ConversationStore` backs the `chat` CLI and ACP daemon.
 Each conversation has a private `.runtime/conversations/<id>/state.json` and a
 stable lock. The binding, execution/schema hashes, and workspace are pinned at

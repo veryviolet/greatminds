@@ -1358,6 +1358,8 @@ def _install_git_pre_commit_hook(project_dir: Path) -> str:
                help=__doc__)
 @click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
               default=None, help="project root (default: cwd)")
+@click.option('--execution-config', type=click.Path(exists=True, dir_okay=False, path_type=Path),
+              help='Bootstrap a new ACP project from a validated execution contract.')
 @click.option("--force", is_flag=True,
               help="overwrite PROJECT.md if present. NOTE: coord.yaml "
                    "is NEVER overwritten by setup (init-style — delete it "
@@ -1381,8 +1383,15 @@ def _install_git_pre_commit_hook(project_dir: Path) -> str:
                    "toy / test fleets where TESTER / STAND-KEEPER cannot "
                    "walk dialogs interactively (task 0076).")
 def setup(project_dir: Path | None, force: bool, lang: str,
-          session: str | None, pre_trust: bool) -> None:
+          session: str | None, pre_trust: bool, execution_config: Path | None = None) -> None:
     project_dir = (project_dir or Path.cwd()).resolve()
+    if execution_config is not None:
+        if force or pre_trust or session is not None or lang != 'en':
+            raise click.ClickException('ACP setup accepts --project-dir and --execution-config; configure other policies explicitly')
+        from greatminds.runtime.bootstrap import bootstrap
+        import json
+        click.echo(json.dumps(bootstrap(project_dir, execution_config), indent=2))
+        return
     project_dir.mkdir(parents=True, exist_ok=True)
     canon = find_canon_dir()
     header(f"greatminds setup: bootstrapping {project_dir}")

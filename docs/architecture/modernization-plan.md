@@ -919,6 +919,22 @@ M5 VS Code ACP conversation integration checkpoint:
 - Next: remaining interactive harness/input checks and M6 default migration,
   alongside the outstanding deterministic maintenance and product improvements.
 
+M6 shared ACP bootstrap preparation:
+
+- Extracted deterministic bootstrap behind `setup --execution-config FILE`:
+  validate the supplied manifest, create shared schema queues and runtime mirror,
+  preserve user files, and publish the execution contract last. It performs no
+  harness launch, service installation, trust mutation, or native-tool setup.
+- Repeated setup is idempotent. Different existing contracts and fleets requiring
+  migration are refused; this option is not a hidden live-fleet conversion.
+- This is migration groundwork. Default setup/launch still require conversion,
+  and native driver removal remains part of M6 rather than being declared done.
+- Bootstrap/setup/documentation regression: 56 passed. Installed-wheel bootstrap,
+  conversation creation, and ACP daemon execution passed in a fresh local fixture.
+  No existing live project, service, or harness configuration was migrated.
+- Next: explicit old-configuration migration and ACP launch surfaces, then default
+  switch/removal with updated acceptance tests. M3/M5/M7 remaining scope persists.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility
