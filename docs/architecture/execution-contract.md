@@ -732,3 +732,22 @@ native fleet migration. Plain setup for an ACP project with a dedicated runtime 
 shared ACP bootstrap. An ACP project using the combined configuration/runtime layout
 requires explicit layout migration before setup; setup does not create a second
 runtime and abandon its task state.
+
+The review also includes a live `execution_observation`, separate from the static
+review hash. It reports active registry processes, project-associated processes
+owned by the current OS user, active run records, unresolved command/result/
+maintenance/deployment records, and unreadable state. Process inventory uses cwd
+and explicit project-directory arguments; raw command lines are not returned.
+The review process and its ancestors are excluded from the cwd scan. An observation
+with no holds is named `observed_quiet`, not migration-ready: detached unregistered
+processes outside this scope and launches after the snapshot are not excluded.
+
+ACP supervisors hold a shared execution barrier for their entire ownership and
+cleanup lifetime. Migration can take its exclusive side to prevent new ACP
+supervisors. The Linux barrier lives in a stable `/tmp` lock keyed by OS user and
+resolved project path, so selecting or migrating a runtime layout does not change
+its identity or introduce a lock file into source control. Lock files are not
+unlinked on release. The existing supervisor lock still enforces a single daemon.
+This barrier does not yet cover prior-version native launchers; the migration
+review therefore leaves `launch_exclusion_verified` false. Retiring those launch
+paths and verifying stopped services remain prerequisites for migration apply.

@@ -34,18 +34,26 @@ class Supervisor:
         self.permissions = PermissionService(store)
         self.id = uuid.uuid4().hex
         self._lease = None
+        self._execution_barrier = None
         self._transports: dict[str, AcpTransport] = {}
 
     async def __aenter__(self):
+        from .migration_safety import execution_barrier
+        self._execution_barrier = execution_barrier(self.project)
+        self._execution_barrier.__enter__()
         self._lease = file_lock(self.store.directory / "supervisor.lock",
                                 label="ACP supervisor", timeout=0)
-        self._lease.__enter__()
         try:
+            self._lease.__enter__()
             await self.recover()
             return self
         except BaseException:
-            self._lease.__exit__(None, None, None)
-            self._lease = None
+            try:
+                self._lease.__exit__(None, None, None)
+                self._lease = None
+            finally:
+                self._execution_barrier.__exit__(None, None, None)
+                self._execution_barrier = None
             raise
 
     async def __aexit__(self, *exc):
@@ -55,8 +63,12 @@ class Supervisor:
             for transport in list(self._transports.values()):
                 await transport.close()
         finally:
-            self._lease.__exit__(*exc)
-            self._lease = None
+            try:
+                self._lease.__exit__(*exc)
+                self._lease = None
+            finally:
+                self._execution_barrier.__exit__(*exc)
+                self._execution_barrier = None
 
     async def recover(self):
         if self._lease is None:

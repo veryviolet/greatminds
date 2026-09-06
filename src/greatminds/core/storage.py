@@ -44,7 +44,7 @@ def safe_name(value: str) -> str:
 
 @contextmanager
 def file_lock(path: Path, *, label: str, timeout: float = 30.0,
-              poll_interval: float = 0.1) -> Iterator[None]:
+              poll_interval: float = 0.1, shared: bool = False) -> Iterator[None]:
     """Hold a stable inode; never unlink a lock with possible queued waiters.
 
     The PID is diagnostic only. Ownership is determined by flock, which the
@@ -57,7 +57,7 @@ def file_lock(path: Path, *, label: str, timeout: float = 30.0,
     try:
         while True:
             try:
-                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(fd, (fcntl.LOCK_SH if shared else fcntl.LOCK_EX) | fcntl.LOCK_NB)
                 acquired = True
                 break
             except BlockingIOError:
@@ -70,13 +70,14 @@ def file_lock(path: Path, *, label: str, timeout: float = 30.0,
                         exit_code=4,
                     )
                 time.sleep(poll_interval)
-        os.ftruncate(fd, 0)
-        os.write(fd, str(os.getpid()).encode("ascii"))
-        os.fsync(fd)
+        if not shared:
+            os.ftruncate(fd, 0)
+            os.write(fd, str(os.getpid()).encode("ascii"))
+            os.fsync(fd)
         yield
     finally:
         try:
-            if acquired:
+            if acquired and not shared:
                 os.ftruncate(fd, 0)
         finally:
             # Closing also releases flock if truncation fails.

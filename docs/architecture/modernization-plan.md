@@ -968,6 +968,24 @@ M6 explicit execution migration review checkpoint:
   Installed-wheel review detected missing roles, accepted explicit retirement,
   and left project files unchanged. No live fleet migration was performed.
 
+M6 execution observation and ACP launch barrier checkpoint:
+
+- Migration reviews now expose current-user/project process holds, live registry
+  PIDs, active runs, unresolved domain/command/deployment work, and unreadable
+  state. Command-line contents are absent from the report. Dynamic observations
+  are separate from the static configuration review hash.
+- ACP supervisors hold a shared project/user execution barrier through cleanup;
+  its exclusive side prevents new ACP startup during migration. The stable Linux
+  lock sits outside project source/runtime layouts. Existing supervisor locking
+  continues to enforce one daemon, and failed startup releases the new barrier.
+- This is not complete quiescence proof for prior-version native launchers.
+  Review output explicitly leaves launch exclusion unverified. Next: retire/block
+  those entrypoints, verify stopped services, and implement durable migration apply.
+- Migration/supervisor/daemon regression: 54 passed; documentation: 8 passed.
+  Final process/barrier suite: 8 passed, including cleanup after failed secondary
+  supervisor admission. Installed-wheel exclusive barrier/startup refusal, release,
+  and quiet-fixture observation passed without launching an agent.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility

@@ -72,4 +72,6 @@ def plan_execution_migration(project: Path, proposed: Path, *, retire_roles=()):
               'required_follow_up':['stop_and_verify_existing_execution','backup_source_artifacts',
                   'publish_execution_contract','retire_generated_launcher_artifacts','verify_runtime_and_frontends']}
     # The raw launch argv and environment data are intentionally absent from review output.
-    return {**review, 'review_sha256':fingerprint(review), 'applied':False}
+    from .migration_safety import inspect_execution
+    return {**review, 'review_sha256':fingerprint(review), 'applied':False,
+            'execution_observation':inspect_execution(project)}
