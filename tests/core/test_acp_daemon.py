@@ -284,6 +284,8 @@ def test_sigkill_recovery_cleans_orphan_without_replaying_task(tmp_path):
 
 @pytest.mark.parametrize("answered", [False, True])
 def test_restart_cancels_permission_without_replaying_operator_decision(tmp_path, answered):
+    import os
+    from greatminds.core.storage import file_lock
     from greatminds.runtime.permissions import PermissionService
     from greatminds.core.errors import GreatMindsError
     root = project(tmp_path, scenario="permission")
@@ -301,7 +303,12 @@ def test_restart_cancels_permission_without_replaying_operator_decision(tmp_path
         run = wait_for_run(store, "waiting_input", daemon)
         identity = run["process"]
         request = next(iter(store.snapshot()["permissions"].values()))
-        daemon.send_signal(signal.SIGSTOP)
+        # Freeze outside the daemon's metadata transaction. Otherwise SIGSTOP
+        # can leave it holding store.lock while this test tries to answer.
+        with file_lock(store.directory / "store.lock", label="test stop boundary"):
+            daemon.send_signal(signal.SIGSTOP)
+            _, status = os.waitpid(daemon.pid, os.WUNTRACED)
+            assert os.WIFSTOPPED(status)
         if answered:
             permissions.answer(request["id"], "yes")
         daemon.kill()

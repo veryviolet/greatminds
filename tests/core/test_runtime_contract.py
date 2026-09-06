@@ -37,6 +37,24 @@ def claim_at(runtime: Path):
                                    schema=schema, project=runtime.parent, owner_id="test-supervisor")
 
 
+def test_assigned_context_pins_cli_without_path_or_workspace_module_lookup(runtime, monkeypatch):
+    import json
+    import subprocess
+    import sys
+    from greatminds.runtime.context import compile_context
+    claim = claim_at(runtime)
+    schema, _ = contract()
+    monkeypatch.setenv("PATH", "")
+    (runtime.parent / "greatminds.py").write_text("raise RuntimeError('workspace module must not run')\n")
+    prompt = compile_context(RunStore(runtime), claim, schema)
+    context = json.loads(prompt.split("\n\n", 1)[1])
+    assert context["cli_argv"] == [sys.executable, "-I", "-m", "greatminds.cli.main"]
+    result = subprocess.run([*context["cli_argv"], "--version"], cwd=runtime.parent,
+                            capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stderr
+    assert "greatminds" in result.stdout.lower()
+
+
 def compete(runtime: str):
     try:
         return claim_at(Path(runtime)).run["id"]

@@ -46,6 +46,11 @@ adapter versions and compatibility evidence belong in the integration matrix.
 The version strings identify the intended installation; parsing configuration
 does not verify the executable's version or negotiated protocol capabilities.
 
+Assigned context includes `cli_argv`: the daemon's Python executable followed by
+`-I -m greatminds.cli.main`. Agents use that invocation for scoped commands and
+result submission. It works without an activated venv or a `greatminds` executable
+on PATH and prevents a project-local Python module from shadowing the CLI.
+
 `argv` is an array, never a shell expression. Environment entries map child
 variable names to parent variable names. Secret values are resolved at launch
 time and do not enter the configuration fingerprint or saved contracts.
@@ -106,6 +111,12 @@ configured and tested. See the [measured permission behavior](acp-compatibility.
 The shared-filesystem deployment remains a cooperative trust boundary.
 
 ## Configured commands and evidence
+
+An explicit latest plan with `stand_required: false` selects local validation:
+the scope-specific stand probes and stand observations are not required. Required
+tests blocks, recorded command evidence where configured, task readiness, review,
+and source/environment freshness remain enforced. A missing or ambiguous stand
+declaration does not waive the existing stand-observation checks.
 
 An assigned agent requests `greatminds run command unit-tests --request-id ID
 --wait 60`. The CLI queues a durable request for the daemon; it never executes

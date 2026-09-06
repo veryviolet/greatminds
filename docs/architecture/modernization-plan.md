@@ -608,6 +608,37 @@ M2 operator permission broker:
   reproducible-probe test and metadata-redaction check each passed. Documentation:
   8 passed. Wheel/sdist built; installed-wheel operator-CLI/callback/file smoke passed.
 
+M2 mixed pipeline / M7 local validation preparation:
+
+- The real Codex developer and Claude tester completed a local feature task's
+  first two typed handoffs using separate daemon-run unit tests. Artifacts and
+  command receipts passed domain validation and reached `feature_review`.
+- Grok review hit the 240-second prompt budget while waiting for an operator
+  permission. No real review/merge/verified outcome is claimed. The retained
+  private continuation locator is `/tmp/greatminds-mixed-pipeline-report.jsonl`;
+  its first record identifies the existing project. Continue that task after
+  reducing service-command overhead, without repeating accepted earlier stages.
+- The scenario now has a repository probe accepting three user-supplied ACP
+  bindings. Its fixture exercises all three transitions, source-bound command
+  evidence, daemon merge, worktree cleanup, main-branch tests, and restart without
+  replay. Focused contract/domain/scope/pipeline regression: 68 passed.
+- Context uses the daemon interpreter's isolated CLI invocation, removing PATH
+  and workspace-module lookup dependence. A test with empty PATH and a shadow
+  module proves it resolves the intended CLI.
+- The effective schema permits explicit local plans to omit stand-only probes;
+  unspecified/stand-required plans preserve those checks. Local validation and
+  review still use the existing domain gates and configured command evidence.
+- The real pipeline exposed avoidable LLM work: external result JSON creation,
+  reading daemon-owned command logs, discovering result fields, and repeated
+  approvals just to invoke scoped CLI operations. These are the next deterministic
+  interface improvements, not reasons to bypass executor permissions globally.
+- Full regression: 1,829 passed, 2 skipped, with one fault-injection test stopping
+  the daemon while it held the store lock. The test now synchronizes SIGSTOP
+  outside that transaction; the final daemon/pipeline/scope subset passed all
+  30 tests. Documentation checks passed all 8. Installed-wheel three-role pipeline,
+  merge, cleanup, and restart smoke passed; this is fixture evidence, not a real
+  harness review result.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility
@@ -615,12 +646,14 @@ matrix, not the lifetime of a desktop conversation. Current focus: finish M2 rea
 integration and operator policies, then the outstanding M3–M7 items above. The full
 plan is still active. A successful synthetic response is not completion of M2.
 
-Continue with a typed domain task using different harnesses and remaining interactive
-input handling. Durable one-time permission callbacks and real command approval now
+Continue by simplifying scoped submission and command-output delivery, then finish
+the retained real pipeline and remaining interactive input handling. Durable
+one-time permission callbacks and real command approval now
 have evidence; complete harness permission-policy parity is still required. Session
 load, history continuity, and cancellation after streaming now have real evidence;
-model selection is verified for Codex/Claude only. Keep raw provider logs and authentication material out of the
-repository. Preserve `.codex-solo-handoff/` as an existing user artifact.
+model selection is verified for Codex/Claude only. Keep raw provider logs and
+authentication material out of the repository. Preserve `.codex-solo-handoff/`
+as an existing user artifact.
 
 The convenient local web interface is the next product phase after this plan;
 its implementation has not started.

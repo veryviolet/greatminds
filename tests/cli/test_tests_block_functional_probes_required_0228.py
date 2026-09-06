@@ -180,6 +180,16 @@ def test_no_scope_field_noop() -> None:
     task_mod._enforce_tests_functional_probes_per_scope(block, data)
 
 
+def test_explicit_local_plan_does_not_require_fabricated_stand_observations():
+    data = {"scope": "backend", "blocks": [{"kind": "plan", "stand_required": False}]}
+    task_mod._enforce_tests_functional_probes_per_scope({"kind": "tests"}, data)
+    data["blocks"].append({"kind": "plan", "stand_required": True})
+    with pytest.raises(task_mod.GreatMindsError, match="functional_probes"):
+        task_mod._enforce_tests_functional_probes_per_scope({"kind": "tests"}, data)
+    with pytest.raises(task_mod.GreatMindsError, match="functional_probes"):
+        task_mod._enforce_tests_functional_probes_per_scope({"kind": "tests"}, {"scope": "backend", "blocks": None})
+
+
 # ---------- integration: require_block_cross_state calls it ----------
 
 

@@ -133,6 +133,38 @@ CLI explicitly; the adapter's separately installed dependency is Codex 0.153.4.
 That bundled combination subsequently passed the session and minimal inference
 stage above. The global CLI installation was not updated.
 
+## Mixed domain pipeline
+
+The [first real pipeline evidence](evidence/acp-mixed-pipeline-2026-09-06.json)
+is **partial**. A local feature task uses a task worktree and six configured
+unit tests for an inclusive numeric clamp function, including invalid bounds.
+Codex 0.153.4 implemented the function, requested daemon-run tests, and submitted
+a typed implementation handoff. Claude SDK 0.3.257 independently inspected it,
+requested its own test execution, and submitted a typed tests handoff. Both
+receipts passed domain gates and the task reached `feature_review`.
+
+Grok 1.0.13 exhausted its 240-second prompt budget while waiting for an operator
+permission during review. There is no real review result, merge, or `verified`
+completion yet. Operator wait and repeated CLI/schema discovery contributed to
+the overhead. The existing task and run state are retained for continuation;
+the completed developer and tester work need not be repeated.
+
+The [pipeline probe](../../tools/acp_pipeline_probe.py) takes `--config FILE`
+with three ACP bindings for DEVELOPER, TESTER, and ARCHITECT-REVIEWER. It copies
+the manifests into a fresh temporary Git project, seeds a synthetic local plan,
+and replaces configured commands with the known local unit-test command. It
+never approves permissions or silently retries a held run. Its full fixture
+regression covers all three role transitions, evidence validation, daemon merge,
+worktree cleanup, main-branch test execution, and restart without duplicate work.
+That fixture result does not establish completion of the real pipeline.
+
+The real run exposed two integration issues. Assigned context now identifies the
+CLI through the daemon's Python executable rather than assuming `greatminds` is
+on PATH; the final implementation also isolates module lookup from workspace
+files. Explicit `stand_required: false` plans no longer require fabricated stand
+observations. Local test blocks and configured command evidence still pass domain
+validation; stand-required or unspecified plans retain scope-specific stand gates.
+
 ## Reproduce the probe
 
 From an editable Greatminds checkout:

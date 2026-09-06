@@ -1040,6 +1040,7 @@ tests_block_validation:
   # functional_probes + tester_observations are TESTER's own
   # behavior verification, distinct from readiness checks.
   required_for_scopes:
+    # Applies to deployed validation; explicit local plans use recorded local checks.
     backend:
       - functional_probes
       - stand_evidence.tester_observations
@@ -1049,6 +1050,7 @@ tests_block_validation:
   exempt_scopes:
     - docs        # READER review covers docs
     - research
+  scope_probes_required_when: plan.stand_required
 
 # ---------------------------------------------------------------------------
 # Filesystem layout

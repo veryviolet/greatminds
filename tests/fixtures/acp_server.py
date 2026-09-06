@@ -1,17 +1,21 @@
 """Independent wire-level ACP test peer. Never contacts a model service."""
 
 import json
+import os
 import subprocess
 import sys
 import time
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 
 scenario = sys.argv[1]
 pending = None
 authenticated = False
-with Path("agent-starts.log").open("a") as starts:
+starts_path = (Path(os.environ["GREATMINDS_PROJECT_DIR"]) / ".greatminds" / "agent-starts.log"
+               if scenario == "pipeline" else Path("agent-starts.log"))
+with starts_path.open("a") as starts:
     starts.write(scenario + "\n")
 
 
@@ -84,6 +88,34 @@ for line in sys.stdin:
                              "options": [{"optionId": "yes", "name": "Allow once", "kind": "allow_once"},
                                          {"optionId": "no", "name": "Reject", "kind": "reject_once"}]}})
         else:
+            if scenario == "pipeline":
+                context = json.loads(message["params"]["prompt"][0]["text"].split("\n\n", 1)[1])
+                role = context["role"]
+                if role == "DEVELOPER":
+                    Path("clamp.py").write_text("def clamp(value, lower, upper):\n    if lower > upper:\n        raise ValueError('invalid bounds')\n    return min(max(value, lower), upper)\n")
+                checked = subprocess.run([*context["cli_argv"], "run", "command", "unit-tests", "--wait", "30"],
+                                         capture_output=True, text=True, check=True)
+                evidence = json.loads(checked.stdout)
+                assert evidence["status"] == "succeeded", evidence
+                commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+                if role == "DEVELOPER":
+                    target, block = "feature_test", {"kind": "implementation", "base_commit": commit,
+                                                      "files": ["clamp.py"], "ready_for_test": True}
+                elif role == "TESTER":
+                    target, block = "feature_review", {"kind": "tests", "base_commit": commit,
+                        "test_files": ["test_clamp.py"], "command_request_id": evidence["id"],
+                        "stand_evidence": {}, "gate_check_result": "n/a", "gate_check_commit": commit,
+                        "gate_check_at": datetime.now(timezone.utc).isoformat(), "ready_for_review": True}
+                else:
+                    target, block = "verified", {"kind": "review", "outcome": "approved", "commit": commit}
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as handle:
+                    json.dump({"decision": "handoff", "payload": {"to_queue": target,
+                        "blocks": [block], "command_evidence": [evidence["id"]], "artifacts": ["clamp.py"]}}, handle)
+                try:
+                    subprocess.run([*context["cli_argv"], "run", "submit", "--file", handle.name],
+                                   capture_output=True, text=True, check=True)
+                finally:
+                    Path(handle.name).unlink()
             if scenario in {"submit", "handoff", "command"}:
                 context = json.loads(message["params"]["prompt"][0]["text"].split("\n\n", 1)[1])
                 envelope = context["result_format"]

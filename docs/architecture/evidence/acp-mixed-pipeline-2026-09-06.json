@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "date": "2026-09-06",
+  "client_sdk": "0.11.1",
+  "status": "partial",
+  "scenario": "Feature task with isolated worktree: implement inclusive numeric clamp and invalid-bound validation, run six local unittest cases through daemon commands, transfer developer -> tester -> reviewer with typed results.",
+  "harnesses": {
+    "codex": "codex-acp 1.10.0 / Codex 0.153.4",
+    "claude": "claude-agent-acp 0.75.1 / SDK 0.3.257",
+    "grok": "Grok 1.0.13; explicit default permission mode, no leader"
+  },
+  "schema_sha256": "eedafb96edcfbf2d86df8d63755a379fbe817cca524f86095319a9cb4cb00446",
+  "final_queue": "feature_review",
+  "verified": false,
+  "runs": [
+    {
+      "role": "DEVELOPER",
+      "harness": "codex",
+      "state": "completed",
+      "reason": "turn_ended",
+      "elapsed_seconds": 62.416035,
+      "context_bytes": 6216,
+      "results": [
+        {
+          "status": "applied",
+          "decision": "handoff",
+          "destination": "feature_test/0001-clamp.yaml"
+        }
+      ],
+      "commands": [
+        {
+          "command": "unit-tests",
+          "status": "succeeded",
+          "exit_code": 0,
+          "source_before": {
+            "commit": "d9fa98e18d441cc1c3a31b2a2cc2206b53c5c452",
+            "source_sha256": "a535ed068849a5871d7588003d744326aa308d4f8d104c4c1ba5c88c5b6ac6d2"
+          },
+          "source_after": {
+            "commit": "d9fa98e18d441cc1c3a31b2a2cc2206b53c5c452",
+            "source_sha256": "a535ed068849a5871d7588003d744326aa308d4f8d104c4c1ba5c88c5b6ac6d2"
+          }
+        }
+      ],
+      "permissions": []
+    },
+    {
+      "role": "TESTER",
+      "harness": "claude",
+      "state": "completed",
+      "reason": "turn_ended",
+      "elapsed_seconds": 190.646005,
+      "context_bytes": 7414,
+      "results": [
+        {
+          "status": "applied",
+          "decision": "handoff",
+          "destination": "feature_review/0001-clamp.yaml"
+        }
+      ],
+      "commands": [
+        {
+          "command": "unit-tests",
+          "status": "succeeded",
+          "exit_code": 0,
+          "source_before": {
+            "commit": "d9fa98e18d441cc1c3a31b2a2cc2206b53c5c452",
+            "source_sha256": "a535ed068849a5871d7588003d744326aa308d4f8d104c4c1ba5c88c5b6ac6d2"
+          },
+          "source_after": {
+            "commit": "d9fa98e18d441cc1c3a31b2a2cc2206b53c5c452",
+            "source_sha256": "a535ed068849a5871d7588003d744326aa308d4f8d104c4c1ba5c88c5b6ac6d2"
+          }
+        }
+      ],
+      "permissions": [
+        {
+          "kind": "read",
+          "status": "consumed",
+          "option_id": "allow-once",
+          "wait_seconds": 74.22
+        },
+        {
+          "kind": "execute",
+          "status": "consumed",
+          "option_id": "allow-once",
+          "wait_seconds": 25.219
+        },
+        {
+          "kind": "execute",
+          "status": "consumed",
+          "option_id": "allow-once",
+          "wait_seconds": 22.238
+        },
+        {
+          "kind": "edit",
+          "status": "consumed",
+          "option_id": "allow-once",
+          "wait_seconds": 29.354
+        }
+      ]
+    },
+    {
+      "role": "ARCHITECT-REVIEWER",
+      "harness": "grok",
+      "state": "waiting_input",
+      "reason": "permission_required",
+      "elapsed_seconds": 243.680916,
+      "context_bytes": 9341,
+      "results": [],
+      "commands": [],
+      "permissions": [
+        {
+          "kind": "execute",
+          "status": "consumed",
+          "option_id": "allow-once",
+          "wait_seconds": 66.472
+        },
+        {
+          "kind": "execute",
+          "status": "consumed",
+          "option_id": "allow-once",
+          "wait_seconds": 38.11
+        },
+        {
+          "kind": "execute",
+          "status": "consumed",
+          "option_id": "allow-once",
+          "wait_seconds": 82.212
+        },
+        {
+          "kind": "execute",
+          "status": "cancelled",
+          "option_id": null,
+          "wait_seconds": 32.116
+        }
+      ]
+    }
+  ],
+  "remaining": "Reviewer exhausted the 240-second prompt budget while awaiting operator permission. No review result, merge, or verified completion is claimed. Existing project/run state is retained privately for continuation."
+}

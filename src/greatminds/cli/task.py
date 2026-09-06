@@ -1820,6 +1820,13 @@ def _enforce_tests_functional_probes_per_scope(
     required = required_table.get(scope)
     if not required:
         return
+    # An explicitly local plan must not invent observations from a stand.
+    # Missing/ambiguous planning retains the existing scope-specific checks.
+    plans = [block for block in (data.get("blocks") or [])
+             if isinstance(block, dict) and block.get("kind") == "plan"]
+    if (cfg.get("scope_probes_required_when") == "plan.stand_required"
+            and plans and plans[-1].get("stand_required") is False):
+        return
 
     # functional_probes — non-empty list.
     probes = new_block.get("functional_probes")
