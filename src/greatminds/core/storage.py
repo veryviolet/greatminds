@@ -93,11 +93,16 @@ def atomic_json(path: Path, value: object) -> None:
     """Replace a document and sync its directory before reporting success."""
     content = json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2,
                          allow_nan=False) + "\n"
+    atomic_bytes(path, content.encode("utf-8"))
+
+
+def atomic_bytes(path: Path, content: bytes) -> None:
+    """Sync a complete replacement before making it visible."""
     _ensure_directory(path.parent)
     fd, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     tmp = Path(name)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+        with os.fdopen(fd, "wb") as stream:
             stream.write(content)
             stream.flush()
             os.fsync(stream.fileno())
@@ -105,3 +110,13 @@ def atomic_json(path: Path, value: object) -> None:
         _sync_directory(path.parent)
     finally:
         tmp.unlink(missing_ok=True)
+
+
+def durable_move(source: Path, destination: Path) -> None:
+    _ensure_directory(destination.parent)
+    if destination.exists():
+        raise FileExistsError(f"destination already exists: {destination}")
+    os.rename(source, destination)
+    _sync_directory(destination.parent)
+    if source.parent != destination.parent:
+        _sync_directory(source.parent)

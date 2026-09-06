@@ -4,16 +4,27 @@ from __future__ import annotations
 
 import asyncio
 import signal
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from greatminds.core.errors import GreatMindsError
 from greatminds.core.paths import project_runtime_dir
 from greatminds.core.schema import load_schema_snapshot
+from greatminds.domain.results import ResultService
 from .config import load_execution_config
 from .context import compile_context
 from .store import RunStore, TERMINAL, TaskRevision
 from .supervisor import Supervisor
 from .processes import terminate_group
+
+
+async def _domain_reconcile(loop, pool, results):
+    future = loop.run_in_executor(pool, results.reconcile)
+    # A finite wait also services shutdown/control signals on hosts where a
+    # cross-thread event-loop wakeup is delayed. Healthy wakeups return early.
+    while not future.done():
+        await asyncio.wait({future}, timeout=0.1)
+    return future.result()
 
 
 def assignments(store, config, schema):
@@ -42,15 +53,24 @@ def assignments(store, config, schema):
                     reason = "dispatch_paused"
                 elif any(run["task_id"] == task.task_id for run in active):
                     reason = "active_run"
+                elif any(receipt["envelope"]["task_id"] == task.task_id
+                         and receipt["status"] in {"received", "applying", "needs_recovery"}
+                         for receipt in snapshot["results"].values()):
+                    reason = "domain_result_unresolved"
                 elif any(run["account"] == binding.account and run["state"] == "waiting_auth" for run in active):
                     reason = "account_authentication_required"
                 elif previous and not latest.get("retry_authorized"):
                     # An unchanged revision does not create an infinite LLM
                     # loop, including after restart. Explicit retry is added
                     # through operator controls, not inferred from prose.
-                    reason = "result_pending" if any(
-                        receipt["envelope"]["run_id"] in {run["id"] for run in previous}
-                        for receipt in snapshot["results"].values()) else "revision_already_attempted"
+                    receipts = [receipt for receipt in snapshot["results"].values()
+                                if receipt["envelope"]["run_id"] == latest["id"]]
+                    if receipts and receipts[-1]["status"] == "rejected":
+                        reason = "result_rejected"
+                    elif receipts and receipts[-1]["envelope"]["decision"] == "needs_input":
+                        reason = "human_input_required"
+                    else:
+                        reason = "revision_already_attempted"
                 elif len(active) >= config.max_running:
                     reason = "project_capacity"
                 elif sum(run["binding_id"] == binding.id for run in active) >= binding.max_running:
@@ -69,6 +89,7 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     installed_signals = []
+    domain_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="greatminds-domain")
     try:
         if not once:
             for signum in (signal.SIGINT, signal.SIGTERM):
@@ -77,12 +98,14 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
         async with Supervisor(project=project, store=store, schema=schema,
                               config=config, environment=environment) as supervisor:
             active: dict[str, asyncio.Task] = {}
+            results = ResultService(store)
             try:
                 while not stop.is_set():
                     for run_id, future in list(active.items()):
                         if future.done():
                             future.result()  # Surface persistence failures; do not silently retry.
                             del active[run_id]
+                    await _domain_reconcile(loop, domain_pool, results)
                     for run in store.snapshot()["runs"].values():
                         control = run.get("control")
                         if not control or control["status"] == "completed":
@@ -115,6 +138,7 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                     if once:
                         if active:
                             await asyncio.gather(*active.values())
+                        await _domain_reconcile(loop, domain_pool, results)
                         break
                     try:
                         await asyncio.wait_for(stop.wait(), timeout=max(0.2, interval))
@@ -126,7 +150,11 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                         future.cancel()
                 if active:
                     await asyncio.gather(*active.values(), return_exceptions=True)
+                # Finish any in-progress domain transaction before releasing
+                # the project supervisor lease, including on cancellation.
+                domain_pool.shutdown(wait=True, cancel_futures=True)
     finally:
         for signum in installed_signals:
             loop.remove_signal_handler(signum)
+        domain_pool.shutdown(wait=True, cancel_futures=True)
     return store.snapshot()

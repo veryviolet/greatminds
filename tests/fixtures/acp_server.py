@@ -66,10 +66,15 @@ for line in sys.stdin:
                              "options": [{"optionId": "yes", "name": "Allow once", "kind": "allow_once"},
                                          {"optionId": "no", "name": "Reject", "kind": "reject_once"}]}})
         else:
-            if scenario == "submit":
+            if scenario in {"submit", "handoff"}:
                 context = json.loads(message["params"]["prompt"][0]["text"].split("\n\n", 1)[1])
                 envelope = context["result_format"]
                 envelope.update(result_id="fixture-result", decision="no_change", payload={})
+                if scenario == "handoff":
+                    Path("implementation.txt").write_text("fixture implementation")
+                    envelope.update(decision="handoff", payload={"to_queue": "feature_test", "blocks": [
+                        {"kind": "implementation", "base_commit": "fixture-commit", "files": ["implementation.txt"],
+                         "ready_for_test": True}], "artifacts": ["implementation.txt"]})
                 Path("result.json").write_text(json.dumps(envelope))
                 submitted = subprocess.run([sys.executable, "-m", "greatminds.cli.main", "run", "submit",
                                             "--file", str(Path("result.json").resolve())],

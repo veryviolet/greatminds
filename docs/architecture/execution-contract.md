@@ -88,10 +88,38 @@ come from the run. A result for another task/revision, an invalid credential,
 or an inactive run is rejected. Each run accepts one decision; identical
 re-delivery returns the original receipt even after the task moves.
 
-`received` means durably accepted for domain validation. It does not mean
-applied, approved, tested, or verified. Similarly, a completed agent turn does
-not complete a task. Domain gates and atomic result application are introduced
-in the domain-completion milestone.
+`received` means durably accepted for domain validation. After the agent stops,
+the result service validates all candidate evidence blocks, role permissions,
+scope routing, readiness flags, and required gates through the same policy
+functions used by the CLI. Validation uses the pinned schema and assigned
+workspace in an explicit context; process-wide cwd and role environment are
+not changed. `applied` acknowledges the legal domain operation. A completed
+agent turn by itself does not complete a task.
+
+An accepted operation records candidate task bytes, source/destination, artifact
+hashes, and worktree actions before modifying the task. Recovery checks these
+identities, resumes atomic writes/moves, and deduplicates the journal entry.
+New blocks retain the decision's role and carry run/result/revision provenance;
+the application event names `SYSTEM` as actor and records the deciding role
+separately. CLI task mutations and new claims are held while an operation is
+incomplete, including when the task is addressed through a short ID.
+
+The four decision payloads are:
+
+- `handoff`: `to_queue`, an array of typed `blocks`, optional `artifacts` and
+  `reason`. Block entries contain `kind` and their evidence fields.
+- `blocked`: `reason`, `dependencies`, `resume_to`, and optional `artifacts`.
+- `needs_input`: `question` and optional `artifacts`; records the question
+  without changing queues.
+- `no_change`: optional `reason` and `artifacts`; records a terminal decision
+  without repeating a model turn for the same revision.
+
+Author/timestamp/provenance fields are assigned by the domain service. Artifact
+paths must identify existing files within the assigned workspace. Invalid
+decisions become `rejected` without partial task changes. An uncertain merge
+or conflicting recovery state becomes `needs_recovery`; it is never treated
+as permission to rerun a possibly completed command. Operator repair for these
+states and further deterministic command/evidence services remain in progress.
 
 This is a cooperative shared-filesystem deployment. Run credentials prevent
 accidental or invalid submissions through the service, but do not isolate a
@@ -157,6 +185,6 @@ The daemon records context bytes, protocol update count, activity time, elapsed
 time, session strategy, stop reason, and structured failure codes. It does not
 classify failures from keywords in model output. A successful turn with an
 unchanged task revision is held until an explicit retry, rather than being
-automatically repeated. Typed result application and semantic gates are the next
-domain integration step. A full pipeline is not established by receipt storage
-alone, and live harness compatibility remains unverified at this stage.
+automatically repeated. Typed results now pass through domain application and
+its semantic gates. Worktree preparation at dispatch, deterministic command
+evidence, repair controls, and live harness compatibility remain in progress.

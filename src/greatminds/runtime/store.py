@@ -146,6 +146,15 @@ class RunStore:
             run.pop("token_sha256", None)
         return state
 
+    def authorize(self, run_id: str, token: str) -> dict:
+        state = self._read() or {"runs": {}}
+        run = self._run(state, run_id)
+        if not hmac.compare_digest(run["token_sha256"], hashlib.sha256(token.encode()).hexdigest()):
+            _error("invalid run credential", 3)
+        if run["state"] not in {"running", "waiting_input"}:
+            _error("run is not authorized for domain operations", 3)
+        return {key: copy.deepcopy(value) for key, value in run.items() if key != "token_sha256"}
+
     def _event(self, state: dict, kind: str, run_id: str | None, data: dict) -> None:
         state["events"].append({"sequence": len(state["events"]) + 1,
                                 "at": self.clock(), "kind": kind,
@@ -171,6 +180,10 @@ class RunStore:
         agent = config.agent(binding.agent)
         with task_lock(self.runtime, task.task_id), self._transaction() as state:
             self._check_revision(task)
+            if any(receipt["envelope"]["task_id"] == task.task_id
+                   and receipt["status"] in {"received", "applying", "needs_recovery"}
+                   for receipt in state["results"].values()):
+                _error("task has an unresolved domain result")
             if state["paused"]:
                 _error("dispatch is paused")
             active = [run for run in state["runs"].values() if run["state"] not in TERMINAL]
@@ -303,7 +316,7 @@ class RunStore:
                 if any(other["task_id"] == run["task_id"] and other.get("sequence", 0) > run.get("sequence", 0)
                        for other in state["runs"].values()):
                     _error("a newer run exists for this task; inspect and retry the latest run")
-                if any(receipt["envelope"]["run_id"] == run_id and receipt["status"] in {"received", "applying"}
+                if any(receipt["envelope"]["run_id"] == run_id and receipt["status"] in {"received", "applying", "needs_recovery"}
                        for receipt in state["results"].values()):
                     _error("resolve the pending domain result before retrying")
             control = run.get("control")
@@ -380,4 +393,21 @@ class RunStore:
                        "role": run["role"], "at": self.clock()}
             state["results"][envelope.result_id] = receipt
             self._event(state, "result_received", run["id"], {"result_id": envelope.result_id})
+            return copy.deepcopy(receipt)
+
+    def result_status(self, result_id: str, status: str, *, details: dict | None = None) -> dict:
+        """Domain-service acknowledgement; never used to bypass validators."""
+        allowed = {"received": {"applying", "rejected"},
+                   "applying": {"applied", "needs_recovery"}}
+        with self._transaction() as state:
+            receipt = state["results"].get(result_id)
+            if receipt is None:
+                _error("unknown result identity")
+            if receipt["status"] == status:
+                return copy.deepcopy(receipt)
+            if status not in allowed.get(receipt["status"], set()):
+                _error(f"illegal result transition {receipt['status']} -> {status}")
+            receipt.update(status=status, details=details or {}, updated_at=self.clock())
+            self._event(state, f"result_{status}", receipt["envelope"]["run_id"],
+                        {"result_id": result_id, "details": details or {}})
             return copy.deepcopy(receipt)

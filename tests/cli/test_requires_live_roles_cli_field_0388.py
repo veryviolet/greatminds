@@ -131,7 +131,7 @@ def test_append_block_via_cli_stores_list_and_guard_refuses(
         task_id=tid,
         kind="blocked",
         fields=[
-            "blocked_by=ARCHITECT-PLANNER",
+            "blocked_by=ARCHITECT-REVIEWER",
             "reason=needs live planner for the lifecycle objective",
             "dependencies=[verified/0387-fix.yaml]",
             "resume_to=review_sessions",

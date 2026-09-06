@@ -12,11 +12,14 @@ follow [SemVer](https://semver.org/) once 1.0.0 ships.
   with `greatminds project execution`. The new runtime store provides durable
   claims, pinned contracts, concurrency limits, and authenticated result receipts.
   Projects with `coordination/execution.yaml` now dispatch through the common
-  ACP supervisor. Domain result application and full cutover remain in progress.
+  ACP supervisor. Full cutover remains in progress.
 - ACP run state and assignment reasons via `greatminds run status`, pause/resume,
   cancellation, explicit retry, and credential-bound CLI result submission.
 - Durable launch gates, process identity checks, bounded restart cleanup, and
   suppression of repeated turns for unchanged tasks in ACP projects.
+- Daemon application of typed decisions through shared task gates, with pinned
+  validation context, system/decision provenance, artifact hashes, journaled
+  recovery, and explicit holds for uncertain operations.
 - `greatminds project schema` prints the effective installed contract.
   `--json` includes its source, version, SHA-256 identity, and project-copy
   status; `--check` detects missing, unreadable, or different generated copies
@@ -24,6 +27,9 @@ follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
 ### Fixed
 
+- Block fields cannot override the caller's authorship or domain provenance.
+- Short task IDs and full IDs share a canonical task lock, including during
+  recovery of partially applied domain results.
 - Task locks retain a stable inode so queued waiters and new callers cannot
   acquire different locks for the same task.
 - Daemon service selection now uses the same canon schema as task validation

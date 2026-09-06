@@ -37,3 +37,5 @@ def _isolate_daemon_user_state(tmp_path, monkeypatch):
     monkeypatch.setattr(daemon, "SYSTEMD_USER_DIR", config / "systemd" / "user")
     for name in daemon.AGENT_ENV_NAMES:
         monkeypatch.delenv(name, raising=False)
+    for name in ("GREATMINDS_RUN_ID", "GREATMINDS_RUN_TOKEN"):
+        monkeypatch.delenv(name, raising=False)

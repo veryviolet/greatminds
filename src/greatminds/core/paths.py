@@ -175,17 +175,19 @@ def find_canon_dir() -> Path:
 
 
 def caller_role() -> str:
-    """Return the caller's role from ``$GREATMINDS_ROLE`` (uppercased, trimmed).
-
-    The env var is the only source of truth — there is no ``--as ROLE`` flag
-    anywhere in the protocol, by design: lying about your role is not a
-    feature.
-
-    Callers that want to additionally check the role against ``schema.yaml``
-    do so themselves after this returns (kept out of core.paths to avoid a
-    schema dependency in path resolution).
-    """
+    """Resolve scoped run identity, or the operator's explicit role context."""
     role = (os.environ.get("GREATMINDS_ROLE") or "").upper().strip()
+    run_id, token = os.environ.get("GREATMINDS_RUN_ID"), os.environ.get("GREATMINDS_RUN_TOKEN")
+    if run_id or token:
+        from .errors import GreatMindsError
+        from greatminds.runtime.store import RunStore
+
+        if not run_id or not token:
+            raise GreatMindsError("incomplete run credential", exit_code=3)
+        run = RunStore(find_runtime_dir()).authorize(run_id, token)
+        if role and role != run["role"]:
+            raise GreatMindsError("role does not match assigned run", exit_code=3)
+        return run["role"]
     if not role:
         die(1, "caller role unknown: set GREATMINDS_ROLE in your shell")
         raise SystemExit

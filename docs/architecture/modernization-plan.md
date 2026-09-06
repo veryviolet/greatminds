@@ -455,7 +455,24 @@ M2 supervisor integration:
   confirmation, and scoped permission decisions. Wheel/sdist build and clean
   wheel dispatch → CLI receipt → restart-hold smoke test passed.
 
-Typed domain application, automatic workflow controllers, live harness
+M4 domain-application foundation:
+
+- Typed results are validated and applied by the daemon through shared task
+  gates, using scoped pinned schema/workspace context instead of process-wide
+  environment changes. Author/provenance fields cannot impersonate other roles.
+- Prepared operations retain candidate task bytes and artifact hashes; crash
+  recovery resumes file changes and deduplicates evidence/journal entries.
+- System application events preserve the originating role/run/result identity.
+  Uncertain merge completion and conflicting evidence produce recovery holds.
+- The ACP wire fixture now submits a handoff through the CLI and the daemon
+  advances it through the domain validators. Fault fixtures cover each durable
+  application stage and prove that reprocessing does not duplicate changes.
+- Full regression run after domain integration: 1,744 passed, 2 skipped.
+  Subsequent targeted checks cover fresh gate validation during recovery and
+  background domain processing with explicit worker shutdown. Built-wheel
+  smoke verifies ACP submission, gated queue advancement, and restart deduplication.
+
+Automatic workflow controllers, deterministic command/workspace services, live harness
 compatibility, interactive attach, and complete migration/removal of the
 existing launch paths remain pending. M2 is not complete until the real
 integration campaign and remaining client policies have passed.

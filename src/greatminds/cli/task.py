@@ -40,6 +40,8 @@ import subprocess
 import sys
 import time
 import uuid
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
@@ -49,7 +51,7 @@ import yaml
 from greatminds.core.errors import GreatMindsError
 from greatminds.core.paths import find_canon_dir, find_coord_dir
 from greatminds.core.schema import load_schema_snapshot
-from greatminds.core.storage import task_lock
+from greatminds.core.storage import task_lock, file_lock, _sync_directory
 from greatminds.core.util import ISO_FMT, now_iso  # noqa: F401  (ISO_FMT re-exported)
 
 
@@ -109,9 +111,40 @@ LIST_FIELDS = {
 
 
 _schema_cache: dict[str, Any] | None = None
+_domain_context: ContextVar[dict | None] = ContextVar("task_domain_context", default=None)
+
+
+@contextmanager
+def domain_context(*, document: dict, runtime: Path, workspace: Path):
+    """Use an explicit run contract without changing process globals or cwd."""
+    context = {"schema": document, "runtime": runtime, "workspace": workspace}
+    token = _domain_context.set(context)
+    try:
+        context["tables"] = _load_fsm_tables_from_schema()
+        yield
+    finally:
+        _domain_context.reset(token)
+
+
+def _table(name: str):
+    context = _domain_context.get()
+    return context["tables"][name] if context else globals()[name]
+
+
+def _domain_runtime() -> Path:
+    context = _domain_context.get()
+    return context["runtime"] if context else find_coord_dir()
+
+
+def _domain_workspace() -> Path:
+    context = _domain_context.get()
+    return context["workspace"] if context else Path.cwd()
 
 
 def schema() -> dict[str, Any]:
+    context = _domain_context.get()
+    if context is not None:
+        return context["schema"]
     global _schema_cache
     if _schema_cache is not None:
         return _schema_cache
@@ -439,10 +472,29 @@ def journal_append(coord: Path, entry: dict[str, Any]) -> None:
     p = coord / JOURNAL_NAME
     line = json.dumps(entry, ensure_ascii=False)
     try:
-        with p.open("a", encoding="utf-8") as f:
-            f.write(line + "\n")
-            f.flush()
-            os.fsync(f.fileno())
+        with file_lock(coord / ".locks" / "journal.lock", label="journal"):
+            operation_id = entry.get("operation_id")
+            if operation_id and p.exists():
+                with p.open("r+", encoding="utf-8") as existing:
+                    rows = existing.readlines()
+                    for index, row in enumerate(rows):
+                        try:
+                            document = json.loads(row)
+                        except json.JSONDecodeError:
+                            if index != len(rows) - 1:
+                                raise GreatMindsError("journal has a corrupt interior record", exit_code=4)
+                            # An interrupted append can leave a torn final line.
+                            existing.seek(0)
+                            existing.write("".join(rows[:index]))
+                            existing.truncate()
+                            break
+                        if document.get("operation_id") == operation_id:
+                            return
+            with p.open("a", encoding="utf-8") as f:
+                f.write(line + "\n")
+                f.flush()
+                os.fsync(f.fileno())
+            _sync_directory(coord)
     except OSError as exc:
         raise GreatMindsError(f"journal append failed: {exc}", exit_code=4)
 
@@ -490,11 +542,21 @@ TASK_FILE_LOCK_POLL_SEC = 0.1
 
 
 
+@contextmanager
 def task_file_lock(coord: Path, task_id: str,
                    timeout: float = TASK_FILE_LOCK_TIMEOUT_SEC,
                    poll_interval: float = TASK_FILE_LOCK_POLL_SEC):
     """Compatibility facade for the shared domain/runtime task lock."""
-    return task_lock(coord, task_id, timeout=timeout, poll_interval=poll_interval)
+    found = find_task(coord, task_id)
+    canonical_id = found[0].stem if found else task_id
+    with task_lock(coord, canonical_id, timeout=timeout, poll_interval=poll_interval):
+        if (coord / ".runtime" / "state.json").exists():
+            from greatminds.runtime.store import RunStore
+            if any(receipt["envelope"]["task_id"] == canonical_id
+                   and receipt["status"] in {"applying", "needs_recovery"}
+                   for receipt in RunStore(coord).snapshot()["results"].values()):
+                raise GreatMindsError("task has an incomplete domain operation; reconcile it first", exit_code=4)
+        yield
 
 
 # ---------------------------------------------------------------------------
@@ -548,17 +610,17 @@ def validate_header(data: dict[str, Any]) -> None:
     must_str("title", data.get("title"))
     must_str("reporter", data.get("reporter"))
     must_iso("opened_at", data.get("opened_at"))
-    must_enum("priority", data.get("priority"), PRIORITIES)
+    must_enum("priority", data.get("priority"), _table("PRIORITIES"))
 
     if stream == "product":
-        must_enum("kind", data.get("kind"), PRODUCT_KINDS)
-        must_enum("scope", data.get("scope"), PRODUCT_SCOPES)
+        must_enum("kind", data.get("kind"), _table("PRODUCT_KINDS"))
+        must_enum("scope", data.get("scope"), _table("PRODUCT_SCOPES"))
     elif stream == "review_session":
         if data.get("kind") != "review_session":
             raise GreatMindsError(
                 "review_session-stream tasks must have kind: review_session"
             , exit_code=2)
-        must_enum("mode", data.get("mode"), MODES)
+        must_enum("mode", data.get("mode"), _table("MODES"))
         must_str("target_functionality", data.get("target_functionality"))
         scen = data.get("scenarios")
         if not isinstance(scen, list) or not scen:
@@ -601,7 +663,7 @@ def _reject_broken_git_evidence_sentinel(block: dict[str, Any]) -> None:
 
 def validate_block(stream: str, block: dict[str, Any]) -> None:
     kind = block.get("kind")
-    allowed = STREAM_BLOCK_KINDS.get(stream, set())
+    allowed = _table("STREAM_BLOCK_KINDS").get(stream, set())
     if kind not in allowed:
         raise GreatMindsError(
             f"block kind {kind!r} not allowed in stream {stream!r}; "
@@ -613,8 +675,8 @@ def validate_block(stream: str, block: dict[str, Any]) -> None:
         must_str("base_commit", block.get("base_commit"))
         must_str("assignee_role", block.get("assignee_role"))
         must_bool("stand_required", block.get("stand_required"))
-        must_enum("plan_kind", block.get("plan_kind"), PLAN_KINDS)
-        must_enum("mode", block.get("mode"), MODES)
+        must_enum("plan_kind", block.get("plan_kind"), _table("PLAN_KINDS"))
+        must_enum("mode", block.get("mode"), _table("MODES"))
         must_bool("ready_for_implementation", block.get("ready_for_implementation"))
         # A3: stand_required must be justified.
         if block.get("stand_required") is True and not (block.get("stand_reason") or "").strip():
@@ -634,17 +696,17 @@ def validate_block(stream: str, block: dict[str, Any]) -> None:
                 "tests block requires at least one entry in test_files"
             , exit_code=2)
         must_str("test_command", block.get("test_command"))
-        must_enum("test_result", block.get("test_result"), TEST_RESULTS)
-        must_enum("gate_check_result", block.get("gate_check_result"), GATE_CHECK_RESULTS)
+        must_enum("test_result", block.get("test_result"), _table("TEST_RESULTS"))
+        must_enum("gate_check_result", block.get("gate_check_result"), _table("GATE_CHECK_RESULTS"))
         must_iso("gate_check_at", block.get("gate_check_at"))
         must_str("gate_check_commit", block.get("gate_check_commit"))
         must_bool("ready_for_review", block.get("ready_for_review"))
     elif kind == "reader_review":
-        must_enum("outcome", block.get("outcome"), READER_OUTCOMES)
+        must_enum("outcome", block.get("outcome"), _table("READER_OUTCOMES"))
         must_bool("stand_checked", block.get("stand_checked"))
         must_bool("ready_for_architect", block.get("ready_for_architect"))
     elif kind == "review":
-        must_enum("outcome", block.get("outcome"), REVIEW_OUTCOMES)
+        must_enum("outcome", block.get("outcome"), _table("REVIEW_OUTCOMES"))
         # commit is only required on approval; changes_requested is a
         # hand-back, nothing was committed.
         if block.get("outcome") == "approved":
@@ -995,10 +1057,9 @@ def _evaluate_gate_check(task_data: dict[str, Any]) -> str:
     if not task_id_full:
         return "missing"
 
-    project_dir = Path.cwd()
+    project_dir = _domain_workspace()
     try:
-        from greatminds.core.paths import find_coord_dir
-        project_dir = find_coord_dir().parent
+        project_dir = _domain_runtime().parent
     except Exception:
         pass
 
@@ -1306,7 +1367,7 @@ def _check_all_dependencies_exist(data: dict[str, Any],
             "all_dependencies_exist_per_wake_check: latest blocked "
             "block has non-list dependencies field"
         )
-    coord = find_coord_dir()
+    coord = _domain_runtime()
     missing: list[str] = []
     for d in deps:
         if not isinstance(d, str):
@@ -1699,7 +1760,7 @@ def role_for_block_kind(role: str, kind: str, queue: str,
                 f"(owner: {owner}); only owner may file a normal blocked "
                 f"block. ARCHITECT-PLANNER may file only a withdrawn-class "
                 f"blocked block for user-requested cancellation.")
-    allowed = BLOCK_KIND_ROLES.get(kind)
+    allowed = _table("BLOCK_KIND_ROLES").get(kind)
     if allowed is None:
         return f"block kind {kind!r} has no role whitelist"
     if role not in allowed:
@@ -1707,7 +1768,7 @@ def role_for_block_kind(role: str, kind: str, queue: str,
                 f"allowed: {sorted(allowed)}")
     if kind == "implementation":
         scope = data.get("scope")
-        expected = IMPL_ROLE_BY_SCOPE.get(scope or "")
+        expected = _table("IMPL_ROLE_BY_SCOPE").get(scope or "")
         if expected and expected != role:
             return (f"task scope: {scope!r} requires {expected} for "
                     f"implementation, not {role}")
@@ -1997,7 +2058,7 @@ def require_block_cross_state(new_block: dict[str, Any],
 
 
 def require_block_acceptable_in_queue(queue: str, kind: str) -> None:
-    allowed = QUEUE_BLOCK_KINDS.get(queue)
+    allowed = _table("QUEUE_BLOCK_KINDS").get(queue)
     if allowed is None:
         raise GreatMindsError(f"queue {queue!r} has no block-policy entry", exit_code=2)
     if not allowed:
@@ -2268,6 +2329,8 @@ def move_task(*, task_id: str, to_queue: str, reason: str | None = None) -> str:
     """Move a task between queues. Returns the resolved ``from_queue``."""
     coord = find_coord_dir()
     role = caller_role()
+    if os.environ.get("GREATMINDS_RUN_ID"):
+        raise GreatMindsError("assigned runs submit queue decisions through `greatminds run submit`", exit_code=3)
     with task_file_lock(coord, task_id):
         return _do_move(coord, role, task_id, to_queue, reason or "")
 
@@ -2571,7 +2634,7 @@ def _enforce_worktree_isolation_for_block(
     """
     if kind not in ("implementation", "tests"):
         return
-    if os.environ.get("GREATMINDS_SKIP_WORKTREE_CHECK", "").strip() == "1":
+    if _domain_context.get() is None and os.environ.get("GREATMINDS_SKIP_WORKTREE_CHECK", "").strip() == "1":
         return
     task_kind = (data.get("kind") or "").strip()
     try:
@@ -2585,7 +2648,7 @@ def _enforce_worktree_isolation_for_block(
     base_path = (cfg.get("base_path") or ".worktrees").strip()
     worktrees_root = (project_dir / base_path).resolve(strict=False)
     try:
-        cwd = Path.cwd().resolve(strict=False)
+        cwd = _domain_workspace().resolve(strict=False)
     except OSError:
         return
     # Allowed: cwd is under <project>/.worktrees/<X>/ where X starts
@@ -2678,6 +2741,113 @@ def _enforce_implementation_files_exist_or_are_changed(
         )
 
 
+def prepare_block_candidate(*, data: dict, queue: str, coord: Path, task_id: str,
+                            role: str, kind: str, fields=None, body=None,
+                            at: str | None = None) -> dict:
+    """Validate one block against candidate task data without writing files."""
+    block: dict[str, Any] = {
+        "kind": kind,
+        "by": role,
+        "at": at or now_iso(),
+    }
+    if isinstance(fields, dict):
+        for k, v in fields.items():
+            if k in {"kind", "by", "at", "provenance"}:
+                raise GreatMindsError(f"block field {k} is assigned by the domain service", exit_code=3)
+            block[k] = v
+    else:
+        for kv in fields or []:
+            if "=" not in kv:
+                raise GreatMindsError(f"--field expects key=value, got: {kv}")
+            k, v = kv.split("=", 1)
+            if k in {"kind", "by", "at", "provenance"}:
+                raise GreatMindsError(f"block field {k} is assigned by the domain service", exit_code=3)
+            block[k] = coerce_value(k, v)
+    for field in ("written_by", "closed_by", "reviewed_by", "blocked_by"):
+        if field in block and block[field] != role:
+            raise GreatMindsError(f"{field} cannot name a different role", exit_code=3)
+    if body:
+        block[body_field_for(kind)] = read_body(body)
+
+    # 0113: role check BEFORE queue-acceptance check. If the caller
+    # is not allowed to produce this block kind regardless, that's
+    # the primary error — saying "block kind X is not acceptable in
+    # queue Y" misleads users who'd never have been allowed anyway.
+    # 2.0 cleanup: build the candidate block first so the narrow
+    # PLANNER withdrawal exception can inspect blocked.reason.
+    err = role_for_block_kind(role, kind, queue, data, block)
+    if err is not None:
+        raise GreatMindsError(err, exit_code=3)
+    require_block_acceptable_in_queue(queue, kind)
+
+    # 0229: auto-stamp worktree_fingerprint for blocks where
+    # "what was tested" identity matters. Captures the
+    # uncommitted overlay so gate_check can decouple tested-state
+    # from committed-state. Skip if the caller supplied one
+    # explicitly (allows test/operator override).
+    #
+    # 0383: the fingerprint MUST be computed over the PER-TASK
+    # worktree, not over ``coord.parent`` (the main fleet tree). The
+    # main tree carries no task overlay, so every task collapsed to
+    # the same hash (the c474b1e3 collision that produced phantom
+    # handoffs across 0361/0365/0380). Resolve the canonical full-id
+    # worktree and diff THAT; fall back to coord.parent only when no
+    # per-task worktree exists (e.g. non-isolated kinds / fixtures).
+    if (kind in ("implementation", "stand_result")
+            and "worktree_fingerprint" not in block):
+        try:
+            from greatminds.cli.gate_check import (
+                compute_worktree_fingerprint,
+            )
+            from greatminds.cli.worktree import (
+                canonical_task_id,
+                load_worktree_policy,
+            )
+            project_dir = coord.parent
+            fp_dir = project_dir
+            try:
+                policy = load_worktree_policy(project_dir)
+                cid = canonical_task_id(project_dir, task_id)
+                wt = policy.worktree_path_for(project_dir, cid)
+                if wt.is_dir() and (wt / ".git").exists():
+                    fp_dir = wt
+            except Exception:
+                fp_dir = project_dir
+            if _domain_context.get() is not None:
+                fp_dir = _domain_workspace()
+            fp = compute_worktree_fingerprint(fp_dir)
+            if fp is not None:
+                block["worktree_fingerprint"] = fp
+        except Exception:
+            pass  # best-effort; never block the append
+
+    validate_block(data.get("stream") or "product", block)
+    # 0303: refuse implementation / tests blocks when the caller's
+    # cwd is not the per-task worktree. Pre-0303 implementers
+    # could silently edit main while filing the block (upstream
+    # issue #3: TESTER rsync'd from .worktrees/<id>/ where the
+    # fix was absent because DEV had edited main). Schema flag
+    # ``worktrees.required_for_task_kinds`` lists the product
+    # kinds that require isolation.
+    _enforce_worktree_isolation_for_block(
+        kind, data, coord, task_id,
+    )
+    _enforce_implementation_files_exist_or_are_changed(
+        kind, block, coord, evidence_dir=_domain_workspace())
+    require_block_cross_state(block, data)
+
+    # 0185: file-lock acquisition removed. Per-task git worktree
+    # isolation makes working-tree contamination impossible — each
+    # task edits in its own ``.worktrees/<task-id>/`` directory.
+
+    new_blocks = list(data.get("blocks") or []) + [block]
+    new_data = dict(data)
+    new_data["blocks"] = new_blocks
+    validate_task(new_data)
+
+    return new_data
+
+
 def append_block(
     *,
     task_id: str,
@@ -2695,6 +2865,8 @@ def append_block(
     """
     coord = find_coord_dir()
     role = caller_role()
+    if os.environ.get("GREATMINDS_RUN_ID"):
+        raise GreatMindsError("assigned runs submit evidence through `greatminds run submit`", exit_code=3)
 
     with task_file_lock(coord, task_id):
         found = find_task(coord, task_id)
@@ -2705,96 +2877,9 @@ def append_block(
             raise GreatMindsError(f"task {task_id} is legacy .md; migrate first", exit_code=2)
         data = load_task(src_path)
 
-        block: dict[str, Any] = {
-            "kind": kind,
-            "by": role,
-            "at": now_iso(),
-        }
-        if isinstance(fields, dict):
-            for k, v in fields.items():
-                block[k] = v
-        else:
-            for kv in fields or []:
-                if "=" not in kv:
-                    raise GreatMindsError(f"--field expects key=value, got: {kv}")
-                k, v = kv.split("=", 1)
-                block[k] = coerce_value(k, v)
-        if body:
-            block[body_field_for(kind)] = read_body(body)
-
-        # 0113: role check BEFORE queue-acceptance check. If the caller
-        # is not allowed to produce this block kind regardless, that's
-        # the primary error — saying "block kind X is not acceptable in
-        # queue Y" misleads users who'd never have been allowed anyway.
-        # 2.0 cleanup: build the candidate block first so the narrow
-        # PLANNER withdrawal exception can inspect blocked.reason.
-        err = role_for_block_kind(role, kind, queue, data, block)
-        if err is not None:
-            raise GreatMindsError(err, exit_code=3)
-        require_block_acceptable_in_queue(queue, kind)
-
-        # 0229: auto-stamp worktree_fingerprint for blocks where
-        # "what was tested" identity matters. Captures the
-        # uncommitted overlay so gate_check can decouple tested-state
-        # from committed-state. Skip if the caller supplied one
-        # explicitly (allows test/operator override).
-        #
-        # 0383: the fingerprint MUST be computed over the PER-TASK
-        # worktree, not over ``coord.parent`` (the main fleet tree). The
-        # main tree carries no task overlay, so every task collapsed to
-        # the same hash (the c474b1e3 collision that produced phantom
-        # handoffs across 0361/0365/0380). Resolve the canonical full-id
-        # worktree and diff THAT; fall back to coord.parent only when no
-        # per-task worktree exists (e.g. non-isolated kinds / fixtures).
-        if (kind in ("implementation", "stand_result")
-                and "worktree_fingerprint" not in block):
-            try:
-                from greatminds.cli.gate_check import (
-                    compute_worktree_fingerprint,
-                )
-                from greatminds.cli.worktree import (
-                    canonical_task_id,
-                    load_worktree_policy,
-                )
-                project_dir = coord.parent
-                fp_dir = project_dir
-                try:
-                    policy = load_worktree_policy(project_dir)
-                    cid = canonical_task_id(project_dir, task_id)
-                    wt = policy.worktree_path_for(project_dir, cid)
-                    if wt.is_dir() and (wt / ".git").exists():
-                        fp_dir = wt
-                except Exception:
-                    fp_dir = project_dir
-                fp = compute_worktree_fingerprint(fp_dir)
-                if fp is not None:
-                    block["worktree_fingerprint"] = fp
-            except Exception:
-                pass  # best-effort; never block the append
-
-        validate_block(data.get("stream") or "product", block)
-        # 0303: refuse implementation / tests blocks when the caller's
-        # cwd is not the per-task worktree. Pre-0303 implementers
-        # could silently edit main while filing the block (upstream
-        # issue #3: TESTER rsync'd from .worktrees/<id>/ where the
-        # fix was absent because DEV had edited main). Schema flag
-        # ``worktrees.required_for_task_kinds`` lists the product
-        # kinds that require isolation.
-        _enforce_worktree_isolation_for_block(
-            kind, data, coord, task_id,
-        )
-        _enforce_implementation_files_exist_or_are_changed(
-            kind, block, coord, evidence_dir=Path.cwd())
-        require_block_cross_state(block, data)
-
-        # 0185: file-lock acquisition removed. Per-task git worktree
-        # isolation makes working-tree contamination impossible — each
-        # task edits in its own ``.worktrees/<task-id>/`` directory.
-
-        new_blocks = list(data.get("blocks") or []) + [block]
-        new_data = dict(data)
-        new_data["blocks"] = new_blocks
-        validate_task(new_data)
+        new_data = prepare_block_candidate(data=data, queue=queue, coord=coord,
+                                           task_id=task_id, role=role, kind=kind,
+                                           fields=fields, body=body)
 
         atomic_write_yaml(src_path, new_data)
         journal_append(coord, {
@@ -2875,17 +2960,17 @@ def _split_multivalue(ctx, param, value):
               type=click.Choice(["product", "review_session"]))
 @click.option("--title", required=True)
 @click.option("--reporter", default=None)
-@click.option("--priority", default=None, type=click.Choice(sorted(PRIORITIES)))
+@click.option("--priority", default=None, type=click.Choice(sorted(_table("PRIORITIES"))))
 @click.option("--kind", default=None,
-              help="product: " + "|".join(sorted(PRODUCT_KINDS)))
+              help="product: " + "|".join(sorted(_table("PRODUCT_KINDS"))))
 @click.option("--scope", default=None,
-              help="product: " + "|".join(sorted(PRODUCT_SCOPES)))
+              help="product: " + "|".join(sorted(_table("PRODUCT_SCOPES"))))
 @click.option("--hosts", multiple=True, callback=_split_multivalue,
               help="list of hosts; repeat the flag or comma-separate values")
 @click.option("--evidence-for", "evidence_for", multiple=True,
               callback=_split_multivalue,
               help="task ids this run is evidence for; repeat or comma-separate")
-@click.option("--mode", default=None, type=click.Choice(sorted(MODES)))
+@click.option("--mode", default=None, type=click.Choice(sorted(_table("MODES"))))
 @click.option("--target-functionality", "target_functionality", default=None)
 @click.option("--scenarios", multiple=True, callback=_split_multivalue,
               help="scenario IDs; repeat or comma-separate")

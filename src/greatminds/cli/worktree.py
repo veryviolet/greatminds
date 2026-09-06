@@ -66,7 +66,7 @@ class WorktreePolicy:
         return project_dir / self.base_path / task_id
 
 
-def load_worktree_policy(project_dir: Path | None = None) -> WorktreePolicy:
+def load_worktree_policy(project_dir: Path | None = None, *, schema_document: dict | None = None) -> WorktreePolicy:
     """Build the worktree policy: canon (package) schema defaults, then
     overlaid by the project's per-project override in ``coord.yaml``.
 
@@ -82,10 +82,10 @@ def load_worktree_policy(project_dir: Path | None = None) -> WorktreePolicy:
     so a project can run its fleet on a branch other than main cleanly.
     When ``project_dir`` is None only the canon defaults apply.
     """
-    schema_path = find_canon_dir() / "schema.yaml"
+    schema_path = find_canon_dir() / "schema.yaml" if schema_document is None else None
     raw: dict = {}
     try:
-        doc = yaml.safe_load(schema_path.read_text(encoding="utf-8")) or {}
+        doc = schema_document if schema_document is not None else yaml.safe_load(schema_path.read_text(encoding="utf-8")) or {}
         if isinstance(doc.get("worktrees"), dict):
             raw = dict(doc["worktrees"])
     except (OSError, yaml.YAMLError):

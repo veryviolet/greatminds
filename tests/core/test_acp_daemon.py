@@ -28,7 +28,10 @@ def project(tmp_path, *, scenario="echo", tasks=True):
     queue = tmp_path / ".greatminds" / "feature_dev"
     queue.mkdir(parents=True)
     if tasks:
-        (queue / "0001-example.yaml").write_text("title: Implement example\n")
+        (queue / "0001-example.yaml").write_text(yaml.safe_dump({
+            "id": "0001-example", "stream": "product", "kind": "research", "scope": "backend",
+            "reporter": "USER", "opened_at": "2026-09-06T10:00:00Z", "priority": "normal",
+            "title": "Implement example", "blocks": []}))
     return tmp_path
 
 
@@ -65,9 +68,20 @@ def test_typed_result_travels_from_agent_cli_to_durable_receipt(tmp_path):
     assert run["state"] == "completed", run
     receipt = snapshot["results"]["fixture-result"]
     assert receipt["role"] == "DEVELOPER"
-    assert receipt["status"] == "received"
+    assert receipt["status"] == "applied"
     assert receipt["envelope"]["run_id"] == run["id"]
     assert (root / ".greatminds" / "feature_dev" / "0001-example.yaml").exists()
+
+
+def test_acp_decision_advances_task_only_through_domain_gates(tmp_path):
+    root = project(tmp_path, scenario="handoff")
+    snapshot = asyncio.run(serve(root, once=True, environment={}))
+    receipt = snapshot["results"]["fixture-result"]
+    assert receipt["status"] == "applied", receipt
+    assert not (root / ".greatminds" / "feature_dev" / "0001-example.yaml").exists()
+    data = yaml.safe_load((root / ".greatminds" / "feature_test" / "0001-example.yaml").read_text())
+    assert data["blocks"][0]["by"] == "DEVELOPER"
+    assert data["blocks"][0]["provenance"]["applied_by"] == "SYSTEM"
 
 
 def test_pause_prevents_dispatch_and_resume_allows_work(tmp_path, monkeypatch):
