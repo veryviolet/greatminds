@@ -432,6 +432,13 @@ M1 foundation implemented on 2026-09-06:
   failed-write, and contract-reload fixtures exercise the new service.
 
 See [execution contract](execution-contract.md) for semantics and limitations.
+M2 transport foundation uses upstream `agent-client-protocol` 0.11.1 for ACP
+framing, request correlation, and callback dispatch. Independent wire-peer tests
+cover negotiation, streaming, permissions during a prompt, missing session-load
+support, incompatible protocol, disconnect, timeout, and process-group cleanup.
+The client advertises neither filesystem nor terminal callbacks yet; permission
+requests default to cancellation plus an explicit input-needed flag.
+
 ACP execution, process recovery integration, typed domain application, and
 automatic workflow controllers are still pending. The existing daemon has not
 yet been switched to the new store; M1 foundation does not establish cutover.

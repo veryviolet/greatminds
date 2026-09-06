@@ -100,6 +100,26 @@ requires a daemon-owned store and an actual execution boundary.
 
 ## Delivery status
 
+The common stdio transport uses the upstream
+[Python ACP SDK](https://agentclientprotocol.github.io/python-sdk/quickstart/),
+pinned to `agent-client-protocol==0.11.1`. The SDK supplies protocol models,
+framing, request correlation, and bidirectional dispatch. Greatminds creates
+the child process separately so it can own a process group and enforce bounded
+shutdown of descendants as well as the agent itself.
+
+Protocol fixtures cover initialization, session creation, streamed updates,
+permission requests during pending prompts, unsupported session loading,
+incompatible versions, disconnection, timeouts, and process-group cleanup.
+These fixtures use an independent JSON-RPC peer, not the SDK's agent classes.
+They establish client behavior, not live harness compatibility.
+
+Filesystem and terminal callbacks are currently unadvertised and explicitly
+rejected. Permission requests use a supplied policy/operator handler, with a
+deadline and validation against the offered option IDs. Without a handler,
+the client cancels the request and reports that input is needed. The transport
+does not persist raw updates or stderr; the supervisor must apply diagnostic
+redaction and retention when connecting its event sink.
+
 The contracts and store are implemented and tested independently. Existing
 launch/daemon paths have not yet been cut over to this store. The common ACP
 supervisor will own process lifetime, restart reconciliation, callback policies,
