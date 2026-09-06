@@ -131,7 +131,7 @@ function activate(context) {
     vscode.window.registerTreeDataProvider("greatminds.tools", provider),
     vscode.commands.registerCommand("greatminds.refresh", () => provider.refresh()),
     vscode.commands.registerCommand("greatminds.openDashboard", () => terminal("greatminds dashboard", `${cliPath()} dashboard`)),
-    vscode.commands.registerCommand("greatminds.openDrivenLog", () => terminal("greatminds driven-log", `${cliPath()} driven-log`)),
+    vscode.commands.registerCommand("greatminds.openRunEvents", () => terminal("greatminds run events", `${cliPath()} run events --follow`)),
     vscode.commands.registerCommand("greatminds.openCoordd", () => terminal("greatminds coordd", `${cliPath()} coordd --verbose`)),
     vscode.commands.registerCommand("greatminds.newChat", chatCommand(output, async () => {
       const rows = await chatRows("bindings");

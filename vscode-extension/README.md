@@ -8,7 +8,7 @@ Current commands:
 
 - `greatminds: Refresh`
 - `greatminds: Open Dashboard`
-- `greatminds: Follow Driven Log`
+- `greatminds: Follow ACP Run Events`
 - `greatminds: Run coordd`
 - `greatminds: Show Agent Tools`
 - `greatminds: Show Stand Status`

@@ -28,6 +28,30 @@ def status(project_dir):
     click.echo(json.dumps(snapshot(project), ensure_ascii=False, indent=2))
 
 
+@run.command("events")
+@click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path))
+@click.option("--after", type=click.IntRange(min=0), default=0, help="Exclusive event sequence cursor.")
+@click.option("--limit", type=click.IntRange(min=1, max=10000), default=200)
+@click.option("--follow", is_flag=True, help="Continue emitting new events as JSON Lines.")
+@click.option("--interval", type=click.FloatRange(min=0.2), default=1.0)
+def events(project_dir, after, limit, follow, interval):
+    """Read the durable ACP event stream without launching an executor."""
+    project = project_dir.resolve() if project_dir else find_project_dir()
+    store = RunStore(project_runtime_dir(project))
+    try:
+        while True:
+            batch = [event for event in store.snapshot()["events"] if event["sequence"] > after][:limit]
+            for event in batch:
+                click.echo(json.dumps(event, ensure_ascii=True, sort_keys=True))
+                after = event["sequence"]
+            if not follow:
+                return
+            if len(batch) < limit:
+                time.sleep(interval)
+    except KeyboardInterrupt:
+        return
+
+
 @run.command("pause")
 def pause():
     """Pause new ACP dispatch; existing runs can finish."""

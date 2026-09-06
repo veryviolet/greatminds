@@ -97,6 +97,7 @@ Task-bound conversations use `chat create BINDING --task TASK_ID`.
 
 ```bash
 greatminds run status
+greatminds run events --follow
 greatminds run pause
 greatminds run resume
 greatminds run cancel RUN_ID

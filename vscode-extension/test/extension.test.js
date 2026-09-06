@@ -145,7 +145,7 @@ test("activate registers cockpit commands and opens terminals", async () => {
     for (const name of [
       "greatminds.refresh",
       "greatminds.openDashboard",
-      "greatminds.openDrivenLog",
+      "greatminds.openRunEvents",
       "greatminds.openCoordd",
       "greatminds.showAgentTools",
       "greatminds.showStandStatus"
@@ -153,11 +153,11 @@ test("activate registers cockpit commands and opens terminals", async () => {
       assert.ok(harness.commands.has(name), `${name} registered`);
     }
     await harness.commands.get("greatminds.openDashboard")();
-    await harness.commands.get("greatminds.openDrivenLog")();
+    await harness.commands.get("greatminds.openRunEvents")();
     await harness.commands.get("greatminds.openCoordd")();
     assert.equal(harness.terminals.length, 3);
     assert.equal(harness.terminals[0].sent[0], "greatminds-test dashboard");
-    assert.equal(harness.terminals[1].sent[0], "greatminds-test driven-log");
+    assert.equal(harness.terminals[1].sent[0], "greatminds-test run events --follow");
     assert.equal(harness.terminals[2].sent[0], "greatminds-test coordd --verbose");
     await harness.commands.get("greatminds.showStandStatus")();
     assert.match(harness.output.lines.join("\n"), /human output/);

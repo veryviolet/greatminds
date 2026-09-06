@@ -22,7 +22,7 @@ def test_vscode_extension_package_declares_cockpit_commands() -> None:
     assert {
         "greatminds.refresh",
         "greatminds.openDashboard",
-        "greatminds.openDrivenLog",
+        "greatminds.openRunEvents",
         "greatminds.openCoordd",
         "greatminds.showAgentTools",
         "greatminds.showStandStatus",
@@ -35,7 +35,8 @@ def test_vscode_extension_uses_cli_backend() -> None:
     assert "execFile(cliPath()" in text
     assert "GREATMINDS_PROJECT_DIR" in text
     assert "agent\", \"tools\", \"--json" in text
-    assert "driven-log" in text
+    assert "run events --follow" in text
+    assert "driven-log" not in text
     assert "stand\", \"status" in text
     assert ".greatminds" not in text
 

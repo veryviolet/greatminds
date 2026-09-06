@@ -39,7 +39,6 @@ from . import migrate_stand_history as _migrate_stand_history_mod
 from . import intent_clean as _intent_clean_mod
 from . import notify_from_journal as _notify_journal_mod
 from . import journal as _journal_mod
-from . import stop_decide as _stop_decide_mod
 from . import plan as _plan_mod
 from . import git_check as _git_check_mod
 from . import gate_check as _gate_check_mod
@@ -49,7 +48,6 @@ from . import update as _update_mod
 from . import worktree as _worktree_mod
 from . import agent as _agent_mod
 from . import dashboard as _dashboard_mod
-from . import driven_log as _driven_log_mod
 from . import project as _project_mod
 from . import run as _run_mod
 
@@ -68,7 +66,6 @@ cli.add_command(_migrate_stand_history_mod.migrate_stand_history,
 cli.add_command(_intent_clean_mod.intent_clean, name="intent-clean")
 cli.add_command(_notify_journal_mod.notify_journal, name="notify-journal")
 cli.add_command(_journal_mod.journal, name="journal")
-cli.add_command(_stop_decide_mod.stop_decide, name="stop-decide")
 cli.add_command(_plan_mod.plan)
 cli.add_command(_git_check_mod.check_git_permission, name="check-git-permission")
 cli.add_command(_gate_check_mod.gate_check, name="gate-check")
@@ -78,7 +75,6 @@ cli.add_command(_update_mod.update)
 cli.add_command(_worktree_mod.worktree)
 cli.add_command(_agent_mod.agent)
 cli.add_command(_dashboard_mod.dashboard)
-cli.add_command(_driven_log_mod.driven_log, name="driven-log")
 cli.add_command(_project_mod.project)
 cli.add_command(_run_mod.run)
 from . import chat as _chat_mod

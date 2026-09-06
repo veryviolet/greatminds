@@ -1294,3 +1294,21 @@ collection errors. Pure deterministic template/profile helpers remain pending
 module cleanup, including review of obsolete profile migration hashes. Native
 CLI/hooks and full-suite execution remain open; this checkpoint is not completion
 of the modernization plan.
+
+### ACP event observer and removal of native stop hooks (2026-09-07)
+
+Removed the host-specific stop-decide CLI/module and its native hook tests.
+Removed driven-log's unused native driver event writer/observer and replaced the
+operator surface with `run events`: JSON Lines from the durable RunStore, an
+exclusive sequence cursor, bounded batches and optional follow. It does not
+create a separate observer log or launch agents. VS Code's command/palette now
+opens ACP run events. Wake-check remains because its ACP branch already calls
+the shared dependency maintenance service; duplicate non-ACP logic still needs
+cleanup with preservation of dependency diagnostics.
+
+Validation: 40 run-event/default-ACP/maintenance/extension scaffold tests passed;
+Node extension harness passed. Event tests cover read-only pagination and
+follow without replay. Final suite collection: 1553 tests without errors.
+No live provider or extension host session was exercised in this checkpoint.
+Remaining native assets, watchdog/wake fallback code, setup template helpers,
+and full-suite execution remain open.
