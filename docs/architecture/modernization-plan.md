@@ -671,6 +671,25 @@ M3/M4 stand durability preparation:
   by ACP daemon scheduling and expired dead-holder lease reclamation. Do not infer
   exactly-once external execution from the deployment lock.
 
+M4 durable deployment intent checkpoint:
+
+- External dispatch now persists an attempt before execution, then the result
+  before the stand transition. A final receipt is recoverable from the exact
+  deployment ID in atomic stand history without re-running the command.
+- Unfinished attempts block replay across process restarts and lease changes.
+  Exceptions preserve uncertainty; corrupt ledgers fail closed. Operator JSON
+  `stand deployment-status` exposes the attempts without manual YAML inspection.
+- Fault tests cover process death after an external effect, failed stand write
+  after a successful command, missing final receipt, and same-lease history that
+  does not prove the particular deployment. Raw logs and arbitrary lease secret
+  fields are excluded from the ledger.
+- Stand/ledger/coordinator regression: 253 passed, 1 skipped; documentation: 8
+  passed. Installed-wheel intent/receipt recovery smoke passed. Final ledger
+  validation and engine regression passed all 27 tests. No live deployment was used.
+- Remaining: child process identity/gated launch, bounded cleanup, explicit
+  resolution of uncertain external outcomes, ACP daemon deployment scheduling,
+  and dead-holder lease reclamation. Owner identity alone cannot prove child exit.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility

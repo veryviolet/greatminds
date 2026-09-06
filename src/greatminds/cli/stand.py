@@ -881,6 +881,10 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
     """Run at most one deployment per project, including operator invocations."""
     from greatminds.core.storage import file_lock
     with file_lock(coord / ".stand" / "deployment.lock", label="stand deployment", timeout=0):
+        from greatminds.domain.stand_deployments import DeploymentLedger
+        ledger = DeploymentLedger(coord)
+        ledger.reconcile_applied()
+        ledger.require_resolved()
         return _deploy_lease_locked(coord, lease_id=lease_id,
                                     ansible_playbook=ansible_playbook,
                                     timeout_seconds=timeout_seconds)
@@ -1033,9 +1037,19 @@ def _deploy_lease_locked(coord: Path, *, lease_id: str | None = None,
         if k in cap:
             lease_meta[k] = cap[k]
 
-    rc, log = dispatch_profile(spec, lease_meta,
-                               ansible_playbook=ansible_playbook,
-                               timeout_seconds=timeout_seconds)
+    from greatminds.domain.stand_deployments import DeploymentLedger
+    ledger = DeploymentLedger(coord)
+    # Recheck after profile preparation and persist intent before external work.
+    ss.update_stand_state(coord, require_same_lease)
+    attempt_id = ledger.begin(cap)
+    try:
+        rc, log = dispatch_profile(spec, lease_meta,
+                                   ansible_playbook=ansible_playbook,
+                                   timeout_seconds=timeout_seconds)
+    except BaseException:
+        ledger.uncertain(attempt_id)
+        raise
+    ledger.finished(attempt_id, rc, log)
     lid = cap.get("lease_id")
     if rc == 0:
         ready_cap: dict[str, Any] = {}
@@ -1049,6 +1063,7 @@ def _deploy_lease_locked(coord: Path, *, lease_id: str | None = None,
             ss.record_transition(
                 state, "preparing", "ready", "COORDD", lease_id=lid,
                 reason=f"deploy ok (profile {profile!r} from {spec.source})")
+            state["history"][-1]["deployment_id"] = attempt_id
 
         ss.update_stand_state(coord, _ready)
         if ready_cap.get("holder"):
@@ -1068,9 +1083,19 @@ def _deploy_lease_locked(coord: Path, *, lease_id: str | None = None,
             state["active_lease"] = None
             ss.record_transition(state, prev, "down", "COORDD",
                                  lease_id=lid, reason=reason)
+            state["history"][-1]["deployment_id"] = attempt_id
 
         ss.update_stand_state(coord, _down)
+    ledger.applied(attempt_id)
     return rc, (log or "")
+
+
+@stand.command(name="deployment-status")
+def stand_deployment_status() -> None:
+    """Inspect durable external deployment attempts and unresolved outcomes."""
+    import json
+    from greatminds.domain.stand_deployments import DeploymentLedger
+    click.echo(json.dumps(DeploymentLedger(find_coord_dir()).snapshot(), indent=2))
 
 
 @stand.command(name="deploy")

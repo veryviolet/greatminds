@@ -400,6 +400,21 @@ stand only while its preparing state and captured lease still match. A late
 result raises a recovery error without overwriting a replacement lease. Retry
 exhaustion also checks the captured lease before marking the stand down.
 
-The deployment lock alone does not resolve external effects after process death.
-Durable deployment intent, child-process recovery, and ACP daemon stand scheduling
-remain required before automatic crash recovery or replay is enabled.
+Before external dispatch, the engine persists a deployment attempt in
+`.stand/deployments.json`. It records lease identity, owner process identity, and
+lifecycle without copying arbitrary lease fields or raw logs. The returned exit
+status and log hash are saved before publishing the stand transition. That
+transition includes the attempt ID; only its exact match can recover a missing
+final receipt after a crash, without executing the command again.
+
+An attempt with an unknown outcome, or a returned result without a confirmed
+stand transition, blocks further external deployment across lease changes and
+process restarts. `greatminds stand deployment-status` exposes these attempts as
+versioned JSON. Executor exceptions retain an unresolved intent; coordinator
+retries cannot bypass it. A malformed ledger also blocks execution.
+
+Owner process identity is not evidence that all deployment children have exited.
+Child-process tracking, recovery controls for unknown external outcomes, and ACP
+daemon stand scheduling remain required. There is currently no automatic replay
+or general operator resolution of uncertain attempts. Preserve the ledger for
+recovery; changing or releasing a lease does not resolve its external outcome.

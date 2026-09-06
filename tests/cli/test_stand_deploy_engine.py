@@ -188,3 +188,128 @@ def test_concurrent_deployment_refused_before_external_execution(tmp_path, monke
         with pytest.raises(GreatMindsError, match='stand deployment is being transitioned'):
             stand.deploy_lease(coord, lease_id='L1')
     assert _state(coord)['state'] == 'preparing'
+
+
+def test_executor_exception_is_durable_and_never_replayed(tmp_path, monkeypatch):
+    from greatminds.domain.stand_deployments import DeploymentLedger
+    coord = tmp_path / 'coordination'
+    _prepare(coord)
+    _patch(monkeypatch, rc=0)
+    calls = []
+    def crash(*args, **kwargs):
+        calls.append(1)
+        raise RuntimeError('synthetic-secret-do-not-persist')
+    monkeypatch.setattr('greatminds.cli.stand_executor.dispatch_profile', crash)
+    with pytest.raises(RuntimeError):
+        stand.deploy_lease(coord, lease_id='L1')
+    ledger = DeploymentLedger(coord)
+    attempt = next(iter(ledger.snapshot()['attempts'].values()))
+    assert attempt['status'] == 'needs_recovery'
+    assert 'synthetic-secret' not in ledger.path.read_text()
+    with pytest.raises(GreatMindsError, match='refusing external replay'):
+        stand.deploy_lease(coord, lease_id='L1')
+    assert len(calls) == 1
+
+
+def test_success_records_result_and_applied_transition(tmp_path, monkeypatch):
+    from greatminds.domain.stand_deployments import DeploymentLedger
+    coord = tmp_path / 'coordination'
+    _prepare(coord)
+    _patch(monkeypatch, rc=0)
+    monkeypatch.setattr(stand, '_file_inbox_info', lambda *a, **kw: None)
+    stand.deploy_lease(coord, lease_id='L1')
+    ledger = DeploymentLedger(coord)
+    receipt = next(iter(ledger.snapshot()['attempts'].values()))
+    assert receipt['status'] == 'applied' and receipt['exit_code'] == 0
+    assert receipt['lease']['lease_id'] == 'L1'
+    assert receipt['log_sha256']
+    ledger.require_resolved()
+
+
+def test_process_death_after_external_effect_blocks_replay_across_lease_change(tmp_path, monkeypatch):
+    import multiprocessing
+    import os
+    from greatminds.cli import stand_state as ss
+    from greatminds.domain.stand_deployments import DeploymentLedger
+    coord = tmp_path / 'coordination'
+    _prepare(coord)
+    _patch(monkeypatch, rc=0)
+    effect = tmp_path / 'external-effect'
+    def crash(*args, **kwargs):
+        effect.write_text('executed once')
+        os._exit(73)
+    monkeypatch.setattr('greatminds.cli.stand_executor.dispatch_profile', crash)
+    child = multiprocessing.get_context('fork').Process(target=stand.deploy_lease, args=(coord,), kwargs={'lease_id': 'L1'})
+    child.start()
+    child.join(timeout=10)
+    if child.is_alive():
+        child.kill()
+        child.join(timeout=5)
+        pytest.fail('fault child did not exit')
+    assert child.exitcode == 73 and effect.read_text() == 'executed once'
+    receipt = next(iter(DeploymentLedger(coord).snapshot()['attempts'].values()))
+    assert receipt['status'] == 'started'
+    ss.update_stand_state(coord, lambda s: s['active_lease'].update(lease_id='L2'))
+    monkeypatch.setattr('greatminds.cli.stand_executor.dispatch_profile', lambda *a, **k: pytest.fail('replayed'))
+    with pytest.raises(GreatMindsError, match='refusing external replay'):
+        stand.deploy_lease(coord, lease_id='L2')
+
+
+def test_result_saved_before_failed_stand_publication_blocks_replay(tmp_path, monkeypatch):
+    from greatminds.cli import stand_state as ss
+    from greatminds.domain.stand_deployments import DeploymentLedger
+    coord = tmp_path / 'coordination'
+    _prepare(coord)
+    _patch(monkeypatch, rc=0)
+    original = ss.atomic_bytes
+    def dispatch(*args, **kwargs):
+        def fail(*args, **kwargs):
+            raise OSError('state write failed')
+        monkeypatch.setattr(ss, 'atomic_bytes', fail)
+        return 0, 'executed'
+    monkeypatch.setattr('greatminds.cli.stand_executor.dispatch_profile', dispatch)
+    with pytest.raises(OSError, match='state write failed'):
+        stand.deploy_lease(coord, lease_id='L1')
+    monkeypatch.setattr(ss, 'atomic_bytes', original)
+    receipt = next(iter(DeploymentLedger(coord).snapshot()['attempts'].values()))
+    assert receipt['status'] == 'command_finished' and receipt['exit_code'] == 0
+    assert _state(coord)['state'] == 'preparing'
+    with pytest.raises(GreatMindsError, match='refusing external replay'):
+        stand.deploy_lease(coord, lease_id='L1')
+
+
+def test_deployment_status_exposes_recovery_without_reading_yaml(tmp_path, monkeypatch):
+    from click.testing import CliRunner
+    from greatminds.domain.stand_deployments import DeploymentLedger
+    import json
+    coord = tmp_path / 'coordination'
+    _prepare(coord)
+    attempt = DeploymentLedger(coord).begin(_state(coord)['active_lease'])
+    monkeypatch.setattr(stand, 'find_coord_dir', lambda: coord)
+    result = CliRunner().invoke(stand.stand, ['deployment-status'])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)['attempts'][attempt]['status'] == 'started'
+
+
+@pytest.mark.parametrize('rc', [0, 2])
+def test_completed_stand_transition_recovers_receipt_without_execution(tmp_path, monkeypatch, rc):
+    from greatminds.domain.stand_deployments import DeploymentLedger
+    coord = tmp_path / 'coordination'
+    _prepare(coord)
+    _patch(monkeypatch, rc=rc)
+    monkeypatch.setattr(stand, '_file_inbox_info', lambda *a, **k: None)
+    def fail(*args, **kwargs):
+        raise OSError('receipt persistence failed')
+    monkeypatch.setattr(DeploymentLedger, 'applied', fail)
+    with pytest.raises(OSError, match='receipt persistence'):
+        stand.deploy_lease(coord, lease_id='L1')
+    ledger = DeploymentLedger(coord)
+    assert next(iter(ledger.snapshot()['attempts'].values()))['status'] == 'command_finished'
+    assert _state(coord)['state'] == ('ready' if rc == 0 else 'down')
+    monkeypatch.setattr('greatminds.cli.stand_executor.dispatch_profile', lambda *a, **k: pytest.fail('replayed'))
+    ledger.reconcile_applied()
+    receipt = next(iter(ledger.snapshot()['attempts'].values()))
+    assert receipt['status'] == 'applied' and receipt['recovery'] == 'stand_transition_recorded'
+    before = ledger.path.read_bytes()
+    ledger.reconcile_applied()
+    assert ledger.path.read_bytes() == before
