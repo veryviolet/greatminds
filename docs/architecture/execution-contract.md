@@ -383,3 +383,23 @@ unchanged task revision is held until an explicit retry, rather than being
 automatically repeated. Typed results now pass through domain application and
 its semantic gates. Worktree preparation at dispatch, deterministic command
 evidence, repair controls, and live harness compatibility remain in progress.
+
+
+## Stand state durability and deployment ownership
+
+Stand state uses a stable `.stand/state.lock` and an atomic, fsynced replacement
+of `.stand/state.yaml`. Concurrent readers see complete snapshots. An exception
+or process death before replacement preserves the preceding lease and history.
+All participating writers must use this locking protocol; stop older processes
+before a live upgrade. This change does not migrate a running fleet.
+
+Both operator and coordinator deployment calls hold `.stand/deployment.lock`.
+A second call fails before external execution and does not consume coordinator
+retry attempts. Success, failure, and stale-source rejection can update the
+stand only while its preparing state and captured lease still match. A late
+result raises a recovery error without overwriting a replacement lease. Retry
+exhaustion also checks the captured lease before marking the stand down.
+
+The deployment lock alone does not resolve external effects after process death.
+Durable deployment intent, child-process recovery, and ACP daemon stand scheduling
+remain required before automatic crash recovery or replay is enabled.

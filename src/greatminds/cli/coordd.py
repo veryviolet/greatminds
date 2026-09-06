@@ -2933,6 +2933,12 @@ def _maybe_auto_deploy_stand(coord: Path, verbose: bool,
                 print(f"  coordd auto-deploy lease {lease_id} rc={rc}",
                       file=sys.stderr)
         except Exception as exc:  # noqa: BLE001 — never crash coordd
+            from greatminds.core.errors import GreatMindsError
+            if isinstance(exc, GreatMindsError) and exc.exit_code == 4:
+                # Lock contention and stale lease results are not failed
+                # deployment attempts. Never take down another lease or a
+                # deployment still owned by an operator process.
+                return
             # The deploy RAISED before transitioning → the stand is still
             # `preparing`. Count the attempt; retry until DEPLOY_MAX_ATTEMPTS,
             # then escalate + force the stand `down` so it is not stuck.
@@ -2952,6 +2958,8 @@ def _maybe_auto_deploy_stand(coord: Path, verbose: bool,
                     reason = f"coordd auto-deploy failed {n}x: {detail}"
 
                     def _down(state: dict) -> None:
+                        if state.get("state") != "preparing" or state.get("active_lease") != active:
+                            return
                         prev = state.get("state") or "preparing"
                         state["down_reason"] = reason
                         state["active_lease"] = None

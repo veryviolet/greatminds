@@ -148,3 +148,43 @@ def test_lease_host_wins_over_profile(tmp_path, monkeypatch):
     stand.deploy_lease(coord, lease_id="L1")
 
     assert cap["meta"]["host"] == "lease-host.example"
+
+
+@pytest.mark.parametrize('rc', [0, 2])
+@pytest.mark.parametrize('replacement', ['new_lease', 'down', 'changed_profile'])
+def test_deploy_result_cannot_mutate_replaced_lease(tmp_path, monkeypatch, rc, replacement):
+    from greatminds.cli import stand_state as ss
+    coord = tmp_path / 'coordination'
+    _prepare(coord)
+    _patch(monkeypatch, rc=rc)
+    expected = {}
+
+    def dispatch(*args, **kwargs):
+        def replace(state):
+            if replacement == 'new_lease':
+                state['active_lease']['lease_id'] = 'L2'
+            elif replacement == 'down':
+                state.update(state='down', active_lease=None, down_reason='operator intervention')
+            else:
+                state['active_lease']['profile'] = 'different-target'
+        expected.update(ss.update_stand_state(coord, replace))
+        return rc, 'late deployment result'
+
+    monkeypatch.setattr('greatminds.cli.stand_executor.dispatch_profile', dispatch)
+    with pytest.raises(GreatMindsError, match='lease changed during deployment'):
+        stand.deploy_lease(coord, lease_id='L1')
+    assert ss.read_stand_state(coord) == expected
+
+
+def test_concurrent_deployment_refused_before_external_execution(tmp_path, monkeypatch):
+    from greatminds.core.storage import file_lock
+    coord = tmp_path / 'coordination'
+    _prepare(coord)
+    _patch(monkeypatch, rc=0)
+    def unexpected(*args, **kwargs):
+        pytest.fail('a second external deployment was started')
+    monkeypatch.setattr('greatminds.cli.stand_executor.dispatch_profile', unexpected)
+    with file_lock(coord / '.stand/deployment.lock', label='test'):
+        with pytest.raises(GreatMindsError, match='stand deployment is being transitioned'):
+            stand.deploy_lease(coord, lease_id='L1')
+    assert _state(coord)['state'] == 'preparing'

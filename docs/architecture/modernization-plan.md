@@ -654,6 +654,23 @@ M2 completed mixed pipeline and scoped CLI checkpoint:
 - Full regression: 1834 passed, 2 skipped. The whole modernization plan remains
   active; one completed local task does not establish every harness/role policy.
 
+M3/M4 stand durability preparation:
+
+- Stand state now uses the shared atomic publication primitive and a stable lock
+  inode. Fault tests cover failed serialization/replacement and process death;
+  concurrent writers and unlocked readers retain complete state and updates.
+- A project deployment lock serializes operator/coordinator execution. Late
+  success, failure, and stale-source results cannot overwrite another lease.
+  Coordinator retry exhaustion rechecks ownership, and lock contention does not
+  consume retries or force an active deployment down.
+- Full regression: 1845 passed, 2 skipped. Additional coordinator retry guards
+  passed the 12-test deployment/routing regression; fault and deployment tests
+  passed all 23 cases, documentation all 8. Installed-wheel state/exclusion smoke
+  passed. No external deployment or live state migration was performed.
+- Next stand work: durable deployment intent and child identity/recovery, followed
+  by ACP daemon scheduling and expired dead-holder lease reclamation. Do not infer
+  exactly-once external execution from the deployment lock.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility

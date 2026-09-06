@@ -77,3 +77,28 @@ def test_noop_when_not_preparing(tmp_path, monkeypatch):
                         lambda *a, **k: called.append(1) or (0, ""))
     assert cd._maybe_auto_deploy_stand(coord, False, run_async=False) is False
     assert not called
+
+
+def test_busy_deployment_does_not_consume_retries_or_take_stand_down(tmp_path, monkeypatch):
+    from greatminds.core.storage import file_lock
+    coord = _preparing(tmp_path)
+    monkeypatch.setattr(cd, '_escalate_to_maintainer', lambda *a, **k: pytest.fail('busy is not failure'))
+    with file_lock(coord / '.stand/deployment.lock', label='operator deployment'):
+        for _ in range(cd.DEPLOY_MAX_ATTEMPTS + 1):
+            cd._maybe_auto_deploy_stand(coord, False, run_async=False)
+    assert 'L1' not in cd._DEPLOY_ATTEMPTS
+    assert _state(coord)['state'] == 'preparing'
+
+
+def test_retry_exhaustion_cannot_clear_replacement_lease(tmp_path, monkeypatch):
+    from greatminds.cli import stand_state as ss
+    coord = _preparing(tmp_path)
+    cd._DEPLOY_ATTEMPTS['L1'] = cd.DEPLOY_MAX_ATTEMPTS - 1
+    monkeypatch.setattr(cd, '_escalate_to_maintainer', lambda *a, **k: None)
+    def replace_then_fail(*args, **kwargs):
+        ss.update_stand_state(coord, lambda s: s['active_lease'].update(lease_id='L2'))
+        raise RuntimeError('late failure')
+    monkeypatch.setattr('greatminds.cli.stand.deploy_lease', replace_then_fail)
+    cd._maybe_auto_deploy_stand(coord, False, run_async=False)
+    assert _state(coord)['state'] == 'preparing'
+    assert _state(coord)['active_lease']['lease_id'] == 'L2'

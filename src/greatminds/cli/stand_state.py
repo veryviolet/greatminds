@@ -29,19 +29,13 @@ Singleton stand resource per project. State lives in
         lease_id: <uuid|null>
         reason: <string|null>
 
-Phase 1 (this module) is read-only from the operator's POV — the
-mutating CLI (``stand lease`` / ``stand release``) lands in 0244.
-But the IO helpers below already support write-with-fcntl for use
-by 0244 + tests.
-
-Mutations always: open(fd, O_RDWR | O_CREAT) → fcntl.LOCK_EX →
-read → mutate dict → seek 0 + truncate + write → fsync → unlock.
-The lock guards against TOCTOU races between concurrent agents.
+Writers hold a separate stable lock inode and atomically replace the state
+file after syncing its contents. Readers see a complete old or new snapshot.
+All writers on a project must use this protocol; stop older daemons before
+upgrading a live project.
 """
 from __future__ import annotations
 
-import fcntl
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -49,6 +43,7 @@ from typing import Any, Callable
 import yaml
 
 from greatminds.core.errors import GreatMindsError
+from greatminds.core.storage import atomic_bytes, file_lock
 
 
 STAND_STATE_DIR = ".stand"
@@ -112,69 +107,23 @@ def read_stand_state(coord: Path) -> dict[str, Any]:
 
 def update_stand_state(coord: Path,
                        mutator: Callable[[dict[str, Any]], None]) -> dict[str, Any]:
-    """0243: read-modify-write the state file under fcntl.LOCK_EX.
+    """Serialize writers on a stable lock and publish a complete snapshot.
 
-    ``mutator`` receives the current state dict and mutates it in
-    place (must return None or the mutated dict). Lock acquisition
-    is blocking so two concurrent CLI invocations serialize
-    deterministically.
-
-    Returns the post-mutation state for the caller's convenience.
+    A failed mutator or pre-replacement write leaves the previous state intact.
+    Never unlink the lock: queued writers must retain the same inode.
     """
     sp = state_file_path(coord)
-    sp.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(sp, os.O_RDWR | os.O_CREAT, 0o644)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        try:
-            os.lseek(fd, 0, os.SEEK_SET)
-            existing_bytes = b""
-            while True:
-                chunk = os.read(fd, 65536)
-                if not chunk:
-                    break
-                existing_bytes += chunk
-            if existing_bytes:
-                try:
-                    doc = yaml.safe_load(existing_bytes.decode("utf-8")) or {}
-                except yaml.YAMLError as exc:
-                    raise GreatMindsError(
-                        f"stand state file parse: {exc}"
-                    )
-                if not isinstance(doc, dict):
-                    raise GreatMindsError(
-                        "stand state file: top-level must be mapping"
-                    )
-            else:
-                doc = {}
-            base = _empty_state()
-            base.update(doc)
-            if not isinstance(base.get("queue"), list):
-                base["queue"] = []
-            if not isinstance(base.get("history"), list):
-                base["history"] = []
-
-            ret = mutator(base)
-            new_state = ret if isinstance(ret, dict) else base
-
-            if new_state.get("state") not in VALID_STATES:
-                raise GreatMindsError(
-                    f"stand state: {new_state.get('state')!r} not in "
-                    f"{list(VALID_STATES)}"
-                )
-
-            # Truncate before write (file may shrink).
-            os.ftruncate(fd, 0)
-            os.lseek(fd, 0, os.SEEK_SET)
-            payload = yaml.safe_dump(new_state, sort_keys=False,
-                                     allow_unicode=True)
-            os.write(fd, payload.encode("utf-8"))
-            os.fsync(fd)
-            return new_state
-        finally:
-            fcntl.flock(fd, fcntl.LOCK_UN)
-    finally:
-        os.close(fd)
+    with file_lock(sp.parent / "state.lock", label="stand state"):
+        base = read_stand_state(coord)
+        ret = mutator(base)
+        new_state = ret if isinstance(ret, dict) else base
+        if new_state.get("state") not in VALID_STATES:
+            raise GreatMindsError(
+                f"stand state: {new_state.get('state')!r} not in {list(VALID_STATES)}"
+            )
+        payload = yaml.safe_dump(new_state, sort_keys=False, allow_unicode=True)
+        atomic_bytes(sp, payload.encode("utf-8"))
+        return new_state
 
 
 def now_iso() -> str:

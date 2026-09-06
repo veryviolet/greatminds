@@ -878,6 +878,17 @@ def stale_verified_deps_for_lease(
 def deploy_lease(coord: Path, *, lease_id: str | None = None,
                  ansible_playbook: str | None = None,
                  timeout_seconds: float | None = None) -> tuple[int, str]:
+    """Run at most one deployment per project, including operator invocations."""
+    from greatminds.core.storage import file_lock
+    with file_lock(coord / ".stand" / "deployment.lock", label="stand deployment", timeout=0):
+        return _deploy_lease_locked(coord, lease_id=lease_id,
+                                    ansible_playbook=ansible_playbook,
+                                    timeout_seconds=timeout_seconds)
+
+
+def _deploy_lease_locked(coord: Path, *, lease_id: str | None = None,
+                 ansible_playbook: str | None = None,
+                 timeout_seconds: float | None = None) -> tuple[int, str]:
     """Deterministic, sanctioned deploy of the active lease's profile.
 
     The single deploy path (1.6.0): load the active lease's YAML/ansible
@@ -912,6 +923,17 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
 
     ss.update_stand_state(coord, _read)
 
+    def require_same_lease(state):
+        # Another operator may release/reclaim/down the stand while the
+        # external deployment is running. Its late result belongs only to
+        # the exact lease snapshot captured before execution.
+        if state.get("state") != "preparing" or state.get("active_lease") != cap:
+            raise GreatMindsError(
+                "stand lease changed during deployment; result cannot update "
+                "the current stand. Inspect the deployment target before retrying",
+                exit_code=4,
+            )
+
     # 0388: refuse to deploy a STALE lease worktree — one missing the
     # verified-dependency code the leasing task was blocked on. Without
     # this, a resumed review_session redeploys its old base commit and
@@ -942,6 +964,7 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
         )
 
         def _down_stale(state):
+            require_same_lease(state)
             prev = state.get("state") or "preparing"
             state["down_reason"] = reason
             state["active_lease"] = None
@@ -1018,6 +1041,7 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
         ready_cap: dict[str, Any] = {}
 
         def _ready(state):
+            require_same_lease(state)
             active = state.get("active_lease") or {}
             active["ready_at"] = ss.now_iso()
             ready_cap["holder"] = active.get("holder_role", "")
@@ -1038,6 +1062,7 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
         reason = f"deploy rc={rc}: {(log or '').strip()[:400]}"
 
         def _down(state):
+            require_same_lease(state)
             prev = state.get("state") or "preparing"
             state["down_reason"] = reason
             state["active_lease"] = None
