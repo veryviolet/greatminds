@@ -42,6 +42,46 @@ function terminal(name, command) {
   return term;
 }
 
+function chatTerminal(conversationId) {
+  if (typeof conversationId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/.test(conversationId)) {
+    throw new Error("Invalid conversation identity from CLI");
+  }
+  const root = workspaceRoot();
+  const term = vscode.window.createTerminal({
+    name: `greatminds chat ${conversationId.slice(0, 8)}`, cwd: root,
+    shellPath: cliPath(), shellArgs: ["chat", "--project-dir", root, "talk", conversationId],
+    env: { GREATMINDS_PROJECT_DIR: root }
+  });
+  term.show();
+  return term;
+}
+
+async function chatRows(action) {
+  const { stdout } = await runGreatminds(["chat", "--project-dir", workspaceRoot(), action]);
+  const rows = JSON.parse(stdout);
+  if (!Array.isArray(rows)) throw new Error("Invalid chat metadata from CLI");
+  return rows;
+}
+
+async function selectConversation() {
+  const rows = await chatRows("list");
+  return vscode.window.showQuickPick(rows.filter(row => !row.closed).map(row => ({
+    label: row.binding_id, description: row.id,
+    detail: `${row.task_id || "Project conversation"} · ${row.dispatch?.status || "queued"}`,
+    conversationId: row.id
+  })), { placeHolder: "Choose a daemon-owned conversation" });
+}
+
+function chatCommand(output, action) {
+  return async () => {
+    try { await action(); }
+    catch (error) {
+      output.appendLine(`chat failed: ${error.stderr || error.message}`);
+      output.show(true);
+    }
+  };
+}
+
 class AgentToolsProvider {
   constructor(output) {
     this.output = output;
@@ -93,6 +133,30 @@ function activate(context) {
     vscode.commands.registerCommand("greatminds.openDashboard", () => terminal("greatminds dashboard", `${cliPath()} dashboard`)),
     vscode.commands.registerCommand("greatminds.openDrivenLog", () => terminal("greatminds driven-log", `${cliPath()} driven-log`)),
     vscode.commands.registerCommand("greatminds.openCoordd", () => terminal("greatminds coordd", `${cliPath()} coordd --verbose`)),
+    vscode.commands.registerCommand("greatminds.newChat", chatCommand(output, async () => {
+      const rows = await chatRows("bindings");
+      const selected = await vscode.window.showQuickPick(rows.map(row => ({
+        label: row.role, description: `${row.id} · ${row.agent}`, bindingId: row.id
+      })), { placeHolder: "Choose a role binding for ACP chat" });
+      if (!selected) return;
+      const task = await vscode.window.showInputBox({ prompt: "Optional exact task ID; leave empty for a project conversation" });
+      if (task === undefined) return;
+      const args = ["chat", "--project-dir", workspaceRoot(), "create", selected.bindingId];
+      if (task.trim()) args.push("--task", task.trim());
+      const { stdout } = await runGreatminds(args);
+      chatTerminal(JSON.parse(stdout).conversation_id);
+    })),
+    vscode.commands.registerCommand("greatminds.attachChat", chatCommand(output, async () => {
+      const selected = await selectConversation();
+      if (selected) chatTerminal(selected.conversationId);
+    })),
+    vscode.commands.registerCommand("greatminds.closeChat", chatCommand(output, async () => {
+      const selected = await selectConversation();
+      if (!selected) return;
+      const { stdout } = await runGreatminds(["chat", "--project-dir", workspaceRoot(), "close", selected.conversationId]);
+      output.appendLine(stdout.trimEnd());
+      output.show(true);
+    })),
     vscode.commands.registerCommand("greatminds.showAgentTools", async () => {
       const { stdout } = await runGreatminds(["agent", "tools"]);
       output.appendLine(stdout.trimEnd());

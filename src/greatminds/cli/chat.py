@@ -102,6 +102,31 @@ def create(context, binding_id, task_id):
     click.echo(json.dumps({'conversation_id': store.id, 'binding_id': binding.id}))
 
 
+@chat.command('bindings')
+@click.pass_obj
+def bindings(context):
+    """List configured role bindings for interactive clients, without launching agents."""
+    schema = load_schema_snapshot()
+    config = load_execution_config(context['project']/'coordination/execution.yaml',
+                                   roles=set(schema.document['roles']))
+    click.echo(json.dumps([{'id': b.id, 'role': b.role, 'agent': b.agent, 'model': b.model,
+                           'workspace': b.workspace} for b in config.bindings], ensure_ascii=False))
+
+
+@chat.command('list')
+@click.pass_obj
+def list_conversations(context):
+    """List conversation metadata; prompt text and provider output are excluded."""
+    rows = []
+    for path in sorted((context['runtime']/'.runtime/conversations').glob('*/state.json')):
+        document = ConversationStore(context['runtime'], path.parent.name).snapshot()
+        rows.append({'id': document['id'], 'binding_id': document['binding_id'],
+                     'task_id': (document.get('task') or {}).get('task_id'),
+                     'closed': document['closed'], 'close_requested': document.get('close_requested', False),
+                     'dispatch': document.get('dispatch'), 'turn_count': len(document['turns'])})
+    click.echo(json.dumps(rows, ensure_ascii=False))
+
+
 @chat.command('send')
 @click.argument('conversation_id')
 @click.option('--message', required=True)

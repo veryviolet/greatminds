@@ -661,5 +661,11 @@ client can enqueue further messages or use `chat interrupt`; talk waits for queu
 work before asking for its next message. Terminal control characters in user and
 assistant text are escaped rather than executed, including across stream chunks.
 
-Richer non-permission input, VS Code integration, and real
-interactive harness validation remain outstanding M5 work.
+`chat bindings` and `chat list` expose metadata for interface clients without
+launching agents or including message contents. The VS Code extension uses these
+commands for New ACP Chat, Attach ACP Chat, and Close ACP Chat. Its terminal runs
+the same `chat talk` client. The daemon remains the process/session owner when an
+editor terminal closes or reconnects.
+
+Richer non-permission input, real extension-host smoke testing, and live interactive
+harness validation remain outstanding M5 work.

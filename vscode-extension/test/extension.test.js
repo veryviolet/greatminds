@@ -7,7 +7,8 @@ const test = require("node:test");
 
 const extensionPath = path.resolve(__dirname, "..", "extension.js");
 
-function loadExtension({ execImpl, workspace = "/tmp/greatminds-project" } = {}) {
+function loadExtension({ execImpl, workspace = "/tmp/greatminds-project", configuredCli = "greatminds-test",
+                         pick = rows => rows[0], taskInput = "" } = {}) {
   delete require.cache[extensionPath];
   const childProcess = require("node:child_process");
   const originalExecFile = childProcess.execFile;
@@ -21,10 +22,12 @@ function loadExtension({ execImpl, workspace = "/tmp/greatminds-project" } = {})
       workspaceFolders: [{ uri: { fsPath: workspace } }],
       getConfiguration(section) {
         assert.equal(section, "greatminds");
-        return { get(name) { return name === "cliPath" ? "greatminds-test" : undefined; } };
+        return { get(name) { return name === "cliPath" ? configuredCli : undefined; } };
       }
     },
     window: {
+      async showQuickPick(rows) { return pick(rows); },
+      async showInputBox() { return taskInput; },
       createOutputChannel(name) {
         assert.equal(name, "greatminds");
         return output;
@@ -160,4 +163,63 @@ test("activate registers cockpit commands and opens terminals", async () => {
   } finally {
     harness.cleanup();
   }
+});
+
+test("new ACP chat passes task and workspace as argv and launches only the CLI client", async () => {
+  const calls = [];
+  const root = "/tmp/project with spaces $(literal)";
+  const harness = loadExtension({ workspace: root, configuredCli: "/tmp/cli with spaces", taskInput: "0001-work",
+    execImpl(cmd, args, _options, cb) {
+      calls.push({cmd, args});
+      if (args.includes("bindings")) cb(null, JSON.stringify([{id:"dev",role:"DEVELOPER",agent:"fixture"}]), "");
+      else if (args.includes("create")) cb(null, JSON.stringify({conversation_id:"conversation-1"}), "");
+      else cb(null, "[]", "");
+    }
+  });
+  try {
+    harness.extension.activate({subscriptions: harness.subscriptions});
+    await harness.commands.get("greatminds.newChat")();
+    assert.deepEqual(calls.find(c => c.args.includes("create")).args,
+      ["chat", "--project-dir", root, "create", "dev", "--task", "0001-work"]);
+    assert.equal(harness.terminals.length, 1);
+    assert.equal(harness.terminals[0].opts.shellPath, "/tmp/cli with spaces");
+    assert.deepEqual(harness.terminals[0].opts.shellArgs, ["chat", "--project-dir", root, "talk", "conversation-1"]);
+    assert.deepEqual(harness.terminals[0].sent, []);
+  } finally { harness.cleanup(); }
+});
+
+test("attach and close use existing conversation identity without recreating a session", async () => {
+  const calls = [];
+  const harness = loadExtension({execImpl(_cmd,args,_options,cb) {
+    calls.push(args);
+    if (args.includes("list")) cb(null, JSON.stringify([
+      {id:"closed",binding_id:"dev",closed:true},
+      {id:"existing",binding_id:"dev",closed:false,task_id:"0001-work"}
+    ]), "");
+    else cb(null, args.includes("close") ? '{"close_requested":true}' : "[]", "");
+  }});
+  try {
+    harness.extension.activate({subscriptions:harness.subscriptions});
+    await harness.commands.get("greatminds.attachChat")();
+    assert.equal(harness.terminals[0].opts.shellArgs.at(-1), "existing");
+    await harness.commands.get("greatminds.closeChat")();
+    assert.deepEqual(calls.find(args => args.includes("close")),
+      ["chat","--project-dir","/tmp/greatminds-project","close","existing"]);
+    assert.equal(harness.terminals.length, 1);
+    assert.ok(!calls.some(args => args.includes("create")));
+    assert.match(harness.output.lines.join("\n"), /close_requested/);
+  } finally { harness.cleanup(); }
+});
+
+test("cancelled role selection performs no create and no terminal launch", async () => {
+  const calls=[];
+  const harness=loadExtension({pick:()=>undefined,execImpl(_cmd,args,_opts,cb) {
+    calls.push(args);cb(null,"[]","");
+  }});
+  try {
+    harness.extension.activate({subscriptions:harness.subscriptions});
+    await harness.commands.get("greatminds.newChat")();
+    assert.equal(harness.terminals.length,0);
+    assert.ok(!calls.some(args=>args.includes("create")));
+  } finally { harness.cleanup(); }
 });

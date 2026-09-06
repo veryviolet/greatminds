@@ -22,7 +22,10 @@
     "onCommand:greatminds.openDrivenLog",
     "onCommand:greatminds.openCoordd",
     "onCommand:greatminds.showAgentTools",
-    "onCommand:greatminds.showStandStatus"
+    "onCommand:greatminds.showStandStatus",
+    "onCommand:greatminds.newChat",
+    "onCommand:greatminds.attachChat",
+    "onCommand:greatminds.closeChat"
   ],
   "main": "./extension.js",
   "contributes": {
@@ -50,6 +53,18 @@
       {
         "command": "greatminds.showStandStatus",
         "title": "greatminds: Show Stand Status"
+      },
+      {
+        "command": "greatminds.newChat",
+        "title": "greatminds: New ACP Chat"
+      },
+      {
+        "command": "greatminds.attachChat",
+        "title": "greatminds: Attach ACP Chat"
+      },
+      {
+        "command": "greatminds.closeChat",
+        "title": "greatminds: Close ACP Chat"
       }
     ],
     "viewsContainers": {

@@ -901,6 +901,24 @@ M5 task-bound conversation checkpoint:
 - Next: richer input events and real interactive harness coverage, then VS Code
   integration, default migration/removal of legacy paths, and remaining M3/M7.
 
+M5 VS Code ACP conversation integration checkpoint:
+
+- Added read-only `chat bindings/list` metadata for interface clients; message
+  contents stay in the private conversation journal. The extension selects a role
+  binding and optional exact task ID, creates or attaches an existing conversation,
+  and opens the shared terminal client using an executable/argument array.
+- Close ACP Chat uses the daemon close command. Terminal closure only detaches;
+  no native harness TUI or additional transport is introduced. Command errors are
+  shown in the extension output. Existing cockpit commands remain until M6.
+- Node syntax and mocked extension tests passed, covering task/role selection,
+  paths containing spaces, existing-session attachment, close, and cancellation.
+  Actual graphical extension-host acceptance remains open.
+  CLI metadata/terminal/task regression: 11 passed; documentation: 8 passed.
+  Installed-wheel binding/create/list metadata smoke passed without creating any
+  agent run; private message contents are absent from the interface listings.
+- Next: remaining interactive harness/input checks and M6 default migration,
+  alongside the outstanding deterministic maintenance and product improvements.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility
