@@ -1,0 +1,1014 @@
+{
+  "version": 1,
+  "date": "2026-09-06",
+  "client_sdk": "0.11.1",
+  "scenarios": {
+    "resume": "Close process, start new process in same workspace, load session, repeat exact-response prompt",
+    "history": "Remember synthetic token in first prompt; after process restart/load, recall it without including token in second prompt",
+    "cancel": "Request finite long numeric response; cancel 0.1 seconds after first nonempty assistant text; require cancelled stop reason"
+  },
+  "records": [
+    {
+      "harness": "codex",
+      "stage": "resume",
+      "version": 1,
+      "inference": true,
+      "tested_at": "2026-09-06T14:58:37.459139+00:00",
+      "assistant_bytes": 12,
+      "tool_calls": 0,
+      "permission_requests": 0,
+      "status": "resume_ok",
+      "protocol_version": 1,
+      "agent_info": {
+        "name": "@agentclientprotocol/codex-acp",
+        "title": "Codex",
+        "version": "1.10.0"
+      },
+      "capabilities": {
+        "load_session": true,
+        "prompt_capabilities": {
+          "image": true,
+          "audio": false,
+          "embedded_context": true
+        },
+        "mcp_capabilities": {
+          "http": true,
+          "sse": false,
+          "acp": false
+        },
+        "session_capabilities": {
+          "list": {},
+          "delete": {},
+          "additional_directories": {},
+          "fork": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {
+          "logout": {}
+        },
+        "providers": {},
+        "nes": null,
+        "position_encoding": null
+      },
+      "auth_methods": [
+        "api-key",
+        "chat-gpt"
+      ],
+      "session_created": true,
+      "session_modes": [
+        "read-only",
+        "agent",
+        "agent-full-access"
+      ],
+      "config_categories": [
+        "mode",
+        "collaboration_mode",
+        "model",
+        "thought_level",
+        "model_config"
+      ],
+      "model_choices": [
+        "gpt-6-astra",
+        "gpt-5.6-sol",
+        "gpt-5.6-terra",
+        "gpt-5.6-luna",
+        "gpt-5.5",
+        "gpt-5.4-mini",
+        "gpt-5.3-codex-spark"
+      ],
+      "selected_model": null,
+      "selected_mode": null,
+      "stop_reason": "end_turn",
+      "expected_text_matches": true,
+      "assistant_sha256": "84882ae3280706753084fb4186e501165d625a95930a93426676f27570a79679",
+      "process_exited": true,
+      "resume": {
+        "version": 1,
+        "inference": true,
+        "tested_at": "2026-09-06T14:58:45.232070+00:00",
+        "assistant_bytes": 12,
+        "tool_calls": 0,
+        "permission_requests": 0,
+        "status": "prompt_ok",
+        "protocol_version": 1,
+        "agent_info": {
+          "name": "@agentclientprotocol/codex-acp",
+          "title": "Codex",
+          "version": "1.10.0"
+        },
+        "capabilities": {
+          "load_session": true,
+          "prompt_capabilities": {
+            "image": true,
+            "audio": false,
+            "embedded_context": true
+          },
+          "mcp_capabilities": {
+            "http": true,
+            "sse": false,
+            "acp": false
+          },
+          "session_capabilities": {
+            "list": {},
+            "delete": {},
+            "additional_directories": {},
+            "fork": {},
+            "resume": {},
+            "close": {}
+          },
+          "auth": {
+            "logout": {}
+          },
+          "providers": {},
+          "nes": null,
+          "position_encoding": null
+        },
+        "auth_methods": [
+          "api-key",
+          "chat-gpt"
+        ],
+        "session_created": true,
+        "session_modes": [
+          "read-only",
+          "agent",
+          "agent-full-access"
+        ],
+        "config_categories": [
+          "mode",
+          "collaboration_mode",
+          "model",
+          "thought_level",
+          "model_config"
+        ],
+        "model_choices": [
+          "gpt-6-astra",
+          "gpt-5.6-sol",
+          "gpt-5.6-terra",
+          "gpt-5.6-luna",
+          "gpt-5.5",
+          "gpt-5.4-mini",
+          "gpt-5.3-codex-spark"
+        ],
+        "selected_model": null,
+        "selected_mode": null,
+        "stop_reason": "end_turn",
+        "expected_text_matches": true,
+        "assistant_sha256": "84882ae3280706753084fb4186e501165d625a95930a93426676f27570a79679",
+        "process_exited": true
+      }
+    },
+    {
+      "harness": "claude",
+      "stage": "resume",
+      "version": 1,
+      "inference": true,
+      "tested_at": "2026-09-06T14:58:49.526249+00:00",
+      "assistant_bytes": 12,
+      "tool_calls": 0,
+      "permission_requests": 0,
+      "status": "resume_ok",
+      "protocol_version": 1,
+      "agent_info": {
+        "name": "@agentclientprotocol/claude-agent-acp",
+        "title": "Claude Agent",
+        "version": "0.75.1"
+      },
+      "capabilities": {
+        "load_session": true,
+        "prompt_capabilities": {
+          "image": true,
+          "audio": false,
+          "embedded_context": true
+        },
+        "mcp_capabilities": {
+          "http": true,
+          "sse": true,
+          "acp": false
+        },
+        "session_capabilities": {
+          "list": {},
+          "delete": {},
+          "additional_directories": {},
+          "fork": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {
+          "logout": {}
+        },
+        "providers": {},
+        "nes": null,
+        "position_encoding": null
+      },
+      "auth_methods": [],
+      "session_created": true,
+      "session_modes": [
+        "default",
+        "acceptEdits",
+        "plan",
+        "auto",
+        "bypassPermissions"
+      ],
+      "config_categories": [
+        "mode",
+        "model",
+        "thought_level",
+        "model_config"
+      ],
+      "model_choices": [
+        "default",
+        "opus[1m]",
+        "claude-fable-5-1[1m]",
+        "sonnet",
+        "haiku"
+      ],
+      "selected_model": null,
+      "selected_mode": null,
+      "stop_reason": "end_turn",
+      "expected_text_matches": true,
+      "assistant_sha256": "84882ae3280706753084fb4186e501165d625a95930a93426676f27570a79679",
+      "process_exited": true,
+      "resume": {
+        "version": 1,
+        "inference": true,
+        "tested_at": "2026-09-06T14:58:55.441366+00:00",
+        "assistant_bytes": 12,
+        "tool_calls": 0,
+        "permission_requests": 0,
+        "status": "prompt_ok",
+        "protocol_version": 1,
+        "agent_info": {
+          "name": "@agentclientprotocol/claude-agent-acp",
+          "title": "Claude Agent",
+          "version": "0.75.1"
+        },
+        "capabilities": {
+          "load_session": true,
+          "prompt_capabilities": {
+            "image": true,
+            "audio": false,
+            "embedded_context": true
+          },
+          "mcp_capabilities": {
+            "http": true,
+            "sse": true,
+            "acp": false
+          },
+          "session_capabilities": {
+            "list": {},
+            "delete": {},
+            "additional_directories": {},
+            "fork": {},
+            "resume": {},
+            "close": {}
+          },
+          "auth": {
+            "logout": {}
+          },
+          "providers": {},
+          "nes": null,
+          "position_encoding": null
+        },
+        "auth_methods": [],
+        "session_created": true,
+        "session_modes": [
+          "default",
+          "acceptEdits",
+          "plan",
+          "auto",
+          "bypassPermissions"
+        ],
+        "config_categories": [
+          "mode",
+          "model",
+          "thought_level",
+          "model_config"
+        ],
+        "model_choices": [
+          "default",
+          "opus[1m]",
+          "claude-fable-5-1[1m]",
+          "sonnet",
+          "haiku"
+        ],
+        "selected_model": null,
+        "selected_mode": null,
+        "stop_reason": "end_turn",
+        "expected_text_matches": true,
+        "assistant_sha256": "84882ae3280706753084fb4186e501165d625a95930a93426676f27570a79679",
+        "process_exited": true
+      }
+    },
+    {
+      "harness": "grok",
+      "stage": "resume",
+      "version": 1,
+      "inference": true,
+      "tested_at": "2026-09-06T14:59:01.449827+00:00",
+      "assistant_bytes": 12,
+      "tool_calls": 0,
+      "permission_requests": 0,
+      "status": "resume_ok",
+      "protocol_version": 1,
+      "agent_info": null,
+      "capabilities": {
+        "load_session": true,
+        "prompt_capabilities": {
+          "image": false,
+          "audio": false,
+          "embedded_context": true
+        },
+        "mcp_capabilities": {
+          "http": true,
+          "sse": true,
+          "acp": false
+        },
+        "session_capabilities": {
+          "list": {},
+          "delete": null,
+          "additional_directories": null,
+          "fork": null,
+          "resume": {},
+          "close": {}
+        },
+        "auth": {
+          "logout": null
+        },
+        "providers": null,
+        "nes": null,
+        "position_encoding": null
+      },
+      "auth_methods": [
+        "cached_token",
+        "grok.com"
+      ],
+      "session_created": true,
+      "session_modes": [],
+      "config_categories": [],
+      "model_choices": [],
+      "selected_model": null,
+      "selected_mode": null,
+      "stop_reason": "end_turn",
+      "expected_text_matches": true,
+      "assistant_sha256": "84882ae3280706753084fb4186e501165d625a95930a93426676f27570a79679",
+      "process_exited": true,
+      "resume": {
+        "version": 1,
+        "inference": true,
+        "tested_at": "2026-09-06T14:59:07.373698+00:00",
+        "assistant_bytes": 12,
+        "tool_calls": 0,
+        "permission_requests": 0,
+        "status": "prompt_ok",
+        "protocol_version": 1,
+        "agent_info": null,
+        "capabilities": {
+          "load_session": true,
+          "prompt_capabilities": {
+            "image": false,
+            "audio": false,
+            "embedded_context": true
+          },
+          "mcp_capabilities": {
+            "http": true,
+            "sse": true,
+            "acp": false
+          },
+          "session_capabilities": {
+            "list": {},
+            "delete": null,
+            "additional_directories": null,
+            "fork": null,
+            "resume": {},
+            "close": {}
+          },
+          "auth": {
+            "logout": null
+          },
+          "providers": null,
+          "nes": null,
+          "position_encoding": null
+        },
+        "auth_methods": [
+          "cached_token",
+          "grok.com"
+        ],
+        "session_created": true,
+        "session_modes": [],
+        "config_categories": [],
+        "model_choices": [],
+        "selected_model": null,
+        "selected_mode": null,
+        "stop_reason": "end_turn",
+        "expected_text_matches": true,
+        "assistant_sha256": "84882ae3280706753084fb4186e501165d625a95930a93426676f27570a79679",
+        "process_exited": true
+      }
+    },
+    {
+      "harness": "codex",
+      "stage": "history",
+      "version": 1,
+      "inference": true,
+      "tested_at": "2026-09-06T15:05:43.044570+00:00",
+      "assistant_bytes": 5,
+      "tool_calls": 0,
+      "permission_requests": 0,
+      "status": "resume_ok",
+      "protocol_version": 1,
+      "agent_info": {
+        "name": "@agentclientprotocol/codex-acp",
+        "title": "Codex",
+        "version": "1.10.0"
+      },
+      "capabilities": {
+        "load_session": true,
+        "prompt_capabilities": {
+          "image": true,
+          "audio": false,
+          "embedded_context": true
+        },
+        "mcp_capabilities": {
+          "http": true,
+          "sse": false,
+          "acp": false
+        },
+        "session_capabilities": {
+          "list": {},
+          "delete": {},
+          "additional_directories": {},
+          "fork": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {
+          "logout": {}
+        },
+        "providers": {},
+        "nes": null,
+        "position_encoding": null
+      },
+      "auth_methods": [
+        "api-key",
+        "chat-gpt"
+      ],
+      "session_created": true,
+      "session_modes": [
+        "read-only",
+        "agent",
+        "agent-full-access"
+      ],
+      "config_categories": [
+        "mode",
+        "collaboration_mode",
+        "model",
+        "thought_level",
+        "model_config"
+      ],
+      "model_choices": [
+        "gpt-6-astra",
+        "gpt-5.6-sol",
+        "gpt-5.6-terra",
+        "gpt-5.6-luna",
+        "gpt-5.5",
+        "gpt-5.4-mini",
+        "gpt-5.3-codex-spark"
+      ],
+      "selected_model": "gpt-6-astra",
+      "selected_mode": "read-only",
+      "stop_reason": "end_turn",
+      "expected_text_matches": true,
+      "assistant_sha256": "d10036cce39b0c2bfb70d5d1618f5806ddd2b0be75dd1b3656831f36b0db94bf",
+      "process_exited": true,
+      "resume": {
+        "version": 1,
+        "inference": true,
+        "tested_at": "2026-09-06T15:06:03.892097+00:00",
+        "assistant_bytes": 11,
+        "tool_calls": 0,
+        "permission_requests": 0,
+        "status": "prompt_ok",
+        "protocol_version": 1,
+        "agent_info": {
+          "name": "@agentclientprotocol/codex-acp",
+          "title": "Codex",
+          "version": "1.10.0"
+        },
+        "capabilities": {
+          "load_session": true,
+          "prompt_capabilities": {
+            "image": true,
+            "audio": false,
+            "embedded_context": true
+          },
+          "mcp_capabilities": {
+            "http": true,
+            "sse": false,
+            "acp": false
+          },
+          "session_capabilities": {
+            "list": {},
+            "delete": {},
+            "additional_directories": {},
+            "fork": {},
+            "resume": {},
+            "close": {}
+          },
+          "auth": {
+            "logout": {}
+          },
+          "providers": {},
+          "nes": null,
+          "position_encoding": null
+        },
+        "auth_methods": [
+          "api-key",
+          "chat-gpt"
+        ],
+        "session_created": true,
+        "session_modes": [
+          "read-only",
+          "agent",
+          "agent-full-access"
+        ],
+        "config_categories": [
+          "mode",
+          "collaboration_mode",
+          "model",
+          "thought_level",
+          "model_config"
+        ],
+        "model_choices": [
+          "gpt-6-astra",
+          "gpt-5.6-sol",
+          "gpt-5.6-terra",
+          "gpt-5.6-luna",
+          "gpt-5.5",
+          "gpt-5.4-mini",
+          "gpt-5.3-codex-spark"
+        ],
+        "selected_model": "gpt-6-astra",
+        "selected_mode": "read-only",
+        "stop_reason": "end_turn",
+        "expected_text_matches": true,
+        "assistant_sha256": "0fcb9a4ee5e323d428fc8f346f240c5f17fec87911ae0e585bd36786d3400aca",
+        "process_exited": true
+      }
+    },
+    {
+      "harness": "claude",
+      "stage": "history",
+      "version": 1,
+      "inference": true,
+      "tested_at": "2026-09-06T15:05:43.067992+00:00",
+      "assistant_bytes": 5,
+      "tool_calls": 0,
+      "permission_requests": 0,
+      "status": "resume_ok",
+      "protocol_version": 1,
+      "agent_info": {
+        "name": "@agentclientprotocol/claude-agent-acp",
+        "title": "Claude Agent",
+        "version": "0.75.1"
+      },
+      "capabilities": {
+        "load_session": true,
+        "prompt_capabilities": {
+          "image": true,
+          "audio": false,
+          "embedded_context": true
+        },
+        "mcp_capabilities": {
+          "http": true,
+          "sse": true,
+          "acp": false
+        },
+        "session_capabilities": {
+          "list": {},
+          "delete": {},
+          "additional_directories": {},
+          "fork": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {
+          "logout": {}
+        },
+        "providers": {},
+        "nes": null,
+        "position_encoding": null
+      },
+      "auth_methods": [],
+      "session_created": true,
+      "session_modes": [
+        "default",
+        "acceptEdits",
+        "plan",
+        "auto",
+        "bypassPermissions"
+      ],
+      "config_categories": [
+        "mode",
+        "model",
+        "thought_level",
+        "model_config"
+      ],
+      "model_choices": [
+        "default",
+        "opus[1m]",
+        "claude-fable-5-1[1m]",
+        "sonnet",
+        "haiku"
+      ],
+      "selected_model": "default",
+      "selected_mode": "default",
+      "stop_reason": "end_turn",
+      "expected_text_matches": true,
+      "assistant_sha256": "d10036cce39b0c2bfb70d5d1618f5806ddd2b0be75dd1b3656831f36b0db94bf",
+      "process_exited": true,
+      "resume": {
+        "version": 1,
+        "inference": true,
+        "tested_at": "2026-09-06T15:05:50.141286+00:00",
+        "assistant_bytes": 11,
+        "tool_calls": 0,
+        "permission_requests": 0,
+        "status": "prompt_ok",
+        "protocol_version": 1,
+        "agent_info": {
+          "name": "@agentclientprotocol/claude-agent-acp",
+          "title": "Claude Agent",
+          "version": "0.75.1"
+        },
+        "capabilities": {
+          "load_session": true,
+          "prompt_capabilities": {
+            "image": true,
+            "audio": false,
+            "embedded_context": true
+          },
+          "mcp_capabilities": {
+            "http": true,
+            "sse": true,
+            "acp": false
+          },
+          "session_capabilities": {
+            "list": {},
+            "delete": {},
+            "additional_directories": {},
+            "fork": {},
+            "resume": {},
+            "close": {}
+          },
+          "auth": {
+            "logout": {}
+          },
+          "providers": {},
+          "nes": null,
+          "position_encoding": null
+        },
+        "auth_methods": [],
+        "session_created": true,
+        "session_modes": [
+          "default",
+          "acceptEdits",
+          "plan",
+          "auto",
+          "bypassPermissions"
+        ],
+        "config_categories": [
+          "mode",
+          "model",
+          "thought_level",
+          "model_config"
+        ],
+        "model_choices": [
+          "default",
+          "opus[1m]",
+          "claude-fable-5-1[1m]",
+          "sonnet",
+          "haiku"
+        ],
+        "selected_model": "default",
+        "selected_mode": "default",
+        "stop_reason": "end_turn",
+        "expected_text_matches": true,
+        "assistant_sha256": "0fcb9a4ee5e323d428fc8f346f240c5f17fec87911ae0e585bd36786d3400aca",
+        "process_exited": true
+      }
+    },
+    {
+      "harness": "grok",
+      "stage": "history",
+      "version": 1,
+      "inference": true,
+      "tested_at": "2026-09-06T15:05:43.062653+00:00",
+      "assistant_bytes": 5,
+      "tool_calls": 0,
+      "permission_requests": 0,
+      "status": "resume_ok",
+      "protocol_version": 1,
+      "agent_info": null,
+      "capabilities": {
+        "load_session": true,
+        "prompt_capabilities": {
+          "image": false,
+          "audio": false,
+          "embedded_context": true
+        },
+        "mcp_capabilities": {
+          "http": true,
+          "sse": true,
+          "acp": false
+        },
+        "session_capabilities": {
+          "list": {},
+          "delete": null,
+          "additional_directories": null,
+          "fork": null,
+          "resume": {},
+          "close": {}
+        },
+        "auth": {
+          "logout": null
+        },
+        "providers": null,
+        "nes": null,
+        "position_encoding": null
+      },
+      "auth_methods": [
+        "cached_token",
+        "grok.com"
+      ],
+      "session_created": true,
+      "session_modes": [],
+      "config_categories": [],
+      "model_choices": [],
+      "selected_model": null,
+      "selected_mode": null,
+      "stop_reason": "end_turn",
+      "expected_text_matches": true,
+      "assistant_sha256": "d10036cce39b0c2bfb70d5d1618f5806ddd2b0be75dd1b3656831f36b0db94bf",
+      "process_exited": true,
+      "resume": {
+        "version": 1,
+        "inference": true,
+        "tested_at": "2026-09-06T15:05:47.831705+00:00",
+        "assistant_bytes": 11,
+        "tool_calls": 0,
+        "permission_requests": 0,
+        "status": "prompt_ok",
+        "protocol_version": 1,
+        "agent_info": null,
+        "capabilities": {
+          "load_session": true,
+          "prompt_capabilities": {
+            "image": false,
+            "audio": false,
+            "embedded_context": true
+          },
+          "mcp_capabilities": {
+            "http": true,
+            "sse": true,
+            "acp": false
+          },
+          "session_capabilities": {
+            "list": {},
+            "delete": null,
+            "additional_directories": null,
+            "fork": null,
+            "resume": {},
+            "close": {}
+          },
+          "auth": {
+            "logout": null
+          },
+          "providers": null,
+          "nes": null,
+          "position_encoding": null
+        },
+        "auth_methods": [
+          "cached_token",
+          "grok.com"
+        ],
+        "session_created": true,
+        "session_modes": [],
+        "config_categories": [],
+        "model_choices": [],
+        "selected_model": null,
+        "selected_mode": null,
+        "stop_reason": "end_turn",
+        "expected_text_matches": true,
+        "assistant_sha256": "0fcb9a4ee5e323d428fc8f346f240c5f17fec87911ae0e585bd36786d3400aca",
+        "process_exited": true
+      }
+    },
+    {
+      "harness": "codex",
+      "stage": "cancel",
+      "version": 1,
+      "inference": true,
+      "tested_at": "2026-09-06T15:06:27.021650+00:00",
+      "assistant_bytes": 42,
+      "tool_calls": 0,
+      "permission_requests": 0,
+      "status": "cancel_ok",
+      "protocol_version": 1,
+      "agent_info": {
+        "name": "@agentclientprotocol/codex-acp",
+        "title": "Codex",
+        "version": "1.10.0"
+      },
+      "capabilities": {
+        "load_session": true,
+        "prompt_capabilities": {
+          "image": true,
+          "audio": false,
+          "embedded_context": true
+        },
+        "mcp_capabilities": {
+          "http": true,
+          "sse": false,
+          "acp": false
+        },
+        "session_capabilities": {
+          "list": {},
+          "delete": {},
+          "additional_directories": {},
+          "fork": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {
+          "logout": {}
+        },
+        "providers": {},
+        "nes": null,
+        "position_encoding": null
+      },
+      "auth_methods": [
+        "api-key",
+        "chat-gpt"
+      ],
+      "session_created": true,
+      "session_modes": [
+        "read-only",
+        "agent",
+        "agent-full-access"
+      ],
+      "config_categories": [
+        "mode",
+        "collaboration_mode",
+        "model",
+        "thought_level",
+        "model_config"
+      ],
+      "model_choices": [
+        "gpt-6-astra",
+        "gpt-5.6-sol",
+        "gpt-5.6-terra",
+        "gpt-5.6-luna",
+        "gpt-5.5",
+        "gpt-5.4-mini",
+        "gpt-5.3-codex-spark"
+      ],
+      "selected_model": null,
+      "selected_mode": null,
+      "output_before_cancel": true,
+      "cancel_sent": true,
+      "stop_reason": "cancelled",
+      "assistant_sha256": "f10d397ddb778aa47efbe9dca382412e69884a16a3a28693c2e1bd981a5767ee",
+      "process_exited": true
+    },
+    {
+      "harness": "claude",
+      "stage": "cancel",
+      "version": 1,
+      "inference": true,
+      "tested_at": "2026-09-06T15:05:56.716059+00:00",
+      "assistant_bytes": 107,
+      "tool_calls": 0,
+      "permission_requests": 0,
+      "status": "cancel_ok",
+      "protocol_version": 1,
+      "agent_info": {
+        "name": "@agentclientprotocol/claude-agent-acp",
+        "title": "Claude Agent",
+        "version": "0.75.1"
+      },
+      "capabilities": {
+        "load_session": true,
+        "prompt_capabilities": {
+          "image": true,
+          "audio": false,
+          "embedded_context": true
+        },
+        "mcp_capabilities": {
+          "http": true,
+          "sse": true,
+          "acp": false
+        },
+        "session_capabilities": {
+          "list": {},
+          "delete": {},
+          "additional_directories": {},
+          "fork": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {
+          "logout": {}
+        },
+        "providers": {},
+        "nes": null,
+        "position_encoding": null
+      },
+      "auth_methods": [],
+      "session_created": true,
+      "session_modes": [
+        "default",
+        "acceptEdits",
+        "plan",
+        "auto",
+        "bypassPermissions"
+      ],
+      "config_categories": [
+        "mode",
+        "model",
+        "thought_level",
+        "model_config"
+      ],
+      "model_choices": [
+        "default",
+        "opus[1m]",
+        "claude-fable-5-1[1m]",
+        "sonnet",
+        "haiku"
+      ],
+      "selected_model": null,
+      "selected_mode": null,
+      "output_before_cancel": true,
+      "cancel_sent": true,
+      "stop_reason": "cancelled",
+      "assistant_sha256": "51cfd743344690c92aa5e7219210935ea6c82cdff92c102418f412b135fa63aa",
+      "process_exited": true
+    },
+    {
+      "harness": "grok",
+      "stage": "cancel",
+      "version": 1,
+      "inference": true,
+      "tested_at": "2026-09-06T15:05:53.503334+00:00",
+      "assistant_bytes": 9,
+      "tool_calls": 0,
+      "permission_requests": 0,
+      "status": "cancel_ok",
+      "protocol_version": 1,
+      "agent_info": null,
+      "capabilities": {
+        "load_session": true,
+        "prompt_capabilities": {
+          "image": false,
+          "audio": false,
+          "embedded_context": true
+        },
+        "mcp_capabilities": {
+          "http": true,
+          "sse": true,
+          "acp": false
+        },
+        "session_capabilities": {
+          "list": {},
+          "delete": null,
+          "additional_directories": null,
+          "fork": null,
+          "resume": {},
+          "close": {}
+        },
+        "auth": {
+          "logout": null
+        },
+        "providers": null,
+        "nes": null,
+        "position_encoding": null
+      },
+      "auth_methods": [
+        "cached_token",
+        "grok.com"
+      ],
+      "session_created": true,
+      "session_modes": [],
+      "config_categories": [],
+      "model_choices": [],
+      "selected_model": null,
+      "selected_mode": null,
+      "output_before_cancel": true,
+      "cancel_sent": true,
+      "stop_reason": "cancelled",
+      "assistant_sha256": "b5584a1464119498204d2bffb86944984de652acb277cb0d2a6810944ee13350",
+      "process_exited": true
+    }
+  ],
+  "stream_boundary": "History and cancellation scenarios repeated after adding a received-update processing barrier to the common client."
+}

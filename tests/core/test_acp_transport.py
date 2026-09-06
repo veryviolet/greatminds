@@ -64,6 +64,33 @@ def test_missing_session_load_is_explicit(tmp_path):
     asyncio.run(check())
 
 
+def test_load_and_prompt_wait_for_preceding_stream_updates(tmp_path):
+    async def check():
+        messages = []
+        async def delayed_sink(kind, data):
+            if kind == "session_update":
+                await asyncio.sleep(0.03)
+                messages.append(data["update"]["content"]["text"])
+        async with transport(tmp_path, "resume", Callbacks(events=delayed_sink)) as client:
+            await client.open_session(session_id="test-session")
+            assert messages == ["historical reply"]
+            messages.clear()
+            await client.prompt("new turn", timeout=1)
+            assert messages == ["hello"]
+    asyncio.run(check())
+
+
+def test_failed_update_sink_cannot_report_success(tmp_path):
+    async def check():
+        async def failing_sink(kind, data):
+            raise RuntimeError("sink unavailable")
+        async with transport(tmp_path, callbacks=Callbacks(events=failing_sink)) as client:
+            await client.open_session()
+            with pytest.raises(ValueError, match="update processing failed"):
+                await client.prompt("hello", timeout=1)
+    asyncio.run(check())
+
+
 def test_timeout_kills_uncooperative_process(tmp_path):
     async def check():
         async with transport(tmp_path, "hang") as client:

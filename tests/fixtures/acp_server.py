@@ -57,12 +57,19 @@ for line in sys.stdin:
     elif method == "session/load":
         with Path("loads.log").open("a") as loads:
             loads.write(message["params"]["sessionId"] + "\n")
+        send({"method": "session/update", "params": {
+            "sessionId": "test-session", "update": {"sessionUpdate": "agent_message_chunk",
+            "content": {"type": "text", "text": "historical reply"}}}})
         result(request_id, {})
     elif method == "session/prompt":
         pending = request_id
         if scenario == "disconnect":
             sys.exit(0)
-        elif scenario in {"hang", "orphan"}:
+        elif scenario in {"hang", "orphan", "cancel", "cancel-output"}:
+            if scenario == "cancel-output":
+                send({"method": "session/update", "params": {
+                    "sessionId": "test-session", "update": {"sessionUpdate": "agent_message_chunk",
+                    "content": {"type": "text", "text": "started"}}}})
             continue
         elif scenario.startswith("permission"):
             tool = {"toolCallId": "tool-one", "title": "Read a file", "kind": "read"}

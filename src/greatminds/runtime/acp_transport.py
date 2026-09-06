@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Awaitable, Callable
 
 from acp import Client, PROTOCOL_VERSION, RequestError, connect_to_agent, text_block
+from acp.connection import StreamDirection
 from acp.schema import (AllowedOutcome, ClientCapabilities, DeniedOutcome,
                         Implementation, RequestPermissionResponse)
 from acp.transports import default_environment
@@ -46,6 +47,11 @@ class Callbacks(Client):
         self.permission_timeout = permission_timeout
         self.session_id: str | None = None
         self.needs_input = False
+        self.received_updates = 0
+        self.completed_updates = 0
+        self._update_lock = asyncio.Lock()
+        self._update_changed = asyncio.Event()
+        self._update_error = False
 
     async def request_permission(self, session_id, tool_call, options, **kwargs):
         if self.session_id != session_id:
@@ -73,11 +79,34 @@ class Callbacks(Client):
         return RequestPermissionResponse(outcome=AllowedOutcome(outcome="selected", option_id=selected))
 
     async def session_update(self, session_id, update, **kwargs):
-        if self.session_id is not None and session_id != self.session_id:
-            raise RequestError.invalid_params({"reason": "session mismatch"})
-        await self.events("session_update", {"session_id": session_id,
-                                            "update": update.model_dump(mode="json", by_alias=True,
-                                                                        exclude_none=True)})
+        async with self._update_lock:
+            try:
+                if self.session_id is not None and session_id != self.session_id:
+                    raise RequestError.invalid_params({"reason": "session mismatch"})
+                await self.events("session_update", {"session_id": session_id,
+                                                    "update": update.model_dump(mode="json", by_alias=True,
+                                                                                exclude_none=True)})
+            except BaseException:
+                self._update_error = True
+                raise
+            finally:
+                self.completed_updates += 1
+                self._update_changed.set()
+
+    def observe(self, event):
+        # The SDK dispatches notifications asynchronously, while resolving RPC
+        # responses directly in its reader. Count wire arrivals without retaining
+        # their raw payloads so callers can await an actual processing boundary.
+        if event.direction == StreamDirection.INCOMING and event.message.get("method") == "session/update":
+            self.received_updates += 1
+
+    async def flush_updates(self):
+        target = self.received_updates
+        while self.completed_updates < target:
+            self._update_changed.clear()
+            await self._update_changed.wait()
+        if self._update_error:
+            raise ValueError("ACP session update processing failed")
 
     async def _unsupported(self, *args, **kwargs):
         raise RequestError.method_not_found("capability not advertised by this client")
@@ -129,7 +158,8 @@ class AcpTransport:
             if self.on_spawn:
                 await self.on_spawn(self.process)
             os.write(gate_write, b"1")
-            self.connection = connect_to_agent(self.callbacks, self.process.stdin, self.process.stdout)
+            self.connection = connect_to_agent(self.callbacks, self.process.stdin, self.process.stdout,
+                                               observers=[self.callbacks.observe])
             self.initialized = await asyncio.wait_for(self.connection.initialize(
                 protocol_version=PROTOCOL_VERSION, client_capabilities=ClientCapabilities(),
                 client_info=Implementation(name="greatminds", version=__version__)), self.request_timeout)
@@ -160,12 +190,39 @@ class AcpTransport:
             response = await asyncio.wait_for(self.connection.new_session(
                 cwd=str(self.workspace), mcp_servers=mcp_servers or []), self.request_timeout)
             self.callbacks.session_id = response.session_id
+        await asyncio.wait_for(self.callbacks.flush_updates(), self.request_timeout)
         return response
 
     async def authenticate(self, method_id: str):
         if method_id not in {method.id for method in self.initialized.auth_methods or []}:
             raise ValueError("authentication method was not advertised")
         return await asyncio.wait_for(self.connection.authenticate(method_id=method_id), self.request_timeout)
+
+    async def configure_session(self, session, *, model: str | None = None, mode: str | None = None):
+        """Apply only advertised selections, with the same policy for every caller."""
+        session_id = self.callbacks.session_id
+        if session_id is None:
+            raise ValueError("open a session before configuring it")
+        if mode:
+            available = session.modes.available_modes if session.modes else []
+            if mode not in {item.id for item in available}:
+                raise ValueError("configured session mode is not advertised")
+            await asyncio.wait_for(self.connection.set_session_mode(
+                session_id=session_id, mode_id=mode), self.request_timeout)
+        if model:
+            option = next((item for item in session.config_options or []
+                           if item.category == "model" and item.type == "select"), None)
+            if option is None:
+                raise ValueError("agent does not advertise model selection")
+            choices = [choice for item in option.options
+                       for choice in (item.options if hasattr(item, "options") else [item])]
+            if model not in {choice.value for choice in choices}:
+                raise ValueError("configured model is not advertised")
+            selected = await asyncio.wait_for(self.connection.set_config_option(
+                config_id=option.id, session_id=session_id, value=model), self.request_timeout)
+            if not any(item.id == option.id and item.current_value == model
+                       for item in selected.config_options):
+                raise ValueError("agent did not confirm the configured model")
 
     async def prompt(self, text: str, *, timeout: float):
         if self.callbacks.session_id is None:
@@ -177,7 +234,9 @@ class AcpTransport:
             turn = asyncio.create_task(self.connection.prompt(
                 session_id=self.callbacks.session_id, prompt=[text_block(text)]))
             try:
-                return await asyncio.wait_for(asyncio.shield(turn), timeout)
+                response = await asyncio.wait_for(asyncio.shield(turn), timeout)
+                await asyncio.wait_for(self.callbacks.flush_updates(), self.request_timeout)
+                return response
             except (TimeoutError, asyncio.CancelledError):
                 with contextlib.suppress(Exception):
                     await self.cancel()

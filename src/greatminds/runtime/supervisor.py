@@ -166,27 +166,7 @@ class Supervisor:
                     session_id = session.session_id
                     metrics["session_strategy"] = ("new_load_unavailable" if compatible and binding.session != "new"
                                                    else "new_context")
-                if binding.mode:
-                    available = session.modes.available_modes if session.modes else []
-                    if binding.mode not in {mode.id for mode in available}:
-                        raise ValueError("configured session mode is not advertised")
-                    await asyncio.wait_for(transport.connection.set_session_mode(
-                        session_id=session_id, mode_id=binding.mode), transport.request_timeout)
-                if binding.model:
-                    option = next((item for item in session.config_options or []
-                                   if item.category == "model" and item.type == "select"), None)
-                    if option is None:
-                        raise ValueError("agent does not advertise model selection")
-                    choices = [choice for item in option.options
-                               for choice in (item.options if hasattr(item, "options") else [item])]
-                    if binding.model not in {choice.value for choice in choices}:
-                        raise ValueError("configured model is not advertised")
-                    selected = await asyncio.wait_for(transport.connection.set_config_option(
-                        config_id=option.id, session_id=session_id, value=binding.model),
-                        transport.request_timeout)
-                    if not any(item.id == option.id and item.current_value == binding.model
-                               for item in selected.config_options):
-                        raise ValueError("agent did not confirm the configured model")
+                await transport.configure_session(session, model=binding.model, mode=binding.mode)
                 self.store._check_revision(TaskRevision(claim.run["task_id"], claim.run["task_path"],
                                                        claim.run["task_revision"]))
                 self._transition(run_id, "running", session_id=session_id)

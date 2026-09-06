@@ -563,6 +563,28 @@ M2 real executable campaign started:
   The matrix retains separate session/inference evidence. Tools, permissions,
   session recovery, cancellation during inference, and mixed-agent tasks are pending.
 
+M2 session lifecycle campaign:
+
+- Codex 0.153.4, Claude SDK 0.3.257, and Grok 1.0.13 loaded sessions in new
+  processes and recalled a synthetic value from the previous turn without that
+  value appearing in the second prompt. No cross-harness history transfer is claimed.
+- All three acknowledged cancellation with `cancelled` after streaming had begun,
+  then exited within transport shutdown. Tool/permission-pending cancellation
+  remains a separate required scenario.
+- Model and mode selection moved into the common transport. Codex and Claude
+  confirmed explicit advertised choices; Grok did not advertise model config
+  options in these sessions, so model selection remains untested there.
+- A regression fixture exposed asynchronous SDK notification dispatch crossing
+  RPC boundaries. The transport now waits for received session updates to finish
+  processing before returning session creation/load or prompt completion. This
+  prevents historical messages from leaking into the next response and prevents
+  response completion from overtaking the last output chunk. Handler failure is
+  explicit. Live history/cancellation tests passed again after this fix.
+- Focused transport/supervisor/daemon/probe regression: 54 passed. Documentation
+  checks: 8 passed. Full regression: 1,819 passed, 2 skipped. Wheel and sdist
+  built offline; installed-wheel stream-boundary/model-selection/cancellation
+  smoke passed in an isolated environment.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility
@@ -570,9 +592,10 @@ matrix, not the lifetime of a desktop conversation. Current focus: finish M2 rea
 integration and operator policies, then the outstanding M3–M7 items above. The full
 plan is still active. A successful synthetic response is not completion of M2.
 
-Continue by exercising tool/permission events, explicit model configuration,
-session load and cancellation in the common probe, then a typed domain task using
-different harnesses. Keep raw provider logs and authentication material out of the
+Continue by implementing operator permission/input handling and exercising real
+tool/permission events, then a typed domain task using different harnesses. Session
+load, history continuity, and cancellation after streaming now have real evidence;
+model selection is verified for Codex/Claude only. Keep raw provider logs and authentication material out of the
 repository. Preserve `.codex-solo-handoff/` as an existing user artifact.
 
 The convenient local web interface is the next product phase after this plan;

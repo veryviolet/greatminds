@@ -58,6 +58,29 @@ login. Manifests may specify `auth_method`; the supervisor verifies it was adver
 and calls `authenticate` before creating or loading a session. It does not guess a
 method or silently choose another identity. Real explicit-auth flows remain untested.
 
+## Restart, context, configuration, and cancellation
+
+| Harness | Load after process restart | Recall previous-turn token | Cancel after first assistant text | Explicit config selection |
+| --- | --- | --- | --- | --- |
+| Codex CLI 0.153.4 / adapter 1.10.0 | Passed | Passed | `cancelled` | Model `gpt-6-astra`, mode `read-only` confirmed |
+| Claude SDK 0.3.257 / adapter 0.75.1 | Passed | Passed | `cancelled` | Model `default`, mode `default` confirmed |
+| Grok 1.0.13 | Passed | Passed | `cancelled` | No model config option advertised; not tested |
+
+[Lifecycle evidence](evidence/acp-lifecycle-2026-09-06.json) records each stage.
+Restart tests close the first agent process, then create another in the same
+workspace and call `session/load` with the privately retained session ID. The
+history test uses a different second prompt which does not contain the token.
+Historical updates emitted during loading are excluded from the second response
+assertion. This proves continuity for these individual harnesses; it does not
+transfer conversation history across different harnesses.
+
+Cancellation tests wait for nonempty assistant text before sending `session/cancel`.
+All three returned `cancelled` and exited during bounded shutdown. Completion
+before the cancellation request is explicitly reported as unconfirmed, not passed.
+These tests do not yet cover cancellation while a tool or permission callback is
+pending. The supervisor and probe share advertised model/mode selection code;
+model configuration responses must confirm the requested value.
+
 OpenHands and Cursor initially could not create their normal per-user runtime
 directories under the filesystem-restricted test runner. Gemini initially could
 not reach its OAuth refresh endpoint. Codex initially could not initialize its
@@ -79,6 +102,13 @@ CODEX_PATH=/absolute/path/to/codex .venv/bin/python tools/acp_probe.py \
 .venv/bin/python tools/acp_probe.py --timeout 45 \
   --prompt 'Reply with exactly ACP_PROBE_OK and nothing else. Do not call any tools.' \
   --expect ACP_PROBE_OK -- /absolute/path/to/claude-agent-acp
+.venv/bin/python tools/acp_probe.py --timeout 45 --resume \
+  --prompt 'Remember TOKEN_42. Reply only SAVED.' --expect SAVED \
+  --resume-prompt 'Return only the token from my previous message.' \
+  --resume-expect TOKEN_42 -- /absolute/path/to/codex-acp
+.venv/bin/python tools/acp_probe.py --timeout 45 --cancel-after 0.1 --cancel-on-output \
+  --prompt 'Write the integers from 1 to 3000, one per line. Do not use tools.' \
+  -- /absolute/path/to/codex-acp
 ```
 
 The default probe sends only `initialize` and performs bounded transport shutdown.
@@ -86,6 +116,11 @@ The default probe sends only `initialize` and performs bounded transport shutdow
 advertised authentication flow, which may require interactive login depending on
 the server and cached account. `--prompt TEXT` explicitly sends a model request and
 may consume provider usage; `--expect TEXT` checks the observed assistant response.
+`--model ID` and `--mode ID` require advertised choices. `--resume` restarts the
+process and loads its session; `--resume-prompt` and `--resume-expect` check a distinct
+follow-up. `--cancel-after` tests cancellation of a pending prompt; add
+`--cancel-on-output` to wait for streaming text first. Resume and cancellation are
+separate scenarios and cannot be combined in one invocation.
 It prints a versioned JSON report and returns nonzero on failure. Each probe retains
 a private report, process identity, stderr, and any assistant response in its temporary
 directory. Extra environment values are passed only through explicit `--env NAME`
