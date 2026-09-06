@@ -1239,3 +1239,22 @@ remains unchanged after attempted registration. Combined registry/service/schema
 suite: 86 passed. Tests operate only on temporary registry files and substituted
 service-manager calls. Strict service config preflight and update lifecycle
 remain the next service tasks.
+
+### Service activation preflight (2026-09-07)
+
+Install validates the shared ACP contract and environment-file syntax before
+writing service files or registry entries. Start, restart and repair require a
+registered project and validate that registered root before activation. Restart
+performs this check before refreshing units. Stop and status remain available
+without requiring a valid execution contract so a broken project can be stopped.
+Service tests now create actual minimal ACP contracts instead of implicitly
+accepting native-only or unregistered project fixtures.
+
+Validation: 106 registry/service/environment/schema tests passed. New cases cover
+missing and malformed contracts, forbidden native transport, malformed project
+environment, unregistered activation and stopping a broken project. Failure
+cases compare all temporary file bytes before/after and assert zero systemctl
+calls. No live user services were changed. This preflight verifies the static
+contract; authentication and negotiated capabilities remain runtime checks.
+Next: update must respect optional service installation and remove remaining
+native restart assumptions.

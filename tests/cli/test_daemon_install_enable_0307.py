@@ -23,6 +23,9 @@ from greatminds.cli import daemon as daemon_mod
 def _project(tmp_path: Path, monkeypatch) -> Path:
     project = tmp_path / "my-fleet"
     project.mkdir()
+    (project/"coordination").mkdir()
+    (project/"coordination/execution.yaml").write_text("version: 1\nagents: {}\nbindings: {}\n")
+    daemon_mod.register_project("my-fleet", project)
     (project / "coord.yaml").write_text(
         yaml.safe_dump({"session": "my-fleet"}),
         encoding="utf-8",
@@ -41,8 +44,6 @@ def _stub_helpers(monkeypatch, *,
     """
     monkeypatch.setattr(daemon_mod, "install_template_unit",
                          lambda: wrote_unit)
-    monkeypatch.setattr(daemon_mod, "register_project",
-                         lambda *a, **kw: None)
 
     calls: list = []
 
@@ -167,6 +168,9 @@ def test_repair_needs_no_native_session(
     """Repair derives the directory identity without a native session."""
     project = tmp_path / "my-fleet"
     project.mkdir()
+    (project/"coordination").mkdir()
+    (project/"coordination/execution.yaml").write_text("version: 1\nagents: {}\nbindings: {}\n")
+    daemon_mod.register_project("my-fleet", project)
     (project / "coord.yaml").write_text(
         yaml.safe_dump({"other": "x"}), encoding="utf-8")
     monkeypatch.chdir(project)

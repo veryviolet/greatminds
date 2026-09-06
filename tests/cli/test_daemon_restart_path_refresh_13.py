@@ -43,7 +43,11 @@ def _isolate(monkeypatch, tmp_path: Path) -> list[tuple]:
     calls: list[tuple] = []
     monkeypatch.setattr(daemon_mod, "_systemctl",
                         lambda *a: calls.append(a) or _Done())
-    monkeypatch.setattr(daemon_mod, "lookup_project_dir", lambda name: None)
+    project = tmp_path/"project"
+    (project/"coordination").mkdir(parents=True)
+    (project/"coordination/execution.yaml").write_text("version: 1\nagents: {}\nbindings: {}\n")
+    daemon_mod.register_project("proj", project)
+    daemon_mod.install_project_dropin("proj", project)
     return calls
 
 

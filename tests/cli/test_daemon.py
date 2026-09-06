@@ -70,7 +70,7 @@ def test_install_writes_template_unit_and_registry_entry(_isolate_paths,
                                                           fake_systemctl,
                                                           tmp_path):
     project_dir = tmp_path / "proj"
-    project_dir.mkdir()
+    _configured(project_dir)
     (project_dir / "coord.yaml").write_text(
         yaml.safe_dump({"session": "alpha", "windows": []}), encoding="utf-8")
     # no legacy coordd present
@@ -95,7 +95,7 @@ def test_install_writes_template_unit_and_registry_entry(_isolate_paths,
 
 def test_install_is_idempotent(_isolate_paths, fake_systemctl, tmp_path):
     project_dir = tmp_path / "proj"
-    project_dir.mkdir()
+    _configured(project_dir)
     (project_dir / "coord.yaml").write_text(
         yaml.safe_dump({"session": "alpha", "windows": []}), encoding="utf-8")
     fake_systemctl.set(("systemctl", "--user", "is-enabled", "coordd.service"),
@@ -115,7 +115,7 @@ def test_install_uses_directory_without_coord_yaml(_isolate_paths, fake_systemct
                                               tmp_path):
     """A fresh project does not need the deleted native window contract."""
     project_dir = tmp_path / "proj"
-    project_dir.mkdir()  # no coord.yaml inside
+    _configured(project_dir)  # no coord.yaml inside
     fake_systemctl.set(("systemctl", "--user", "is-enabled", "coordd.service"),
                        rc=1)
 
@@ -130,7 +130,8 @@ def test_install_uses_directory_without_coord_yaml(_isolate_paths, fake_systemct
 
 
 def test_start_with_explicit_project_calls_systemctl(_isolate_paths,
-                                                      fake_systemctl):
+                                                      fake_systemctl, tmp_path):
+    _configured(tmp_path, "foo")
     result = _invoke(["start", "--project", "foo"])
     assert result.exit_code == 0
     starts = [c for c in fake_systemctl.calls
@@ -143,10 +144,11 @@ def test_start_ignores_native_coord_yaml_session(_isolate_paths,
                                                    fake_systemctl,
                                                    tmp_path):
     project_dir = tmp_path / "proj"
-    project_dir.mkdir()
+    _configured(project_dir)
     (project_dir / "coord.yaml").write_text(
         yaml.safe_dump({"session": "from-yaml", "windows": []}),
         encoding="utf-8")
+    daemon_mod.register_project("proj", project_dir)
     result = _invoke(["start", "--project-dir", str(project_dir)])
     assert result.exit_code == 0
     starts = [c for c in fake_systemctl.calls
@@ -154,7 +156,8 @@ def test_start_ignores_native_coord_yaml_session(_isolate_paths,
     assert any("greatminds-daemon@proj.service" in c for c in starts)
 
 
-def test_restart_invokes_systemctl_restart(_isolate_paths, fake_systemctl):
+def test_restart_invokes_systemctl_restart(_isolate_paths, fake_systemctl, tmp_path):
+    _configured(tmp_path, "alpha")
     result = _invoke(["restart", "--project", "alpha"])
     assert result.exit_code == 0
     assert any(
@@ -294,7 +297,7 @@ def test_install_template_unit_idempotent_same_path(_isolate_paths, monkeypatch)
 
 def test_install_manages_only_common_daemon_even_with_old_vendor_config(fake_systemctl, tmp_path):
     project = tmp_path/'project'
-    project.mkdir()
+    _configured(project)
     (project/'coord.yaml').write_text(yaml.safe_dump({'session': 'acp-only', 'windows': [
         {'role': 'DEVELOPER', 'tool': 'codex', 'mode': 'driven'}]}))
     result = _invoke(['install', '--project-dir', str(project)])
@@ -376,6 +379,7 @@ def test_fresh_acp_setup_installs_and_starts_by_registered_identity(tmp_path, fa
 
 
 def test_failed_reload_is_retried_before_enable_even_when_files_are_unchanged(fake_systemctl, tmp_path):
+    _configured(tmp_path)
     fake_systemctl.set(('systemctl', '--user', 'daemon-reload'), rc=1, stderr='manager unavailable')
     args = ['install', '--name', 'reload-test', '--project-dir', str(tmp_path)]
     for _ in range(2):
@@ -390,7 +394,8 @@ def test_failed_reload_is_retried_before_enable_even_when_files_are_unchanged(fa
     assert fake_systemctl.calls[-1] == ['systemctl', '--user', 'enable', 'greatminds-daemon@reload-test.service']
 
 
-def test_restart_does_not_run_after_failed_reload(fake_systemctl):
+def test_restart_does_not_run_after_failed_reload(fake_systemctl, tmp_path):
+    _configured(tmp_path, "reload-test")
     fake_systemctl.set(('systemctl', '--user', 'daemon-reload'), rc=1)
     for _ in range(2):
         result = _invoke(['restart', '--project', 'reload-test'])
@@ -409,3 +414,10 @@ def test_systemctl_errors_are_bounded_and_actionable(monkeypatch, failure):
     result = _invoke(['status', '--project', 'test'])
     assert result.exit_code != 0
     assert ('inspect service state' if failure == 'timeout' else 'cannot run systemctl') in result.output
+
+
+def _configured(root, name=None):
+    (root/'coordination').mkdir(parents=True, exist_ok=True)
+    (root/'coordination/execution.yaml').write_text('version: 1\nagents: {}\nbindings: {}\n')
+    if name:
+        daemon_mod.register_project(name, root)

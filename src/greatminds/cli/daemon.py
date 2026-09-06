@@ -385,6 +385,24 @@ def daemon() -> None:
     pass
 
 
+def _preflight_service_project(project_dir: Path) -> None:
+    from greatminds.runtime.observation import configuration
+    configuration(project_dir)
+    _parse_env_file(project_env_file(project_dir))
+
+
+def _registered_service_project(name: str, project_dir: Path | None) -> Path:
+    registered = lookup_project_dir(name)
+    if registered is None:
+        raise click.ClickException("project is not registered; run daemon install first")
+    root = registered.resolve()
+    if project_dir is not None and root != project_dir.resolve():
+        raise click.ClickException("project name is registered to a different directory")
+    _preflight_service_project(root)
+    _parse_env_file(_agent_env_file(name))
+    return root
+
+
 @daemon.command("install", short_help="install template unit + register project")
 @click.option("--name", "name", default=None,
               help="project name (default: registry or project directory name)")
@@ -396,6 +414,8 @@ def install_cmd(name: str | None, project_dir: Path | None) -> None:
     from greatminds.core.paths import find_project_dir
     pd = project_dir.resolve() if project_dir else find_project_dir(Path.cwd(), strict=False, use_env=False)
     resolved = _resolve_project_name(name, pd)
+    _preflight_service_project(pd)
+    _parse_env_file(_agent_env_file(resolved))
 
     wrote_unit = install_template_unit()
     register_project(resolved, pd)
@@ -438,6 +458,7 @@ def repair_cmd(name: str | None, project_dir: Path | None) -> None:
     from greatminds.core.paths import find_project_dir
     pd = project_dir.resolve() if project_dir else find_project_dir(Path.cwd(), strict=False, use_env=False)
     resolved = _resolve_project_name(name, pd)
+    _registered_service_project(resolved, pd)
     instance = _instance_unit(resolved)
     _checked_systemctl("enable", instance)
     ok(f"{instance} enabled for the user manager's default target")
@@ -458,7 +479,8 @@ def _project_options(fn):
 @_project_options
 def start_cmd(project: str | None, project_dir: Path | None) -> None:
     name = _resolve_project_name(project, project_dir)
-    if capture_agent_env(name, project_dir):
+    pd = _registered_service_project(name, project_dir)
+    if capture_agent_env(name, pd):
         info("agent auth/session env refreshed before daemon start")
     _run_verb("start", name)
 
@@ -472,8 +494,8 @@ def stop_cmd(project: str | None, project_dir: Path | None) -> None:
 def _refresh_units_before_restart(name: str,
                                   project_dir: Path | None) -> bool:
     """Refresh the common daemon unit and project environment before restart."""
+    pd = _registered_service_project(name, project_dir)
     changed = install_template_unit()
-    pd = project_dir.resolve() if project_dir else lookup_project_dir(name)
     if pd is not None:
         if install_project_dropin(name, pd):
             changed = True
