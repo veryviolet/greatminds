@@ -1013,94 +1013,61 @@ def restart_cmd(project: str | None, project_dir: Path | None) -> None:
     _run_verb("restart", name)
 
 
-def _claude_headless_probe(name: str, project_dir: Path,
-                           timeout_sec: float) -> tuple[bool, str]:
-    env = _agent_tool_env(_daemon_candidate_env(name, project_dir))
-    credential_diag = _claude_oauth_credential_diagnostic(env)
-    claude_bin = _resolve_tool_exec("claude") or "claude"
-    claude_argv = [
-        claude_bin, "-p",
-        "Reply with OK only. This is a greatminds daemon doctor probe.",
-        "--strict-mcp-config",
-        "--permission-mode", "auto",
-        "--output-format", "json",
-    ]
-    argv = claude_argv
-    started = time.monotonic()
-    try:
-        cp = subprocess.run(
-            argv, cwd=str(project_dir), env=env,
-            capture_output=True, text=True, timeout=timeout_sec,
-        )
-    except FileNotFoundError:
-        return False, "`claude` is not on the daemon PATH"
-    except subprocess.TimeoutExpired:
-        return False, f"`claude -p` did not finish within {timeout_sec:.0f}s"
-
-    elapsed = time.monotonic() - started
-    stdout = cp.stdout or ""
-    stderr = cp.stderr or ""
-    try:
-        obj = json.loads(stdout)
-    except (ValueError, TypeError):
-        obj = None
-    if isinstance(obj, dict) and obj.get("is_error"):
-        status = obj.get("api_error_status")
-        result = str(obj.get("result") or "").strip()
-        if status in (401, 403) or "auth" in result.lower():
-            suffix = f" {credential_diag}" if credential_diag else ""
-            return (
-                False,
-                f"Claude auth failed in daemon-equivalent env "
-                f"(status={status}, rc={cp.returncode}, {elapsed:.1f}s): "
-                f"{result[:240]}.{suffix}",
-            )
-        return (
-            False,
-            f"Claude returned an error in daemon-equivalent env "
-            f"(status={status}, rc={cp.returncode}, {elapsed:.1f}s): "
-            f"{result[:240]}",
-        )
-    if cp.returncode != 0:
-        detail = (stderr or stdout).strip().replace("\n", " ")
-        return (
-            False,
-            f"`claude -p` exited rc={cp.returncode} in daemon-equivalent env: "
-            f"{detail[:240]}",
-        )
-    return True, f"Claude headless probe succeeded in {elapsed:.1f}s"
-
-
-@daemon.command("doctor", short_help="check daemon agent runtime env")
+@daemon.command("doctor", short_help="check ACP configuration without launching agents")
 @_project_options
-@click.option("--timeout-sec", type=float, default=60.0, show_default=True,
-              help="headless Claude probe timeout")
+@click.option("--json", "as_json", is_flag=True, help="Machine-readable static checks")
 def doctor_cmd(project: str | None, project_dir: Path | None,
-               timeout_sec: float) -> None:
-    """Check whether daemon-driven agent tools work in daemon-equivalent env."""
-    name = _resolve_project_name(project, project_dir)
-    pd = project_dir.resolve() if project_dir else lookup_project_dir(name)
-    if pd is None:
-        err(f"project '{name}' is not registered; pass --project-dir")
-        raise click.exceptions.Exit(2)
+               as_json: bool) -> None:
+    """Check declared ACP prerequisites; does not verify login or protocol support."""
+    from greatminds.runtime.observation import configuration
+    from greatminds.cli.chat import terminal_text
 
-    click.echo(f"project: {name}")
-    click.echo(f"root: {pd}")
-    agent_env = _agent_env_file(name)
-    if agent_env.is_file():
-        ok(f"agent env file present: {agent_env}")
+    if project_dir is not None:
+        pd = project_dir.resolve()
+    elif project:
+        pd = lookup_project_dir(project)
+        if pd is None:
+            raise click.ClickException("project is not registered; pass --project-dir")
     else:
-        warn(f"agent env file missing: {agent_env}")
-    if has_driven_claude_roles(pd):
-        ok("driven Claude roles detected")
-        ok_probe, detail = _claude_headless_probe(name, pd, timeout_sec)
-        if ok_probe:
-            ok(detail)
+        from greatminds.core.paths import find_project_dir
+        pd = find_project_dir(Path.cwd(), use_env=False)
+    _, config = configuration(pd)
+    names = [name for name, root in load_registry().items()
+             if Path(root).resolve() == pd]
+    name = project or (sorted(names)[0] if names else pd.name)
+    env = _daemon_candidate_env(name, pd)
+    checks = []
+    for agent in config.agents:
+        effective = dict(env)
+        effective.update({dest: env[ref] for dest, ref in agent.environment if ref in env})
+        executable = agent.argv[0]
+        # Relative executables/PATH entries depend on each binding's workspace.
+        # Do not resolve them against the operator's unrelated current directory.
+        if os.path.isabs(executable):
+            available = Path(executable).is_file() and os.access(executable, os.X_OK)
+        elif "/" in executable:
+            available = False
         else:
-            err(detail)
-            raise click.exceptions.Exit(1)
+            path = os.pathsep.join(part for part in effective.get("PATH", os.defpath).split(os.pathsep)
+                                   if os.path.isabs(part))
+            available = shutil.which(executable, path=path) is not None
+        missing = [key for key in agent.required_env if not env.get(key)]
+        checks.append({"agent": agent.id, "executable_available": available,
+                       "missing_required_env": missing,
+                       "ready": available and not missing})
+    result = {"project": str(pd), "transport": "acp", "verification": "static",
+              "environment": "current process plus project and captured environment files",
+              "agents": checks, "ready": all(row["ready"] for row in checks)}
+    if as_json:
+        click.echo(json.dumps(result, sort_keys=True))
     else:
-        info("no driven Claude roles detected")
+        click.echo(terminal_text(f"ACP configuration: {pd}"))
+        for row in checks:
+            click.echo(terminal_text(f"{row['agent']}: executable={'found' if row['executable_available'] else 'unresolved'}; "
+                                    f"missing environment={', '.join(row['missing_required_env']) or 'none'}"))
+        click.echo("Static checks only; authentication and ACP capabilities require a live session.")
+    if not result["ready"]:
+        raise click.exceptions.Exit(1)
 
 
 @daemon.command("status", short_help="show daemon status for a project")

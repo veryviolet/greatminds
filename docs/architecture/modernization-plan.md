@@ -1104,3 +1104,20 @@ its implementation has not started.
 
 This document authorizes no release or migration of existing live fleets by
 itself; those operations are separate from developing and testing the changes.
+
+### Recovery checkpoint: static ACP doctor (2026-09-07)
+
+Replaced `daemon doctor`'s direct Claude prompt with shared ACP configuration
+validation, executable discovery and required-environment checks. The command
+never starts an agent, reports only environment names, offers JSON, and works
+with an explicit ACP project root without `coord.yaml`. It labels evidence as
+static and names the environment sources; it does not claim service-manager
+environment parity, authentication or negotiated protocol support. Relative
+executable/PATH entries remain unresolved by this static check. Removed the
+three native prompt-probe tests and replaced them with a no-subprocess,
+read-only, secret-redaction and missing-prerequisite regression.
+
+Validation: ACP doctor and existing project environment drop-in tests: 9 passed.
+Service app-server removal, manifest-based environment capture and service name
+resolution remain the next cleanup steps. The full modernization plan remains
+in progress.
