@@ -245,23 +245,10 @@ def _require_stand_global_control_role(command: str) -> str:
 
 
 def _lease_expired(lease: dict) -> bool:
-    """0342: True iff the lease is past ``granted_at + ttl_seconds``.
-
-    Conservative: if the timestamp or ttl can't be read, returns False
-    (treat as NOT expired) so a force-reclaim never steals a lease whose
-    expiry can't be proven."""
-    from datetime import datetime, timedelta, timezone
-    ttl = lease.get("ttl_seconds")
-    started = lease.get("granted_at") or lease.get("enqueued_at")
-    if not isinstance(ttl, (int, float)) or not started:
-        return False
-    try:
-        t0 = datetime.fromisoformat(str(started))
-    except (ValueError, TypeError):
-        return False
-    if t0.tzinfo is None:
-        t0 = t0.replace(tzinfo=timezone.utc)
-    return datetime.now(tz=timezone.utc) >= t0 + timedelta(seconds=int(ttl))
+    """Share the daemon's conservative, finite positive TTL check."""
+    from datetime import datetime, timezone
+    from greatminds.domain.stand_leases import expiry_reason
+    return expiry_reason(lease, datetime.now(timezone.utc)) is None
 
 
 def _holder_alive(coord: Path, holder_role: str) -> bool:
@@ -592,6 +579,7 @@ def stand_reclaim(lease_id: str | None) -> None:
         )
     coord = find_coord_dir()
     captured: dict[str, Any] = {}
+    runtime_snapshot = None
 
     def mutator(state):
         active = state.get("active_lease") or {}
@@ -612,6 +600,13 @@ def stand_reclaim(lease_id: str | None) -> None:
                 "cannot be force-reclaimed; the holder must release it",
                 exit_code=3,
             )
+        from greatminds.domain.stand_leases import holder_hold
+        from greatminds.domain.stand_deployments import DeploymentLedger
+        if runtime_snapshot is not None:
+            hold = holder_hold(coord, active, runtime_snapshot)
+            if hold:
+                raise GreatMindsError(f"stand reclaim blocked: {hold}", exit_code=3)
+        DeploymentLedger(coord).require_resolved()
         hr = active.get("holder_role") or ""
         if _holder_alive(coord, hr):
             raise GreatMindsError(
@@ -633,7 +628,13 @@ def stand_reclaim(lease_id: str | None) -> None:
         # free-with-pending-queue forever.
         captured["promoted"] = ss.promote_head_on_free(state, role)
 
-    ss.update_stand_state(coord, mutator)
+    from greatminds.core.storage import file_lock
+    from contextlib import ExitStack
+    from greatminds.runtime.store import RunStore
+    with file_lock(coord / ".stand/deployment.lock", label="stand deployment", timeout=0), ExitStack() as locks:
+        if (coord / ".runtime" / "state.json").exists():
+            runtime_snapshot = locks.enter_context(RunStore(coord)._transaction())
+        ss.update_stand_state(coord, mutator)
     msg = (f"reclaimed expired lease {captured['lease_id']} "
            f"(holder {captured['holder']} not alive); stand → free")
     if captured.get("promoted"):

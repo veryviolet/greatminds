@@ -30,6 +30,8 @@ def status(project_dir):
     snapshot = store.snapshot()
     from greatminds.domain.stand_deployments import DeploymentLedger
     snapshot["stand_deployments"] = DeploymentLedger(store.runtime).snapshot()
+    from greatminds.domain.stand_leases import StandLeaseService
+    snapshot["stand_lease"] = StandLeaseService(store).inspect()
     source = project / "coordination" / "execution.yaml"
     snapshot["assignments"] = []
     if source.is_file():

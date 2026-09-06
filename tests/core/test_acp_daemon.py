@@ -369,3 +369,23 @@ def test_idle_daemon_reconciles_deployment_without_agent_or_external_replay(tmp_
     status = CliRunner().invoke(cli, ['run', 'status', '--project-dir', str(root)])
     assert status.exit_code == 0, status.output
     assert json.loads(status.output)['stand_deployments'] == ledger.snapshot()
+
+
+def test_idle_daemon_reclaims_expired_dead_holder_lease_without_agent(tmp_path):
+    from greatminds.cli import stand_state as ss
+    root = project(tmp_path, tasks=False)
+    runtime = root/'.greatminds'
+    ss.update_stand_state(runtime, lambda s:s.update(state='ready', active_lease={
+        'lease_id':'expired','task':'0001-old','holder_role':'TESTER',
+        'ttl_seconds':60,'granted_at':'2020-01-01T00:00:00Z'}))
+    snapshot = asyncio.run(serve(root, once=True, environment={}))
+    assert snapshot['runs'] == {}
+    state = ss.read_stand_state(runtime)
+    assert state['state'] == 'free' and state['active_lease'] is None
+    assert state['history'][-1]['by'] == 'SYSTEM'
+    before = ss.state_file_path(runtime).read_bytes()
+    asyncio.run(serve(root, once=True, environment={}))
+    assert ss.state_file_path(runtime).read_bytes() == before
+    status = CliRunner().invoke(cli, ['run','status','--project-dir',str(root)])
+    assert json.loads(status.output)['stand_lease']['status'] == 'no_active_lease'
+    assert not (root/'agent-starts.log').exists()

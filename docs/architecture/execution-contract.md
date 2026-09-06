@@ -440,3 +440,26 @@ an agent or replays an external command for this sweep. `run status` includes th
 same versioned deployment ledger. Local workflows without a stand ledger create
 no stand state. ACP daemon deployment scheduling remains to be integrated;
 changing a lease alone never resolves an unknown outcome.
+
+
+## Mechanical stand lease expiry
+
+The ACP daemon checks leases without creating a maintainer turn. A finite,
+positive TTL and a valid grant time must prove expiry. Reclamation also requires
+no active run for the holder role or task, no remaining tracked process group,
+no unresolved task command/result, and no unresolved deployment. Live or unreadable
+holder PID registry records keep the lease held. Invalid or uncertain state does not
+establish an expired, dead holder.
+
+Reclamation holds the deployment lock, runtime store lock, and stand state lock
+in that order. It rechecks preconditions under these locks before publication,
+preventing a new claim or deployment from racing the decision. A single atomic
+stand update clears the expired lease, records `SYSTEM` history, and promotes
+the FIFO head using the existing lease policy. A repeated sweep makes no further
+transition. Projects without stand state create none.
+
+`run status` includes `stand_lease` with the current expiry or blocking reason.
+Manual `stand reclaim` uses the same TTL and ACP ownership checks and respects
+the deployment lock and unresolved deployment ledger. Granting/deploying the
+next lease remains a separate operation; automatic profile scheduling in the ACP
+daemon is still pending.

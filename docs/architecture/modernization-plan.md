@@ -712,6 +712,24 @@ M4 gated deployment process and operator recovery checkpoint:
   leases with explicit liveness evidence. Extend command output bounds and
   source/environment evidence to stand receipts.
 
+M3/M4 deterministic stand lease expiry checkpoint:
+
+- ACP daemon expiry requires a valid elapsed TTL and absence of active holder/task
+  runs, residual groups, unresolved commands/results, and deployment uncertainty.
+  Unreadable or live legacy holder records block reclamation.
+- Reclamation rechecks under deployment → runtime store → stand locks, records
+  SYSTEM history, and promotes FIFO in one atomic state replacement. Repeated
+  sweeps do not repeat transitions; local workflows create no stand state.
+- `run status` explains stand lease holds. Manual reclaim shares TTL and ACP
+  ownership checks and cannot overlap a deployment or bypass unresolved effects.
+- Daemon/lease/reclaim integration: 42 passed. Final lease/manual/documentation
+  regression: 57 passed. The controller suite including a claim arriving between
+  inspection and publication passed all 18 tests. Installed-wheel expiry, SYSTEM
+  history, and idempotent sweep passed. No live stand was modified.
+- Next: ACP daemon profile scheduling with explicit authorization, output limits,
+  and source/environment evidence; remaining M3 maintenance and M5–M7 work stays
+  open. Lease reclamation alone does not complete stand integration.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility
