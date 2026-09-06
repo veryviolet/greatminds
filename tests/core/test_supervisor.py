@@ -154,6 +154,93 @@ def test_permission_requires_action_without_repeating_or_completing_task(tmp_pat
     asyncio.run(check())
 
 
+@pytest.mark.parametrize("choice", ["yes", "no"])
+def test_operator_answers_permission_and_continues_the_same_turn(tmp_path, choice):
+    store, schema, config, task = setup(tmp_path, "permission-execute")
+    config = replace(config, bindings=(replace(config.bindings[0], timeout_seconds=5),))
+    async def check():
+        async with supervisor(tmp_path, store, schema, config) as service:
+            claim = service.claim(task, config.bindings[0])
+            work = asyncio.create_task(service.execute(claim, binding=config.bindings[0], prompt="work"))
+            async with asyncio.timeout(4):
+                while not store.snapshot().get("permissions"):
+                    await asyncio.sleep(.01)
+            request = next(iter(store.snapshot()["permissions"].values()))
+            assert store.snapshot()["runs"][claim.run["id"]]["state"] == "waiting_input"
+            assert request["tool"]["kind"] == "execute"
+            with pytest.raises(GreatMindsError, match="not offered"):
+                service.permissions.answer(request["id"], "invented-option")
+            answer = service.permissions.answer(request["id"], choice)
+            assert service.permissions.answer(request["id"], choice) == answer
+            with pytest.raises(GreatMindsError, match="no longer pending"):
+                service.permissions.answer(request["id"], "no" if choice == "yes" else "yes")
+            result = await work
+            assert result["state"] == "completed", result
+            assert service.permissions.get(request["id"])["status"] == "consumed"
+            assert (tmp_path / "agent-starts.log").read_text().splitlines() == ["permission-execute"]
+            assert len(store.snapshot()["runs"]) == 1
+            with pytest.raises(GreatMindsError, match="active run"):
+                service.permissions.answer(request["id"], choice)
+    asyncio.run(check())
+
+
+def test_cancel_while_permission_pending_closes_request(tmp_path):
+    store, schema, config, task = setup(tmp_path, "permission")
+    config = replace(config, bindings=(replace(config.bindings[0], timeout_seconds=5),))
+    async def check():
+        async with supervisor(tmp_path, store, schema, config) as service:
+            claim = service.claim(task, config.bindings[0])
+            work = asyncio.create_task(service.execute(claim, binding=config.bindings[0], prompt="work"))
+            async with asyncio.timeout(4):
+                while not store.snapshot().get("permissions"):
+                    await asyncio.sleep(.01)
+            request = next(iter(store.snapshot()["permissions"].values()))
+            work.cancel()
+            result = await work
+            assert result["state"] == "cancelled", result
+            assert service.permissions.get(request["id"])["status"] == "cancelled"
+            assert process_identity(result["process"]["pid"]) is None
+            with pytest.raises(GreatMindsError):
+                service.permissions.answer(request["id"], "yes")
+    asyncio.run(check())
+
+
+def test_permission_redaction_expiry_and_changed_revision(tmp_path):
+    store, schema, config, task = setup(tmp_path, "permission")
+    config = replace(config, bindings=(replace(config.bindings[0], timeout_seconds=5),))
+    async def check():
+        async with supervisor(tmp_path, store, schema, config) as service:
+            claim = service.claim(task, config.bindings[0])
+            work = asyncio.create_task(service.execute(claim, binding=config.bindings[0], prompt="work"))
+            try:
+                async with asyncio.timeout(4):
+                    while not store.snapshot().get("permissions"):
+                        await asyncio.sleep(.01)
+                original = next(iter(store.snapshot()["permissions"].values()))
+                extra = service.permissions.create(claim.run["id"], owner_id=service.id,
+                    session_id="test-session", tool={"rawInput": {"password": "hidden-password",
+                    "command": "print synthetic-secret", "header": "Bearer hidden-bearer"},
+                    "_meta": {"vendor": "private-vendor-metadata"}},
+                    options=[{"optionId": "once", "kind": "allow_once", "name": "Once"},
+                             {"optionId": "always", "kind": "allow_always", "name": "Always"}],
+                    secrets=["synthetic-secret"])
+                text = store.path.read_text()
+                assert not any(secret in text for secret in ["synthetic-secret", "hidden-password", "hidden-bearer", "private-vendor-metadata"])
+                with pytest.raises(GreatMindsError, match="persistent permission"):
+                    service.permissions.answer(extra["id"], "always")
+                store.clock = lambda: extra["expires_at"] + 1
+                with pytest.raises(GreatMindsError, match="expired"):
+                    service.permissions.answer(extra["id"], "once")
+                service.permissions.cancel(extra["id"], owner_id=service.id, reason="test_expired")
+                (store.runtime / task.path).write_text("title: Changed revision\n")
+                with pytest.raises(GreatMindsError):
+                    service.permissions.answer(original["id"], "yes")
+            finally:
+                work.cancel()
+                await work
+    asyncio.run(check())
+
+
 def test_missing_auth_waits_before_process_launch(tmp_path):
     store, schema, config, task = setup(tmp_path)
     config = replace(config, agents=(replace(config.agents[0], required_env=("UNSET_TEST_TOKEN",)),))

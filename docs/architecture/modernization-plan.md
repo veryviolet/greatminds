@@ -585,6 +585,29 @@ M2 session lifecycle campaign:
   built offline; installed-wheel stream-boundary/model-selection/cancellation
   smoke passed in an isolated environment.
 
+M2 operator permission broker:
+
+- Pending ACP permissions now have durable request identities, exact offered
+  choices, expiry, and run/process/session/revision bindings. Operator inspection
+  and one-time answers use `run permission`; the existing callback continues
+  without another agent turn. Pending waits are visible in run status.
+- Duplicate identical pending answers are idempotent; conflicting, stale, expired,
+  and persistent grants are rejected. Consumption is recorded before delivery;
+  cancellation/restart never replays an answer. Recovery preserves an input hold.
+- Review details exclude known credentials, sensitive fields, bearer tokens,
+  and arbitrary vendor metadata. Redaction is best effort. Cooperative local
+  state access and each harness's own sandbox remain explicit trust boundaries.
+- Real Claude, explicitly configured Grok, and Codex's explicitly escalated
+  synthetic command passed operator CLI → same callback → expected file checks.
+  Initial Grok/Codex runs wrote without requesting approval; their mode-specific
+  behavior is retained in the matrix. Client policy cannot intercept unrequested
+  tool execution. No global harness configuration was changed.
+- Fixtures cover approval/rejection, cancellation while pending, stale revisions,
+  expiry, redaction, and SIGKILL before delivery of both pending and answered
+  requests. Full regression: 1,826 passed, 2 skipped; the subsequently added
+  reproducible-probe test and metadata-redaction check each passed. Documentation:
+  8 passed. Wheel/sdist built; installed-wheel operator-CLI/callback/file smoke passed.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility
@@ -592,8 +615,9 @@ matrix, not the lifetime of a desktop conversation. Current focus: finish M2 rea
 integration and operator policies, then the outstanding M3–M7 items above. The full
 plan is still active. A successful synthetic response is not completion of M2.
 
-Continue by implementing operator permission/input handling and exercising real
-tool/permission events, then a typed domain task using different harnesses. Session
+Continue with a typed domain task using different harnesses and remaining interactive
+input handling. Durable one-time permission callbacks and real command approval now
+have evidence; complete harness permission-policy parity is still required. Session
 load, history continuity, and cancellation after streaming now have real evidence;
 model selection is verified for Codex/Claude only. Keep raw provider logs and authentication material out of the
 repository. Preserve `.codex-solo-handoff/` as an existing user artifact.

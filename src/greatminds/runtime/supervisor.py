@@ -19,6 +19,7 @@ from .processes import process_identity, terminate_group
 from .store import Claim, RunStore, TERMINAL, TaskRevision
 from .workspaces import prepare_workspace_async
 from .commands import CommandService
+from .permissions import PermissionService
 
 
 class Supervisor:
@@ -30,6 +31,7 @@ class Supervisor:
         self.schema = schema
         self.environment = dict(os.environ if environment is None else environment)
         self.commands = CommandService(store, environment=self.environment)
+        self.permissions = PermissionService(store)
         self.id = uuid.uuid4().hex
         self._lease = None
         self._transports: dict[str, AcpTransport] = {}
@@ -66,6 +68,7 @@ class Supervisor:
             identity = run.get("process")
             if identity:
                 await terminate_group(identity)
+            self.permissions.close_run(run["id"], owner_id=run["owner_id"], reason="supervisor_restart")
             # With no recorded PID the launch gate never authorized exec.
             self.store.recover_run(run["id"], previous_owner=run["owner_id"], owner_id=self.id)
 
@@ -103,6 +106,25 @@ class Supervisor:
                 metrics["last_activity_at"] = self.store.clock()
 
         callbacks = Callbacks(events=event)
+        prompt_deadline = None
+        async def ask(session_id, tool, options):
+            secrets = [claim.token, *agent.environment_values(self.environment).values()]
+            request = self.permissions.create(run_id, owner_id=self.id, session_id=session_id,
+                                               tool=tool, options=options, secrets=secrets,
+                                               timeout=min(callbacks.permission_timeout,
+                                                   max(0, prompt_deadline - time.monotonic()) if prompt_deadline else 0))
+            callbacks.needs_input = True
+            try:
+                while True:
+                    selected = self.permissions.consume(request["id"], owner_id=self.id)
+                    if selected is not None:
+                        callbacks.needs_input = any(item["run_id"] == run_id and item["status"] == "pending"
+                            for item in self.store.snapshot().get("permissions", {}).values())
+                        return selected
+                    await asyncio.sleep(0.1)
+            finally:
+                self.permissions.cancel(request["id"], owner_id=self.id, reason="callback_closed")
+        callbacks.permissions = ask
         if binding.permission == "deny":
             async def deny(_session, _tool, options):
                 return next((o["optionId"] for o in options if o["kind"] == "reject_once"), None)
@@ -118,8 +140,7 @@ class Supervisor:
                     chosen = next((o["optionId"] for o in options if o["kind"] == "allow_once"), None)
                     if chosen:
                         return chosen
-                callbacks.needs_input = True
-                return None
+                return await ask(_session, tool, options)
             callbacks.permissions = allow_workspace
         transport = None
         target = "failed"
@@ -170,6 +191,7 @@ class Supervisor:
                 self.store._check_revision(TaskRevision(claim.run["task_id"], claim.run["task_path"],
                                                        claim.run["task_revision"]))
                 self._transition(run_id, "running", session_id=session_id)
+                prompt_deadline = time.monotonic() + binding.timeout_seconds
                 result = await transport.prompt(prompt, timeout=binding.timeout_seconds)
                 metrics["stop_reason"] = result.stop_reason
                 if callbacks.needs_input:
@@ -189,7 +211,10 @@ class Supervisor:
             self._transition(run_id, "cancelling", reason="operator_cancelled")
             target, reason = "cancelled", "operator_cancelled"
         except TimeoutError:
-            reason = "timeout"
+            if callbacks.needs_input:
+                target, reason = "waiting_input", "permission_required"
+            else:
+                reason = "timeout"
         except (OSError, ValueError, RuntimeError, GreatMindsError) as exc:
             # Persist the class, not arbitrary stderr or exception text which
             # can contain auth material. Detailed redacted diagnostics follow.
@@ -197,6 +222,7 @@ class Supervisor:
             reason = "configuration_error" if isinstance(exc, (ValueError, GreatMindsError)) else "transport_failure"
         finally:
             self._transports.pop(run_id, None)
+            self.permissions.close_run(run_id, owner_id=self.id, reason="run_closed", resume_run=True)
             await self.commands.finish_run(run_id)
         metrics["elapsed_seconds"] = round(time.monotonic() - started, 6)
         return self._transition(run_id, target, reason=reason, details=metrics)

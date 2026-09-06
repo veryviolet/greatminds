@@ -125,6 +125,8 @@ for line in sys.stdin:
             result(pending, {"stopReason": "end_turn"})
     elif method is None and request_id == "permission-one":
         outcome = message.get("result", {}).get("outcome", {})
+        if scenario == "permission-marker" and outcome.get("optionId") == "yes":
+            Path("acp-permission-check.txt").write_text("permission-ok")
         send({"method": "session/update", "params": {
             "sessionId": "test-session", "update": {"sessionUpdate": "agent_message_chunk",
             "content": {"type": "text", "text": json.dumps(outcome)}}}})

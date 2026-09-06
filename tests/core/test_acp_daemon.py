@@ -3,6 +3,8 @@ import json
 import sys
 import subprocess
 import time
+import signal
+import pytest
 from pathlib import Path
 
 import yaml
@@ -242,6 +244,13 @@ def wait_for_run(store, state, process):
     raise AssertionError(f"daemon did not reach {state}: {store.snapshot()}")
 
 
+def test_assigned_agent_cannot_answer_operator_permission(monkeypatch):
+    monkeypatch.setenv("GREATMINDS_RUN_ID", "assigned")
+    result = CliRunner().invoke(cli, ["run", "permission", "request", "--option", "yes"])
+    assert result.exit_code == 3
+    assert "require the operator" in result.output
+
+
 def test_sigkill_recovery_cleans_orphan_without_replaying_task(tmp_path):
     root = project(tmp_path, scenario="orphan")
     source = root / "coordination" / "execution.yaml"
@@ -270,6 +279,48 @@ def test_sigkill_recovery_cleans_orphan_without_replaying_task(tmp_path):
         daemon.wait()
         if identity:
             asyncio.run(terminate_group(identity, timeout=0.2))
+        daemon.stderr.close()
+
+
+@pytest.mark.parametrize("answered", [False, True])
+def test_restart_cancels_permission_without_replaying_operator_decision(tmp_path, answered):
+    from greatminds.runtime.permissions import PermissionService
+    from greatminds.core.errors import GreatMindsError
+    root = project(tmp_path, scenario="permission")
+    source = root / "coordination" / "execution.yaml"
+    document = yaml.safe_load(source.read_text())
+    document["bindings"]["implementation"]["timeout_seconds"] = 60
+    source.write_text(yaml.safe_dump(document))
+    store = RunStore(root / ".greatminds")
+    permissions = PermissionService(store)
+    daemon = subprocess.Popen([sys.executable, "-m", "greatminds.cli.main", "coordd",
+                               "--project-dir", str(root), "--interval-sec", "0.2"],
+                              cwd=root, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    identity = None
+    try:
+        run = wait_for_run(store, "waiting_input", daemon)
+        identity = run["process"]
+        request = next(iter(store.snapshot()["permissions"].values()))
+        daemon.send_signal(signal.SIGSTOP)
+        if answered:
+            permissions.answer(request["id"], "yes")
+        daemon.kill()
+        daemon.wait(timeout=5)
+        recovered = asyncio.run(serve(root, once=True, environment={}))
+        assert recovered["runs"][run["id"]]["state"] == "waiting_input"
+        assert recovered["permissions"][request["id"]]["status"] == "cancelled"
+        assert recovered["permissions"][request["id"]]["reason"] == "supervisor_restart"
+        assert len(recovered["runs"]) == 1
+        assert process_identity(identity["pid"]) is None
+        assert (root / "agent-starts.log").read_text().splitlines() == ["permission"]
+        with pytest.raises(GreatMindsError):
+            permissions.answer(request["id"], "yes")
+    finally:
+        if daemon.poll() is None:
+            daemon.kill()
+        daemon.wait()
+        if identity:
+            asyncio.run(terminate_group(identity, timeout=.2))
         daemon.stderr.close()
 
 

@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "date": "2026-09-06",
+  "client_sdk": "0.11.1",
+  "scenario": "Execute a Python command that writes permission-ok to acp-permission-check.txt in a fresh temporary project; answer an observed request through the operator CLI.",
+  "configurations": {
+    "claude_live": "claude-agent-acp 0.75.1, Claude SDK 0.3.257, default ACP mode",
+    "grok_live": "Grok 1.0.13, cached ui.permission_mode auto: no ACP permission request",
+    "codex_live": "codex-acp 1.10.0, Codex 0.153.4, default agent mode: workspace write without ACP permission request",
+    "grok_explicit": "grok --no-auto-update --permission-mode default agent --no-leader stdio",
+    "codex_explicit": "ACP mode read-only; prompt explicitly requests sandbox_permissions=require_escalated for the synthetic command"
+  },
+  "observations": {
+    "grok_explicit_marker_before_answer": false,
+    "codex_explicit_marker_before_answer": false
+  },
+  "records": [
+    {
+      "harness": "claude",
+      "configuration": "live",
+      "run_count": 1,
+      "run_state": "completed",
+      "marker": "permission-ok",
+      "permission_requests": 1,
+      "requests": [
+        {
+          "answered_at": 1788707843.0258152,
+          "consumed_at": 1788707843.092503,
+          "created_at": 1788707822.298707,
+          "option_id": "allow-once",
+          "status": "consumed"
+        }
+      ],
+      "same_run_consumed_decision": true
+    },
+    {
+      "harness": "grok",
+      "configuration": "live",
+      "run_count": 1,
+      "run_state": "completed",
+      "marker": "permission-ok",
+      "permission_requests": 0,
+      "requests": [],
+      "same_run_consumed_decision": null
+    },
+    {
+      "harness": "codex",
+      "configuration": "live",
+      "run_count": 1,
+      "run_state": "completed",
+      "marker": "permission-ok",
+      "permission_requests": 0,
+      "requests": [],
+      "same_run_consumed_decision": null
+    },
+    {
+      "harness": "grok",
+      "configuration": "explicit",
+      "run_count": 1,
+      "run_state": "completed",
+      "marker": "permission-ok",
+      "permission_requests": 1,
+      "requests": [
+        {
+          "answered_at": 1788708226.9401813,
+          "consumed_at": 1788708226.9701095,
+          "created_at": 1788708167.403064,
+          "option_id": "allow-once",
+          "status": "consumed"
+        }
+      ],
+      "same_run_consumed_decision": true
+    },
+    {
+      "harness": "codex",
+      "configuration": "explicit",
+      "run_count": 1,
+      "run_state": "completed",
+      "marker": "permission-ok",
+      "permission_requests": 1,
+      "requests": [
+        {
+          "answered_at": 1788708239.58565,
+          "consumed_at": 1788708239.6897917,
+          "created_at": 1788708183.7195687,
+          "option_id": "allow_once",
+          "status": "consumed"
+        }
+      ],
+      "same_run_consumed_decision": true
+    }
+  ]
+}

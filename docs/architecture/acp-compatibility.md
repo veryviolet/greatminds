@@ -81,6 +81,49 @@ These tests do not yet cover cancellation while a tool or permission callback is
 pending. The supervisor and probe share advertised model/mode selection code;
 model configuration responses must confirm the requested value.
 
+## Live permission callbacks and operator responses
+
+[Permission evidence](evidence/acp-permissions-2026-09-06.json) records a synthetic
+shell command that writes `permission-ok` to a file in a temporary project. Claude
+0.75.1/SDK 0.3.257 requested approval; `greatminds run permission ID --option ID`
+answered once, the same run consumed it, and the file appeared before turn completion.
+Grok and Codex also passed with the explicit settings below. For those two explicit
+tests the file was directly observed absent while the request was pending.
+
+The initial Grok run inherited `ui.permission_mode = auto` and performed the write
+without an ACP callback. Using `grok --no-auto-update --permission-mode default
+agent --no-leader stdio` produced the callback without changing user configuration.
+Codex's default `agent` mode also performed the ordinary workspace write without
+a callback. Its `read-only` mode delegates escalated approvals to the user but still
+allows ordinary workspace writes in this adapter version. The successful callback
+test selected that mode and explicitly requested `sandbox_permissions=require_escalated`
+for the harmless command. These are different approval triggers, not proof that
+every shell command in every harness requires an ACP approval.
+
+The client `ask` policy routes callbacks to the operator; it does not override a
+harness's internal approval defaults. The executable's mode, cached settings, and
+execution boundary remain part of compatibility configuration. Complete permission
+policy parity and negotiated filesystem/terminal callbacks remain pending.
+
+The [supervisor permission probe](../../tools/acp_permission_probe.py) makes the
+scenario reproducible. It prints a temporary project/runtime location, submits one
+synthetic model request, and waits for an operator. It never approves a request.
+From that project's operator terminal, inspect `greatminds run status`, then inspect
+and answer its exact permission ID. The probe requires an observed pending request
+before the marker exists, a consumed one-time approval, and the expected file.
+
+```bash
+.venv/bin/python tools/acp_permission_probe.py \
+  --adapter-version 0.75.1 --harness-version sdk-0.3.257 \
+  -- /absolute/path/to/claude-agent-acp
+```
+
+Fixture tests additionally cover explicit rejection, cancellation during a pending
+callback, stale revisions, expired requests, conflicting replies, and SIGKILL before
+delivery of both pending and answered requests. Restart cancels those requests and
+preserves the input hold without spawning another agent. These crash/denial cases
+have not yet been repeated across all real executables.
+
 OpenHands and Cursor initially could not create their normal per-user runtime
 directories under the filesystem-restricted test runner. Gemini initially could
 not reach its OAuth refresh endpoint. Codex initially could not initialize its

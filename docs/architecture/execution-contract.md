@@ -67,6 +67,44 @@ account independently of the harness. Unknown fields and unsupported values
 fail validation. Workspaces are explicit trusted local paths and must exist
 before a claim can be created.
 
+## Operator permission requests
+
+An ACP callback that requires input creates a durable entry in the `permissions`
+section of `greatminds run status`. The run enters `waiting_input` while its
+process and pending prompt remain alive. Inspect and answer the exact request:
+
+```bash
+greatminds run permission REQUEST_ID
+greatminds run permission REQUEST_ID --option OPTION_ID
+```
+
+Select an advertised `allow_once` or `reject_once` option ID. The service rejects
+invented choices and persistent grants. It verifies the supervisor, live process,
+session, deadline, and task revision before accepting and consuming the answer.
+Repeated identical answers before consumption are idempotent; conflicting or late
+answers fail. The agent receives the answer in its existing callback; no new LLM
+turn is created. Assigned agents cannot use the operator CLI to approve themselves.
+
+The wait is bounded by the callback's 300-second deadline and the remaining prompt
+budget. Timeout leaves an input hold. Cancellation or restart closes unconsumed
+requests, including an answered request whose response was not yet delivered.
+Recovery preserves the run's input hold and never replays an operator decision.
+Inspect the hold and explicitly retry when appropriate; stale request IDs cannot
+authorize a new run. Consumed means handed to the callback, not proof of tool success.
+
+Permission records retain the tool description, inputs, locations, and offered
+options for review in private runtime state. Known assigned environment values,
+the run credential, sensitive field names, and bearer tokens are redacted. This is
+best-effort redaction of agent-provided content, not a general secret detector.
+Arbitrary vendor metadata is excluded.
+Requests exceeding 256 KiB fail explicitly instead of silently truncating details.
+
+The `ask`, `deny`, and `allow-workspace` policies govern ACP permission requests.
+They cannot intercept tools that an executable runs without requesting permission.
+Harness approval mode, cached configuration, and sandbox restrictions must also be
+configured and tested. See the [measured permission behavior](acp-compatibility.md).
+The shared-filesystem deployment remains a cooperative trust boundary.
+
 ## Configured commands and evidence
 
 An assigned agent requests `greatminds run command unit-tests --request-id ID

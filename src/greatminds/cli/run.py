@@ -140,3 +140,16 @@ def submit(source):
         raise GreatMindsError(f"invalid result envelope: {exc}", exit_code=2) from exc
     receipt = RunStore(project_runtime_dir(find_project_dir())).submit_decision(document, run_id=run_id, token=token)
     click.echo(json.dumps(receipt, ensure_ascii=False, indent=2))
+
+
+@run.command("permission")
+@click.argument("request_id")
+@click.option("--option", "option_id", help="Choose an option ID from this exact live request")
+def permission(request_id, option_id):
+    """Inspect a permission request, or answer it for the live ACP callback."""
+    from greatminds.runtime.permissions import PermissionService
+    if option_id is not None and os.environ.get("GREATMINDS_RUN_ID"):
+        raise GreatMindsError("permission decisions require the operator", exit_code=3)
+    service = PermissionService(RunStore(project_runtime_dir(find_project_dir())))
+    result = service.get(request_id) if option_id is None else service.answer(request_id, option_id)
+    click.echo(json.dumps(result, ensure_ascii=False, indent=2))
