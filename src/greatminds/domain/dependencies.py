@@ -70,15 +70,13 @@ def live_role_holds(runtime, data, block, schema, *, environment=None):
     if not isinstance(required, list) or any(not isinstance(role, str) for role in required):
         return [{"code": "invalid_live_roles", "message": "requires_live_roles must be an array of role names"}]
     context = block.get("requires_live_roles_context", data.get("requires_live_roles_context"))
-    target = runtime
-    if context is not None:
-        if not isinstance(context, str) or not context.strip():
-            return [{"code": "invalid_live_context", "message": "live-role context must be a project/runtime path"}]
-        target = (runtime.parent / Path(context).expanduser()).resolve()
-        if (target / ".greatminds").is_dir():
-            target = target / ".greatminds"
-        if not target.is_dir() or target.name not in {".greatminds", "coordination"}:
-            return [{"code": "live_context_unavailable", "context": context}]
+    if context is not None and (not isinstance(context, str) or not context.strip()):
+        return [{"code": "invalid_live_context", "message": "live-role context must be a project/runtime path"}]
+    from greatminds.core.paths import live_roles_runtime
+    try:
+        target = live_roles_runtime(runtime, context)
+    except GreatMindsError:
+        return [{"code": "live_context_unavailable", "context": context}]
     config_path = target.parent / "coordination" / "execution.yaml"
     try:
         config = load_execution_config(config_path, roles=set(schema.get("roles", {})))

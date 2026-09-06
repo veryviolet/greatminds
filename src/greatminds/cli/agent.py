@@ -101,37 +101,13 @@ def required_live_roles_context(header: dict[str, Any],
 
 def resolve_live_roles_coord(context: "str | None", local_coord: Path
                              ) -> "tuple[Path | None, str | None]":
-    """0389: resolve a declared ``requires_live_roles_context`` to the
-    runtime dir whose agents must be inspected.
-
-    Returns ``(coord, error)``:
-      * context None        → ``(local_coord, None)`` — local behaviour.
-      * context resolvable  → ``(<target coord>, None)``. Accepts either a
-        runtime dir directly or a project dir that contains
-        ``.greatminds/``; an existing dir without a registry yet still
-        resolves (its agents simply read as not-registered).
-      * context unreachable → ``(None, <reason>)``. DELIBERATELY NOT
-        fail-open: a task that explicitly names a remote target whose
-        runtime state can't be found must HOLD with an actionable
-        message, never silently resume against nothing (an unreachable
-        avatar must not read READY)."""
-    if context is None:
-        return local_coord, None
-    p = Path(context).expanduser()
-    # A project dir resolves to its ``.greatminds/`` child; a runtime dir
-    # resolves to itself.
-    if (p / ".greatminds").is_dir():
-        return project_runtime_dir(p), None
-    if (p / "coordination").is_dir():
-        return p / "coordination", None
-    if p.is_dir() and (
-        p.name in {".greatminds", "coordination"} or (p / ".runtime").is_dir()
-    ):
-        return p, None
-    return None, (
-        f"target context {context!r} not found / unreachable (looked for "
-        f"{p / '.greatminds'}/ and {p}/). Deploy / fix the target stand, "
-        f"confirm its greatminds runtime exists, then retry the resume.")
+    """Resolve the same project-relative target as the dependency controller."""
+    from greatminds.core.paths import live_roles_runtime
+    from greatminds.core.errors import GreatMindsError
+    try:
+        return live_roles_runtime(local_coord, context), None
+    except GreatMindsError as exc:
+        return None, f"target context {context!r}: {exc}"
 
 
 def held_live_roles(local_coord: Path, header: dict[str, Any],

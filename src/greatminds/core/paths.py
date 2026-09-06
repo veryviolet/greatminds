@@ -213,3 +213,20 @@ def caller_role() -> str:
         die(1, "caller role unknown: set GREATMINDS_ROLE in your shell")
         raise SystemExit
     return role
+
+
+def live_roles_runtime(local_runtime: Path, context: str | None) -> Path:
+    """Resolve a declared role context relative to the owning project."""
+    from .errors import GreatMindsError
+    if context is None:
+        return local_runtime.resolve()
+    if not isinstance(context, str) or not context.strip():
+        raise GreatMindsError('live-role context must be a project/runtime path')
+    target = (local_runtime.parent / Path(context).expanduser()).resolve()
+    if not target.is_dir():
+        raise GreatMindsError('live-role target context not found / unreachable')
+    if target.name in {RUNTIME_DIR_NAME, CONFIG_DIR_NAME}:
+        return project_runtime_dir(target.parent)
+    if (target / CONFIG_DIR_NAME).is_dir() or (target / RUNTIME_DIR_NAME).is_dir():
+        return project_runtime_dir(target)
+    raise GreatMindsError('live-role target context not found / unreachable')

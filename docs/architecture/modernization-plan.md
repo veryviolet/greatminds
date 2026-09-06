@@ -1333,3 +1333,21 @@ are recorded in /tmp/greatminds-modernization-suite-4.txt: obsolete live-develop
 launch, native backlog APIs and pane-based live-role tests. Port live-role
 invariants to durable ACP runs; do not discard the required-live-role gate.
 Other broad logs: /tmp/greatminds-modernization-suite{,-2,-3}.txt.
+
+### ACP required-live-role gate parity (2026-09-07)
+
+Ported local/remote live-role tests from pane text and native registry files to
+RunStore claims, transitions and process identities. Found and fixed an actual
+resolver discrepancy: agent diagnostics and dependency enforcement disagreed
+for explicit coordination-directory contexts and relative context paths. Both
+now use the shared live_roles_runtime resolver; relative paths are anchored to
+the owning project, and project/runtime/config paths select the same ACP store.
+
+Validation: 78 remote/local role, maintenance, observation and stale-deployment
+gate tests passed. The matrix covers running, waiting_auth, waiting_input,
+failed and idle roles, reused PID identity, missing contexts, unconfigured roles,
+header/block overrides and local/remote separation. Maintenance inspection,
+wake-check JSON and the domain resume validator agree on readiness in eight
+local/remote state scenarios. Claims/states are synthetic and use the test
+process identity; no live provider was invoked. Required-live-role enforcement
+is retained. Other broad-suite failures and native fallback cleanup remain open.
