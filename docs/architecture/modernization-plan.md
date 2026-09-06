@@ -881,6 +881,26 @@ M5 terminal conversation client checkpoint:
 - Next: task attachment, richer input and interactive live-harness coverage, then
   VS Code/default migration and the remaining deterministic/product work.
 
+M5 task-bound conversation checkpoint:
+
+- `chat create --task EXACT_TASK_ID` pins a real task revision and enforces the
+  role's queue claim policy. Shared admission prevents concurrent background and
+  interactive claims. Required worktrees, task context, command evidence, and
+  typed results use the existing services.
+- Recheck the revision before every prompt; changed tasks retain queued input
+  behind an explicit hold. A task result releases the interactive run after the
+  prompt so the domain service can apply it. Live permission waits cannot permit
+  task mutation or worktree cleanup while the agent is still executing.
+- Expanded conversation/domain/contract/supervisor regression: 100 passed.
+  Focused task tests: 5 passed, including actual task worktree preparation,
+  shared task admission, stale revision, and result application gating.
+  Terminal/task/documentation checkpoint: 17 passed. Final task suite: 6 passed,
+  including revision changes between messages in a connected session and result
+  application in continuous daemon mode. Installed-wheel task attachment, context,
+  and domain application passed using the local ACP fixture.
+- Next: richer input events and real interactive harness coverage, then VS Code
+  integration, default migration/removal of legacy paths, and remaining M3/M7.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility

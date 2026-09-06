@@ -35,7 +35,7 @@ def prepare_workspace(store, run: dict, binding, schema, owner_id: str) -> dict:
     from greatminds.cli.worktree import load_worktree_policy, worktree_create
 
     project = store.runtime.parent
-    if run.get('conversation_id'):
+    if run.get('conversation_id') and not run.get('conversation_task'):
         store._check_revision(TaskRevision(run['task_id'], run['task_path'], run['task_revision']))
         workspace = binding.workspace_path(project)
         store.workspace_plan(run['id'], owner_id=owner_id,

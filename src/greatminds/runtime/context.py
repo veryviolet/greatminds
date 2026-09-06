@@ -17,7 +17,7 @@ def context_document(store: RunStore, claim: Claim, schema: SchemaSnapshot) -> d
     run = claim.run
     task = TaskRevision(run["task_id"], run["task_path"], run["task_revision"])
     store._check_revision(task)
-    if run.get('conversation_id'):
+    if run.get('conversation_id') and not run.get('conversation_task'):
         role = schema.document['roles'][run['role']]
         return {'run_id': run['id'], 'conversation_id': run['conversation_id'],
                 'role': run['role'], 'workspace': run['workspace'], 'cli_argv': cli_argv,

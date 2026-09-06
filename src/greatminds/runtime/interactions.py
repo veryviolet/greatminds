@@ -9,6 +9,7 @@ import copy
 import hashlib
 import json
 import uuid
+from dataclasses import asdict
 from contextlib import contextmanager
 
 from greatminds.core.errors import GreatMindsError
@@ -34,12 +35,13 @@ class ConversationStore:
         self.lock = self.directory / 'conversation.lock'
 
     @classmethod
-    def create(cls, runtime, *, binding, config_sha256, schema_sha256, workspace):
+    def create(cls, runtime, *, binding, config_sha256, schema_sha256, workspace, task=None):
         store = cls(runtime, uuid.uuid4().hex)
         document = {'version': 1, 'id': store.id, 'binding_id': binding.id,
                     'binding_sha256': binding.sha256, 'config_sha256': config_sha256,
                     'schema_sha256': schema_sha256, 'workspace': str(workspace.resolve()),
                     'owner_id': None, 'session_id': None, 'closed': False,
+                    'task': asdict(task) if task is not None else None,
                     'turns': {}, 'events': []}
         with file_lock(store.lock, label='conversation'):
             atomic_json(store.path, document)

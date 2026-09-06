@@ -76,8 +76,9 @@ def chat(ctx, project_dir):
 
 @chat.command('create')
 @click.argument('binding_id')
+@click.option('--task', 'task_id', help='Pin an exact workflow task ID and its current revision.')
 @click.pass_obj
-def create(context, binding_id):
+def create(context, binding_id, task_id):
     """Create a conversation pinned to an existing role binding."""
     schema = load_schema_snapshot()
     config = load_execution_config(context['project']/'coordination/execution.yaml',
@@ -85,9 +86,19 @@ def create(context, binding_id):
     binding = next((b for b in config.bindings if b.id == binding_id), None)
     if binding is None:
         raise GreatMindsError('unknown conversation binding', exit_code=2)
+    task = None
+    if task_id is not None:
+        from greatminds.core.storage import safe_name
+        from greatminds.runtime.store import TaskRevision
+        paths = list(context['runtime'].glob(f'*/{safe_name(task_id)}.yaml'))
+        if len(paths) != 1:
+            raise GreatMindsError('task ID must identify exactly one workflow file', exit_code=2)
+        task = TaskRevision.capture(context['runtime'], paths[0])
+        if task.path.split('/')[0] not in schema.document['roles'][binding.role].get('claims_from', []):
+            raise GreatMindsError('binding role cannot claim this task queue', exit_code=3)
     store = ConversationStore.create(context['runtime'], binding=binding,
         config_sha256=config.sha256, schema_sha256=schema.sha256,
-        workspace=binding.workspace_path(context['project']))
+        workspace=binding.workspace_path(context['project']), task=task)
     click.echo(json.dumps({'conversation_id': store.id, 'binding_id': binding.id}))
 
 

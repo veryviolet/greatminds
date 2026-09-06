@@ -39,6 +39,16 @@ GENERATED_BLOCK_FIELDS = {
 
 
 class ResultService:
+    @staticmethod
+    def _can_apply(run):
+        if run['state'] in TERMINAL:
+            return True
+        if run['state'] not in {'waiting_input', 'waiting_auth'}:
+            return False
+        from greatminds.runtime.processes import group_members, process_identity
+        identity = run.get('process')
+        return not identity or (process_identity(identity['pid']) != identity and not group_members(identity))
+
     def __init__(self, store: RunStore, *, checkpoint: Callable[[str], None] | None = None,
                  environment: dict | None = None):
         from greatminds.runtime.commands import CommandService
@@ -51,7 +61,7 @@ class ResultService:
         for result_id, receipt in snapshot["results"].items():
             run = snapshot["runs"][receipt["envelope"]["run_id"]]
             if (receipt["status"] in {"received", "applying"}
-                    and run["state"] in TERMINAL | {"waiting_input", "waiting_auth"}):
+                    and self._can_apply(run)):
                 self.apply(result_id)
 
     def _prepare(self, receipt: dict, run: dict, contract: dict) -> dict:
@@ -247,7 +257,7 @@ class ResultService:
             if receipt["status"] not in {"received", "applying"}:
                 return receipt
             run = snapshot["runs"][receipt["envelope"]["run_id"]]
-            if run["state"] not in TERMINAL | {"waiting_input", "waiting_auth"}:
+            if not self._can_apply(run):
                 return receipt  # Do not mutate the assignment while its process is working.
             path = self.store.directory / "operations" / f"{result_id}.json"
             recovered = path.exists()

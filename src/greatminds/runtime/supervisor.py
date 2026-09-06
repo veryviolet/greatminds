@@ -165,7 +165,7 @@ class Supervisor:
                 raise RequestError.auth_required()
             run = await prepare_workspace_async(self.store, claim.run, binding, self.schema, self.id)
             claim = Claim(run, claim.token)
-            if conversation is not None:
+            if conversation is not None and not claim.run.get('conversation_task'):
                 import json
                 from .context import context_document
                 prompt = ('You are working interactively with the user in Greatminds. '
@@ -228,6 +228,9 @@ class Supervisor:
                     result = await transport.prompt(prompt, timeout=binding.timeout_seconds)
                 else:
                     while True:
+                        if current_turn is None and claim.run.get('conversation_task') and any(
+                                r['envelope']['run_id'] == run_id for r in self.store.snapshot()['results'].values()):
+                            break  # Release the process before domain application can move/clean the task.
                         if current_turn is None:
                             current_turn = conversation.claim_next(self.id)
                             if current_turn is None:
@@ -236,6 +239,8 @@ class Supervisor:
                                 await asyncio.sleep(.1)
                                 continue
                         prompt_deadline = time.monotonic() + binding.timeout_seconds
+                        self.store._check_revision(TaskRevision(claim.run['task_id'], claim.run['task_path'],
+                                                               claim.run['task_revision']))
                         accept_output = True
                         pending = asyncio.create_task(transport.prompt(
                             prompt + '\nUser message:\n' + current_turn['prompt'], timeout=binding.timeout_seconds))

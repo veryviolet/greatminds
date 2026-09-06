@@ -605,8 +605,21 @@ existing background run. No user prompt is injected into a background task sessi
 Any configured role binding can start a conversation without creating a workflow
 task. Its run uses a namespaced conversation subject identity, a pinned role context
 and the binding workspace. It cannot submit a domain result for a nonexistent task.
-Attaching a conversation to an existing workflow task remains future work; interactive
-project work does not acquire the task's automatic worktree or approval semantics.
+
+`chat create BINDING --task EXACT_TASK_ID` instead pins the current file/revision of
+one workflow task. The binding role must be permitted to claim its queue. Dispatch
+uses the same task lock, worktree policy, compiled context, commands, and domain
+result service as background work; the two paths cannot claim that task together.
+A changed/moved task holds queued input with a stale-revision explanation. The
+revision is checked before each prompt. No message is silently rebound to new task
+contents; create another conversation for the current revision when appropriate.
+
+A received task result ends the conversation's current run after the prompt ends,
+including in continuous daemon mode, so result application can proceed after
+process cleanup. Waiting for a permission with a live process does not qualify as
+finished execution. Subsequent queued messages retain their identities and remain
+subject to the pinned revision check. Domain transitions and worktree cleanup are
+still performed by the shared result service, not by the terminal client.
 
 With ACP coordd running for the project:
 
@@ -648,5 +661,5 @@ client can enqueue further messages or use `chat interrupt`; talk waits for queu
 work before asking for its next message. Terminal control characters in user and
 assistant text are escaped rather than executed, including across stream chunks.
 
-Task attachment, richer non-permission input, VS Code integration, and real
+Richer non-permission input, VS Code integration, and real
 interactive harness validation remain outstanding M5 work.

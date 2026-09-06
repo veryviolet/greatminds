@@ -88,6 +88,13 @@ for line in sys.stdin:
                              "options": [{"optionId": "yes", "name": "Allow once", "kind": "allow_once"},
                                          {"optionId": "no", "name": "Reject", "kind": "reject_once"}]}})
         else:
+            if scenario == 'task-chat':
+                context = json.loads(subprocess.check_output(
+                    [sys.executable, '-m', 'greatminds.cli.main', 'run', 'contract'], text=True))
+                Path('chat-task-context.json').write_text(json.dumps(context))
+                subprocess.run([*context['cli_argv'], 'run', 'submit', '--json',
+                                json.dumps({'decision': 'no_change', 'payload': {}})], check=True,
+                               capture_output=True, text=True)
             if scenario == "pipeline":
                 context = json.loads(message["params"]["prompt"][0]["text"].split("\n\n", 1)[1])
                 role = context["role"]

@@ -52,6 +52,8 @@ class TaskRevision:
     def conversation(cls, runtime: Path, conversation_id: str) -> TaskRevision:
         from .interactions import ConversationStore
         document = ConversationStore(runtime, conversation_id).snapshot()
+        if document.get('task') is not None:
+            return cls(**document['task'])
         identity = {key: document[key] for key in (
             'id', 'binding_id', 'binding_sha256', 'config_sha256', 'schema_sha256', 'workspace')}
         return cls('chat-' + conversation_id, '', fingerprint(identity))
@@ -193,7 +195,8 @@ class RunStore:
                     or conversation['schema_sha256'] != schema.sha256
                     or conversation['workspace'] != str(binding.workspace_path(project))):
                 _error('conversation does not match the execution contract', 3)
-        elif task.path.split("/")[0] not in schema.document["roles"][binding.role].get("claims_from", []):
+        if ((conversation_id is None or conversation.get('task') is not None)
+                and task.path.split("/")[0] not in schema.document["roles"][binding.role].get("claims_from", [])):
             _error(f"role {binding.role} cannot claim the assigned queue", 3)
         workspace = str(binding.workspace_path(project))
         agent = config.agent(binding.agent)
@@ -231,6 +234,7 @@ class RunStore:
             run = {
                 "id": run_id, "project_id": state["project_id"], "owner_id": owner_id,
                 "conversation_id": conversation_id,
+                "conversation_task": bool(conversation_id is not None and conversation.get('task') is not None),
                 "task_id": task.task_id, "task_path": task.path, "task_revision": task.sha256,
                 "role": binding.role, "binding_id": binding.id, "binding_sha256": binding.sha256,
                 "agent_id": agent.id, "agent_sha256": agent.sha256, "config_sha256": config.sha256,
@@ -454,7 +458,7 @@ class RunStore:
         digest = fingerprint(document)
         with task_lock(self.runtime, envelope.task_id), self._transaction() as state:
             run = self._run(state, envelope.run_id)
-            if run.get('conversation_id'):
+            if run.get('conversation_id') and not run.get('conversation_task'):
                 _error('conversation has no assigned task for a domain result', 3)
             if not hmac.compare_digest(run["token_sha256"], hashlib.sha256(token.encode()).hexdigest()):
                 _error("invalid run credential", 3)
