@@ -347,9 +347,28 @@ without a cloud service. Document the supported host/OS envelope independently
 of harness support. Keep deployment and UI integrations behind boundaries so
 they do not become prerequisites for the task engine.
 
-Defer a database migration, distributed scheduler, custom web frontend, and
-automatic model selection until measurements or concrete usage justify them.
-Use the existing CLI and VS Code surfaces to prove the workflow first.
+Defer a database migration, distributed scheduler, and automatic model selection
+until measurements or concrete usage justify them. Use the existing CLI and
+VS Code surfaces to prove the workflow first. A local web interface is the
+agreed next phase after this modernization plan, as recorded below.
+
+## Next phase — local web workspace
+
+User direction recorded on 2026-09-06: after completing M0–M7, build a convenient
+local web interface for managing the product and doing work in it. This is a
+follow-on phase; it does not replace or delay the current modernization work.
+
+Initial scope: tasks and queues, agent conversations, approval/input requests,
+dispatch controls and cancellation, changes and results, and execution
+diagnostics. Refine the interaction design against the completed runtime before
+implementation.
+
+The web interface will consume the daemon's versioned operations, snapshots,
+and event stream. Task transitions, authorization, scheduling, and session
+ownership stay in the shared daemon/domain services. Reconnect must recover
+current state and active conversations without duplicating work. Keep the
+product local and ensure that running the web interface is optional for CLI
+and unattended operation.
 
 ## Delivery sequence
 
