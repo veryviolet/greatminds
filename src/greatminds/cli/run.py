@@ -37,6 +37,10 @@ def status(project_dir):
     if source.is_file():
         schema = load_schema_snapshot()
         config = load_execution_config(source, roles=set(schema.document["roles"]))
+        from greatminds.runtime.stand_scheduler import StandScheduler
+        stand_scheduler = StandScheduler(store, config.stand)
+        snapshot["stand_dispatch"] = stand_scheduler.inspect()
+        snapshot["stand_schedule"] = stand_scheduler.snapshot()
         from greatminds.domain.maintenance import MaintenanceService
         snapshot["maintenance_findings"] = MaintenanceService(store, schema).inspect()
         snapshot["assignments"] = [{"task_id": task.task_id, "binding": binding.id,

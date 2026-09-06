@@ -438,7 +438,7 @@ same deployment lock; unchanged cleanup is not repeatedly written. It reconciles
 recorded stand transitions before cleaning uncertain attempts and never starts
 an agent or replays an external command for this sweep. `run status` includes the
 same versioned deployment ledger. Local workflows without a stand ledger create
-no stand state. ACP daemon deployment scheduling remains to be integrated;
+no stand state. Authorized profile dispatch uses the scheduler described below;
 changing a lease alone never resolves an unknown outcome.
 
 
@@ -461,8 +461,7 @@ transition. Projects without stand state create none.
 `run status` includes `stand_lease` with the current expiry or blocking reason.
 Manual `stand reclaim` uses the same TTL and ACP ownership checks and respects
 the deployment lock and unresolved deployment ledger. Granting/deploying the
-next lease remains a separate operation; automatic profile scheduling in the ACP
-daemon is still pending.
+next lease uses the separate authorized profile scheduler below.
 
 
 ## Bounded deployment output
@@ -485,3 +484,41 @@ uncertainty. Once the main process exits, remaining group members are cleaned
 without waiting for inherited output pipes to hit the deployment timeout. Output
 pipes remaining open beyond bounded cleanup raise a recovery error. Internal
 `_deployment_*` metadata is excluded from playbook variables.
+
+
+## Authorized ACP daemon stand scheduling
+
+Automatic profile deployment is opt-in in `coordination/execution.yaml`:
+
+```yaml
+stand:
+  authorized: true
+  profiles: [smoke-only, full-deploy]
+  timeout_seconds: 1800
+  max_output_bytes: 1048576
+```
+
+Omitting `stand`, or setting `authorized: false`, disables automatic deployment.
+The profile list must be explicit and distinct. This permission does not replace
+registry role restrictions or per-lease approval for profiles requiring explicit
+user approval. Registry/profile-file consistency is checked again at dispatch.
+
+A dedicated worker runs the existing deployment engine while the daemon continues
+processing agents, command requests, and operator controls. Dispatch pause stops
+new profile selections; existing work may finish. Shutdown signals cooperative
+cancellation and drains the worker before releasing the supervisor lease.
+`coordd --once` waits for its selected stand deployment as well as agent work.
+
+Before external work, `.stand/schedule.json` records a ticket keyed by the complete
+lease snapshot and immutable stand policy. Selection is serialized against pause,
+deployment ownership, and run claims. The engine rechecks the captured lease before
+using it. A failed or interrupted selection is not automatically replayed for the
+same lease/policy, even when no external deployment receipt was written. After
+correcting a preflight issue, an operator may invoke `stand deploy` explicitly;
+unresolved external effects still require deployment recovery/resolution first.
+
+`run status` exposes `stand_dispatch` and the versioned `stand_schedule`. Failed
+tickets retain exception type and known policy error text with environment-value
+redaction; arbitrary exception text and process output are not copied there.
+Existing bounded capture, exec gating, orphan cleanup, and no-replay rules remain
+in effect. Source/environment identity for stand evidence is still being extended.

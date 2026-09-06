@@ -132,12 +132,21 @@ class CommandDefinition:
 
 
 @dataclass(frozen=True)
+class StandDeploymentPolicy:
+    profiles: tuple[str, ...] = ()
+    authorized: bool = False
+    timeout_seconds: int = 1800
+    max_output_bytes: int = 1048576
+
+
+@dataclass(frozen=True)
 class ExecutionConfig:
     agents: tuple[AgentManifest, ...]
     bindings: tuple[RoleBinding, ...]
     max_running: int = 4
     account_limits: tuple[tuple[str, int], ...] = ()
     commands: tuple[CommandDefinition, ...] = ()
+    stand: StandDeploymentPolicy | None = None
 
     @property
     def sha256(self) -> str:
@@ -149,7 +158,7 @@ class ExecutionConfig:
 
 def parse_execution_config(document: Any, *, roles: set[str]) -> ExecutionConfig:
     root = _mapping(document, "root", {"version", "agents", "bindings", "max_running",
-                                       "account_limits", "commands"})
+                                       "account_limits", "commands", "stand"})
     if type(root.get("version")) is not int or root["version"] != 1:
         _fail("version must be 1")
     agents = []
@@ -226,10 +235,24 @@ def parse_execution_config(document: Any, *, roles: set[str]) -> ExecutionConfig
             purpose=_choice(item.get("purpose", "validation"),
                             {"validation", "deployment", "publication"}, "command purpose"),
             authorized=authorized))
+    stand = None
+    if "stand" in root:
+        item = _mapping(root["stand"], "stand", set(StandDeploymentPolicy.__dataclass_fields__))
+        authorized = item.get("authorized", False)
+        if type(authorized) is not bool:
+            _fail("stand authorized must be boolean")
+        profiles = _strings(item.get("profiles", []), "stand profiles")
+        if len(set(profiles)) != len(profiles) or (authorized and not profiles):
+            _fail("authorized stand deployment requires distinct explicit profiles")
+        limit = _positive(item.get("max_output_bytes", 1048576), "stand output limit")
+        if limit > 67108864:
+            _fail("stand output limit must not exceed 67108864")
+        stand = StandDeploymentPolicy(profiles, authorized,
+            _positive(item.get("timeout_seconds", 1800), "stand timeout"), limit)
     return ExecutionConfig(tuple(agents), tuple(bindings),
                            _positive(root.get("max_running", 4), "max_running"),
                            tuple((safe_name(k), _positive(v, "account limit"))
-                                 for k, v in sorted(limits.items())), tuple(commands))
+                                 for k, v in sorted(limits.items())), tuple(commands), stand)
 
 
 def load_execution_config(path: Path, *, roles: set[str]) -> ExecutionConfig:

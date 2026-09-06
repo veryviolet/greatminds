@@ -904,7 +904,7 @@ def deploy_lease(coord: Path, *, lease_id: str | None = None,
 def _deploy_lease_locked(coord: Path, *, lease_id: str | None = None,
                  ansible_playbook: str | None = None,
                  timeout_seconds: float | None = None, output_limit: int = 1048576,
-                 cancel_event=None) -> tuple[int, str]:
+                 cancel_event=None, expected_lease=None, allowed_profiles=None) -> tuple[int, str]:
     """Deterministic, sanctioned deploy of the active lease's profile.
 
     The single deploy path (1.6.0): load the active lease's YAML/ansible
@@ -935,6 +935,10 @@ def _deploy_lease_locked(coord: Path, *, lease_id: str | None = None,
             raise GreatMindsError(
                 f"active lease is {active.get('lease_id')!r}, not "
                 f"{lease_id!r}", exit_code=3)
+        if expected_lease is not None and active != expected_lease:
+            raise GreatMindsError("stand lease changed before scheduled deployment", exit_code=4)
+        if allowed_profiles is not None and active.get("profile") not in allowed_profiles:
+            raise GreatMindsError("stand profile is not authorized for automatic deployment", exit_code=3)
         cap.update(active)
 
     ss.update_stand_state(coord, _read)
@@ -1003,6 +1007,14 @@ def _deploy_lease_locked(coord: Path, *, lease_id: str | None = None,
     # copy. Falls back to the main tree when the worktree lacks it.
     lease_worktree = cap.get("worktree")
     profile_file = cap.get("profile_file")
+    if allowed_profiles is not None:
+        from greatminds.cli.stand_profile_registry import load_registry, validate_profile_lease_policy, PROFILE_APPROVAL_TOKEN
+        entry = load_registry(coord, worktree=lease_worktree).require(profile)
+        validate_profile_lease_policy(entry, holder_role=cap.get("holder_role"),
+            profile_approval=PROFILE_APPROVAL_TOKEN if cap.get("profile_approval") == "explicit-user-approval" else None)
+        if profile_file and profile_file != entry.file:
+            raise GreatMindsError("lease profile file disagrees with current registry", exit_code=3)
+        profile_file = entry.file
     if not profile_file:
         try:
             from greatminds.cli.stand_profile_registry import load_registry

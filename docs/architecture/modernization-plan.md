@@ -748,6 +748,25 @@ M4 bounded deployment capture and cancellation preparation:
 - Next: wire authorized profile dispatch and cancellation into the ACP daemon
   scheduler; extend source/environment evidence. Full M3/M5–M7 scope remains open.
 
+M4 authorized ACP stand scheduler checkpoint:
+
+- Optional execution `stand` policy declares explicit authorized profiles, timeout,
+  and output limit. Registry role restrictions, per-lease user approval, and file
+  consistency remain enforced by the shared deployment engine.
+- Dedicated worker runs profiles without blocking ACP processing. Pause prevents
+  new selection; shutdown cancels and drains the worker. `--once` waits for it.
+- Durable lease/policy tickets prevent identical automatic replay after failure or
+  interrupted selection. Exact lease revalidation closes the selection/start race.
+  Operator status includes dispatch reasons, tickets, and redacted policy errors.
+- Final scheduler tests: 18 passed; ACP/config integration: 68 passed. Synthetic local
+  executables cover successful deployment, no-agent operation, restart, shutdown,
+  policy/approval refusal, lease mutation, and lost selection acknowledgement.
+- Full regression: 1909 passed, 2 skipped; documentation: 8 passed. Installed-wheel
+  authorized local profile and no-replay restart smoke passed. Final scheduler
+  checks additionally cover role/file approval and nonzero-result classification.
+- Next: stand source/environment evidence and remaining deterministic maintenance,
+  then interactive ACP roles, default migration, and product simplification (M5–M7).
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility
