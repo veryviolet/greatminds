@@ -1258,3 +1258,22 @@ calls. No live user services were changed. This preflight verifies the static
 contract; authentication and negotiated capabilities remain runtime checks.
 Next: update must respect optional service installation and remove remaining
 native restart assumptions.
+
+### Optional service lifecycle during update (2026-09-07)
+
+Update no longer installs missing systemd templates or contains native tmux
+session/agent restart helpers. Project refresh resolves the current ACP root or
+an explicit registered project. Only services with an existing template and
+project drop-in are refreshed; systemctl try-restart preserves inactive services.
+Unregistered foreground workflows receive a manual daemon restart hint. Package
+self-replacement now uses an argv list with the current interpreter (preserving
+spaces and venv symlinks) and retains explicit --project selection.
+
+Retired auto-service-install and native tmux lifecycle tests, preserving package
+upgrade/environment-manager checks and adding ACP lifecycle cases. Validation:
+134 update/registry/service/environment/schema tests passed. Tests prove no
+service files or subprocess service actions for uninstalled services, exact
+reload/try-restart calls for installed services, failure propagation, explicit
+root selection, and interpreter/project preservation. No live service was
+restarted and no package upgrade was performed. Full modernization remains open;
+remaining native setup/helper/CLI cleanup and full-suite execution are next.

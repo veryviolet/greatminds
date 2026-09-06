@@ -187,27 +187,6 @@ def test_full_update_refuses_major_without_flag(fake_pypi, fake_subprocess,
     assert fake_execv.calls == []
 
 
-def test_already_up_to_date_still_reconciles_config(fake_pypi, fake_subprocess,
-                                                    fake_execv, monkeypatch):
-    """1.5.10: when the package is already current, `update` no longer
-    exits early — it still runs the config-migration + restart phase, so
-    a stale project config (old coord.yaml etc.) is reconciled even when
-    the package needs no bump. No package bump → no self-replace execv."""
-    fake_pypi["latest"] = GM_VERSION
-    from greatminds.cli import update as _update_mod
-    monkeypatch.setattr(
-        _update_mod, "_resolve_session_from_coord_yaml", lambda: "greatminds")
-    monkeypatch.setattr(_update_mod, "_tmux_session_present", lambda _s: True)
-
-    result = _invoke([])
-    assert result.exit_code == 0, result.output
-    assert "already up to date" in result.output
-    # No bump → no os.execv self-replace...
-    assert fake_execv.calls == []
-    # ...but the config-reconcile phase STILL ran: daemon restart fired.
-    daemon_calls = [c for c in fake_subprocess
-                    if "daemon" in c and "restart" in c]
-    assert len(daemon_calls) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -215,66 +194,12 @@ def test_already_up_to_date_still_reconciles_config(fake_pypi, fake_subprocess,
 # ---------------------------------------------------------------------------
 
 
-def test_post_pip_invokes_daemon_restart_and_agent_restart(monkeypatch,
-                                                            fake_subprocess):
-    # No legacy coordd present.
-    # 0299: agent restart now gates on tmux session presence.
-    # Stub both helpers so the legacy assertion (restart subprocess
-    # fires) continues to hold.
-    from greatminds.cli import update as _update_mod
-    monkeypatch.setattr(
-        _update_mod, "_resolve_session_from_coord_yaml",
-        lambda: "greatminds",
-    )
-    monkeypatch.setattr(
-        _update_mod, "_tmux_session_present", lambda _s: True,
-    )
-
-    result = _invoke(["--post-pip"])
-    assert result.exit_code == 0, result.output
-
-    # daemon restart was called.
-    daemon_calls = [c for c in fake_subprocess
-                    if "daemon" in c and "restart" in c]
-    assert len(daemon_calls) == 1
-
-    # tmux restart (top-level `greatminds restart`) was called.
-    restart_calls = [c for c in fake_subprocess
-                     if c and c[-1] == "restart"
-                     and "daemon" not in c]
-    assert len(restart_calls) == 1
 
 
 
 
-def test_post_pip_with_explicit_project_name_passes_flag(monkeypatch,
-                                                          fake_subprocess):
-    result = _invoke(["--post-pip", "--project", "myproj"])
-    assert result.exit_code == 0
-    daemon_calls = [c for c in fake_subprocess
-                    if "daemon" in c and "restart" in c]
-    assert len(daemon_calls) == 1
-    assert "--project" in daemon_calls[0]
-    assert "myproj" in daemon_calls[0]
 
 
-def test_post_pip_daemon_restart_failure_exits_nonzero(monkeypatch,
-                                                        fake_subprocess):
-    """If `daemon restart` fails, update propagates the rc with a recovery hint."""
-
-    real_runs: list[list[str]] = fake_subprocess
-
-    def selective_run(cmd, *_a, **_kw):
-        real_runs.append(list(cmd))
-        # First daemon restart fails; everything else succeeds.
-        if "daemon" in cmd and "restart" in cmd:
-            return subprocess.CompletedProcess(list(cmd), 3, "", "")
-        return subprocess.CompletedProcess(list(cmd), 0, "", "")
-
-    monkeypatch.setattr(upd.subprocess, "run", selective_run)
-    result = _invoke(["--post-pip"])
-    assert result.exit_code == 3
-    assert "daemon restart failed" in result.output
 
 
 # ---------------------------------------------------------------------------

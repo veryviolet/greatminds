@@ -77,6 +77,11 @@ set PATH in `.greatminds/PROJECT.env`, or declare an agent/command `environment`
 reference for PATH in `execution.yaml`. Service installation does not run login
 shells or discover vendor-specific executables.
 
+`greatminds update` refreshes the ACP project and only already-installed services.
+It uses `try-restart`, so inactive services stay inactive. It never installs a
+service or opens a frontend. Restart a foreground daemon manually after updating.
+`update --project NAME` selects the registered project even from another directory.
+
 In another terminal, create an operator conversation with the configured binding:
 
 ```bash

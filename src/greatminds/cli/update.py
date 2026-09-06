@@ -1,31 +1,13 @@
-"""greatminds update — single-command upgrade of CLI + daemon + agents.
+"""Upgrade Greatminds and refresh the current ACP project.
 
-Three moving parts to keep in sync after a release:
-
-  1. The package itself in the venv where ``greatminds`` is installed
-     (typically the project's ``.venv/`` from ``uv add greatminds`` or
-     ``pip install greatminds``).
-  2. The systemd-user daemon ``greatminds-daemon@<project>.service``.
-  3. The tmux agents restarted via ``greatminds restart``.
-
-This command runs all three in one pass, with a self-replacement step
-(``os.execv``) between phase 1 and the rest so the new code drives the
-daemon and agent refresh. ``--post-pip`` skips package installation and
-refreshes only daemon/agent state.
-
-CLI surface::
-
-    greatminds update                  # full path: pip + daemon + agents
-    greatminds update --post-pip       # skip pip; daemon + agents only
-    greatminds update --check          # report would-be changes, no actions
-    greatminds update --dry-run        # alias of --check
-    greatminds update --major          # allow major-version bump
+Installed services are refreshed with try-restart, which preserves inactive
+services. Updating never installs a service or starts a native agent frontend.
+Use --post-pip to repeat project refresh without installing the package.
 """
 from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 import urllib.error
@@ -92,23 +74,9 @@ def _is_major_bump(current: str, latest: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _greatminds_bin() -> str:
-    """Resolve the `greatminds` console script, PINNED to the venv of the
-    RUNNING interpreter — NOT PATH.
-
-    ``shutil.which`` is PATH-first, so a foreign activated virtualenv
-    (e.g. an unrelated ``.venv-coord`` leaking onto PATH under ``uv run``)
-    can shadow the project's greatminds and make the self-replace exec the
-    wrong version. ``sys.executable``'s sibling is the right binary for
-    the env update is installed in. Falls back to PATH, then the module.
-    """
-    cand = Path(sys.executable).resolve().parent / "greatminds"
-    if cand.is_file():
-        return str(cand)
-    found = shutil.which("greatminds")
-    if found:
-        return str(Path(found).resolve())
-    return f"{sys.executable} -m greatminds.cli.main"
+def _greatminds_argv() -> list[str]:
+    """Use the current environment, preserving interpreter symlinks and spaces."""
+    return [sys.executable, "-m", "greatminds.cli.main"]
 
 
 def _installed_version_fresh() -> str | None:
@@ -170,7 +138,7 @@ def _step_pip_upgrade(major: bool) -> bool:
 
     Returns True if an upgrade was actually performed (caller must
     self-replace into the new binary), False if the package was already
-    current (caller still runs the config-migration + restart phase
+    current (caller still runs the project refresh phase
     in-process — config can be stale even when the package is current).
     """
     current = __version__
@@ -240,128 +208,55 @@ def _step_pip_upgrade(major: bool) -> bool:
     return True
 
 
-def _self_replace_to_post_pip() -> None:
-    """os.execv into the freshly-installed binary with --post-pip."""
-    new_bin = _greatminds_bin()
-    if " -m " in new_bin:
-        # Fallback `python -m greatminds.cli.main` form: split into argv.
-        argv = new_bin.split() + ["update", "--post-pip"]
-        try:
-            os.execv(argv[0], argv)
-        except OSError as exc:
-            warn(f"os.execv fallback (subprocess): {exc}")
-            cp = subprocess.run(argv)
-            raise click.exceptions.Exit(cp.returncode)
-        return
+def _self_replace_to_post_pip(project_name: str | None = None) -> None:
+    argv = _greatminds_argv() + ["update", "--post-pip"]
+    if project_name:
+        argv += ["--project", project_name]
     try:
-        os.execv(new_bin, [new_bin, "update", "--post-pip"])
+        os.execv(argv[0], argv)
     except OSError as exc:
         warn(f"os.execv fallback (subprocess): {exc}")
-        cp = subprocess.run([new_bin, "update", "--post-pip"])
+        cp = subprocess.run(argv)
         raise click.exceptions.Exit(cp.returncode)
 
 
-def _step_migrate_project_config() -> None:
-    """Refresh additive shared ACP project state, preserving its contract."""
+def _refresh_project(project_name: str | None) -> None:
+    from greatminds.cli import daemon
+    from greatminds.core.paths import find_project_dir
     from greatminds.runtime.bootstrap import bootstrap
-    info("==> refreshing ACP project state...")
-    bootstrap(Path.cwd())
-
-
-
-
-def _step_ensure_template_unit_installed() -> None:
-    """Install the common daemon template if missing before service restart."""
-    from greatminds.cli.daemon import SYSTEMD_USER_DIR, TEMPLATE_UNIT_NAME
-
-    template = SYSTEMD_USER_DIR / TEMPLATE_UNIT_NAME
-    if template.is_file():
-        return  # already installed; nothing to do
-
-    info("==> template unit not found; running daemon install")
-    new_bin = _greatminds_bin().split()
-    cp = subprocess.run(new_bin + ["daemon", "install"])
-    if cp.returncode != 0:
-        err(
-            "daemon install failed; check `systemctl --user enable "
-            "greatminds-daemon@<name>.service` and re-run "
-            "`greatminds update --post-pip`. Ensure systemd-user is "
-            "enabled for this account (loginctl enable-linger)."
-        )
-        raise click.exceptions.Exit(cp.returncode)
-    ok("    ✓ template unit installed")
-
-
-def _step_restart_daemon(project_name: str | None) -> None:
-    """Invoke `greatminds daemon restart` via the freshly-installed CLI."""
-    new_bin = _greatminds_bin().split()  # may be `<py> -m greatminds.cli.main`
-    cmd = new_bin + ["daemon", "restart"]
     if project_name:
-        cmd += ["--project", project_name]
-    info(f"==> restarting daemon...")
-    cp = subprocess.run(cmd)
-    if cp.returncode != 0:
-        err(
-            "daemon restart failed; check `systemctl --user status "
-            "greatminds-daemon@<name>` and re-run `greatminds update --post-pip`."
-        )
-        raise click.exceptions.Exit(cp.returncode)
-    ok("    ✓ daemon active")
-
-
-def _tmux_session_present(session: str | None) -> bool:
-    """0299: check whether the project's tmux session exists.
-
-    Returns False when:
-      - ``session`` is None (no coord.yaml or no session field).
-      - ``tmux`` is not on PATH.
-      - ``tmux has-session -t <session>`` returns non-zero (session
-        not running).
-
-    Caller skips the agent-restart phase entirely when this is
-    False — USER may have intentionally killed the session before
-    running ``greatminds update``; resurrecting it would be hostile.
-    """
-    if not session:
-        return False
-    tmux = shutil.which("tmux")
-    if not tmux:
-        return False
-    try:
-        cp = subprocess.run(
-            [tmux, "has-session", "-t", session],
-            capture_output=True, text=True, timeout=10,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-    return cp.returncode == 0
-
-
-def _resolve_session_from_coord_yaml() -> str | None:
-    """Best-effort: read ``coord.yaml`` for the session name. None
-    if absent / malformed."""
-    import yaml as _yaml
-    cy = Path.cwd() / "coord.yaml"
-    if not cy.is_file():
-        return None
-    try:
-        doc = _yaml.safe_load(cy.read_text(encoding="utf-8")) or {}
-    except (OSError, _yaml.YAMLError):
-        return None
-    sess = doc.get("session")
-    return str(sess).strip() if isinstance(sess, str) and sess.strip() else None
-
-
+        daemon._validate_project_name(project_name)
+        root = daemon.lookup_project_dir(project_name)
+        if root is None:
+            raise click.ClickException("project is not registered")
+        root = root.resolve()
+        names = [project_name]
+    else:
+        root = find_project_dir(Path.cwd(), use_env=False)
+        names = sorted(name for name, path in daemon.load_registry().items()
+                       if Path(path).resolve() == root)
+    info("==> refreshing ACP project state...")
+    bootstrap(root)
+    template = daemon.SYSTEMD_USER_DIR / daemon.TEMPLATE_UNIT_NAME
+    for name in names:
+        dropin = daemon._project_dropin_dir(name) / "10-project-env.conf"
+        if not template.is_file() or not dropin.is_file():
+            info(f"==> service {name} is not installed; skipping service refresh")
+            continue
+        daemon._refresh_units_before_restart(name, root)
+        daemon._checked_systemctl("try-restart", daemon._instance_unit(name))
+        ok(f"service {name} refreshed; inactive state preserved")
+    if not names:
+        info("==> no registered service; restart a foreground daemon manually if needed")
 
 
 @click.command(
     "update",
-    short_help="upgrade greatminds (pip + daemon + agents) in one shot",
+    short_help="upgrade package and refresh ACP project",
     help=__doc__,
 )
 @click.option("--post-pip", "post_pip", is_flag=True,
-              help="skip pip; only run daemon + agent restarts "
-                   "(idempotent recovery mode).")
+              help="skip package installation; refresh project and installed services.")
 @click.option("--check", "check", is_flag=True,
               help="report what would change; no actions.")
 @click.option("--dry-run", "dry_run", is_flag=True,
@@ -369,8 +264,7 @@ def _resolve_session_from_coord_yaml() -> str | None:
 @click.option("--major", is_flag=True,
               help="allow major-version bump (default: refuse).")
 @click.option("--project", "project_name", default=None,
-              help="project name for `greatminds daemon restart` (default: "
-                   "coord.yaml session).")
+              help="registered project name (default: current project).")
 def update(post_pip: bool, check: bool, dry_run: bool, major: bool,
            project_name: str | None) -> None:
     is_check = check or dry_run
@@ -395,22 +289,16 @@ def update(post_pip: bool, check: bool, dry_run: bool, major: bool,
         bumped = _step_pip_upgrade(major)
         if bumped:
             # Phase 2: self-replace via os.execv → continues as `--post-pip`
-            # in the freshly-installed binary (which has the new migration).
-            _self_replace_to_post_pip()
+            # in the freshly-installed binary (which has the updated project logic).
+            _self_replace_to_post_pip(project_name)
             return  # pragma: no cover — execv replaces the process
         # Package already current → NO self-replace needed (this binary is
-        # the right version). Fall through to run the same config-migration
+        # the right version). Fall through to run the same project refresh
         # + restart phase in-process, so `update` ALWAYS reconciles the
         # project config to the installed version, not just the package.
         info("==> reconciling project config to installed version...")
 
-    # --post-pip phase (idempotent; reached via self-replace, explicit
-    # --post-pip, or the already-current fall-through above).
-    # Project-config migration FIRST so the daemon + agents below start
-    # on the migrated config (new coord.yaml model, refreshed canon).
-    _step_migrate_project_config()
-    _step_ensure_template_unit_installed()  # 0202: fill the migration gap
-    _step_restart_daemon(project_name)
+    _refresh_project(project_name)
     # Fresh read — in-process __version__ is stale right after a same-run
     # upgrade (it reflects the OLD module the process imported at start).
     ok(f"==> done: greatminds at {_installed_version_fresh() or __version__}")
