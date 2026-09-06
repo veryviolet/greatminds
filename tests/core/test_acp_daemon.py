@@ -43,6 +43,38 @@ def test_idle_daemon_never_starts_an_agent(tmp_path):
     assert not (root / "agent-starts.log").exists()
 
 
+def test_daemon_resumes_dependency_ready_work_before_dispatch_without_a_reviewer_turn(tmp_path):
+    root = project(tmp_path, tasks=False)
+    runtime = root / ".greatminds"
+    blocked = runtime / "feature_blocked" / "0001-waiter.yaml"
+    blocked.parent.mkdir()
+    dependency = runtime / "verified" / "0002-prerequisite.yaml"
+    dependency.parent.mkdir()
+    dependency.write_text("id: 0002-prerequisite\n")
+    blocked.write_text(yaml.safe_dump({"id": "0001-waiter", "stream": "product", "kind": "research",
+        "scope": "backend", "reporter": "USER", "opened_at": "2026-09-06T10:00:00Z", "priority": "normal",
+        "title": "Resume fixture", "blocks": [
+            {"kind": "plan", "by": "ARCHITECT-PLANNER", "at": "2026-09-06T10:00:00Z",
+             "base_commit": "fixture", "assignee_role": "DEVELOPER", "stand_required": False,
+             "plan_kind": "full", "mode": "A", "ready_for_implementation": True},
+            {"kind": "blocked", "by": "DEVELOPER", "at": "2026-09-06T10:00:00Z",
+             "reason": "Waiting for prerequisite", "dependencies": ["verified/0002-prerequisite.yaml"],
+             "resume_to": "feature_dev"}]}))
+    snapshot = asyncio.run(serve(root, once=True, interval=0.2, environment={}))
+    assert not blocked.exists()
+    assert (runtime / "feature_dev" / blocked.name).exists()
+    assert len(snapshot["runs"]) == 1
+    run = next(iter(snapshot["runs"].values()))
+    assert run["role"] == "DEVELOPER" and run["state"] == "completed", run
+    operation = next(iter(snapshot["maintenance"].values()))
+    assert operation["status"] == "applied"
+    events = [event["kind"] for event in snapshot["events"]]
+    assert events.index("system_operation_applied") < events.index("claimed")
+    assert (root / "agent-starts.log").read_text().splitlines() == ["echo"]
+    status = CliRunner().invoke(cli, ["run", "status", "--project-dir", str(root)])
+    assert json.loads(status.output)["maintenance_findings"] == snapshot["maintenance_findings"]
+
+
 def command_project(tmp_path, script="print('daemon check passed')"):
     root = project(tmp_path, scenario="command")
     path = root / "coordination" / "execution.yaml"

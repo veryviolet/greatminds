@@ -91,7 +91,8 @@ class ResultService:
             raise GreatMindsError("command_evidence must be an array of command request IDs")
         command_records = {request_id: self.commands.evidence(run, request_id, require_success=False)
                            for request_id in command_ids}
-        with policy.domain_context(document=contract, runtime=self.store.runtime, workspace=workspace):
+        with policy.domain_context(document=contract, runtime=self.store.runtime, workspace=workspace,
+                                   environment=self.commands.environment):
             for raw in blocks:
                 fields = dict(raw)
                 kind = fields.pop("kind", None)
@@ -218,7 +219,8 @@ class ResultService:
         candidate = yaml.safe_load(operation["after"])
         source = operation["source"].split("/")[0]
         destination = operation["destination"].split("/")[0]
-        with policy.domain_context(document=contract, runtime=self.store.runtime, workspace=Path(run["workspace"])):
+        with policy.domain_context(document=contract, runtime=self.store.runtime, workspace=Path(run["workspace"]),
+                                   environment=self.commands.environment):
             for request_id in operation.get("command_evidence", []):
                 self.commands.evidence(run, request_id, require_success=False)
             policy.validate_task(candidate)

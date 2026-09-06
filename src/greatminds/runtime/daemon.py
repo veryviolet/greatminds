@@ -11,6 +11,7 @@ from greatminds.core.errors import GreatMindsError
 from greatminds.core.paths import project_runtime_dir
 from greatminds.core.schema import load_schema_snapshot
 from greatminds.domain.results import ResultService
+from greatminds.domain.maintenance import MaintenanceService
 from .config import load_execution_config
 from .store import RunStore, TERMINAL, TaskRevision
 from .supervisor import Supervisor
@@ -59,6 +60,9 @@ def assignments(store, config, schema):
                 elif any(item["task_id"] == task.task_id and item["status"] in {"queued", "starting", "running", "needs_recovery"}
                          for item in snapshot.get("commands", {}).values()):
                     reason = "command_unresolved"
+                elif any(item["task_id"] == task.task_id and item["status"] in {"prepared", "needs_recovery"}
+                         for item in snapshot.get("maintenance", {}).values()):
+                    reason = "maintenance_unresolved"
                 elif any(run["account"] == binding.account and run["state"] == "waiting_auth" for run in active):
                     reason = "account_authentication_required"
                 elif previous and not latest.get("retry_authorized"):
@@ -101,6 +105,7 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                               config=config, environment=environment) as supervisor:
             active: dict[str, asyncio.Task] = {}
             results = ResultService(store, environment=supervisor.environment)
+            maintenance = MaintenanceService(store, schema, environment=supervisor.environment)
             dispatched_once = False
             try:
                 while not stop.is_set():
@@ -112,6 +117,7 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                                 await supervisor.commands.finish_run(run_id)
                             del active[run_id]
                     await _domain_reconcile(loop, domain_pool, results)
+                    await _domain_reconcile(loop, domain_pool, maintenance)
                     for run in store.snapshot()["runs"].values():
                         control = run.get("control")
                         if not control or control["status"] == "completed":
@@ -140,6 +146,7 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                     dispatched_once = True
                     if once and not active:
                         await _domain_reconcile(loop, domain_pool, results)
+                        await _domain_reconcile(loop, domain_pool, maintenance)
                         break
                     try:
                         await asyncio.wait_for(stop.wait(), timeout=max(0.2, interval))

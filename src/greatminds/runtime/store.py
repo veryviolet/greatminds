@@ -180,6 +180,9 @@ class RunStore:
         agent = config.agent(binding.agent)
         with task_lock(self.runtime, task.task_id), self._transaction() as state:
             self._check_revision(task)
+            if any(item["task_id"] == task.task_id and item["status"] in {"prepared", "needs_recovery"}
+                   for item in state.get("maintenance", {}).values()):
+                _error("task has an unresolved maintenance operation")
             if any(receipt["envelope"]["task_id"] == task.task_id
                    and receipt["status"] in {"received", "applying", "needs_recovery"}
                    for receipt in state["results"].values()):
@@ -333,6 +336,9 @@ class RunStore:
             if kind == "retry" and run["state"] not in TERMINAL | {"waiting_auth", "waiting_input"}:
                 _error("cancel the active run before requesting retry")
             if kind == "retry":
+                if any(item["task_id"] == run["task_id"] and item["status"] in {"prepared", "needs_recovery"}
+                       for item in state.get("maintenance", {}).values()):
+                    _error("resolve the pending maintenance operation before retrying")
                 if any(item["run_id"] == run_id and item["status"] in {"queued", "starting", "running", "needs_recovery"}
                        for item in state.get("commands", {}).values()):
                     _error("resolve the pending command before retrying")

@@ -17,9 +17,9 @@ Also detects:
     the feature_blocked dependency graph);
   - tasks with no blocked block (orphans).
 
-ARCHITECT-REVIEWER is expected to run this at the start of every tick
-and act on ready-to-wake / cycle / malformed findings. wake_check
-never moves files.
+For ACP execution contracts the daemon resumes ready work automatically.
+This command exposes the same dependency/system-operation findings read-only.
+Legacy projects retain their informational report until configuration migration.
 
 Exit code:
   0 always (informational).
@@ -27,6 +27,7 @@ Exit code:
 from __future__ import annotations
 
 import re
+import json
 from pathlib import Path
 
 import click
@@ -150,7 +151,8 @@ def all_blocked_files(coord: Path) -> list[Path]:
 @click.option("--canon-dir", type=click.Path(exists=True, file_okay=False, path_type=Path),
               default=None, help="canon data dir (default: packaged greatminds.data)")
 @click.option("--quiet", is_flag=True, help="suppress no-findings output")
-def wake_check(project_dir: Path | None, canon_dir: Path | None, quiet: bool) -> None:
+@click.option("--json", "as_json", is_flag=True, help="versioned dependency/controller findings")
+def wake_check(project_dir: Path | None, canon_dir: Path | None, quiet: bool, as_json: bool = False) -> None:
     project_dir = project_dir or Path.cwd()
     canon_dir = canon_dir or find_canon_dir()
 
@@ -159,6 +161,21 @@ def wake_check(project_dir: Path | None, canon_dir: Path | None, quiet: bool) ->
         coord = project_dir
     else:
         coord = find_runtime_dir(project_dir, strict=False)
+    if as_json or (coord.parent / "coordination" / "execution.yaml").is_file():
+        from greatminds.core.schema import load_schema_snapshot
+        from greatminds.domain.maintenance import MaintenanceService
+        from greatminds.runtime.store import RunStore
+        report = MaintenanceService(RunStore(coord), load_schema_snapshot(canon_dir)).inspect()
+        if as_json:
+            click.echo(json.dumps(report, ensure_ascii=False, indent=2))
+        else:
+            for item in report["tasks"].values():
+                click.echo(f"{item['task_id']}: {item['status']} → {item['resume_to']}")
+                for reason in item["reasons"]:
+                    click.echo("  " + json.dumps(reason, ensure_ascii=False))
+            if not report["tasks"] and not quiet:
+                info("no blocked tasks")
+        return
     if not (coord / "feature_blocked").is_dir():
         if not quiet:
             info(f"no feature_blocked/ at {coord}")

@@ -10,6 +10,14 @@
 
 version: 1
 
+# Daemon-only operations are separate from agent roles and role transitions.
+# An agent cannot acquire SYSTEM through a role binding or submit its approval.
+system_transitions:
+  resume_dependencies:
+    from: feature_blocked
+    to: declared_resume_to
+    requires: [terminal_dependencies, declared_resume, task_readiness]
+
 # ---------------------------------------------------------------------------
 # Glossary
 #
@@ -251,7 +259,7 @@ roles:
     responsibilities:
       - verify_evidence_chain
       - commit_and_merge
-      - resume_blocked_tasks_via_wake_check
+      - resolve_dependency_cycles_and_invalid_declarations
       - rollback_verified_tasks
     forbidden_actions:
       - implement_code
@@ -265,8 +273,7 @@ roles:
         - mv_to_verified_on_approved
         - mv_back_to_implementer_queue_on_changes_requested
       on_feature_blocked_claim:
-        - run_wake_check
-        - mv_to_resume_to_queue_when_dependencies_satisfied
+        - inspect_dependency_findings_and_resolve_semantic_blockers
         - archive_when_withdrawn_reason_present
       on_verified_rollback:
         - append_rollback_block_with_reason

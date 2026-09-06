@@ -33,6 +33,8 @@ def status(project_dir):
     if source.is_file():
         schema = load_schema_snapshot()
         config = load_execution_config(source, roles=set(schema.document["roles"]))
+        from greatminds.domain.maintenance import MaintenanceService
+        snapshot["maintenance_findings"] = MaintenanceService(store, schema).inspect()
         snapshot["assignments"] = [{"task_id": task.task_id, "binding": binding.id,
                                     "role": binding.role, "reason": reason}
                                    for binding, task, reason in assignments(store, config, schema)]
@@ -108,6 +110,20 @@ def command_resolve(request_id, reason):
         raise GreatMindsError("uncertain command resolution requires the operator", exit_code=3)
     service = CommandService(RunStore(project_runtime_dir(find_project_dir())))
     click.echo(json.dumps(service.resolve(request_id, reason=reason), ensure_ascii=False, indent=2))
+
+
+@run.command("repair")
+@click.option("--operation", "operation_id", required=True)
+@click.option("--abandon", is_flag=True, help="cancel an uncommitted intent after inspection")
+@click.option("--reason", help="required when abandoning an intent")
+def repair(operation_id, abandon, reason):
+    """Request bounded reconciliation of an incomplete system operation."""
+    from greatminds.domain.maintenance import MaintenanceService
+    if os.environ.get("GREATMINDS_RUN_ID"):
+        raise GreatMindsError("system operation repair requires the operator", exit_code=3)
+    service = MaintenanceService(RunStore(project_runtime_dir(find_project_dir())), load_schema_snapshot())
+    result = service.abandon(operation_id, reason=reason) if abandon else service.request_repair(operation_id)
+    click.echo(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 @run.command("submit")

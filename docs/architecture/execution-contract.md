@@ -116,6 +116,50 @@ its effects, an operator can use `greatminds run command-resolve ID --reason TEX
 to acknowledge uncertainty. This produces no passing evidence and does not run
 anything; authorizing another task run is a separate explicit retry operation.
 
+## Dependency maintenance
+
+For ACP projects, the daemon resumes dependency-ready tasks without an agent
+turn. `greatminds wake-check --json` and `greatminds run status` expose the same
+versioned findings: ready, waiting/missing dependencies, conflicting terminal
+location, malformed/duplicate identity, cycle, withdrawal, required live-role
+hold, readiness failure, or an unresolved operation. No repeated heartbeat or
+reviewer queue scan is required. Unchanged findings generate no repeated events.
+
+Dependencies must name an existing task in their declared terminal queue. An
+active task, an archived task when verified was required, or an ambiguous identity
+cannot silently satisfy the condition. Markdown task files require conversion to
+typed YAML before automatic resumption. The
+graph detects entire cycle components without a recursion-depth limit. A required
+live ACP role needs a recorded running process with a matching OS identity;
+configuration alone is not proof that a role is usable. An unavailable explicit
+target context remains a hold.
+
+The effective schema separately authorizes `system_transitions.resume_dependencies`.
+SYSTEM is not an agent role and cannot be selected in a binding. The system
+operation uses only the latest blocked block's `resume_to`, requires an active
+destination, and preserves schema scope/readiness gates. Withdrawn work still
+requires a semantic decision. The original blocking author is retained in the
+system journal rather than impersonated as the actor of the resume.
+
+Before moving the task, the daemon locks the task and dependency identities in
+stable order, rechecks their revisions, and records an intent with the pinned
+schema and dependency evidence. Claims and CLI mutations hold while the operation
+is incomplete. Recovery finishes a recorded move/journal once; changed evidence
+or conflicting task contents produce `needs_recovery` without overwriting files.
+The same task revision and dependency evidence cannot resume repeatedly if the
+task reappears unchanged in the blocked queue.
+
+An operator requests reconciliation with `greatminds run repair --operation ID`.
+This rechecks the original preconditions; it grants no override. If an intent has
+not moved its task, `--abandon --reason TEXT` can cancel that intent while preserving
+the source. Changed dependency evidence can then create a fresh intent. An intent
+whose task may already have moved must be reconciled, not abandoned. Agent-scoped
+credentials cannot request these operator actions.
+
+Projects without an ACP execution contract receive an informational wake report.
+Within ACP, both manual domain decisions and automatic maintenance use the shared
+terminal-dependency and declared-destination checks.
+
 ## Persistence and ownership
 
 The runtime service stores a versioned snapshot in `.runtime/state.json` beneath

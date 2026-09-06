@@ -515,7 +515,28 @@ M3 context simplification:
   the ACP fixtures also submitted compact decisions through the CLI, including
   command evidence and handoff application.
 
-Automatic workflow controllers, stand/lease integration, live harness
+M3 dependency controller:
+
+- ACP domain validation, wake diagnostics, and daemon maintenance share terminal
+  dependency semantics and declared resume destinations. The graph reports missing,
+  active, conflicting terminal, malformed, duplicate, and cyclic dependencies.
+- An explicit schema system operation resumes ready tasks under task/dependency
+  locks, retaining pinned schema, dependency revisions, and the blocking author's
+  provenance. No reviewer or other LLM turn is created for the mechanical resume.
+- Prepared/moved/journaled crash stages recover once. Changed evidence holds;
+  bounded operator repair rechecks the original conditions. Abandoning an unmoved
+  intent preserves task files and does not turn uncertain work into success.
+- Withdrawals, live-role/auth holds, semantic gates, active runs, and incomplete
+  operations block automatic movement. Configured roles alone do not prove liveness.
+- Shared JSON diagnostics drive `run status` and `wake-check --json`; unchanged
+  findings are deduplicated. The reviewer no longer receives routine wake-check
+  and mechanical resume duties in the effective schema.
+- Full regression: 1,803 passed and 2 skipped, with one documentation-wording
+  check subsequently corrected. The final documentation/controller/daemon subset
+  passed all 31 tests. Built-wheel smoke covers system resume → ACP dispatch →
+  shared operator status with no reviewer turn. No live inference was used.
+
+Remaining maintenance controllers, stand/lease integration, live harness
 compatibility, interactive attach, and complete migration/removal of the
 existing launch paths remain pending. M2 is not complete until the real
 integration campaign and remaining client policies have passed.

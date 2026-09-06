@@ -115,9 +115,9 @@ _domain_context: ContextVar[dict | None] = ContextVar("task_domain_context", def
 
 
 @contextmanager
-def domain_context(*, document: dict, runtime: Path, workspace: Path):
+def domain_context(*, document: dict, runtime: Path, workspace: Path, environment: dict | None = None):
     """Use an explicit run contract without changing process globals or cwd."""
-    context = {"schema": document, "runtime": runtime, "workspace": workspace}
+    context = {"schema": document, "runtime": runtime, "workspace": workspace, "environment": environment}
     token = _domain_context.set(context)
     try:
         context["tables"] = _load_fsm_tables_from_schema()
@@ -552,6 +552,9 @@ def task_file_lock(coord: Path, task_id: str,
     with task_lock(coord, canonical_id, timeout=timeout, poll_interval=poll_interval):
         if (coord / ".runtime" / "state.json").exists():
             from greatminds.runtime.store import RunStore
+            if any(item["task_id"] == canonical_id and item["status"] in {"prepared", "needs_recovery"}
+                   for item in RunStore(coord).snapshot().get("maintenance", {}).values()):
+                raise GreatMindsError("task has an incomplete system operation; reconcile it first", exit_code=4)
             if any(receipt["envelope"]["task_id"] == canonical_id
                    and receipt["status"] in {"applying", "needs_recovery"}
                    for receipt in RunStore(coord).snapshot()["results"].values()):
@@ -1352,6 +1355,17 @@ def _check_all_dependencies_exist(data: dict[str, Any],
 
     Resolves dependency strings from the latest blocked block and
     checks each against ``coord/<path>``. Missing dep → reject."""
+    coord = _domain_runtime()
+    if _domain_context.get() is not None or (coord.parent / "coordination" / "execution.yaml").is_file():
+        from greatminds.domain.dependencies import inspect_dependencies
+        context = _domain_context.get()
+        report = inspect_dependencies(coord, schema(), environment=context.get("environment") if context else None)
+        finding = report["tasks"].get(data.get("id"))
+        if not finding or finding["status"] != "ready":
+            return "dependencies are not ready: " + str(finding["reasons"] if finding else "task not found")
+        if finding["resume_to"] != to_q:
+            return "resume must use the latest blocked.resume_to destination"
+        return None
     blocks = data.get("blocks") or []
     blockeds = [b for b in blocks
                 if isinstance(b, dict) and b.get("kind") == "blocked"]
