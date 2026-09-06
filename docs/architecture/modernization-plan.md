@@ -1138,3 +1138,19 @@ Validation: 31 service/doctor/environment tests passed; full suite collection:
 1626 tests without collection errors. This is not a full-suite execution claim.
 Project naming and environment capture still need conversion from native setup
 assumptions, and update service opt-in behavior remains to be reviewed.
+
+### ACP service identity (2026-09-07)
+
+Service naming no longer reads `coord.yaml`: resolve an explicit name, an
+existing unique registry entry for the project, or the project directory name.
+Implicit selection from a nested directory finds the enclosing project. Validate
+service identifiers before install mutations, reject conflicting directory/name
+pairs and duplicate-basename redirection, and require explicit selection for
+multiple registered aliases. Doctor uses the same resolver. Documented optional
+service installation in the quickstart.
+
+Validation: 44 service/doctor/coordd tests passed, including fresh ACP setup,
+service registration and nested-directory start without coord.yaml, invalid
+names, collisions and ambiguous aliases. systemctl was substituted in tests;
+no live user services were modified. Environment capture, registry concurrency
+and service/update failure handling remain to be completed.

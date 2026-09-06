@@ -3,7 +3,7 @@
 Wraps ``systemctl --user`` to manage instances of the
 ``greatminds-daemon@<project>.service`` template unit. Each greatminds
 project on the host gets ONE daemon instance keyed by its
-``coord.yaml: session`` name (or an explicit ``--project NAME`` flag),
+registered project name (or the project directory name by default),
 so multiple projects on the same user can run their daemons
 concurrently without colliding on a global unit name.
 
@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import os
 import pwd
+import re
 import shlex
 import shutil
 import subprocess
@@ -181,8 +182,11 @@ def save_registry(reg: dict[str, str]) -> None:
 
 
 def register_project(name: str, project_dir: Path) -> None:
-    """Insert/overwrite ``{name → str(project_dir.resolve())}``."""
+    """Register a project without redirecting an existing service identity."""
+    _validate_project_name(name)
     reg = load_registry()
+    if name in reg and Path(reg[name]).resolve() != project_dir.resolve():
+        raise click.ClickException("project name is registered to a different directory")
     reg[name] = str(project_dir.resolve())
     save_registry(reg)
 
@@ -194,39 +198,39 @@ def lookup_project_dir(name: str) -> Path | None:
 
 
 # ---------------------------------------------------------------------------
-# coord.yaml session-name resolution
+# Project identity is independent of agent/window configuration.
 # ---------------------------------------------------------------------------
 
 
-def _read_session_from_coord_yaml(project_dir: Path) -> str | None:
-    p = coord_yaml_path(project_dir)
-    if not p.is_file():
-        return None
-    try:
-        data = yaml.safe_load(p.read_text(encoding="utf-8"))
-    except yaml.YAMLError:
-        return None
-    if isinstance(data, dict):
-        v = data.get("session")
-        if isinstance(v, str) and v:
-            return v
-    return None
+def _validate_project_name(name: str) -> str:
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,79}", name):
+        raise click.ClickException("project name must be 1–80 ASCII letters, digits, dots, underscores or hyphens, starting with a letter or digit")
+    return name
 
 
 def _resolve_project_name(project: str | None,
                           project_dir: Path | None) -> str:
     if project:
-        return project
-    pd = (project_dir or Path.cwd()).resolve()
-    name = _read_session_from_coord_yaml(pd)
-    if name:
+        name = _validate_project_name(project)
+        registered = lookup_project_dir(name)
+        if project_dir is not None and registered is not None and registered.resolve() != project_dir.resolve():
+            raise click.ClickException("project name is registered to a different directory")
         return name
-    err("--project not given and coord.yaml has no `session:` key")
-    raise click.exceptions.Exit(2)
+    from greatminds.core.paths import find_project_dir
+    pd = (project_dir.resolve() if project_dir is not None else
+          find_project_dir(Path.cwd(), strict=False, use_env=False))
+    names = sorted(name for name, root in load_registry().items() if Path(root).resolve() == pd)
+    if len(names) > 1:
+        raise click.ClickException("project has multiple registered names; pass --project explicitly")
+    name = _validate_project_name(names[0] if names else pd.name)
+    registered = lookup_project_dir(name)
+    if registered is not None and registered.resolve() != pd:
+        raise click.ClickException("directory name is already registered to another project; choose an explicit name")
+    return name
 
 
 # ---------------------------------------------------------------------------
-# Template unit + legacy detection
+# Common daemon template
 # ---------------------------------------------------------------------------
 
 
@@ -601,7 +605,7 @@ def _systemctl(*args: str) -> subprocess.CompletedProcess:
 
 
 def _instance_unit(name: str) -> str:
-    return f"greatminds-daemon@{name}.service"
+    return f"greatminds-daemon@{_validate_project_name(name)}.service"
 
 
 def _run_verb(verb: str, name: str, *, expect_zero: bool = True) -> int:
@@ -628,17 +632,15 @@ def daemon() -> None:
 
 @daemon.command("install", short_help="install template unit + register project")
 @click.option("--name", "name", default=None,
-              help="project name (default: coord.yaml `session`)")
+              help="project name (default: registry or project directory name)")
 @click.option("--project-dir",
               type=click.Path(file_okay=False, path_type=Path),
               default=None,
               help="project root (default: cwd)")
 def install_cmd(name: str | None, project_dir: Path | None) -> None:
-    pd = (project_dir or Path.cwd()).resolve()
-    resolved = name or _read_session_from_coord_yaml(pd)
-    if not resolved:
-        err("--name not given and coord.yaml has no `session:` key")
-        raise click.exceptions.Exit(2)
+    from greatminds.core.paths import find_project_dir
+    pd = project_dir.resolve() if project_dir else find_project_dir(Path.cwd(), strict=False, use_env=False)
+    resolved = _resolve_project_name(name, pd)
 
     wrote_unit = install_template_unit()
     register_project(resolved, pd)
@@ -685,18 +687,16 @@ def install_cmd(name: str | None, project_dir: Path | None) -> None:
 @daemon.command("repair",
                 short_help="ensure the daemon instance is systemctl-enabled")
 @click.option("--name", "name", default=None,
-              help="project name (default: coord.yaml `session`)")
+              help="project name (default: registry or project directory name)")
 @click.option("--project-dir",
               type=click.Path(file_okay=False, path_type=Path),
               default=None,
               help="project root (default: cwd)")
 def repair_cmd(name: str | None, project_dir: Path | None) -> None:
     """Idempotently enable the project's daemon instance."""
-    pd = (project_dir or Path.cwd()).resolve()
-    resolved = name or _read_session_from_coord_yaml(pd)
-    if not resolved:
-        err("--name not given and coord.yaml has no `session:` key")
-        raise click.exceptions.Exit(2)
+    from greatminds.core.paths import find_project_dir
+    pd = project_dir.resolve() if project_dir else find_project_dir(Path.cwd(), strict=False, use_env=False)
+    resolved = _resolve_project_name(name, pd)
     instance = _instance_unit(resolved)
     cp = _systemctl("enable", instance)
     if cp.returncode == 0:
@@ -717,7 +717,7 @@ def _project_options(fn):
                       default=None,
                       help="project root (default: cwd)")(fn)
     fn = click.option("--project", default=None,
-                      help="project name (default: coord.yaml session)")(fn)
+                      help="project name (default: registry or project directory name)")(fn)
     return fn
 
 
@@ -787,9 +787,7 @@ def doctor_cmd(project: str | None, project_dir: Path | None,
         from greatminds.core.paths import find_project_dir
         pd = find_project_dir(Path.cwd(), use_env=False)
     _, config = configuration(pd)
-    names = [name for name, root in load_registry().items()
-             if Path(root).resolve() == pd]
-    name = project or (sorted(names)[0] if names else pd.name)
+    name = _resolve_project_name(project, pd)
     env = _daemon_candidate_env(name, pd)
     checks = []
     for agent in config.agents:

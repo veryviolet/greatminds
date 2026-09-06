@@ -57,6 +57,20 @@ Start the daemon in one terminal:
 greatminds coordd
 ```
 
+On Linux with a systemd user manager, service installation is optional:
+
+```bash
+greatminds daemon install --name my-project
+greatminds daemon start --project my-project
+```
+
+The registry associates the service name with the project directory. Without an
+explicit name, installation uses an existing registered name or the directory
+name. Names accept ASCII letters, digits, dots, underscores and hyphens (1–80
+characters, starting with a letter or digit). Use an explicit name for directories
+containing spaces or when another project has the same basename. Existing names
+cannot be redirected to a different project. No `coord.yaml` is required.
+
 In another terminal, create an operator conversation with the configured binding:
 
 ```bash

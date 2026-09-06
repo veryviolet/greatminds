@@ -21,7 +21,7 @@ from greatminds.cli import daemon as daemon_mod
 
 
 def _project(tmp_path: Path, monkeypatch) -> Path:
-    project = tmp_path / "proj"
+    project = tmp_path / "my-fleet"
     project.mkdir()
     (project / "coord.yaml").write_text(
         yaml.safe_dump({"session": "my-fleet"}),
@@ -102,12 +102,10 @@ def test_install_reports_enable_failure_as_warning(
 
 
 
-def test_install_passes_resolved_name_from_coord_yaml(
+def test_install_passes_directory_name(
     tmp_path: Path, monkeypatch,
 ) -> None:
-    """The instance unit name comes from coord.yaml's ``session``
-    key when ``--name`` isn't passed. Pin the resolution path so a
-    future refactor doesn't accidentally enable the wrong unit."""
+    """The directory supplies the default service identity."""
     _project(tmp_path, monkeypatch)
     calls = _stub_helpers(monkeypatch)
     CliRunner().invoke(daemon_mod.daemon, ["install"])
@@ -165,13 +163,11 @@ def test_repair_propagates_nonzero_systemctl_exit(
     assert "systemctl" in out.lower() or "enable" in out.lower()
 
 
-def test_repair_rejects_missing_session(
+def test_repair_needs_no_native_session(
     tmp_path: Path, monkeypatch,
 ) -> None:
-    """coord.yaml without a ``session`` key AND no ``--name`` →
-    exit 2 with the missing-name error (same diagnostic install
-    surfaces)."""
-    project = tmp_path / "proj"
+    """Repair derives the directory identity without a native session."""
+    project = tmp_path / "my-fleet"
     project.mkdir()
     (project / "coord.yaml").write_text(
         yaml.safe_dump({"other": "x"}), encoding="utf-8")
@@ -179,4 +175,4 @@ def test_repair_rejects_missing_session(
     _stub_helpers(monkeypatch)
 
     result = CliRunner().invoke(daemon_mod.daemon, ["repair"])
-    assert result.exit_code == 2
+    assert result.exit_code == 0

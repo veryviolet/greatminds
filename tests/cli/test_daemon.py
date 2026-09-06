@@ -87,7 +87,7 @@ def test_install_writes_template_unit_and_registry_entry(_isolate_paths,
     assert "%i" in body
 
     reg = json.loads(daemon_mod.REGISTRY_PATH.read_text(encoding="utf-8"))
-    assert reg == {"alpha": str(project_dir.resolve())}
+    assert reg == {"proj": str(project_dir.resolve())}
     # daemon-reload should have been invoked for a new unit.
     assert any(c[:3] == ["systemctl", "--user", "daemon-reload"]
                for c in fake_systemctl.calls)
@@ -106,22 +106,22 @@ def test_install_is_idempotent(_isolate_paths, fake_systemctl, tmp_path):
     assert r1.exit_code == 0 == r2.exit_code
     # Registry has single entry.
     reg = json.loads(daemon_mod.REGISTRY_PATH.read_text(encoding="utf-8"))
-    assert reg == {"alpha": str(project_dir.resolve())}
+    assert reg == {"proj": str(project_dir.resolve())}
 
 
 
 
-def test_install_errors_if_name_unresolvable(_isolate_paths, fake_systemctl,
+def test_install_uses_directory_without_coord_yaml(_isolate_paths, fake_systemctl,
                                               tmp_path):
-    """No --name and no coord.yaml → clear error, exit 2."""
+    """A fresh project does not need the deleted native window contract."""
     project_dir = tmp_path / "proj"
     project_dir.mkdir()  # no coord.yaml inside
     fake_systemctl.set(("systemctl", "--user", "is-enabled", "coordd.service"),
                        rc=1)
 
     result = _invoke(["install", "--project-dir", str(project_dir)])
-    assert result.exit_code == 2
-    assert "session" in result.output.lower()
+    assert result.exit_code == 0
+    assert daemon_mod.lookup_project_dir("proj") == project_dir
 
 
 # ---------------------------------------------------------------------------
@@ -139,7 +139,7 @@ def test_start_with_explicit_project_calls_systemctl(_isolate_paths,
     assert "greatminds-daemon@foo.service" in starts[0]
 
 
-def test_start_reads_project_name_from_coord_yaml(_isolate_paths,
+def test_start_ignores_native_coord_yaml_session(_isolate_paths,
                                                    fake_systemctl,
                                                    tmp_path):
     project_dir = tmp_path / "proj"
@@ -151,7 +151,7 @@ def test_start_reads_project_name_from_coord_yaml(_isolate_paths,
     assert result.exit_code == 0
     starts = [c for c in fake_systemctl.calls
               if c[:3] == ["systemctl", "--user", "start"]]
-    assert any("greatminds-daemon@from-yaml.service" in c for c in starts)
+    assert any("greatminds-daemon@proj.service" in c for c in starts)
 
 
 def test_restart_invokes_systemctl_restart(_isolate_paths, fake_systemctl):
@@ -302,10 +302,74 @@ def test_install_manages_only_common_daemon_even_with_old_vendor_config(fake_sys
     service_calls = [c for c in fake_systemctl.calls if c[:2] == ['systemctl', '--user']]
     assert service_calls == [
         ['systemctl', '--user', 'daemon-reload'],
-        ['systemctl', '--user', 'enable', 'greatminds-daemon@acp-only.service'],
+        ['systemctl', '--user', 'enable', 'greatminds-daemon@project.service'],
     ]
     units = list(daemon_mod.SYSTEMD_USER_DIR.glob('*.service'))
     assert [p.name for p in units] == ['greatminds-daemon@.service']
     assert ' coordd --project %i' in units[0].read_text()
     assert 'migrate' not in daemon_mod.daemon.commands
     assert not hasattr(daemon_mod, 'install_appserver_unit')
+
+
+def test_registered_identity_survives_directory_basename_and_nested_cwd(tmp_path, monkeypatch):
+    project = tmp_path/'renamed'
+    (project/'coordination').mkdir(parents=True)
+    nested = project/'src'/'nested'
+    nested.mkdir(parents=True)
+    daemon_mod.register_project('stable', project)
+    monkeypatch.chdir(nested)
+    assert daemon_mod._resolve_project_name(None, None) == 'stable'
+    assert daemon_mod._resolve_project_name(None, project) == 'stable'
+
+
+@pytest.mark.parametrize('name', ['../escape', '-option', 'x/y', 'x%h', 'x\nEnvironment=bad', 'a'*81, 'two words'])
+def test_invalid_service_names_fail_before_writes(name, fake_systemctl, tmp_path):
+    result = _invoke(['install', '--name', name, '--project-dir', str(tmp_path)])
+    assert result.exit_code != 0
+    assert not daemon_mod.REGISTRY_PATH.exists()
+    assert not daemon_mod.SYSTEMD_USER_DIR.exists()
+    assert not fake_systemctl.calls
+
+
+def test_duplicate_basename_and_explicit_identity_cannot_redirect_service(tmp_path, fake_systemctl):
+    first, second = tmp_path/'a'/'same', tmp_path/'b'/'same'
+    first.mkdir(parents=True)
+    second.mkdir(parents=True)
+    daemon_mod.register_project('same', first)
+    before = daemon_mod.REGISTRY_PATH.read_bytes()
+    for flags in ([], ['--name', 'same']):
+        result = _invoke(['install', '--project-dir', str(second), *flags])
+        assert result.exit_code != 0
+        assert 'registered' in result.output
+    with pytest.raises(Exception, match='different directory'):
+        daemon_mod.register_project('same', second)
+    assert daemon_mod.REGISTRY_PATH.read_bytes() == before
+    assert not fake_systemctl.calls
+    assert not daemon_mod.SYSTEMD_USER_DIR.exists()
+
+
+def test_ambiguous_aliases_require_explicit_selection(tmp_path):
+    daemon_mod.register_project('one', tmp_path)
+    daemon_mod.register_project('two', tmp_path)
+    with pytest.raises(Exception, match='multiple registered names'):
+        daemon_mod._resolve_project_name(None, tmp_path)
+    assert daemon_mod._resolve_project_name('two', tmp_path) == 'two'
+
+
+def test_fresh_acp_setup_installs_and_starts_by_registered_identity(tmp_path, fake_systemctl, monkeypatch):
+    from greatminds.cli.main import cli
+    project = tmp_path/'fresh-acp'
+    project.mkdir()
+    runner = CliRunner()
+    setup = runner.invoke(cli, ['setup', '--project-dir', str(project)])
+    assert setup.exit_code == 0, setup.output
+    assert not (project/'coord.yaml').exists()
+    installed = _invoke(['install', '--name', 'shared-acp', '--project-dir', str(project)])
+    assert installed.exit_code == 0, installed.output
+    nested = project/'src'
+    nested.mkdir()
+    monkeypatch.chdir(nested)
+    started = _invoke(['start'])
+    assert started.exit_code == 0, started.output
+    assert fake_systemctl.calls[-1] == ['systemctl', '--user', 'start', 'greatminds-daemon@shared-acp.service']
+    assert daemon_mod.lookup_project_dir('shared-acp') == project
