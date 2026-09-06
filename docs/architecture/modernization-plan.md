@@ -3,6 +3,15 @@
 Date: 2026-09-06. Status: implementation in progress; see Progress below.
 Baseline and evidence: [initial audit](rehabilitation-audit-2026-09-06.md).
 
+Scope clarification from the owner (2026-09-06): there are no legacy installations
+and no production deployment. A live-fleet migration, dual transport compatibility,
+and rollback to native drivers are therefore not delivery requirements. Cut over
+directly to ACP defaults and remove obsolete execution paths and setup artifacts.
+Preserve project task data. Historical migration checkpoints below record work
+already done, not a requirement to build more migration infrastructure. Continue
+testing crash recovery of actual ACP runs and domain operations; that remains part
+of the product's reliability contract.
+
 ## Agreed destination
 
 1. All Greatminds-managed agent execution uses ACP, including interactive roles.
@@ -107,10 +116,10 @@ Tmux and VS Code may display this client, dashboard, and logs. They no longer
 host native agent TUIs that the daemon controls through synthetic keystrokes.
 Detach/reconnect must not duplicate or silently terminate the running turn.
 
-After parity tests and configuration migration, remove the direct Claude
+After parity tests, remove the direct Claude
 subprocess driver, Greatminds' Codex app-server implementation, generic
 headless drivers, and TUI wake/sleep signaling. Remove their obsolete units,
-setup artifacts, and documentation through an explicit upgrade migration.
+setup artifacts, and documentation. No installed native fleet needs migration.
 
 Track A is complete when every supported execution path, including interactive
 roles, uses the common ACP client and no legacy driver is required.
@@ -257,12 +266,12 @@ of generated files. Repeated setup must converge without widening permissions
 or reinstalling unrelated plugins. Respect existing project hooks.
 
 Keep schema, adapter/harness compatibility, and configuration versions explicit.
-Upgrade with dispatch paused/drained, a recoverable state snapshot, validation,
-then resume. Define rollback limits when a migration is irreversible. Avoid
-floating adapter upgrades under live sessions.
+Keep configuration changes explicit and reject stale in-flight contracts. Avoid
+floating adapter upgrades under live sessions. The initial ACP cutover does not
+need a migration or rollback path for native installations.
 
-Acceptance: clean install, repeated setup, migration of a customized project,
-interrupted upgrade, and supported rollback have reproducible local fixtures.
+Acceptance: clean ACP install, repeated setup preserving customizations, and
+interrupted run/domain-operation recovery have reproducible local fixtures.
 
 ### C4. Resource budgets and useful performance metrics — P1
 
@@ -380,7 +389,7 @@ and unattended operation.
 | M3 — unattended mechanics | B2, B3, C5 doctor and repair | Idle operation, known recovery, and dependency release invoke no LLM |
 | M4 — domain completion | B4, B5, C6 enforcement | Typed handoffs, automatic evidence, preserved review gates, revision checks |
 | M5 — role and harness coverage | A4, A5, C1 operator control | Declared role × harness matrix; mixed-fleet and interactive scenarios |
-| M6 — complete cutover | Legacy removal, C3 migration, C7 documentation | Clean install and upgrade work entirely over ACP |
+| M6 — complete cutover | Native driver removal, C3 ACP setup, C7 documentation | Every public managed execution path uses ACP; clean install works |
 | M7 — product refinement | C2 presets, C4 budgets/optimization, C8 scope review | Simpler first task, measured overhead reduction, documented limits |
 
 A and B share the run contract. They can progress as separate workstreams
@@ -1021,6 +1030,31 @@ M6 native parent execution exclusion checkpoint:
   existing fleet was launched or migrated.
 
 ## Recovery checkpoint
+
+Current owner clarification and direct ACP cutover checkpoint:
+
+- The owner confirmed there are no legacy installations or production deployment.
+  Uncommitted work on live-fleet migration apply/rollback was discarded. No more
+  native migration compatibility is required; preserve project task data while
+  removing the native implementation directly.
+- Plain setup now initializes an explicit empty ACP contract and shared queues;
+  supplying a contract remains supported. Repeated setup preserves user config.
+  Setup no longer dispatches native harness/plugin/auth/service configuration.
+- Public coordd always selects ACP, including from nested directories. Launch
+  only uses ACP frontends. Direct start-agent/PTY modules and their driver registry,
+  native frontend generation, the native daemon loop, and native migration
+  implementation have been deleted. Native fleet restart/migrate are no longer
+  public commands; package update no longer restarts native agent panes.
+- Remaining cutover work: remove internal driven-driver/TTY helpers after replacing
+  agent/dashboard diagnostics; remove unused setup/service/profile integration
+  code and migration scaffolding; update service installation and extension paths;
+  port remaining tests and documentation to ACP defaults. Full offline suite
+  execution is still required after that cleanup. Collection currently succeeds.
+- ACP defaults/bootstrap/frontend/public-documentation regression: 28 passed.
+  Synthetic conversation and task-bound ACP regression: 22 passed. Installed-wheel
+  default setup, nested daemon, synthetic ACP conversation, frontend generation
+  and absence of direct native launch modules passed. No new live harness
+  compatibility or production migration is claimed by these checks.
 
 The authoritative continuation point is this committed plan and the compatibility
 matrix, not the lifetime of a desktop conversation. Current focus: finish M2 real

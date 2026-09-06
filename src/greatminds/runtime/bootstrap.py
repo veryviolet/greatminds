@@ -8,16 +8,22 @@ from .config import parse_execution_config
 import yaml
 
 
-def bootstrap(project: Path, source: Path):
+DEFAULT_EXECUTION = b"# Add ACP agent manifests and role bindings here.\nversion: 1\nagents: {}\nbindings: {}\n"
+
+
+def bootstrap(project: Path, source: Path | None = None):
+    project = project.resolve()
+    destination = project/'coordination/execution.yaml'
     try:
-        raw = source.read_bytes()
+        if source is None and (destination.exists() or destination.is_symlink()):
+            source = destination
+        raw = source.read_bytes() if source is not None else DEFAULT_EXECUTION
         document = yaml.safe_load(raw)
     except (OSError, UnicodeError, yaml.YAMLError) as exc:
         raise GreatMindsError('cannot read execution contract', exit_code=2) from exc
     schema = load_schema_snapshot()
     config = parse_execution_config(document, roles=set(schema.document['roles']))
     queues = [safe_name(name) for name in schema.document['queues'] if not name.startswith('.')]
-    project = project.resolve()
     runtime, coordination = project/'.greatminds', project/'coordination'
     destination = coordination/'execution.yaml'
 
@@ -27,10 +33,11 @@ def bootstrap(project: Path, source: Path):
                                                roles=set(schema.document['roles']))
             if installed.sha256 != config.sha256:
                 raise GreatMindsError('execution contract differs; setup does not replace an existing contract', exit_code=2)
-        elif ((coordination/'coord.yaml').exists() or (project/'coord.yaml').exists()
-              or (runtime/'.runtime/state.json').exists() or (runtime/'.agent_registry').exists()
-              or (coordination/'.runtime').exists()):
-            raise GreatMindsError('existing fleet requires explicit execution migration before ACP setup', exit_code=2)
+        elif (runtime/'.runtime/state.json').exists():
+            raise GreatMindsError('runtime state exists without its execution contract; restore the contract before setup', exit_code=2)
+        if not runtime.is_dir() and any((coordination/name).exists()
+                                       for name in [*queues, '.runtime', '.agent_registry']):
+            raise GreatMindsError('runtime data exists in coordination; setup will not create a second empty runtime', exit_code=2)
 
     validate_target()
     with file_lock(runtime/'setup.lock', label='ACP setup'):

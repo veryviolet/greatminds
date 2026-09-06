@@ -262,14 +262,10 @@ def _self_replace_to_post_pip() -> None:
 
 
 def _step_migrate_project_config() -> None:
-    """Bring the project's on-disk config to the installed version:
-    canon refresh + coord.yaml driven-model migration + legacy-artifact
-    removal. Without this, ``update`` bumped the package but left a stale
-    coord.yaml (old all-paned window model), refreshed neither canon nor
-    queues — the package/config drift the operator hit as a 'bug'."""
-    from greatminds.cli.migrate import run_migration
-    info("==> migrating project config to the new version...")
-    run_migration(Path.cwd(), run_setup=True)
+    """Refresh additive shared ACP project state, preserving its contract."""
+    from greatminds.runtime.bootstrap import bootstrap
+    info("==> refreshing ACP project state...")
+    bootstrap(Path.cwd())
 
 
 def _step_migrate_legacy_coordd() -> None:
@@ -387,40 +383,6 @@ def _resolve_session_from_coord_yaml() -> str | None:
     return str(sess).strip() if isinstance(sess, str) and sess.strip() else None
 
 
-def _step_restart_agents() -> None:
-    """Invoke `greatminds restart` to refresh tmux agents — but
-    only if the tmux session was already running before ``update``.
-
-    0299: ``update`` MUST NOT start a tmux session that wasn't up
-    when the operator invoked it. USER may have killed the session
-    deliberately (debugging, paused fleet, etc.); spinning the
-    agents back up would be hostile + create surprise PIDs.
-    """
-    session = _resolve_session_from_coord_yaml()
-    if not _tmux_session_present(session):
-        info(
-            f"==> tmux session {session!r} absent; skipping agent "
-            "restart (re-run `greatminds launch --target tmux` "
-            "when you want the fleet back up)"
-        )
-        return
-
-    new_bin = _greatminds_bin().split()
-    cmd = new_bin + ["restart"]
-    info("==> restarting tmux agents...")
-    cp = subprocess.run(cmd)
-    if cp.returncode != 0:
-        err(
-            "agent restart failed; check `tmux a -t <session>` and "
-            "re-run `greatminds update --post-pip`."
-        )
-        raise click.exceptions.Exit(cp.returncode)
-    ok("    ✓ agents up")
-
-
-# ---------------------------------------------------------------------------
-# Click command
-# ---------------------------------------------------------------------------
 
 
 @click.command(
@@ -478,10 +440,8 @@ def update(post_pip: bool, check: bool, dry_run: bool, major: bool,
     # Project-config migration FIRST so the daemon + agents below start
     # on the migrated config (new coord.yaml model, refreshed canon).
     _step_migrate_project_config()
-    _step_migrate_legacy_coordd()
     _step_ensure_template_unit_installed()  # 0202: fill the migration gap
     _step_restart_daemon(project_name)
-    _step_restart_agents()
     # Fresh read — in-process __version__ is stale right after a same-run
     # upgrade (it reflects the OLD module the process imported at start).
     ok(f"==> done: greatminds at {_installed_version_fresh() or __version__}")

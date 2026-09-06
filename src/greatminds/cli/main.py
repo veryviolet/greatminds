@@ -1,24 +1,9 @@
-"""greatminds — unified CLI root.
+"""Greatminds CLI for local ACP orchestration and shared task operations.
 
-Single entry-point ``greatminds`` (wired in pyproject.toml as
-``greatminds = "greatminds.cli.main:cli"``) registers every subcommand
-into one click group. Replaces the 19 separate ``greatminds-*``
-entry-points used in 0.1.x.
-
-Usage::
-
-    greatminds setup --venv /path        # bootstrap a project
-    greatminds launch --target tmux      # start the fleet
-    greatminds task list verified        # list tasks in a queue
-    greatminds inbox send DEVELOPER --kind wake --body "..."
-    greatminds stand lease --task TASK_ID --profile full-deploy
-    greatminds coordd --verbose          # run the keystroke daemon
-    greatminds wake-check
-    greatminds watchdog
-
-Three sub-groups carry multi-action commands (``task``, ``inbox``,
-``stand``); the rest are flat single commands attached directly to the
-root group.
+Initialize a project with ``greatminds setup``, configure ACP manifests and role
+bindings, and start ``greatminds coordd``. Operator conversation and run controls
+use ``greatminds chat`` and ``greatminds run``. Task, evidence, worktree and stand
+commands share the same domain services used by the daemon.
 """
 
 from __future__ import annotations
@@ -33,9 +18,7 @@ from .. import __version__
 )
 @click.version_option(__version__, prog_name="greatminds")
 def cli() -> None:
-    """File-based multi-agent coordination protocol — fleet orchestration,
-    task pipeline, agent launcher.
-    """
+    """Local ACP agent orchestration, operator conversations and task workflows."""
 
 
 # Sub-group registration. Each module exposes a top-level ``click.Group``
@@ -57,12 +40,9 @@ from . import intent_clean as _intent_clean_mod
 from . import notify_from_journal as _notify_journal_mod
 from . import journal as _journal_mod
 from . import stop_decide as _stop_decide_mod
-from . import pty_launch as _pty_launch_mod
-from . import start_agent as _start_agent_mod
 from . import plan as _plan_mod
 from . import git_check as _git_check_mod
 from . import gate_check as _gate_check_mod
-from . import restart as _restart_mod
 from . import report_upstream as _report_upstream_mod
 from . import daemon as _daemon_mod
 from . import update as _update_mod
@@ -71,7 +51,6 @@ from . import agent as _agent_mod
 from . import dashboard as _dashboard_mod
 from . import driven_log as _driven_log_mod
 from . import project as _project_mod
-from . import migrate as _migrate_mod
 from . import run as _run_mod
 
 cli.add_command(_task_mod.task)
@@ -90,12 +69,9 @@ cli.add_command(_intent_clean_mod.intent_clean, name="intent-clean")
 cli.add_command(_notify_journal_mod.notify_journal, name="notify-journal")
 cli.add_command(_journal_mod.journal, name="journal")
 cli.add_command(_stop_decide_mod.stop_decide, name="stop-decide")
-cli.add_command(_pty_launch_mod.pty_launch, name="pty-launch")
-cli.add_command(_start_agent_mod.start_agent, name="start-agent")
 cli.add_command(_plan_mod.plan)
 cli.add_command(_git_check_mod.check_git_permission, name="check-git-permission")
 cli.add_command(_gate_check_mod.gate_check, name="gate-check")
-cli.add_command(_restart_mod.restart)
 cli.add_command(_report_upstream_mod.report_upstream, name="report-upstream")
 cli.add_command(_daemon_mod.daemon)
 cli.add_command(_update_mod.update)
@@ -104,7 +80,6 @@ cli.add_command(_agent_mod.agent)
 cli.add_command(_dashboard_mod.dashboard)
 cli.add_command(_driven_log_mod.driven_log, name="driven-log")
 cli.add_command(_project_mod.project)
-cli.add_command(_migrate_mod.migrate)
 cli.add_command(_run_mod.run)
 from . import chat as _chat_mod
 cli.add_command(_chat_mod.chat)

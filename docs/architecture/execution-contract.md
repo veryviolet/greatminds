@@ -708,46 +708,18 @@ an execution contract still uses the other launcher while default migration is
 being completed. Generating an ACP workspace does not remove pre-existing fleet
 artifacts; that belongs to the explicit project migration.
 
-## Execution migration review
+## ACP defaults and cutover
 
-`greatminds migrate --project-dir PATH --execution-config PROPOSED.yaml` prints a
-read-only ACP migration review. It compares the source coord.yaml role/window
-metadata with the explicit proposed bindings: agent/version, model, workspace,
-scheduling, session, permission, account, and capacity. Observer windows, repeated
-source roles, added roles, missing roles, and declared stand policy are visible.
-No adapter, model, authentication identity, or role mapping is guessed from a tool
-name. Raw launch argv and environment references are excluded from the report.
+`greatminds setup` initializes an empty explicit ACP execution contract and shared
+runtime directories. Supplying `--execution-config FILE` initializes from reviewed
+manifests and bindings instead. Setup preserves existing contract bytes and task
+data, and does not configure harness authentication or install services/plugins.
+It refuses to create a second runtime if task data still resides in coordination.
 
-Missing source roles remain incomplete unless explicitly named with repeatable
-`--retire-role ROLE`; a target binding and retirement for the same role conflict.
-`role_coverage_complete` only reports coverage, not deployment readiness. The review
-pins source bytes, proposed bytes, the effective schema, and any installed execution
-contract using hashes. `review_sha256` changes when those reviewed inputs change.
-The command performs no setup, cleanup, service operation, or contract publication;
-`applied` is false. Quiescence checks and durable application are subsequent migration
-work. This preview is available now; it is not an implementation of migration apply.
+`coordd` always uses ACP. A missing or invalid execution contract is an error.
+`launch` exposes daemon/operator frontends. Use `run pause`, `run resume`,
+`run cancel`, `run retry` and the `chat` commands to control work and conversations.
 
-Ordinary migrate/update project refresh retains an existing ACP contract and skips
-native fleet migration. Plain setup for an ACP project with a dedicated runtime uses
-shared ACP bootstrap. An ACP project using the combined configuration/runtime layout
-requires explicit layout migration before setup; setup does not create a second
-runtime and abandon its task state.
-
-The review also includes a live `execution_observation`, separate from the static
-review hash. It reports active registry processes, project-associated processes
-owned by the current OS user, active run records, unresolved command/result/
-maintenance/deployment records, and unreadable state. Process inventory uses cwd
-and explicit project-directory arguments; raw command lines are not returned.
-The review process and its ancestors are excluded from the cwd scan. An observation
-with no holds is named `observed_quiet`, not migration-ready: detached unregistered
-processes outside this scope and launches after the snapshot are not excluded.
-
-ACP supervisors hold a shared execution barrier for their entire ownership and
-cleanup lifetime. Migration can take its exclusive side to prevent new ACP
-supervisors. The Linux barrier lives in a stable `/tmp` lock keyed by OS user and
-resolved project path, so selecting or migrating a runtime layout does not change
-its identity or introduce a lock file into source control. Lock files are not
-unlinked on release. The existing supervisor lock still enforces a single daemon.
-This barrier does not yet cover prior-version native launchers; the migration
-review therefore leaves `launch_exclusion_verified` false. Retiring those launch
-paths and verifying stopped services remain prerequisites for migration apply.
+ACP run cancellation, recovery, permission checks and task revision validation
+remain part of the runtime contract. Follow the modernization plan for the current
+implementation status of diagnostics, service configuration and documentation.

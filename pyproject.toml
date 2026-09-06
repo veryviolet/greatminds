@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "greatminds"
 version = "2.6.0"
-description = "File-based multi-agent coordination with tool adapters, driven roles, VS Code cockpit tasks, Ansible stand leases, and evidence gates"
+description = "Local ACP agent orchestration with deterministic task workflows, interactive sessions, and verified execution evidence"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"

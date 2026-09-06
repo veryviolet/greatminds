@@ -72,5 +72,5 @@ def test_coord_yaml_from_another_directory_cannot_bypass_acp_launch(tmp_path,mon
     config.write_text(yaml.safe_dump({'project_dir':str(root),'windows':[]}))
     monkeypatch.chdir(tmp_path)
     result=CliRunner().invoke(cli,['launch','--config',str(config),'--target','vscode'])
-    assert result.exit_code!=0 and 'ACP launch requires --project-dir' in result.output
+    assert result.exit_code!=0 and 'No such option' in result.output and '--config' in result.output
     assert not (root/'.vscode/tasks.json').exists()

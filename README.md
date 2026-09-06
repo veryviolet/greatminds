@@ -1,239 +1,134 @@
 # greatminds
 
-<p align="center">
-File-based multi-agent coordination for agent fleets and task pipelines.
-</p>
-
-<p align="center">
-  <a href="https://pypi.org/project/greatminds/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/greatminds.svg"></a>
-  <a href="https://pypi.org/project/greatminds/"><img alt="Python versions" src="https://img.shields.io/pypi/pyversions/greatminds.svg"></a>
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/pypi/l/greatminds.svg"></a>
-  <a href="https://veryviolet.github.io/greatminds/"><img alt="Docs" src="https://img.shields.io/badge/docs-github_pages-blue.svg"></a>
-</p>
-
-greatminds runs a fleet of coding agents on a shared filesystem-based finite
-state machine. Tasks flow through queues such as
-`feature_inbox/`, `feature_plan/`, `feature_dev/`, `feature_test/`, and
-`verified/`; a small `coordd` daemon nudges agents when input appears. There is
-no central broker and no database. Per-project setup writes editable project
-configuration under `coordination/` and runtime/system state under
-`.greatminds/`; the per-user daemon can supervise multiple projects on one
-machine.
+Greatminds coordinates coding agents through ACP. A local daemon owns task
+assignment, sessions, process cleanup, validation commands, and workflow
+transitions. Agents perform work that needs reasoning and submit typed results.
+Task files and evidence remain on the filesystem; there is no database service.
 
 ## Quickstart
 
 ```bash
-# install
-pip install greatminds  # or: uv add greatminds
-
-# bootstrap a project
+pip install greatminds  # or install in your preferred Python environment
 mkdir -p /tmp/greatminds-demo
 cd /tmp/greatminds-demo
-greatminds setup --session myproject
+greatminds setup
 ```
 
-List supported agent tools and their execution modes:
+Setup creates `coordination/execution.yaml` with empty `agents` and `bindings`,
+and the queue tree under `.greatminds/`. It does not install harnesses, change
+authentication, install plugins or services, or choose a provider for you.
+Repeated setup preserves your execution contract and task data.
 
-```bash
-greatminds agent tools
-greatminds agent tools --json
-```
-
-The packaged adapters support:
-
-- `claude`: Claude Code. Used for chat, loop, and driven roles. Setup writes
-  `.claude/settings.local.json` and installs configured Claude marketplace
-  plugins for Claude-hosted roles.
-- `codex`: OpenAI Codex. Used for chat and driven roles. Run `codex login`
-  once for the machine account; generated files under
-  `.greatminds/.codex-home/{role}/` are role config sources, not auth homes.
-- `cursor`: Cursor agent. Used for chat/loop panes and one-shot driven turns.
-  Greatminds runs `cursor-agent` through a `systemd-run --user` scope in
-  `cursor.slice` by default; tune `GREATMINDS_CURSOR_MEM_HIGH`,
-  `GREATMINDS_CURSOR_MEM_MAX`, `GREATMINDS_CURSOR_CPU`, or
-  `GREATMINDS_CURSOR_SLICE` when the machine needs different resource limits.
-- `cline`: Cline CLI. Used for chat/loop panes and one-shot driven turns.
-- `gemini`: Gemini CLI. Used for chat/loop panes and one-shot driven turns.
-- `openhands`: OpenHands CLI. Used for chat panes and one-shot driven turns.
-  Install the `openhands` command, run `openhands` or `openhands login` once
-  to create machine settings, and configure its LLM provider before assigning
-  driven roles. `agent-canvas` is a separate OpenHands UI launcher and is not
-  the CLI entrypoint used by the greatminds adapter.
-
-Window modes in `coordination/coord.yaml`:
-
-- `chat`: a live tmux pane for an operator-facing conversation.
-- `loop`: a resident watchdog pane that wakes on its own timer.
-- `staged`: a tmux pane with the start command pre-typed, so the operator
-  starts that role manually when needed.
-- `driven`: no live pane; `coordd` starts one driven turn when work lands in
-  the role's queue, inbox, or stand event stream. Claude and Codex use
-  stateful drivers; Cursor, Cline, Gemini, and OpenHands use one-shot
-  headless subprocess drivers.
-
-Role-to-tool assignment lives in `coordination/coord.yaml`. Edit it after
-setup when you want different tools for different roles:
-
-| Role | Default tool | Default mode |
-| --- | --- | --- |
-| `ARCHITECT-PLANNER` | `codex` | `chat` |
-| `MAINTAINER` | `claude` | `loop` |
-| `LIVE-DEVELOPER` | `claude` | `staged` |
-| `ARCHITECT-REVIEWER` | `codex` | `driven` |
-| `DEVELOPER` | `claude` | `driven` |
-| `UI-DEVELOPER` | `claude` | `driven` |
-| `TECHNICAL-WRITER` | `codex` | `driven` |
-| `TESTER` | `claude` | `driven` |
-| `READER` | `claude` | `driven` |
-| `EXPLORER` | `codex` | `driven` |
+Add an ACP agent and a role binding to `coordination/execution.yaml`. This is a
+configuration example: replace the executable path and version labels with your
+installed adapter and harness, and complete that harness's authentication first.
 
 ```yaml
-session: myproject
-project_dir: /tmp/greatminds-demo
-windows:
-  - name: planner
+version: 1
+agents:
+  local-agent:
+    transport: acp
+    argv: [/absolute/path/to/your-acp-agent]
+    adapter_version: your-tested-adapter-version
+    harness_version: your-tested-harness-version
+bindings:
+  planner:
+    agent: local-agent
     role: ARCHITECT-PLANNER
-    tool: codex
-    mode: chat
-  - name: maintainer
-    role: MAINTAINER
-    tool: claude
-    mode: loop
-  - name: dev
-    role: DEVELOPER
-    tool: claude
-    mode: driven
-  - name: reviewer
-    role: ARCHITECT-REVIEWER
-    tool: codex
-    mode: driven
+    scheduling: on-demand
+    permission: ask
 ```
 
-Put machine-local project and stand variables in `.greatminds/PROJECT.env`.
-It is gitignored, sourced before agent launch, and passed to stand profiles as
-Ansible extra vars:
+Role, harness, model, permissions, workspace and scheduling are independent.
+Use `scheduling: queue` for automatic task assignment. Additional bindings can
+use the same agent manifest or a different ACP implementation. See the
+[execution contract](docs/architecture/execution-contract.md) for command,
+worktree, model, account and stand policies.
+
+An existing explicit contract can be supplied during initialization:
 
 ```bash
-cat > .greatminds/PROJECT.env <<'EOF'
-STAND_HOST=localhost
-STAND_USER=violet
-EOF
+greatminds setup --project-dir /path/to/project --execution-config /path/to/execution.yaml
 ```
 
-`STAND_HOST=localhost` is enough for a local smoke stand. For a remote stand,
-set `STAND_HOST` to an SSH config alias or a comma-separated list of aliases,
-and set `STAND_USER` to the remote account whose PATH should be used.
+Start the daemon in one terminal:
 
-A stand is a singleton live environment. Agents lease it with
-`greatminds stand lease`; `coordd` deploys the leased worktree by running an
-Ansible playbook selected through `coordination/stand-profiles.yaml`. There is
-no global current profile. The current profile is chosen for each lease with
-`greatminds stand lease --profile {profile}`, stored in
-`.greatminds/.stand/state.yaml` as `active_lease.profile`, and resolved through
-the registry to a YAML file under `coordination/stand-profiles/`.
-
-Setup seeds reference profiles named `full-deploy`, `vite-dev`, and
-`smoke-only`. Add project profiles by adding registry entries and YAML files.
-The `used_for` and `default_for` values are machine-readable tokens from
-the packaged schema copied to `.greatminds/schema.yaml` under
-`stand_profile_registry`; `default_for` tells roles which profile to choose for
-common lease purposes:
-
-```yaml
-profiles:
-  full-deploy:
-    file: full-deploy.yaml
-    purpose: Full deployed product validation on a stand.
-    environment: stand
-    used_for: [tester_validation, explorer_review, reviewer_validation]
-    default_for: [feature_test, explorer, reviewer]
+```bash
+greatminds coordd
 ```
 
-Inspect and validate the registry with:
+In another terminal, create an operator conversation with the configured binding:
+
+```bash
+greatminds chat create planner
+# Use the conversation ID returned above:
+greatminds chat talk CONVERSATION_ID
+```
+
+The daemon owns the ACP session. Detaching leaves the work running; reconnecting
+does not replay completed prompts. `talk` displays streamed text and explicit
+one-time permission choices. `chat close CONVERSATION_ID` requests cleanup.
+Task-bound conversations use `chat create BINDING --task TASK_ID`.
+
+```bash
+greatminds run status
+greatminds run pause
+greatminds run resume
+greatminds run cancel RUN_ID
+greatminds run retry RUN_ID
+```
+
+## Local frontends
+
+```bash
+greatminds launch --target tmux
+greatminds launch --target vscode
+```
+
+Tmux hosts the daemon and an operator shell. The VS Code target writes
+`greatminds-acp.code-workspace` with process tasks for the daemon and operator
+commands, preserving unrelated workspace settings. Neither frontend launches
+native harness TUIs. The [VS Code extension](vscode-extension/README.md) supplies
+New ACP Chat, Attach ACP Chat and Close ACP Chat commands.
+
+## Harness compatibility
+
+Claude Code and OpenAI Codex use upstream ACP adapters. Other harnesses may expose
+ACP directly or through a bridge. Protocol initialization alone does not establish
+working authentication, session continuity, model selection or tool permissions.
+The [compatibility matrix](docs/architecture/acp-compatibility.md) distinguishes
+verified scenarios from untested support for Codex, Claude, Grok, Qwen, Kimi,
+Cline, Gemini, OpenHands and Cursor. The same client handles supported harnesses;
+there is no fallback to a native transport.
+
+## Tasks, evidence and stands
+
+Task queues live under `.greatminds/`; editable project configuration lives under
+`coordination/`. The installed schema is authoritative and is pinned to each run.
+Successful ACP output alone never completes a workflow transition: the daemon
+validates typed results, task revision, permissions and evidence first.
+
+Configured validation commands run through the daemon with bounded output and
+recorded receipts. Optional stand deployment uses an explicit policy in the
+execution contract and profiles in `coordination/stand-profiles.yaml` and
+`coordination/stand-profiles/`. Ansible-backed profiles remain available; setup
+does not enable deployment or seed a deployment policy automatically.
 
 ```bash
 greatminds stand profiles list
 greatminds stand profiles doctor
 ```
 
-For production, create an explicit registry entry with
-`environment: production`, `requires_explicit_user_approval: true`, and
-`allowed_roles` such as `[ARCHITECT-REVIEWER, MAINTAINER]`. Lease it only after
-approval:
+## Development status
 
-```bash
-greatminds stand lease \
-  --task TASK_ID \
-  --profile production \
-  --profile-approval USER_APPROVED
-```
+The primary setup, launch and daemon entrypoints use ACP. Modernization of
+diagnostic surfaces, service configuration and documentation continues. See the
+[modernization plan](docs/architecture/modernization-plan.md) for remaining work
+and reproducible evidence. A local web interface is the subsequent product phase.
 
-A minimal smoke playbook looks like this:
+## Issues and license
 
-```yaml
----
-- name: register stand node
-  hosts: localhost
-  gather_facts: false
-  tasks:
-    - name: add configured stand host
-      ansible.builtin.add_host:
-        name: "{{ STAND_HOST | default('localhost') }}"
-        groups: stand_nodes
-        ansible_connection: >-
-          {{ 'local' if (STAND_HOST | default('localhost')) == 'localhost'
-             else 'ssh' }}
-
-- name: smoke stand
-  hosts: stand_nodes
-  gather_facts: false
-  tasks:
-    - name: remote shell works
-      ansible.builtin.command: /bin/true
-      changed_when: false
-```
-
-Then start the fleet:
-
-```bash
-
-# install the per-project daemon
-greatminds daemon install
-greatminds daemon start
-
-# launch agents in tmux
-greatminds launch --target tmux
-tmux a -t myproject
-
-# or generate a VS Code workspace and cockpit tasks
-greatminds launch --target vscode
-```
-
-The VS Code target writes `.vscode/tasks.json` and a `.code-workspace` file
-with agent terminals plus operator tasks for dashboard, driven logs, coordd,
-agent status, agent tools, and stand status. The repository also ships a
-`vscode-extension/` cockpit that calls the `greatminds` CLI as its backend.
-
-## Key Concepts
-
-- **Queues**: [`feature_inbox/`, `feature_plan/`, `feature_dev/`, `verified/`](https://veryviolet.github.io/greatminds/concepts/queues/) - task state is its directory.
-- **Roles**: [`ARCHITECT-PLANNER`, `DEVELOPER`, `TESTER`, and others](https://veryviolet.github.io/greatminds/concepts/roles/) - each role owns queues and a heartbeat file.
-- **Scenarios A/B/C**: [standard pipeline, intensive review, and UI rapid iteration](https://veryviolet.github.io/greatminds/concepts/scenarios/).
-- **Stand**: [lease-backed Ansible deployment profiles](https://veryviolet.github.io/greatminds/concepts/stand-operations/) prepare the singleton live environment.
-- **Stand gate**: [stand-required tasks](https://veryviolet.github.io/greatminds/concepts/stand-gate/) need lease-backed live-stand evidence before review.
-- **Inbox**: [per-role mailbox](https://veryviolet.github.io/greatminds/concepts/inbox/) for `ask`, `info`, and `wake` messages without moving tasks.
-
-## Documentation
-
-Full documentation: <https://veryviolet.github.io/greatminds/>
-
-## Where to File Issues
-
-```text
-Bugs in greatminds: https://github.com/veryviolet/greatminds/issues
-Bugs in a project you use greatminds in: that project's issue tracker.
-```
-
-## License
+Report Greatminds defects in the [project issue tracker](https://github.com/veryviolet/greatminds/issues).
+Bugs in a project managed by Greatminds belong in that project's tracker.
 
 Apache-2.0. See [LICENSE](LICENSE).

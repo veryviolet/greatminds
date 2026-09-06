@@ -67,7 +67,7 @@ def test_package_summary_matches_current_codex_auth_contract() -> None:
     data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     desc = data["project"]["description"]
     assert "per-role CODEX_HOME" not in desc
-    assert "driven roles" in desc
+    assert "ACP" in desc
     assert data["project"]["urls"]["Documentation"] == (
         "https://veryviolet.github.io/greatminds/"
     )

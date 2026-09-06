@@ -39,20 +39,28 @@ def test_invalid_manifest_does_not_create_project(tmp_path):
     assert not (tmp_path/'project').exists()
 
 
-def test_bootstrap_cannot_activate_existing_fleet_or_replace_contract(tmp_path):
+def test_bootstrap_preserves_source_configuration_and_cannot_replace_contract(tmp_path):
     source=manifest(tmp_path);project=tmp_path/'project'
     (project/'coordination').mkdir(parents=True)
     legacy=project/'coordination/coord.yaml';legacy.write_text('windows: []')
-    with pytest.raises(GreatMindsError,match='migration'):
-        bootstrap(project,source)
-    assert not (project/'.greatminds').exists()
-    legacy.unlink();bootstrap(project,source)
+    bootstrap(project,source)
+    assert legacy.read_text() == 'windows: []'
     before=(project/'coordination/execution.yaml').read_bytes()
     document=yaml.safe_load(source.read_text());document['max_running']=2
     source.write_text(yaml.safe_dump(document))
     with pytest.raises(GreatMindsError,match='differs'):
         bootstrap(project,source)
     assert (project/'coordination/execution.yaml').read_bytes()==before
+
+
+def test_bootstrap_does_not_abandon_task_data_in_configuration_directory(tmp_path):
+    source=manifest(tmp_path);project=tmp_path/'project'
+    queue=project/'coordination/feature_inbox';queue.mkdir(parents=True)
+    (queue/'0001.md').write_text('preserved task')
+    with pytest.raises(GreatMindsError,match='second empty runtime'):
+        bootstrap(project,source)
+    assert not (project/'.greatminds').exists()
+    assert (queue/'0001.md').read_text()=='preserved task'
 
 
 def test_custom_schema_and_ignore_entries_are_preserved(tmp_path):
