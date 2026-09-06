@@ -68,34 +68,48 @@ def _greatminds_argv() -> tuple[str, ...]:
 
 
 def load_registry() -> dict[str, str]:
-    if not REGISTRY_PATH.is_file():
-        return {}
+    """Read a complete registry snapshot; corruption is never an empty registry."""
+    def unique_entries(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate registry name")
+            result[key] = value
+        return result
     try:
-        data = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+        text = REGISTRY_PATH.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        if REGISTRY_PATH.is_symlink():
+            raise click.ClickException("project registry is a broken symlink") from exc
         return {}
-    if not isinstance(data, dict):
-        return {}
-    return {k: v for k, v in data.items()
-            if isinstance(k, str) and isinstance(v, str)}
-
-
-def save_registry(reg: dict[str, str]) -> None:
-    REGISTRY_DIR.mkdir(parents=True, exist_ok=True)
-    REGISTRY_PATH.write_text(
-        json.dumps(reg, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    except (OSError, UnicodeError) as exc:
+        raise click.ClickException("cannot read project registry") from exc
+    try:
+        data = json.loads(text, object_pairs_hook=unique_entries)
+        if not isinstance(data, dict):
+            raise ValueError("expected registry object")
+        for name, root in data.items():
+            _validate_project_name(name)
+            if not isinstance(root, str) or "\0" in root or not Path(root).is_absolute():
+                raise ValueError("expected absolute project path")
+    except (ValueError, click.ClickException) as exc:
+        raise click.ClickException("invalid project registry; restore it before managing services") from exc
+    return data
 
 
 def register_project(name: str, project_dir: Path) -> None:
-    """Register a project without redirecting an existing service identity."""
+    """Serialize registrations and durably publish the complete updated registry."""
+    from greatminds.core.storage import file_lock, atomic_json
     _validate_project_name(name)
-    reg = load_registry()
-    if name in reg and Path(reg[name]).resolve() != project_dir.resolve():
-        raise click.ClickException("project name is registered to a different directory")
-    reg[name] = str(project_dir.resolve())
-    save_registry(reg)
+    root = project_dir.resolve()
+    with file_lock(REGISTRY_PATH.with_suffix(".lock"), label="project registry"):
+        reg = load_registry()
+        if name in reg and Path(reg[name]).resolve() != root:
+            raise click.ClickException("project name is registered to a different directory")
+        if reg.get(name) == str(root):
+            return
+        reg[name] = str(root)
+        atomic_json(REGISTRY_PATH, reg)
 
 
 def lookup_project_dir(name: str) -> Path | None:

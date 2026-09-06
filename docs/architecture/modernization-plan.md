@@ -1222,3 +1222,20 @@ contains spaces, percent specifier text and a dollar sign; no service was starte
 Drop-in tests verify percent escaping and quoted paths. Remaining service work
 includes registry concurrency, strict configuration preflight and update's
 optional service lifecycle behavior.
+
+### Durable project registry (2026-09-07)
+
+Project registration now holds the shared storage primitive's bounded stable
+file lock across read/check/write and publishes with atomic fsynced replacement.
+Concurrent writers cannot lose unrelated registrations or redirect a name after
+another writer claims it. Unchanged registrations do not rewrite the document.
+Readers reject malformed JSON, duplicate names, invalid identifiers and relative
+or non-string project paths; read failures no longer turn into an empty registry.
+
+Validation: parallel-process tests start eight registrations together, both for
+unique names (all retained) and a shared name (one winner). Injected publication
+failure preserves previous bytes and removes the temporary file. Corrupt input
+remains unchanged after attempted registration. Combined registry/service/schema
+suite: 86 passed. Tests operate only on temporary registry files and substituted
+service-manager calls. Strict service config preflight and update lifecycle
+remain the next service tasks.
