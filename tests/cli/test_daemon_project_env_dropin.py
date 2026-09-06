@@ -116,3 +116,14 @@ def test_capture_follows_manifest_references_and_prunes_removed_names(tmp_path, 
     path.write_text(yaml.safe_dump(document))
     assert dm.capture_agent_env('fixture', project)
     assert target.read_text() == ''
+
+
+def test_environment_parse_error_does_not_expose_secret(tmp_path):
+    import pytest
+    import click
+    path = tmp_path/'invalid.env'
+    path.write_text('KEY="never-print-this')
+    with pytest.raises(click.ClickException) as caught:
+        dm._parse_env_file(path)
+    assert 'never-print-this' not in str(caught.value)
+    assert 'invalid environment file syntax' in str(caught.value)

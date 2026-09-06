@@ -26,7 +26,6 @@ import json
 import os
 import pwd
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -316,9 +315,14 @@ def capture_agent_env(name: str, project_dir: Path | None = None) -> bool:
     env.update({key: os.environ[key] for key in names if key in os.environ})
     if not env and not target.exists():
         return False
-    body = "".join(f"{k}={shlex.quote(v)}\n" for k, v in sorted(env.items()))
-    old = target.read_text(encoding="utf-8") if target.is_file() else None
-    if old == body:
+    from greatminds.core.service_environment import encode_environment
+    try:
+        body = encode_environment(env)
+    except (ValueError, UnicodeError) as exc:
+        raise click.ClickException("captured environment contains invalid text") from exc
+    old = target.read_bytes() if target.is_file() else None
+    if old == body.encode("utf-8"):
+        target.chmod(0o600)
         return False
     from greatminds.core.storage import atomic_bytes
     atomic_bytes(target, body.encode("utf-8"))
@@ -326,33 +330,18 @@ def capture_agent_env(name: str, project_dir: Path | None = None) -> bool:
 
 
 def _parse_env_file(path: Path) -> dict[str, str]:
-    """Parse the simple KEY=VALUE files greatminds writes for systemd.
-
-    PROJECT.env may be edited by users, so this is deliberately forgiving:
-    unknown lines are ignored and shell-style quoting is accepted.
-    """
-    env: dict[str, str] = {}
-    if not path.is_file():
-        return env
+    """Read systemd EnvironmentFile values without evaluating shell syntax."""
+    from greatminds.core.service_environment import decode_environment
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return env
-    for raw in lines:
-        line = raw.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        try:
-            parts = shlex.split(line, comments=True, posix=True)
-        except ValueError:
-            parts = [line]
-        for part in parts:
-            if "=" not in part:
-                continue
-            key, val = part.split("=", 1)
-            if key:
-                env[key] = val
-    return env
+        text = path.read_bytes().decode("utf-8")
+    except FileNotFoundError:
+        return {}
+    except (OSError, UnicodeError) as exc:
+        raise click.ClickException("cannot read environment file") from exc
+    try:
+        return decode_environment(text)
+    except ValueError as exc:
+        raise click.ClickException("invalid environment file syntax") from exc
 
 
 def _daemon_candidate_env(name: str, project_dir: Path) -> dict[str, str]:

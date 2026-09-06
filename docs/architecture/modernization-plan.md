@@ -1186,3 +1186,22 @@ references and secrets; no provider was launched. Follow-up remains necessary
 for systemd EnvironmentFile quoting/parsing, per-project PATH, registry locking,
 and complete service configuration preflight. This checkpoint establishes
 manifest selection, not full environment serialization parity.
+
+### Systemd environment serialization (2026-09-07)
+
+Replaced shlex-based EnvironmentFile serialization/inspection with a dedicated
+codec. It preserves literal whitespace, multiline values, quotes, backslashes
+and shell-looking text without expansion; malformed quotes/escapes and NUL fail
+with diagnostics that omit values. Missing optional files remain allowed, while
+other read errors are no longer silently treated as empty configuration.
+Captured file comparisons preserve carriage returns, and unchanged captured
+files have their private permissions restored.
+
+Rules were checked against the upstream [systemd environment parser](https://github.com/systemd/systemd/blob/main/src/basic/env-file.c)
+and the versioned [255 parser interface](https://github.com/systemd/systemd/blob/v255/src/basic/env-file.h).
+An optional regression calls the installed systemd 255 shared-library parser
+on 200 seeded synthetic values and compares its output byte-for-byte with the
+inputs and the Python decoder. It passed on this host without launching a
+service. Broader service/schema suite: 68 passed; final codec/environment/doctor
+subset after private-permission and error-redaction adjustments: 24 passed.
+Per-project PATH, unit directive escaping and registry locking remain pending.
