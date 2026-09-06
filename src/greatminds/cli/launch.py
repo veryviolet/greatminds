@@ -494,6 +494,13 @@ def _emit_vscode(project_dir: Path, cfg: dict, setup: gm_env.EnvSetup,
               help="(tmux target only) kill existing session and rebuild")
 def launch(target: str, config_path: Path | None, project_dir: Path | None,
            venv: Path | None, recreate: bool) -> None:
+    acp_project = (project_dir or Path.cwd()).resolve()
+    if (acp_project/'coordination/execution.yaml').is_file():
+        if config_path is not None:
+            raise click.ClickException('ACP launch uses coordination/execution.yaml; --config is not applicable')
+        from greatminds.runtime.frontends import launch as launch_acp
+        click.echo(json.dumps(launch_acp(acp_project,target=target,venv=venv,recreate=recreate),indent=2))
+        return
     # Locate coord.yaml.
     if config_path is None:
         candidates = []
@@ -510,6 +517,8 @@ def launch(target: str, config_path: Path | None, project_dir: Path | None,
 
     cfg = _load_coord_yaml(config_path)
     project_dir = (project_dir or Path(cfg.get("project_dir") or ".")).resolve()
+    if (project_dir/'coordination/execution.yaml').is_file():
+        raise click.ClickException('ACP launch requires --project-dir instead of --config')
     if not project_dir.is_dir():
         err(f"project_dir {project_dir} not found")
         raise click.exceptions.Exit(1)

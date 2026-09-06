@@ -935,6 +935,23 @@ M6 shared ACP bootstrap preparation:
 - Next: explicit old-configuration migration and ACP launch surfaces, then default
   switch/removal with updated acceptance tests. M3/M5/M7 remaining scope persists.
 
+M6 ACP launch surface checkpoint:
+
+- `launch` selects ACP frontends when execution.yaml exists, including protection
+  against entering the other launcher through an explicit coord.yaml path.
+  VS Code/Cursor workspace tasks run the daemon and operator queries as process
+  argv, preserve unrelated workspace content, and leave folder tasks untouched.
+- Tmux creates only a coordd window and an operator shell. Existing project-specific
+  sessions are reported without recreation; no native harness commands or synthetic
+  keystrokes are emitted. Destructive recreation requires explicit operator cleanup.
+- Launch/documentation regression: 42 passed. Final frontend tests: 5 passed,
+  including configuration-path bypass prevention. Tmux command behavior is tested
+  with a process mock; graphical editor and live tmux acceptance remain open.
+  Installed-wheel workspace generation and repeat generation passed; executing
+  the generated daemon argv with --once completed on an empty local ACP project.
+- Next: explicit fleet configuration migration and default setup/driver removal.
+  This does not complete M6 or the remaining M3/M5/M7 acceptance scope.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility

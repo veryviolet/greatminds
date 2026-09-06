@@ -682,3 +682,28 @@ editor terminal closes or reconnects.
 
 Richer non-permission input, real extension-host smoke testing, and live interactive
 harness validation remain outstanding M5 work.
+
+## ACP launch surfaces
+
+When `coordination/execution.yaml` exists, `greatminds launch --project-dir PATH`
+uses the ACP frontend. `--target vscode` or `cursor-ide` writes
+`greatminds-acp.code-workspace` with process tasks for coordd, run status, and
+conversation metadata. It preserves unrelated workspace tasks/settings and does
+not modify the user's `.vscode/tasks.json`. Open the workspace and use the ACP chat
+extension commands for role conversations. Workspace generation itself starts no
+agent or daemon. The workspace must retain the project as its first folder.
+
+`--target tmux` creates a project-specific session with a coordd window and an
+operator shell. It sends no synthetic keystrokes and starts no native harness TUI.
+The daemon dispatches according to execution.yaml. Repeated launch reports an
+existing tmux session; it does not kill or replace it. `--recreate` is refused for
+this path; stop the daemon and close its session explicitly when needed. The
+supervisor's exclusive lease remains responsible for preventing duplicate daemon
+ownership, including when a service already runs coordd.
+
+The frontend uses the current CLI's Python, or an explicit `--venv` whose ACP
+runtime imports are checked before launch. `--config` does not select another
+configuration for an ACP project; use its project directory. A project without
+an execution contract still uses the other launcher while default migration is
+being completed. Generating an ACP workspace does not remove pre-existing fleet
+artifacts; that belongs to the explicit project migration.
