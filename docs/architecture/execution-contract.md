@@ -563,3 +563,34 @@ machine state or detect transient changes reverted between snapshots. Until the
 explicit legacy migration, projects with neither execution.yaml nor a deployment
 ledger retain their existing marker/evidence behavior; ACP projects require a
 managed receipt and never fall back to a marker or prose.
+
+## Interactive conversation journal (M5 foundation)
+
+`runtime.interactions.ConversationStore` is the persistence layer for the upcoming
+chat/attach surface. It is not yet wired into dispatch or exposed as a chat CLI.
+Each conversation has a private `.runtime/conversations/<id>/state.json` and a
+stable lock. The binding, execution/schema hashes, and workspace are pinned at
+creation. Prompt text belongs to this private conversation journal, not the global
+run/event snapshot. Consumers must normalize and redact assistant text before
+appending it; arbitrary tool payloads are not accepted by the text API.
+
+Caller-supplied request IDs make enqueue retries idempotent. Reusing an ID with a
+different prompt fails. A durable sequence establishes FIFO order independently
+of JSON key order and clock time; only one turn may be running per conversation.
+Cancellation removes a queued turn from dispatch. Cancelling a running turn records
+intent, and the daemon must complete ACP cancellation before recording its outcome.
+
+A new supervisor owner interrupts already-started turns without re-enqueueing them.
+Queued input and the provider session ID survive. The caller must hold the exclusive
+project supervisor lease before acquiring ownership; this store does not itself
+assert process liveness or implement session loading. Changed contracts require a
+new conversation rather than silently rebinding pending messages. Integration must
+load the compatible session or report explicitly why continuity is unavailable.
+
+Reconnect readers page events by monotonically increasing cursor without changing
+execution state. Limits are explicit: 64 KiB per prompt, 64 pending turns, 256 turns
+per conversation, and 1 MiB/4096 text events of captured output per turn. Exceeding
+output capture emits one truncation event while allowing the daemon to finish the
+turn. New prompts exceeding limits are rejected without deleting earlier input.
+Daemon dispatch, shared run/account capacity, permissions, task context, and the
+interactive CLI still need integration before this constitutes a usable chat path.

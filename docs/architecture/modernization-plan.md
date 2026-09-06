@@ -806,6 +806,20 @@ M4 stand evidence consumption checkpoint:
   sessions, then default configuration migration and product simplification.
   M5–M7 and the complete harness compatibility campaign remain open.
 
+M5 interactive journal foundation:
+
+- Added a private conversation journal with pinned binding/config/schema/workspace,
+  idempotent prompt IDs, durable FIFO ordering, one running turn, cancellation
+  intent, and cursor-based output reading. Supervisor ownership changes interrupt
+  started turns without automatic replay and preserve queued input.
+- Nine focused tests passed: concurrent claims, lost enqueue acknowledgement,
+  reconnect, recovery/old-owner rejection, cancellation, UTF-8 output bounds,
+  contract changes, and queue limits. This is an internal persistence foundation;
+  it does not yet launch an interactive session or expose chat commands.
+- Immediate next step: integrate this journal with daemon-owned ACP sessions,
+  shared capacity and permissions, then implement chat/attach and restart tests.
+  Keep the complete migration and compatibility scope open.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility
