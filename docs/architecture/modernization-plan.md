@@ -1,6 +1,6 @@
 # Greatminds modernization plan
 
-Date: 2026-09-06. Status: implementation plan; runtime changes not yet made.
+Date: 2026-09-06. Status: implementation in progress; see Progress below.
 Baseline and evidence: [initial audit](rehabilitation-audit-2026-09-06.md).
 
 ## Agreed destination
@@ -420,7 +420,20 @@ M0 implemented on 2026-09-06:
   remains part of the upcoming run lifecycle implementation.
 - Full regression suite: 1,665 passed, 2 skipped. Wheel and sdist build succeeded.
 
-The next implementation step is the shared run contract in M1. ACP execution
-and automatic workflow controllers are still pending, not implemented by M0.
+M1 foundation implemented on 2026-09-06:
+
+- Validated ACP-only manifests and independent role bindings, environment
+  references, execution fingerprints, and read-only `project execution` output.
+- Durable project/run identities, task revision checks, atomic claims, scoped
+  result receipts, event deduplication, pause state, and concurrency limits.
+- Schema and execution documents retained by content hash for each run.
+- Shared stable-inode task locks close a queued-waiter mutual exclusion race.
+- Cross-process claim, stale-result, identity, duplicate event/receipt, capacity,
+  failed-write, and contract-reload fixtures exercise the new service.
+
+See [execution contract](execution-contract.md) for semantics and limitations.
+ACP execution, process recovery integration, typed domain application, and
+automatic workflow controllers are still pending. The existing daemon has not
+yet been switched to the new store; M1 foundation does not establish cutover.
 This document authorizes no release or migration of existing live fleets by
 itself; those operations are separate from developing and testing the changes.

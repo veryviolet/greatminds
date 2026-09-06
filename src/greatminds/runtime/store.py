@@ -1,0 +1,307 @@
+"""Durable run identities, claims, and result receipts on a local filesystem.
+
+One short flock transaction replaces the metadata snapshot atomically. Task
+locks are acquired before the store lock whenever both are needed. Process
+launch and domain result application are deliberately outside this store:
+an accepted receipt is not a task transition or a correctness verdict.
+"""
+
+from __future__ import annotations
+
+import copy
+import hashlib
+import hmac
+import json
+import secrets
+import time
+import uuid
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Callable, Iterator
+
+from greatminds.core.errors import GreatMindsError
+from greatminds.core.schema import SchemaSnapshot
+from greatminds.core.storage import atomic_json, file_lock, safe_name, task_lock
+from .config import ExecutionConfig, RoleBinding, fingerprint
+
+
+TERMINAL = frozenset({"completed", "failed", "cancelled", "interrupted"})
+TRANSITIONS = {
+    "claimed": {"starting", "cancelled", "interrupted"},
+    "starting": {"running", "waiting_auth", "waiting_input", "failed", "cancelling", "interrupted"},
+    "running": {"waiting_input", "waiting_auth", "completed", "failed", "cancelling", "interrupted"},
+    "waiting_input": {"running", "cancelling", "failed", "interrupted"},
+    "waiting_auth": {"starting", "cancelling", "failed", "interrupted"},
+    "cancelling": {"cancelled", "failed", "interrupted"},
+}
+
+
+def _error(message: str, code: int = 2):
+    raise GreatMindsError(message, exit_code=code)
+
+
+@dataclass(frozen=True)
+class TaskRevision:
+    task_id: str
+    path: str
+    sha256: str
+
+    @classmethod
+    def capture(cls, runtime: Path, path: Path) -> TaskRevision:
+        root = runtime.resolve()
+        resolved = path.resolve()
+        if path.absolute() != resolved:
+            _error("task paths must not contain symlinks or traversal")
+        try:
+            relative = resolved.relative_to(root)
+        except ValueError:
+            _error("task must be inside the runtime directory")
+        if len(relative.parts) != 2 or relative.parts[0].startswith(".") or path.suffix != ".yaml":
+            _error("task must be a YAML file directly inside a queue")
+        safe_name(relative.parts[0])
+        task_id = safe_name(path.stem)
+        content = resolved.read_bytes()
+        # Moving queues changes the revision even when file contents do not.
+        digest = hashlib.sha256(str(relative).encode() + b"\0" + content).hexdigest()
+        return cls(task_id, str(relative), digest)
+
+
+@dataclass(frozen=True)
+class Claim:
+    run: dict
+    token: str
+
+
+@dataclass(frozen=True)
+class ResultEnvelope:
+    result_id: str
+    run_id: str
+    task_id: str
+    task_revision: str
+    schema_sha256: str
+    decision: str
+    payload: dict
+
+    def document(self) -> dict:
+        for value in (self.result_id, self.run_id, self.task_id):
+            safe_name(value)
+        if self.decision not in {"handoff", "blocked", "needs_input", "no_change"}:
+            _error("unknown result decision")
+        if not isinstance(self.payload, dict):
+            _error("result payload must be a mapping")
+        # Role and provenance are derived from the authenticated run.
+        if {"role", "by", "run_id", "task_revision", "schema_sha256"} & self.payload.keys():
+            _error("result payload cannot override run identity", 3)
+        document = asdict(self)
+        try:
+            fingerprint(document)
+        except (TypeError, ValueError) as exc:
+            _error(f"result must contain finite JSON values: {exc}")
+        return document
+
+
+class RunStore:
+    def __init__(self, runtime: Path, *, clock: Callable[[], float] = time.time):
+        self.runtime = runtime.resolve()
+        self.directory = self.runtime / ".runtime"
+        self.path = self.directory / "state.json"
+        self.clock = clock
+
+    def _read(self) -> dict | None:
+        if not self.path.exists():
+            return None
+        try:
+            state = json.loads(self.path.read_text(encoding="utf-8"))
+            if (not isinstance(state, dict) or state.get("version") != 1
+                    or not isinstance(state.get("runs"), dict)
+                    or not isinstance(state.get("events"), list)
+                    or not isinstance(state.get("results"), dict)
+                    or not isinstance(state.get("project_id"), str)
+                    or type(state.get("paused")) is not bool):
+                raise ValueError("invalid or unsupported runtime state")
+            return state
+        except (OSError, ValueError) as exc:
+            _error(f"cannot read runtime state {self.path}: {exc}", 4)
+
+    @contextmanager
+    def _transaction(self) -> Iterator[dict]:
+        with file_lock(self.directory / "store.lock", label="runtime"):
+            state = self._read() or {
+                "version": 1, "project_id": uuid.uuid4().hex, "paused": False,
+                "runs": {}, "events": [], "results": {},
+            }
+            before = copy.deepcopy(state)
+            yield state
+            if state != before or not self.path.exists():
+                atomic_json(self.path, state)
+
+    def snapshot(self) -> dict:
+        """Read-only operator view; never return credential hashes."""
+        state = self._read()
+        if state is None:
+            return {"version": 1, "project_id": None, "paused": False,
+                    "runs": {}, "events": [], "results": {}}
+        for run in state["runs"].values():
+            run.pop("token_sha256", None)
+        return state
+
+    def _event(self, state: dict, kind: str, run_id: str | None, data: dict) -> None:
+        state["events"].append({"sequence": len(state["events"]) + 1,
+                                "at": self.clock(), "kind": kind,
+                                "run_id": run_id, "data": copy.deepcopy(data)})
+
+    def set_paused(self, paused: bool) -> None:
+        if type(paused) is not bool:
+            _error("paused must be a boolean")
+        with self._transaction() as state:
+            if state["paused"] != paused:
+                state["paused"] = paused
+                self._event(state, "dispatch_paused" if paused else "dispatch_resumed", None, {})
+
+    def claim(self, *, task: TaskRevision, binding: RoleBinding,
+              config: ExecutionConfig, schema: SchemaSnapshot,
+              project: Path, owner_id: str) -> Claim:
+        safe_name(owner_id)
+        if binding not in config.bindings or binding.role not in schema.document.get("roles", {}):
+            _error("binding is not part of the effective execution contract", 3)
+        workspace = str(binding.workspace_path(project))
+        agent = config.agent(binding.agent)
+        with task_lock(self.runtime, task.task_id), self._transaction() as state:
+            self._check_revision(task)
+            if state["paused"]:
+                _error("dispatch is paused")
+            active = [run for run in state["runs"].values() if run["state"] not in TERMINAL]
+            if any(run["task_id"] == task.task_id for run in active):
+                _error(f"task {task.task_id} already has an active run")
+            if len(active) >= config.max_running:
+                _error("project execution capacity reached")
+            if sum(run["binding_id"] == binding.id for run in active) >= binding.max_running:
+                _error(f"binding {binding.id} execution capacity reached")
+            limit = dict(config.account_limits).get(binding.account, config.max_running)
+            if sum(run["account"] == binding.account for run in active) >= limit:
+                _error(f"account {binding.account} execution capacity reached")
+            self._persist_contract("schema", schema.sha256,
+                                   {"text": schema.text, "version": schema.version})
+            self._persist_contract("execution", config.sha256, asdict(config))
+            token = secrets.token_urlsafe(32)
+            run_id = uuid.uuid4().hex
+            run = {
+                "id": run_id, "project_id": state["project_id"], "owner_id": owner_id,
+                "task_id": task.task_id, "task_path": task.path, "task_revision": task.sha256,
+                "role": binding.role, "binding_id": binding.id, "binding_sha256": binding.sha256,
+                "agent_id": agent.id, "agent_sha256": agent.sha256, "config_sha256": config.sha256,
+                "schema_sha256": schema.sha256, "schema_version": schema.version,
+                "workspace": workspace, "account": binding.account,
+                "permission": binding.permission, "state": "claimed", "created_at": self.clock(),
+                "updated_at": self.clock(), "session_id": None, "event_receipts": {},
+                "token_sha256": hashlib.sha256(token.encode()).hexdigest(),
+            }
+            state["runs"][run_id] = run
+            self._event(state, "claimed", run_id, {"task_id": task.task_id})
+            public = {key: copy.deepcopy(value) for key, value in run.items() if key != "token_sha256"}
+        return Claim(public, token)
+
+    def _persist_contract(self, kind: str, digest: str, document: dict) -> None:
+        """Write immutable dependencies before publishing the run that uses them.
+
+        A crash may leave an unreferenced contract, never a run referencing a
+        contract that was not synced. No credential values enter this document.
+        """
+        path = self.directory / "contracts" / f"{kind}-{digest}.json"
+        if path.exists():
+            try:
+                existing = json.loads(path.read_text(encoding="utf-8"))
+                if fingerprint(existing) != fingerprint(document):
+                    raise ValueError("stored contract differs from its identity")
+            except (OSError, ValueError) as exc:
+                _error(f"cannot read pinned contract {path}: {exc}", 4)
+        else:
+            atomic_json(path, document)
+
+    def contracts(self, run_id: str) -> dict:
+        run = self._run(self.snapshot(), run_id)
+        result = {}
+        for kind, key in (("schema", "schema_sha256"), ("execution", "config_sha256")):
+            path = self.directory / "contracts" / f"{kind}-{run[key]}.json"
+            try:
+                document = json.loads(path.read_text(encoding="utf-8"))
+                digest = (hashlib.sha256(document["text"].encode()).hexdigest()
+                          if kind == "schema" else fingerprint(document))
+                if digest != run[key]:
+                    raise ValueError("contract content does not match pinned identity")
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                _error(f"cannot read pinned contract {path}: {exc}", 4)
+            result[kind] = document
+        return result
+
+    def _check_revision(self, task: TaskRevision) -> None:
+        try:
+            current = TaskRevision.capture(self.runtime, self.runtime / task.path)
+        except (FileNotFoundError, OSError):
+            _error("stale task revision: assigned task is missing or moved")
+        if current != task:
+            _error("stale task revision: assigned task has changed")
+
+    @staticmethod
+    def _run(state: dict, run_id: str) -> dict:
+        if run_id not in state["runs"]:
+            _error(f"unknown run {run_id}")
+        return state["runs"][run_id]
+
+    def transition(self, run_id: str, *, owner_id: str, event_id: str,
+                   target: str, reason: str = "", session_id: str | None = None) -> dict:
+        """Apply one supervisor event; duplicate delivery cannot replay it."""
+        safe_name(event_id)
+        payload = {"target": target, "reason": reason, "session_id": session_id}
+        digest = fingerprint(payload)
+        with self._transaction() as state:
+            run = self._run(state, run_id)
+            if run["owner_id"] != owner_id:
+                _error("run belongs to a different supervisor", 3)
+            previous = run["event_receipts"].get(event_id)
+            if previous is not None:
+                if previous != digest:
+                    _error("event identity reused with different contents")
+                return {k: copy.deepcopy(v) for k, v in run.items() if k != "token_sha256"}
+            if target not in TRANSITIONS.get(run["state"], set()):
+                _error(f"illegal run transition {run['state']} -> {target}")
+            run.update(state=target, updated_at=self.clock(), reason=reason)
+            if session_id is not None:
+                run["session_id"] = session_id
+            run["event_receipts"][event_id] = digest
+            self._event(state, target, run_id, payload)
+            return {k: copy.deepcopy(v) for k, v in run.items() if k != "token_sha256"}
+
+    def receive_result(self, envelope: ResultEnvelope, *, token: str) -> dict:
+        """Authenticate and durably receive a decision for later domain validation.
+
+        Re-delivery of the identical result remains valid after the task moves.
+        It returns the existing receipt rather than repeating domain side effects.
+        """
+        document = envelope.document()
+        digest = fingerprint(document)
+        with task_lock(self.runtime, envelope.task_id), self._transaction() as state:
+            run = self._run(state, envelope.run_id)
+            if not hmac.compare_digest(run["token_sha256"], hashlib.sha256(token.encode()).hexdigest()):
+                _error("invalid run credential", 3)
+            for name, expected in (("task_id", envelope.task_id),
+                                   ("task_revision", envelope.task_revision),
+                                   ("schema_sha256", envelope.schema_sha256)):
+                if run[name] != expected:
+                    _error(f"result {name} does not match assigned run", 3)
+            existing = state["results"].get(envelope.result_id)
+            if existing:
+                if existing["sha256"] != digest:
+                    _error("result identity reused with different contents")
+                return copy.deepcopy(existing)
+            if run["state"] not in {"running", "waiting_input"}:
+                _error("run is not accepting new results")
+            self._check_revision(TaskRevision(run["task_id"], run["task_path"], run["task_revision"]))
+            if any(receipt["envelope"]["run_id"] == envelope.run_id for receipt in state["results"].values()):
+                _error("run already submitted a result")
+            receipt = {"status": "received", "sha256": digest, "envelope": document,
+                       "role": run["role"], "at": self.clock()}
+            state["results"][envelope.result_id] = receipt
+            self._event(state, "result_received", run["id"], {"result_id": envelope.result_id})
+            return copy.deepcopy(receipt)

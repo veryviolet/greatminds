@@ -13,6 +13,7 @@ flock (in-process flock on the same fd doesn't conflict on Linux).
 from __future__ import annotations
 
 import os
+import fcntl
 import signal
 import subprocess
 import sys
@@ -79,15 +80,32 @@ def test_task_file_lock_writes_holder_pid_to_file(tmp_path: Path) -> None:
         )
 
 
-def test_task_file_lock_removes_file_on_release(tmp_path: Path) -> None:
+def test_task_file_lock_preserves_inode_on_release(tmp_path: Path) -> None:
     coord = tmp_path
     task_id = "0001-test"
     lock_path = coord / ".locks" / f"{task_id}.lock"
     with task_file_lock(coord, task_id):
         assert lock_path.is_file()
-    # After release, no empty lock marker is left behind. A future acquire
-    # recreates it on demand.
-    assert not lock_path.exists()
+    # Queued waiters may already have opened this inode. Unlinking it lets
+    # a new caller acquire a different inode and enter concurrently.
+    inode = lock_path.stat().st_ino
+    assert lock_path.read_text() == ""
+    with task_file_lock(coord, task_id):
+        assert lock_path.stat().st_ino == inode
+
+
+def test_waiter_that_opened_before_release_still_excludes_new_callers(tmp_path: Path) -> None:
+    lock_path = tmp_path / ".locks" / "0001-contended.lock"
+    with task_file_lock(tmp_path, "0001-contended"):
+        waiter = os.open(lock_path, os.O_RDWR)
+    try:
+        # Simulate a queued waiter acquiring the original inode after release.
+        fcntl.flock(waiter, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        with pytest.raises(GreatMindsError, match="being transitioned"):
+            with task_file_lock(tmp_path, "0001-contended", timeout=0.05, poll_interval=0.01):
+                pytest.fail("a third caller entered while the queued waiter held the lock")
+    finally:
+        os.close(waiter)
 
 
 def test_task_file_lock_times_out_when_other_process_holds(

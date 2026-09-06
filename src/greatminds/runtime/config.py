@@ -1,0 +1,190 @@
+"""Versioned ACP launch manifests and independent role bindings.
+
+Configuration contains environment *names*, never copied credentials. Nothing
+in this module launches a process or silently substitutes another harness.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any, Mapping
+
+import yaml
+
+from greatminds.core.errors import GreatMindsError
+from greatminds.core.storage import safe_name
+
+
+def fingerprint(value: Any) -> str:
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"),
+                                     allow_nan=False).encode()).hexdigest()
+
+
+def _fail(message: str):
+    raise GreatMindsError(f"execution config: {message}", exit_code=2)
+
+
+def _mapping(value: Any, label: str, allowed: set[str] | None = None) -> dict:
+    if not isinstance(value, dict) or not all(isinstance(k, str) for k in value):
+        _fail(f"{label} must be a mapping")
+    if allowed is not None and value.keys() - allowed:
+        _fail(f"unknown {label} fields: {sorted(value.keys() - allowed)}")
+    return value
+
+
+def _string(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not value.strip() or "\0" in value:
+        _fail(f"{label} must be a nonempty string")
+    return value
+
+
+def _strings(value: Any, label: str) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        _fail(f"{label} must be an array")
+    return tuple(_string(item, label) for item in value)
+
+
+def _choice(value: Any, allowed: set[str], label: str) -> str:
+    if not isinstance(value, str) or value not in allowed:
+        _fail(f"{label} must be one of {sorted(allowed)}")
+    return value
+
+
+def _positive(value: Any, label: str) -> int:
+    if type(value) is not int or value < 1:
+        _fail(f"{label} must be a positive integer")
+    return value
+
+
+@dataclass(frozen=True)
+class AgentManifest:
+    id: str
+    argv: tuple[str, ...]
+    adapter_version: str
+    harness_version: str
+    environment: tuple[tuple[str, str], ...] = ()
+    required_env: tuple[str, ...] = ()
+    required_capabilities: tuple[str, ...] = ()
+    optional_capabilities: tuple[str, ...] = ()
+
+    @property
+    def sha256(self) -> str:
+        return fingerprint(asdict(self))
+
+    def environment_values(self, source: Mapping[str, str]) -> dict[str, str]:
+        """Resolve references at launch time without persisting their values."""
+        absent = [name for name in self.required_env if not source.get(name)]
+        if absent:
+            raise GreatMindsError(f"agent {self.id}: missing environment names: "
+                                  + ", ".join(absent), exit_code=2)
+        return {dest: source[ref] for dest, ref in self.environment if ref in source}
+
+
+@dataclass(frozen=True)
+class RoleBinding:
+    id: str
+    role: str
+    agent: str
+    workspace: str = "."
+    scheduling: str = "on-demand"
+    permission: str = "ask"
+    session: str = "resume-if-compatible"
+    model: str | None = None
+    mode: str | None = None
+    account: str = "default"
+    max_running: int = 1
+    timeout_seconds: int = 1800
+
+    @property
+    def sha256(self) -> str:
+        return fingerprint(asdict(self))
+
+    def workspace_path(self, project: Path) -> Path:
+        path = (project / self.workspace).resolve()
+        if not path.is_dir():
+            raise GreatMindsError(f"binding {self.id}: workspace does not exist: {path}",
+                                  exit_code=2)
+        return path
+
+
+@dataclass(frozen=True)
+class ExecutionConfig:
+    agents: tuple[AgentManifest, ...]
+    bindings: tuple[RoleBinding, ...]
+    max_running: int = 4
+    account_limits: tuple[tuple[str, int], ...] = ()
+
+    @property
+    def sha256(self) -> str:
+        return fingerprint(asdict(self))
+
+    def agent(self, agent_id: str) -> AgentManifest:
+        return next(agent for agent in self.agents if agent.id == agent_id)
+
+
+def parse_execution_config(document: Any, *, roles: set[str]) -> ExecutionConfig:
+    root = _mapping(document, "root", {"version", "agents", "bindings", "max_running",
+                                       "account_limits"})
+    if type(root.get("version")) is not int or root["version"] != 1:
+        _fail("version must be 1")
+    agents = []
+    for name, raw in _mapping(root.get("agents"), "agents").items():
+        safe_name(name)
+        item = _mapping(raw, f"agent {name}", {
+            "transport", "argv", "adapter_version", "harness_version", "environment",
+            "required_env", "required_capabilities", "optional_capabilities"})
+        if item.get("transport") != "acp":
+            _fail(f"agent {name}: transport must be acp")
+        argv = _strings(item.get("argv"), "argv")
+        if not argv:
+            _fail(f"agent {name}: argv must not be empty")
+        env = _mapping(item.get("environment", {}), "environment")
+        required = _strings(item.get("required_env", []), "required_env")
+        for name_or_ref in [*env, *env.values(), *required]:
+            if not isinstance(name_or_ref, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name_or_ref):
+                _fail("environment entries must reference environment variable names")
+        agents.append(AgentManifest(
+            name, argv, _string(item.get("adapter_version"), "adapter_version"),
+            _string(item.get("harness_version"), "harness_version"),
+            tuple(sorted(env.items())), required,
+            _strings(item.get("required_capabilities", []), "required_capabilities"),
+            _strings(item.get("optional_capabilities", []), "optional_capabilities")))
+    bindings = []
+    agent_ids = {agent.id for agent in agents}
+    for name, raw in _mapping(root.get("bindings"), "bindings").items():
+        safe_name(name)
+        item = _mapping(raw, f"binding {name}", set(RoleBinding.__dataclass_fields__) - {"id"})
+        role = _string(item.get("role"), "role")
+        if role not in roles:
+            _fail(f"binding {name}: unknown role {role}")
+        agent = _string(item.get("agent"), "agent")
+        if agent not in agent_ids:
+            _fail(f"binding {name}: unknown agent {agent}")
+        bindings.append(RoleBinding(
+            id=name, role=role, agent=agent,
+            workspace=_string(item.get("workspace", "."), "workspace"),
+            scheduling=_choice(item.get("scheduling", "on-demand"), {"on-demand", "queue"}, "scheduling"),
+            permission=_choice(item.get("permission", "ask"), {"ask", "deny", "allow-workspace"}, "permission"),
+            session=_choice(item.get("session", "resume-if-compatible"), {"new", "resume-if-compatible"}, "session"),
+            model=_string(item["model"], "model") if "model" in item else None,
+            mode=_string(item["mode"], "mode") if "mode" in item else None,
+            account=safe_name(item.get("account", "default")),
+            max_running=_positive(item.get("max_running", 1), "max_running"),
+            timeout_seconds=_positive(item.get("timeout_seconds", 1800), "timeout_seconds")))
+    limits = _mapping(root.get("account_limits", {}), "account_limits")
+    return ExecutionConfig(tuple(agents), tuple(bindings),
+                           _positive(root.get("max_running", 4), "max_running"),
+                           tuple((safe_name(k), _positive(v, "account limit"))
+                                 for k, v in sorted(limits.items())))
+
+
+def load_execution_config(path: Path, *, roles: set[str]) -> ExecutionConfig:
+    try:
+        document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise GreatMindsError(f"cannot load execution config {path}: {exc}", exit_code=2) from exc
+    return parse_execution_config(document, roles=roles)

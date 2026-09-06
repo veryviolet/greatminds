@@ -8,6 +8,10 @@ follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
 ### Added
 
+- ACP execution manifests and independent role bindings, inspected read-only
+  with `greatminds project execution`. The new runtime store provides durable
+  claims, pinned contracts, concurrency limits, and authenticated result receipts.
+  Daemon/ACP integration is still in progress; this does not change launch paths.
 - `greatminds project schema` prints the effective installed contract.
   `--json` includes its source, version, SHA-256 identity, and project-copy
   status; `--check` detects missing, unreadable, or different generated copies
@@ -15,6 +19,8 @@ follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
 ### Fixed
 
+- Task locks retain a stable inode so queued waiters and new callers cannot
+  acquire different locks for the same task.
 - Daemon service selection now uses the same canon schema as task validation
   and driven dispatch instead of trusting a potentially stale project copy.
   Codex service selection also requires the configured window mode to be driven.

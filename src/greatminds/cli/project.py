@@ -17,6 +17,7 @@ import click
 from greatminds.core.errors import GreatMindsError
 from greatminds.core.paths import find_config_dir, find_project_dir
 from greatminds.core.schema import inspect_schema_copy, load_schema_snapshot
+from greatminds.runtime.config import load_execution_config
 
 
 @click.group(name="project",
@@ -34,6 +35,20 @@ def project_show() -> None:
         raise GreatMindsError(
             f"PROJECT.md not found at {p} — run `greatminds setup` first")
     click.echo(p.read_text(encoding="utf-8"), nl=False)
+
+
+@project.command(name="execution", help="validate and show the ACP execution contract (read-only).")
+@click.option("--config", "config_path", type=click.Path(dir_okay=False, path_type=Path),
+              help="defaults to coordination/execution.yaml in the current project.")
+def project_execution(config_path: Path | None) -> None:
+    from dataclasses import asdict
+
+    source = config_path or find_config_dir() / "execution.yaml"
+    schema = load_schema_snapshot()
+    config = load_execution_config(source, roles=set(schema.document.get("roles", {})))
+    click.echo(json.dumps({"version": 1, "source": str(source.resolve()),
+                           "sha256": config.sha256, "schema_sha256": schema.sha256,
+                           "execution": asdict(config)}, indent=2))
 
 
 @project.command(name="schema", help="print the effective schema, not the project mirror.")
