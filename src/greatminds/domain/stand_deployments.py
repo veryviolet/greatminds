@@ -34,6 +34,7 @@ class DeploymentLedger:
                        or not isinstance(item.get('lease'), dict)
                        or not isinstance(item['lease'].get('lease_id'), str)
                        or not item['lease']['lease_id']
+                       or ('sequence' in item and (type(item['sequence']) is not int or item['sequence'] <= 0))
                        or (item.get('status') in {'command_finished', 'applied'}
                            and type(item.get('exit_code')) is not int)
                        or item.get('status') not in {'started', 'command_finished', 'applied', 'needs_recovery', 'resolved'}
@@ -93,7 +94,8 @@ class DeploymentLedger:
         with file_lock(self.lock, label='deployment ledger'):
             self.require_resolved()
             document = self.snapshot()
-            attempt = {'id': uuid.uuid4().hex, 'status': 'started', 'lease': {key: copy.deepcopy(lease[key]) for key in
+            attempt = {'id': uuid.uuid4().hex, 'status': 'started',
+                       'sequence': max((a.get('sequence', 0) for a in document['attempts'].values()), default=0) + 1, 'lease': {key: copy.deepcopy(lease[key]) for key in
                        ('lease_id', 'task', 'profile', 'worktree', 'holder_role', 'granted_at') if key in lease},
                        'launch_protocol': 'gated-v1', 'created_at': now_iso(), 'owner_process': process_identity(os.getpid())}
             document['attempts'][attempt['id']] = attempt
@@ -160,8 +162,10 @@ class DeploymentLedger:
                      status='resolved', resolution=reason, resolved_at=now_iso())
         return self.snapshot()['attempts'][attempt_id]
 
-    def inputs(self, attempt_id, *, before=None, after=None):
+    def inputs(self, attempt_id, *, before=None, after=None, context=None):
         fields = {}
+        if context is not None:
+            fields['inputs_context'] = context
         if before is not None:
             fields['inputs_before'] = before
         if after is not None:

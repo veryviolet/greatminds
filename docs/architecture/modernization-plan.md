@@ -783,6 +783,29 @@ M4 managed stand input identity checkpoint:
 - Next: revalidate stand evidence at domain consumption, declare external environment
   revisions, and complete remaining maintenance / interactive ACP / migration work.
 
+M4 stand evidence consumption checkpoint:
+
+- Domain transitions, CLI gate checks, and manual ready now require current
+  managed deployment evidence in ACP projects. They compare local inputs again
+  and verify complete captured output by path, size, and hash. Later failed or
+  unresolved same-lease attempts cannot reuse an earlier successful receipt.
+- Manual ready serializes with deployment and checks the deployed lease snapshot.
+  Operational run credentials and terminal variables are excluded from both the
+  playbook environment and its identity. Public context is reconstructable;
+  environment values remain private. Declared `stand.environment_revision` covers
+  operator-known external changes; it is not remote-state discovery.
+- Expanded stand/config/ACP/gate regression: 340 passed, 1 skipped. Final focused
+  regression: 49 passed, including same-ID lease mutation, output symlinks,
+  malformed environment revisions, and source changes between deploy and gates.
+  Installed-wheel local deployment accepted fresh evidence and rejected a source
+  change through both the CLI gate and task transition evaluator. No remote
+  deployment was performed.
+  Legacy marker fallback exists only without both ACP configuration and ledger,
+  pending the explicit M6 migration.
+- Next: remaining deterministic maintenance and interactive daemon-owned ACP
+  sessions, then default configuration migration and product simplification.
+  M5–M7 and the complete harness compatibility campaign remain open.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility

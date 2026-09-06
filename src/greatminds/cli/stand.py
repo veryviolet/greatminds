@@ -1184,9 +1184,8 @@ def stand_deploy(lease_id: str, timeout: float | None, output_limit: int) -> Non
 def stand_ready(lease_id: str) -> None:
     """Transition a prepared lease to ready and notify the holder.
 
-    Refuses the transition unless a deploy marker exists at
-    ``<coord>/.stand/deploy-<lease_id>.log``. The marker proves coordd
-    invoked the YAML deploy profile before setting the lease ready.
+    Requires fresh managed deployment evidence in ACP projects. Legacy projects
+    retain the deploy marker check until configuration migration.
     """
     from greatminds.cli import stand_state as ss
     from greatminds.cli.stand_executor import deploy_marker_path
@@ -1224,13 +1223,19 @@ def stand_ready(lease_id: str) -> None:
                 f"{lease_id!r}",
                 exit_code=3,
             )
+        from greatminds.domain.stand_evidence import require_fresh_deployment
+        receipt = require_fresh_deployment(coord, lease_id, task_id=active.get("task"))
+        if receipt is not None and any(active.get(key) != value for key, value in receipt["lease"].items()):
+            raise GreatMindsError("stand lease changed since its recorded deployment", exit_code=4)
         active["ready_at"] = ss.now_iso()
         captured["holder"] = active.get("holder_role", "")
         captured["task"] = active.get("task", "")
         ss.record_transition(state, "preparing", "ready", role,
                               lease_id=lease_id, reason="deploy ok")
 
-    ss.update_stand_state(coord, mutator)
+    from greatminds.core.storage import file_lock
+    with file_lock(coord / ".stand/deployment.lock", label="stand deployment", timeout=0):
+        ss.update_stand_state(coord, mutator)
     if captured.get("holder"):
         _file_inbox_info(
             coord, captured["holder"],

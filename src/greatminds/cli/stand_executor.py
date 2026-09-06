@@ -267,14 +267,15 @@ def execute_yaml_profile(
         # dead pid during a multi-minute remote deploy. Best-effort;
         # never crashes the executor.
         attempt_id = lease_meta.get("_deployment_attempt_id")
-        execution_environment = {**os.environ, "ANSIBLE_FORCE_COLOR": "0"}
+        from greatminds.domain.stand_evidence import deployment_environment, evidence_context
+        execution_environment = deployment_environment() if attempt_id else {**os.environ, "ANSIBLE_FORCE_COLOR": "0"}
         before = None
         if attempt_id:
             from greatminds.domain.stand_deployments import DeploymentLedger
             from greatminds.domain.stand_evidence import deployment_inputs
             before = deployment_inputs(coord, lease_meta["worktree"], spec.path, cmd,
                                        execution_environment, extra_vars)
-            DeploymentLedger(coord).inputs(attempt_id, before=before)
+            DeploymentLedger(coord).inputs(attempt_id, before=before, context=evidence_context(lease_meta))
         hb_handle = _start_heartbeat_refresher(coord, "stand-keeper")
         try:
             run_command = subprocess.run
@@ -318,7 +319,7 @@ def execute_yaml_profile(
 
         if attempt_id:
             after = deployment_inputs(coord, lease_meta["worktree"], spec.path, cmd,
-                {**os.environ, "ANSIBLE_FORCE_COLOR": "0"},
+                deployment_environment(),
                 {**read_project_env(coord), **_build_extra_vars(lease_meta)})
             DeploymentLedger(coord).inputs(attempt_id, after=after)
             if before != after:

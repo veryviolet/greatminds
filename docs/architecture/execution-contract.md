@@ -540,7 +540,26 @@ the process returned zero. The actual process result and bounded output remain
 available for assessment. Failure/timeout paths lacking a complete snapshot pair
 do not assert stable inputs.
 
-This records and compares local inputs at the execution boundaries. It does not
-attest remote machine state or prevent transient changes that are reverted between
-snapshots. Revalidation when domain evidence is subsequently consumed, and declared
-revisions for external environment changes, remain to be integrated.
+Domain transitions, `gate-check`, and manual `stand ready` revalidate the latest
+receipt for the cited lease. The receipt must belong to the task, have an applied
+successful outcome and matching input snapshots, and retain complete stdout/stderr
+artifacts whose paths, sizes, and hashes still match. An unresolved later attempt
+cannot fall back to an earlier successful one. Monotonic ledger sequences order
+attempts independently of wall-clock timestamps. Manual ready also requires the
+same deployed lease fields and holds the deployment lock while publishing state.
+
+Current source, profile, executable, effective variables, and environment identity
+must match the receipt. The ledger stores only the public deployment context needed
+to reconstruct variables; PROJECT.env values remain outside it. Managed playbooks
+and validators use the same environment normalization: run ID/token, role/project
+context, shell working-directory bookkeeping, and terminal presentation variables
+are removed; ANSIBLE_FORCE_COLOR is fixed to zero. Other environment changes can
+conservatively invalidate evidence, including differences between caller shells.
+
+`stand.environment_revision` is a nonempty string, defaulting to `"1"`. Change it
+when relevant external services or installed infrastructure change. This is a
+declared revision, not remote-state discovery. These checks cannot attest remote
+machine state or detect transient changes reverted between snapshots. Until the
+explicit legacy migration, projects with neither execution.yaml nor a deployment
+ledger retain their existing marker/evidence behavior; ACP projects require a
+managed receipt and never fall back to a marker or prose.

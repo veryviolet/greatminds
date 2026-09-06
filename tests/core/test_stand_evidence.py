@@ -2,6 +2,9 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
+from greatminds.core.errors import GreatMindsError
 from greatminds.domain.stand_evidence import deployment_inputs
 
 
@@ -23,3 +26,12 @@ def test_environment_identity_uses_private_hmac_and_detects_values(tmp_path):
     kwargs['environment']['__greatminds_stand_extra_vars']='actual-process-variable'
     changed_environment=deployment_inputs(**kwargs)
     assert changed_environment['environment']['environment_hmac']!=after['environment']['environment_hmac']
+
+
+@pytest.mark.parametrize('document',['[]','null','stand: []','stand: null','stand: {environment_revision: 2}','stand: {environment_revision: " "}'])
+def test_invalid_environment_revision_fails_with_domain_error(tmp_path,document):
+    from greatminds.domain.stand_evidence import environment_revision
+    (tmp_path/'coordination').mkdir()
+    (tmp_path/'coordination/execution.yaml').write_text(document)
+    with pytest.raises(GreatMindsError):
+        environment_revision(tmp_path/'.greatminds')

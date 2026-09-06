@@ -178,3 +178,80 @@ def test_changed_deployment_inputs_cannot_mark_stand_ready(tmp_path,monkeypatch,
         assert attempt['inputs_before']['source']==attempt['inputs_after']['source']
         assert attempt['inputs_before']['environment']!=attempt['inputs_after']['environment']
     assert 'changed-value' not in ledger
+
+
+@pytest.mark.parametrize('change',['none','source','environment','revision','output','output_symlink','wrong_task','unresolved'])
+def test_deployment_receipt_is_revalidated_when_consumed(tmp_path,monkeypatch,change):
+    from greatminds.domain.stand_evidence import require_fresh_deployment
+    from greatminds.domain.stand_deployments import DeploymentLedger
+    runtime=setup(tmp_path,monkeypatch)
+    asyncio.run(serve(tmp_path,once=True,environment={}))
+    assert require_fresh_deployment(runtime,'L1',task_id='0001-work')['inputs_match']
+    if change=='none':
+        monkeypatch.setenv('GREATMINDS_ROLE','TESTER')
+        monkeypatch.setenv('GREATMINDS_RUN_TOKEN','ephemeral-run-token')
+        assert require_fresh_deployment(runtime,'L1',task_id='0001-work')['inputs_match']
+        return
+    if change=='source': (tmp_path/'source.py').write_text('changed')
+    if change=='environment': (runtime/'PROJECT.env').write_text('SECRET=changed')
+    if change=='revision':
+        path=tmp_path/'coordination/execution.yaml'
+        config=yaml.safe_load(path.read_text());config['stand']['environment_revision']='2'
+        path.write_text(yaml.safe_dump(config))
+    if change=='output':
+        attempt=next(iter(DeploymentLedger(runtime).snapshot()['attempts'].values()))
+        Path(attempt['output']['stdout']['path']).write_text('tampered')
+    if change=='output_symlink':
+        attempt=next(iter(DeploymentLedger(runtime).snapshot()['attempts'].values()))
+        path=Path(attempt['output']['stdout']['path'])
+        replacement=path.with_name('replacement');path.rename(replacement)
+        path.symlink_to(replacement)
+    if change=='unresolved': DeploymentLedger(runtime).begin({'lease_id':'L1','task':'0001-work'})
+    with pytest.raises(GreatMindsError):
+        require_fresh_deployment(runtime,'L1',task_id='different-task' if change=='wrong_task' else '0001-work')
+
+
+def test_domain_gate_and_manual_ready_reject_stale_managed_deployment(tmp_path,monkeypatch):
+    from greatminds.cli import task,gate_check,stand
+    from click.testing import CliRunner
+    runtime=setup(tmp_path,monkeypatch)
+    asyncio.run(serve(tmp_path,once=True,environment={}))
+    data={'id':'0001-work','blocks':[{'kind':'plan','stand_required':True,'base_commit':'fixture'},
+        {'kind':'tests','test_result':'pass','stand_evidence':{'lease_id':'L1','commit':'fixture'}}]}
+    queue=runtime/'feature_test';queue.mkdir()
+    (queue/'0001-work.yaml').write_text(yaml.safe_dump(data))
+    monkeypatch.setattr(task,'find_coord_dir',lambda:runtime)
+    assert task._evaluate_gate_check(data)=='pass'
+    runner=CliRunner()
+    result=runner.invoke(gate_check.gate_check,['0001-work','--project-dir',str(tmp_path)])
+    assert result.exit_code==0,result.output
+    (tmp_path/'source.py').write_text('changed after deployment')
+    assert task._evaluate_gate_check(data)=='fail'
+    result=runner.invoke(gate_check.gate_check,['0001-work','--project-dir',str(tmp_path)])
+    assert result.exit_code==1,result.output
+    ss.update_stand_state(runtime,lambda s:s.update(state='preparing'))
+    monkeypatch.setattr(stand,'find_coord_dir',lambda:runtime)
+    result=runner.invoke(stand.stand,['ready','--lease-id','L1'])
+    assert result.exit_code!=0 and 'stale' in result.output
+    assert ss.read_stand_state(runtime)['state']=='preparing'
+
+
+@pytest.mark.parametrize('changed_field',[None,'profile','holder_role'])
+def test_manual_ready_requires_same_deployed_lease(tmp_path,monkeypatch,changed_field):
+    from greatminds.cli import stand
+    from click.testing import CliRunner
+    runtime=setup(tmp_path,monkeypatch)
+    asyncio.run(serve(tmp_path,once=True,environment={}))
+    def prepare(state):
+        state['state']='preparing'
+        if changed_field:
+            state['active_lease'][changed_field]='replacement'
+    ss.update_stand_state(runtime,prepare)
+    monkeypatch.setattr(stand,'find_coord_dir',lambda:runtime)
+    result=CliRunner().invoke(stand.stand,['ready','--lease-id','L1'])
+    if changed_field:
+        assert result.exit_code!=0 and 'lease changed' in result.output
+        assert ss.read_stand_state(runtime)['state']=='preparing'
+    else:
+        assert result.exit_code==0,result.output
+        assert ss.read_stand_state(runtime)['state']=='ready'

@@ -137,6 +137,7 @@ class StandDeploymentPolicy:
     authorized: bool = False
     timeout_seconds: int = 1800
     max_output_bytes: int = 1048576
+    environment_revision: str = "1"
 
 
 @dataclass(frozen=True)
@@ -248,7 +249,8 @@ def parse_execution_config(document: Any, *, roles: set[str]) -> ExecutionConfig
         if limit > 67108864:
             _fail("stand output limit must not exceed 67108864")
         stand = StandDeploymentPolicy(profiles, authorized,
-            _positive(item.get("timeout_seconds", 1800), "stand timeout"), limit)
+            _positive(item.get("timeout_seconds", 1800), "stand timeout"), limit,
+            _string(item.get("environment_revision", "1"), "stand environment revision"))
     return ExecutionConfig(tuple(agents), tuple(bindings),
                            _positive(root.get("max_running", 4), "max_running"),
                            tuple((safe_name(k), _positive(v, "account limit"))

@@ -1112,6 +1112,8 @@ def _evaluate_gate_check(task_data: dict[str, Any]) -> str:
         if task_commit and sr_commit and not str(sr_commit).startswith(str(task_commit)) \
                 and not str(task_commit).startswith(str(sr_commit)):
             continue
+        if gc_mod.deployment_freshness_error(project_dir, sr, str(task_id_full)):
+            continue
         return "pass"
     return "fail"
 

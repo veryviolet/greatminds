@@ -239,6 +239,16 @@ def get_task_commit(merged: dict) -> str | None:
     return None
 
 
+def deployment_freshness_error(project_dir, evidence, task_id):
+    from greatminds.domain.stand_evidence import require_fresh_deployment
+    from greatminds.core.errors import GreatMindsError
+    try:
+        require_fresh_deployment(project_runtime_dir(project_dir), evidence.get("lease_id"), task_id=task_id)
+    except (GreatMindsError, OSError, ValueError, TypeError, KeyError, yaml.YAMLError) as exc:
+        return str(exc)
+    return None
+
+
 def extract_lease_evidence_from_tests(merged: dict) -> dict | None:
     """0246 (0242d / Phase 5): read lease-release evidence from the
     product task's latest tests block.
@@ -456,6 +466,10 @@ def gate_check(task_id: str, project_dir: Path | None, canon_dir: Path | None,
                     f"task={task_fingerprint!r}) — iter-N overlay drift"
                 )
                 continue
+        freshness = deployment_freshness_error(project_dir, sr, str(task_id_full))
+        if freshness:
+            fail_reasons.append(f"{path.name}: {freshness}")
+            continue
         pass_any = True
         if verbose:
             info(f"  matched: {path.name}")
