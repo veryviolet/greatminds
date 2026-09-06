@@ -1205,3 +1205,20 @@ inputs and the Python decoder. It passed on this host without launching a
 service. Broader service/schema suite: 68 passed; final codec/environment/doctor
 subset after private-permission and error-redaction adjustments: 24 passed.
 Per-project PATH, unit directive escaping and registry locking remain pending.
+
+### Literal service paths and generic PATH (2026-09-07)
+
+Removed vendor-specific PATH discovery and login-shell execution from service
+rendering. Launcher paths remain argv elements rather than being split on
+whitespace; interpreter symlinks remain intact. The generic baseline can be
+replaced by project EnvironmentFiles or by declared agent/command PATH mapping.
+Added unit-word escaping for whitespace, controls, quotes and percent specifiers;
+launcher arguments containing dollars use systemd's no-expansion execution
+prefix. HOME, PATH and EnvironmentFile directives use this literal encoding.
+
+Validation: 75 service/environment/schema tests passed. Native
+`systemd-analyze verify --man=no` accepted a generated unit whose executable path
+contains spaces, percent specifier text and a dollar sign; no service was started.
+Drop-in tests verify percent escaping and quoted paths. Remaining service work
+includes registry concurrency, strict configuration preflight and update's
+optional service lifecycle behavior.

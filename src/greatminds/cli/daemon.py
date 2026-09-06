@@ -45,6 +45,8 @@ REGISTRY_PATH = REGISTRY_DIR / "projects.json"
 AGENT_ENV_DIR = REGISTRY_DIR / "agent-env"
 SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
 TEMPLATE_UNIT_NAME = "greatminds-daemon@.service"
+
+
 def _current_user_home() -> Path:
     try:
         return Path(pwd.getpwuid(os.getuid()).pw_dir)
@@ -52,21 +54,12 @@ def _current_user_home() -> Path:
         return Path.home()
 
 
-def _resolved_greatminds_exec() -> str:
-    """Pick the ExecStart command for the systemd template unit.
-
-    Mirrors `setup.py:_greatminds_bin()` (task 0002): resolves the
-    currently-running greatminds binary via shutil.which, normalises to
-    absolute path. Falls back to ``<sys.executable> -m greatminds.cli.main``
-    when no console script is on PATH (e.g. a bare-pip module install).
-    Per-project venv installs (uv add greatminds) put the binary at
-    ``<project>/.venv/bin/greatminds`` — picking it up here makes
-    `daemon install` work without requiring a global ~/.local/bin/greatminds.
-    """
+def _greatminds_argv() -> tuple[str, ...]:
+    """Resolve the launcher without splitting paths or following interpreter symlinks."""
     found = shutil.which("greatminds")
     if found:
-        return str(Path(found).resolve())
-    return f"{sys.executable} -m greatminds.cli.main"
+        return (str(Path(found).absolute()),)
+    return (str(Path(sys.executable).absolute()), "-m", "greatminds.cli.main")
 
 
 # ---------------------------------------------------------------------------
@@ -148,75 +141,23 @@ def _resolve_project_name(project: str | None,
 # ---------------------------------------------------------------------------
 
 
-def _clean_daemon_path(exec_cmd: str) -> str:
-    """A MINIMAL, deliberate PATH for the daemon unit — NOT the operator's
-    raw shell PATH (which drags in cuda / flutter / plugin bins / another
-    project's ``.venv-coord``). The daemon needs exactly: the project's
-    own venv bin (greatminds + its ansible), the dirs of the resolved
-    agent tools (node / claude / codex — typically nvm + ``~/.local/bin``),
-    and the standard system dirs. Resolved once, at install time."""
-    import shutil
-
-    dirs: list[str] = []
-    # 1. the project's OWN venv bin (from ExecStart) — its ansible-playbook
-    #    and greatminds, ahead of everything else.
-    try:
-        first = exec_cmd.split()[0]
-        dirs.append(str(Path(first).resolve().parent))
-    except Exception:  # noqa: BLE001
-        pass
+def _clean_daemon_path(executable: str) -> str:
+    """Stable generic baseline; project EnvironmentFiles can explicitly set PATH."""
     home = _current_user_home()
-    dirs.append(str(home / ".local" / "bin"))
-    dirs.append(str(home / ".npm-global" / "bin"))
-    # 2. dirs of the agent tools, resolved via which / the login shell.
-    #    NOT ansible — the project venv above provides it; resolving it
-    #    here risks pulling in a cross-project venv (the .venv-coord bug).
-    for tool in ("node", "claude", "codex"):
-        p = shutil.which(tool)
-        if not p:
-            try:
-                cp = subprocess.run(
-                    ["bash", "-lc", f"command -v {tool} 2>/dev/null"],
-                    capture_output=True, text=True, timeout=10)
-                for line in reversed((cp.stdout or "").splitlines()):
-                    cand = line.strip()
-                    if cand and Path(cand).exists():
-                        p = cand
-                        break
-            except Exception:  # noqa: BLE001
-                p = None
-        if p and Path(p).exists():
-            # the dir where the command was FOUND (a ~/.local/bin symlink,
-            # an nvm bin) — NOT the symlink's resolved target dir, which
-            # may be a versions/ parent with no invokable entry.
-            dirs.append(str(Path(p).parent))
-    # 3. standard system dirs.
-    dirs += ["/usr/local/sbin", "/usr/local/bin", "/usr/sbin",
-             "/usr/bin", "/sbin", "/bin"]
-    seen: set[str] = set()
-    out: list[str] = []
-    for d in dirs:
-        if d and d not in seen:
-            seen.add(d)
-            out.append(d)
-    return ":".join(out)
+    dirs = [str(Path(executable).absolute().parent), str(home / ".local/bin"),
+            str(home / ".npm-global/bin"), "/usr/local/sbin", "/usr/local/bin",
+            "/usr/sbin", "/usr/bin", "/sbin", "/bin"]
+    # A colon in a directory cannot be represented as a PATH component.
+    return ":".join(dict.fromkeys(directory for directory in dirs if ":" not in directory))
 
 
 def _template_unit_body() -> str:
-    """Compose the systemd template unit with the resolved ExecStart path.
-
-    The shipped canon copy under ``src/greatminds/data/systemd/`` uses a
-    placeholder ``__GREATMINDS_BIN__`` that we substitute at install time
-    with the actual greatminds binary path (per
-    ``_resolved_greatminds_exec``). This avoids the 203/EXEC failure
-    reported by 0030 from EXPLORER's avatar dogfood: a uv-style
-    per-project venv install put the binary at
-    ``<project>/.venv/bin/greatminds``, NOT at the canon-template's
-    ``%h/.local/bin/greatminds``.
-
-    Falls back to an inline body when the canon file is missing.
-    """
-    exec_cmd = _resolved_greatminds_exec()
+    """Render the common ACP service with literal launcher and environment paths."""
+    from greatminds.core.service_environment import unit_word
+    argv = _greatminds_argv()
+    literal_argv = ((":" + argv[0], *argv[1:])
+                    if any("$" in arg for arg in argv) else argv)
+    exec_cmd = " ".join(unit_word(arg) for arg in literal_argv)
     body = None
     try:
         src = find_canon_dir() / "systemd" / TEMPLATE_UNIT_NAME
@@ -244,21 +185,10 @@ def _template_unit_body() -> str:
             "[Install]\n"
             "WantedBy=default.target\n"
         )
-    # 1.6.3: bake a CLEAN, minimal PATH into the unit (the systemd-user
-    # default PATH lacks nvm / ~/.local/bin, so the daemon's driven turns
-    # couldn't find codex / claude / node). NOT the operator's raw shell
-    # PATH — that dragged in cuda / flutter / plugin bins / another
-    # project's .venv-coord. `_clean_daemon_path` resolves exactly: the
-    # project's own venv bin (greatminds + its ansible), the agent tool
-    # dirs, and the standard system dirs.
-    path_val = _clean_daemon_path(exec_cmd)
-    if path_val and "Environment=PATH=" not in body:
-        body = body.replace(
-            "[Service]\n", f"[Service]\nEnvironment=PATH={path_val}\n", 1)
-    home_val = str(_current_user_home())
-    if home_val and "Environment=HOME=" not in body:
-        body = body.replace(
-            "[Service]\n", f"[Service]\nEnvironment=HOME={home_val}\n", 1)
+    path_val = _clean_daemon_path(argv[0])
+    body = body.replace("[Service]\n", "[Service]\nEnvironment=" +
+                        unit_word("PATH=" + path_val) + "\nEnvironment=" +
+                        unit_word("HOME=" + str(_current_user_home())) + "\n", 1)
     return body
 
 
@@ -368,12 +298,13 @@ def install_project_dropin(name: str, project_dir: Path) -> bool:
     yet (or before setup writes it) simply gets no extra env, no failure.
     Returns True when the drop-in was written/changed.
     """
-    env_file = project_env_file(project_dir)
-    agent_env_file = _agent_env_file(name)
+    from greatminds.core.service_environment import unit_word
+    env_file = unit_word("-" + str(project_env_file(project_dir)))
+    agent_env_file = unit_word("-" + str(_agent_env_file(name)))
     body = (
         "[Service]\n"
-        f"EnvironmentFile=-{env_file}\n"
-        f"EnvironmentFile=-{agent_env_file}\n"
+        f"EnvironmentFile={env_file}\n"
+        f"EnvironmentFile={agent_env_file}\n"
     )
     d = _project_dropin_dir(name)
     d.mkdir(parents=True, exist_ok=True)
@@ -541,9 +472,7 @@ def _refresh_units_before_restart(name: str,
 @_project_options
 def restart_cmd(project: str | None, project_dir: Path | None) -> None:
     name = _resolve_project_name(project, project_dir)
-    # issue #13: refresh the on-disk unit (re-bake PATH) before restarting,
-    # so a stale pre-PATH unit self-heals instead of restarting coordd with
-    # systemd's bare PATH (which cannot exec claude / codex / ansible).
+    # Refresh service configuration before asking the manager to restart.
     if _refresh_units_before_restart(name, project_dir):
         info("daemon units refreshed (PATH re-baked) before restart")
     _run_verb("restart", name)

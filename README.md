@@ -71,6 +71,12 @@ characters, starting with a letter or digit). Use an explicit name for directori
 containing spaces or when another project has the same basename. Existing names
 cannot be redirected to a different project. No `coord.yaml` is required.
 
+The service uses a generic PATH containing the launcher directory, standard
+system directories and user bin directories. For additional runtime locations,
+set PATH in `.greatminds/PROJECT.env`, or declare an agent/command `environment`
+reference for PATH in `execution.yaml`. Service installation does not run login
+shells or discover vendor-specific executables.
+
 In another terminal, create an operator conversation with the configured binding:
 
 ```bash

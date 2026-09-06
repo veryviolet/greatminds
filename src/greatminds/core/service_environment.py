@@ -78,3 +78,17 @@ def decode_environment(text: str) -> dict[str, str]:
         if _NAME.fullmatch(name):
             result[name] = ''.join(value)
     return result
+
+
+def unit_word(value: str) -> str:
+    """One literal unit-file word, with systemd specifiers disabled by escaping."""
+    if '\0' in value:
+        raise ValueError('NUL in unit value')
+    value.encode('utf-8')
+    value = value.replace('%', '%%')
+    if value and re.fullmatch(r'[A-Za-z0-9_./:=@%+,-]+', value):
+        return value
+    escaped = ''.join('\\' + char if char in '\\"' else
+                      f'\\x{ord(char):02x}' if ord(char) < 32 or ord(char) == 127 else char
+                      for char in value)
+    return '"' + escaped + '"'

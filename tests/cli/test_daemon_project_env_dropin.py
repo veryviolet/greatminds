@@ -127,3 +127,13 @@ def test_environment_parse_error_does_not_expose_secret(tmp_path):
         dm._parse_env_file(path)
     assert 'never-print-this' not in str(caught.value)
     assert 'invalid environment file syntax' in str(caught.value)
+
+
+def test_dropin_escapes_spaces_and_systemd_specifiers(tmp_path, monkeypatch):
+    project = tmp_path/'project %h with spaces'
+    monkeypatch.setattr(dm, 'AGENT_ENV_DIR', tmp_path/'auth %i with spaces')
+    dm.install_project_dropin('fixture', project)
+    body = (dm._project_dropin_dir('fixture')/'10-project-env.conf').read_text()
+    assert f'EnvironmentFile="-{project.parent}/project %%h with spaces/.greatminds/PROJECT.env"' in body
+    assert f'EnvironmentFile="-{tmp_path}/auth %%i with spaces/fixture.env"' in body
+    assert body.count('EnvironmentFile=') == 2
