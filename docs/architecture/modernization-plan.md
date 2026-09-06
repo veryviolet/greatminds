@@ -820,6 +820,33 @@ M5 interactive journal foundation:
   shared capacity and permissions, then implement chat/attach and restart tests.
   Keep the complete migration and compatibility scope open.
 
+M5 daemon-owned conversation integration checkpoint:
+
+- Added `chat create/send/attach/interrupt`. All execution goes through the same
+  ACP Supervisor and gated transport. Dialogues can use any configured role binding
+  without a synthetic workflow file; conversation runs cannot submit task results.
+- Shared admission covers project, binding, and account capacity plus authentication
+  holds. Continuous coordd keeps a conversation session connected between messages;
+  once mode drains queued input. Reopening requires saved-session load support,
+  with an explicit failure when unavailable. Loaded history is not streamed twice.
+- User input is serialized per conversation and never injected into background
+  task turns. Shared permission callbacks can be answered by the operator. Attach
+  reads cursor-based JSON events; detach leaves the run alive. Interrupt requests
+  transport cancellation. Configuration/capacity holds retain queued messages and
+  publish a dispatch explanation.
+- Initial daemon/supervisor regression: 57 passed. Final conversation/journal/
+  contract regression: 58 passed. Installed-wheel create/send/attach, two turns in
+  one session, cursor reconnect, and saved-session continuation passed with the
+  local ACP fixture. No new live harness compatibility claim is made.
+- Full regression: 1954 passed, 2 skipped, with one documentation wording failure.
+  The wording was corrected and the documentation checks passed on rerun. An
+  additional focused test proves shared background capacity and rejection of a
+  conversation's attempted task result. No implementation failure occurred in
+  the full run; its collected suite predates that additional admission test.
+- Next: terminal conversation presentation, explicit session close, task attachment,
+  richer input events, real interactive harness checks, and VS Code integration.
+  Default migration/removal of legacy execution and remaining M3/M7 remain open.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility

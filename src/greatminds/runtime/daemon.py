@@ -141,6 +141,30 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                             store.control_status(run["id"], control["id"], completed=True)
                     await supervisor.commands.poll(supervisor.id)
                     stand_scheduler.poll()
+                    from .interactions import ConversationStore
+                    for path in sorted((store.directory / 'conversations').glob('*/state.json')):
+                        conversation = ConversationStore(store.runtime, path.parent.name)
+                        document = conversation.snapshot()
+                        if document['closed'] or any(r.get('conversation_id') == conversation.id
+                                and r['state'] not in TERMINAL for r in store.snapshot()['runs'].values()):
+                            continue
+                        binding = next((b for b in config.bindings if b.id == document['binding_id']), None)
+                        if binding is None:
+                            conversation.dispatch_status('blocked', 'binding is no longer configured')
+                            continue
+                        try:
+                            conversation.acquire(supervisor.id, config_sha256=config.sha256,
+                                                 schema_sha256=schema.sha256)
+                            if not any(t['status'] == 'queued' for t in conversation.snapshot()['turns'].values()):
+                                continue
+                            claim = supervisor.claim(TaskRevision.conversation(store.runtime, conversation.id),
+                                                     binding, conversation_id=conversation.id)
+                        except GreatMindsError as exc:
+                            conversation.dispatch_status('blocked', str(exc)[:200])
+                            continue
+                        conversation.dispatch_status('running')
+                        active[claim.run['id']] = asyncio.create_task(supervisor.execute(
+                            claim, binding=binding, conversation=conversation, keep_open=not once))
                     for binding, task, reason in assignments(store, config, schema):
                         if reason != "ready" or (once and dispatched_once):
                             continue

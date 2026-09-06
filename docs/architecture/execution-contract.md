@@ -553,21 +553,20 @@ must match the receipt. The ledger stores only the public deployment context nee
 to reconstruct variables; PROJECT.env values remain outside it. Managed playbooks
 and validators use the same environment normalization: run ID/token, role/project
 context, shell working-directory bookkeeping, and terminal presentation variables
-are removed; ANSIBLE_FORCE_COLOR is fixed to zero. Other environment changes can
+are omitted; ANSIBLE_FORCE_COLOR is fixed to zero. Other environment changes can
 conservatively invalidate evidence, including differences between caller shells.
 
 `stand.environment_revision` is a nonempty string, defaulting to `"1"`. Change it
 when relevant external services or installed infrastructure change. This is a
 declared revision, not remote-state discovery. These checks cannot attest remote
-machine state or detect transient changes reverted between snapshots. Until the
-explicit legacy migration, projects with neither execution.yaml nor a deployment
-ledger retain their existing marker/evidence behavior; ACP projects require a
+machine state or detect transient changes reverted between snapshots. Projects
+with neither execution.yaml nor a deployment ledger use marker/evidence checks;
+ACP projects require a
 managed receipt and never fall back to a marker or prose.
 
-## Interactive conversation journal (M5 foundation)
+## Daemon-owned interactive conversations
 
-`runtime.interactions.ConversationStore` is the persistence layer for the upcoming
-chat/attach surface. It is not yet wired into dispatch or exposed as a chat CLI.
+`runtime.interactions.ConversationStore` backs the `chat` CLI and ACP daemon.
 Each conversation has a private `.runtime/conversations/<id>/state.json` and a
 stable lock. The binding, execution/schema hashes, and workspace are pinned at
 creation. Prompt text belongs to this private conversation journal, not the global
@@ -584,13 +583,53 @@ A new supervisor owner interrupts already-started turns without re-enqueueing th
 Queued input and the provider session ID survive. The caller must hold the exclusive
 project supervisor lease before acquiring ownership; this store does not itself
 assert process liveness or implement session loading. Changed contracts require a
-new conversation rather than silently rebinding pending messages. Integration must
-load the compatible session or report explicitly why continuity is unavailable.
+new conversation rather than silently rebinding pending messages. The supervisor
+loads the saved provider session when reopening; missing ACP load support fails
+the turn with `session_load_unavailable` instead of silently replacing history.
+History updates emitted by session loading are not duplicated in the output feed.
 
 Reconnect readers page events by monotonically increasing cursor without changing
 execution state. Limits are explicit: 64 KiB per prompt, 64 pending turns, 256 turns
 per conversation, and 1 MiB/4096 text events of captured output per turn. Exceeding
 output capture emits one truncation event while allowing the daemon to finish the
 turn. New prompts exceeding limits are rejected without deleting earlier input.
-Daemon dispatch, shared run/account capacity, permissions, task context, and the
-interactive CLI still need integration before this constitutes a usable chat path.
+Conversations use the same Supervisor, gated ACP transport, permissions broker,
+configured-command service, run cancellation, and project/binding/account admission
+limits as queued work. They reserve a run slot while the session remains connected.
+Dispatch pause prevents new conversation runs; an already connected conversation
+can continue accepting user messages. Continuous coordd keeps that session open
+between messages; `--once` drains its available messages and closes it. Interactive
+requests are considered before new background assignments, without preempting an
+existing background run. No user prompt is injected into a background task session.
+
+Any configured role binding can start a conversation without creating a workflow
+task. Its run uses a namespaced conversation subject identity, a pinned role context
+and the binding workspace. It cannot submit a domain result for a nonexistent task.
+Attaching a conversation to an existing workflow task remains future work; interactive
+project work does not acquire the task's automatic worktree or approval semantics.
+
+With ACP coordd running for the project:
+
+```sh
+greatminds chat create BINDING
+greatminds chat send CONVERSATION --request-id MESSAGE_ID --message 'User request'
+greatminds chat attach CONVERSATION --follow
+greatminds chat attach CONVERSATION --after LAST_CURSOR --follow
+greatminds chat interrupt CONVERSATION MESSAGE_ID
+```
+
+Each command accepts `chat --project-dir PATH` before its subcommand. `attach`
+streams JSON pages with reconnect cursors; Ctrl-C detaches without cancelling work.
+`interrupt` cancels queued input or requests active ACP cancellation, closing that
+run's connection. Stop an idle connected session using `run cancel RUN_ID`.
+Permission questions remain visible in `run status`; inspect or answer one using
+`run permission REQUEST_ID --option OPTION_ID`. Assigned agent credentials cannot
+use chat operator controls.
+Admission holds appear in the conversation's dispatch events/status; queued input
+survives changed configuration or capacity holds. Known environment secrets are
+redacted from normalized assistant chunks on a best-effort basis; this is not a
+guarantee against secrets split across chunks or unrecognized secret values.
+
+This initial surface provides structured CLI interaction. A terminal conversation
+view, task attachment, richer non-permission input, VS Code integration, and real
+interactive harness validation remain outstanding M5 work.

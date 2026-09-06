@@ -43,9 +43,18 @@ def _error(message: str, code: int = 2):
 
 @dataclass(frozen=True)
 class TaskRevision:
+    """Pinned execution subject; an empty path denotes a conversation, not a file."""
     task_id: str
     path: str
     sha256: str
+
+    @classmethod
+    def conversation(cls, runtime: Path, conversation_id: str) -> TaskRevision:
+        from .interactions import ConversationStore
+        document = ConversationStore(runtime, conversation_id).snapshot()
+        identity = {key: document[key] for key in (
+            'id', 'binding_id', 'binding_sha256', 'config_sha256', 'schema_sha256', 'workspace')}
+        return cls('chat-' + conversation_id, '', fingerprint(identity))
 
     @classmethod
     def capture(cls, runtime: Path, path: Path) -> TaskRevision:
@@ -170,11 +179,20 @@ class RunStore:
 
     def claim(self, *, task: TaskRevision, binding: RoleBinding,
               config: ExecutionConfig, schema: SchemaSnapshot,
-              project: Path, owner_id: str) -> Claim:
+              project: Path, owner_id: str, conversation_id: str | None = None) -> Claim:
         safe_name(owner_id)
         if binding not in config.bindings or binding.role not in schema.document.get("roles", {}):
             _error("binding is not part of the effective execution contract", 3)
-        if task.path.split("/")[0] not in schema.document["roles"][binding.role].get("claims_from", []):
+        if conversation_id is not None:
+            from .interactions import ConversationStore
+            conversation = ConversationStore(self.runtime, conversation_id).snapshot()
+            if (task != TaskRevision.conversation(self.runtime, conversation_id)
+                    or conversation['closed'] or conversation['binding_sha256'] != binding.sha256
+                    or conversation['config_sha256'] != config.sha256
+                    or conversation['schema_sha256'] != schema.sha256
+                    or conversation['workspace'] != str(binding.workspace_path(project))):
+                _error('conversation does not match the execution contract', 3)
+        elif task.path.split("/")[0] not in schema.document["roles"][binding.role].get("claims_from", []):
             _error(f"role {binding.role} cannot claim the assigned queue", 3)
         workspace = str(binding.workspace_path(project))
         agent = config.agent(binding.agent)
@@ -193,6 +211,8 @@ class RunStore:
             if state["paused"]:
                 _error("dispatch is paused")
             active = [run for run in state["runs"].values() if run["state"] not in TERMINAL]
+            if any(run['account'] == binding.account and run['state'] == 'waiting_auth' for run in active):
+                _error('account requires authentication')
             if any(run["task_id"] == task.task_id for run in active):
                 _error(f"task {task.task_id} already has an active run")
             if len(active) >= config.max_running:
@@ -209,6 +229,7 @@ class RunStore:
             run_id = uuid.uuid4().hex
             run = {
                 "id": run_id, "project_id": state["project_id"], "owner_id": owner_id,
+                "conversation_id": conversation_id,
                 "task_id": task.task_id, "task_path": task.path, "task_revision": task.sha256,
                 "role": binding.role, "binding_id": binding.id, "binding_sha256": binding.sha256,
                 "agent_id": agent.id, "agent_sha256": agent.sha256, "config_sha256": config.sha256,
@@ -258,6 +279,11 @@ class RunStore:
         return result
 
     def _check_revision(self, task: TaskRevision) -> None:
+        if task.path == '' and task.task_id.startswith('chat-'):
+            current = TaskRevision.conversation(self.runtime, task.task_id.removeprefix('chat-'))
+            if current != task:
+                _error('conversation identity changed')
+            return
         try:
             current = TaskRevision.capture(self.runtime, self.runtime / task.path)
         except (FileNotFoundError, OSError):
@@ -427,6 +453,8 @@ class RunStore:
         digest = fingerprint(document)
         with task_lock(self.runtime, envelope.task_id), self._transaction() as state:
             run = self._run(state, envelope.run_id)
+            if run.get('conversation_id'):
+                _error('conversation has no assigned task for a domain result', 3)
             if not hmac.compare_digest(run["token_sha256"], hashlib.sha256(token.encode()).hexdigest()):
                 _error("invalid run credential", 3)
             for name, expected in (("task_id", envelope.task_id),

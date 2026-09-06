@@ -17,6 +17,15 @@ def context_document(store: RunStore, claim: Claim, schema: SchemaSnapshot) -> d
     run = claim.run
     task = TaskRevision(run["task_id"], run["task_path"], run["task_revision"])
     store._check_revision(task)
+    if run.get('conversation_id'):
+        role = schema.document['roles'][run['role']]
+        return {'run_id': run['id'], 'conversation_id': run['conversation_id'],
+                'role': run['role'], 'workspace': run['workspace'], 'cli_argv': cli_argv,
+                'responsibilities': role.get('responsibilities', []),
+                'forbidden_actions': role.get('forbidden_actions', []),
+                'configured_commands': [item for item in store.contracts(run['id'])['execution'].get('commands', [])
+                                        if run['role'] in item['roles']],
+                'task': None, 'allowed_transitions': [], 'result_format': None}
     try:
         document = yaml.safe_load((store.runtime / task.path).read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:

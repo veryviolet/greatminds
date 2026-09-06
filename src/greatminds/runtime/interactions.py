@@ -190,6 +190,14 @@ class ConversationStore:
                 turn['cancel_requested'] = True
                 self._event(document, 'cancel_requested', turn_id)
 
+    def dispatch_status(self, status, reason=None):
+        """Publish daemon admission feedback without changing queued messages."""
+        value = {'status': status, 'reason': reason}
+        with self._transaction() as document:
+            if document.get('dispatch') != value:
+                document['dispatch'] = value
+                self._event(document, 'dispatch', None, **value)
+
     def events(self, *, after=0, limit=100):
         if type(after) is not int or after < 0 or type(limit) is not int or not 1 <= limit <= 1000:
             _fail('invalid conversation cursor or page size')
@@ -198,4 +206,5 @@ class ConversationStore:
             _fail('conversation cursor is ahead of the journal')
         page = document['events'][after:after + limit]
         return {'events': page, 'cursor': page[-1]['sequence'] if page else after,
-                'has_more': after + len(page) < len(document['events'])}
+                'has_more': after + len(page) < len(document['events']),
+                'dispatch': document.get('dispatch')}

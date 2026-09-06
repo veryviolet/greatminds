@@ -106,6 +106,8 @@ cli.add_command(_driven_log_mod.driven_log, name="driven-log")
 cli.add_command(_project_mod.project)
 cli.add_command(_migrate_mod.migrate)
 cli.add_command(_run_mod.run)
+from . import chat as _chat_mod
+cli.add_command(_chat_mod.chat)
 
 
 if __name__ == "__main__":

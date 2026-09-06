@@ -72,17 +72,19 @@ class Supervisor:
             # With no recorded PID the launch gate never authorized exec.
             self.store.recover_run(run["id"], previous_owner=run["owner_id"], owner_id=self.id)
 
-    def claim(self, task: TaskRevision, binding: RoleBinding) -> Claim:
+    def claim(self, task: TaskRevision, binding: RoleBinding, *, conversation_id=None) -> Claim:
         if self._lease is None:
             raise RuntimeError("claim requires the exclusive supervisor lease")
         return self.store.claim(task=task, binding=binding, config=self.config,
-                                schema=self.schema, project=self.project, owner_id=self.id)
+                                schema=self.schema, project=self.project, owner_id=self.id,
+                                conversation_id=conversation_id)
 
     def _transition(self, run_id, target, **kwargs):
         return self.store.transition(run_id, owner_id=self.id, event_id=uuid.uuid4().hex,
                                      target=target, **kwargs)
 
-    async def execute(self, claim: Claim, *, binding: RoleBinding, prompt: str | None = None) -> dict:
+    async def execute(self, claim: Claim, *, binding: RoleBinding, prompt: str | None = None,
+                      conversation=None, keep_open=False) -> dict:
         if self._lease is None or claim.run["owner_id"] != self.id:
             raise RuntimeError("run belongs to a different or inactive supervisor")
         if binding.sha256 != claim.run["binding_sha256"]:
@@ -92,6 +94,8 @@ class Supervisor:
         self._transition(run_id, "starting")
         agent = self.config.agent(binding.agent)
         metrics = {"context_bytes": 0, "updates": 0, "stop_reason": None}
+        current_turn = None
+        accept_output = False
 
         async def record_spawn(process):
             identity = process_identity(process.pid)
@@ -104,6 +108,13 @@ class Supervisor:
             if kind == "session_update":
                 metrics["updates"] += 1
                 metrics["last_activity_at"] = self.store.clock()
+                if conversation is not None and current_turn is not None and accept_output:
+                    update = data.get('update', {})
+                    content = update.get('content', {})
+                    if update.get('sessionUpdate') == 'agent_message_chunk' and content.get('type') == 'text':
+                        from .permissions import redact
+                        conversation.append_text(self.id, current_turn['id'], redact(content.get('text', ''),
+                            [claim.token, *agent.environment_values(self.environment).values()]))
 
         callbacks = Callbacks(events=event)
         prompt_deadline = None
@@ -146,11 +157,22 @@ class Supervisor:
         target = "failed"
         reason = "transport_failure"
         try:
+            if conversation is not None:
+                current_turn = conversation.claim_next(self.id)
+                if current_turn is None:
+                    raise GreatMindsError('conversation has no queued turn')
             if any(not self.environment.get(name) for name in agent.required_env):
                 raise RequestError.auth_required()
             run = await prepare_workspace_async(self.store, claim.run, binding, self.schema, self.id)
             claim = Claim(run, claim.token)
-            if prompt is None:
+            if conversation is not None:
+                import json
+                from .context import context_document
+                prompt = ('You are working interactively with the user in Greatminds. '
+                          'This conversation has no assigned workflow task. Do not submit a task result '
+                          'or manufacture another role approval. Follow the user request within your role. '
+                          + json.dumps(context_document(self.store, claim, self.schema), ensure_ascii=False))
+            elif prompt is None:
                 from .context import compile_context
                 prompt = compile_context(self.store, claim, self.schema)
             metrics["context_bytes"] = len(prompt.encode())
@@ -178,7 +200,15 @@ class Supervisor:
                                 "task_id", "task_revision", "binding_sha256", "agent_sha256",
                                 "schema_sha256", "workspace"))]
                 compatible = max(previous, key=lambda run: run.get("sequence", 0)) if previous else None
-                if binding.session == "resume-if-compatible" and compatible and getattr(caps, "load_session", False):
+                saved_session = conversation.snapshot().get('session_id') if conversation is not None else None
+                if saved_session:
+                    if not getattr(caps, 'load_session', False):
+                        reason = 'session_load_unavailable'
+                        raise GreatMindsError('conversation resume requires ACP session loading')
+                    session = await transport.open_session(session_id=saved_session)
+                    session_id = saved_session
+                    metrics['session_strategy'] = 'loaded'
+                elif binding.session == "resume-if-compatible" and compatible and getattr(caps, "load_session", False):
                     session = await transport.open_session(session_id=compatible["session_id"])
                     session_id = compatible["session_id"]
                     metrics["session_strategy"] = "loaded"
@@ -191,8 +221,41 @@ class Supervisor:
                 self.store._check_revision(TaskRevision(claim.run["task_id"], claim.run["task_path"],
                                                        claim.run["task_revision"]))
                 self._transition(run_id, "running", session_id=session_id)
+                if conversation is not None:
+                    conversation.set_session(self.id, session_id)
                 prompt_deadline = time.monotonic() + binding.timeout_seconds
-                result = await transport.prompt(prompt, timeout=binding.timeout_seconds)
+                if conversation is None:
+                    result = await transport.prompt(prompt, timeout=binding.timeout_seconds)
+                else:
+                    while True:
+                        if current_turn is None:
+                            current_turn = conversation.claim_next(self.id)
+                            if current_turn is None:
+                                if not keep_open:
+                                    break
+                                await asyncio.sleep(.1)
+                                continue
+                        prompt_deadline = time.monotonic() + binding.timeout_seconds
+                        accept_output = True
+                        pending = asyncio.create_task(transport.prompt(
+                            prompt + '\nUser message:\n' + current_turn['prompt'], timeout=binding.timeout_seconds))
+                        try:
+                            while not pending.done():
+                                await asyncio.wait({pending}, timeout=.1)
+                                turn = conversation.snapshot()['turns'][current_turn['id']]
+                                if turn['cancel_requested'] and not pending.done():
+                                    pending.cancel()
+                            result = await pending
+                        finally:
+                            if not pending.done():
+                                pending.cancel()
+                            await asyncio.gather(pending, return_exceptions=True)
+                            accept_output = False
+                        status = 'completed' if result.stop_reason == 'end_turn' else 'failed'
+                        conversation.finish(self.id, current_turn['id'], status=status, reason=result.stop_reason)
+                        current_turn = None
+                        if status != 'completed':
+                            break
                 metrics["stop_reason"] = result.stop_reason
                 if callbacks.needs_input:
                     target, reason = "waiting_input", "permission_required"
@@ -219,10 +282,16 @@ class Supervisor:
             # Persist the class, not arbitrary stderr or exception text which
             # can contain auth material. Detailed redacted diagnostics follow.
             metrics["error_type"] = type(exc).__name__
-            reason = "configuration_error" if isinstance(exc, (ValueError, GreatMindsError)) else "transport_failure"
+            if reason == 'transport_failure':
+                reason = "configuration_error" if isinstance(exc, (ValueError, GreatMindsError)) else "transport_failure"
         finally:
+            if conversation is not None and current_turn is not None:
+                conversation.finish(self.id, current_turn['id'],
+                    status='cancelled' if target == 'cancelled' else 'failed', reason=reason)
             self._transports.pop(run_id, None)
             self.permissions.close_run(run_id, owner_id=self.id, reason="run_closed", resume_run=True)
             await self.commands.finish_run(run_id)
         metrics["elapsed_seconds"] = round(time.monotonic() - started, 6)
+        if conversation is not None:
+            conversation.dispatch_status(target, reason)
         return self._transition(run_id, target, reason=reason, details=metrics)
