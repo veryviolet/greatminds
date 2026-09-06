@@ -1042,6 +1042,7 @@ def _deploy_lease_locked(coord: Path, *, lease_id: str | None = None,
     # Recheck after profile preparation and persist intent before external work.
     ss.update_stand_state(coord, require_same_lease)
     attempt_id = ledger.begin(cap)
+    lease_meta["_deployment_attempt_id"] = attempt_id
     try:
         rc, log = dispatch_profile(spec, lease_meta,
                                    ansible_playbook=ansible_playbook,
@@ -1096,6 +1097,35 @@ def stand_deployment_status() -> None:
     import json
     from greatminds.domain.stand_deployments import DeploymentLedger
     click.echo(json.dumps(DeploymentLedger(find_coord_dir()).snapshot(), indent=2))
+
+
+def _deployment_recovery_operator(command):
+    if os.environ.get("GREATMINDS_RUN_ID") or os.environ.get("GREATMINDS_RUN_TOKEN"):
+        raise GreatMindsError("deployment recovery decisions require the operator", exit_code=3)
+    role = (os.environ.get("GREATMINDS_ROLE") or "OPERATOR").upper()
+    if role not in STAND_GLOBAL_CONTROL_ROLES | {"OPERATOR"}:
+        raise GreatMindsError(f"stand {command} requires operator or maintainer control", exit_code=3)
+
+
+@stand.command(name="deployment-recover")
+@click.argument("attempt_id")
+def stand_deployment_recover(attempt_id):
+    """Stop a tracked orphan process group; preserve its uncertain outcome."""
+    import json
+    from greatminds.domain.stand_deployments import DeploymentLedger
+    _deployment_recovery_operator("deployment-recover")
+    click.echo(json.dumps(DeploymentLedger(find_coord_dir()).recover_process(attempt_id), indent=2))
+
+
+@stand.command(name="deployment-resolve")
+@click.argument("attempt_id")
+@click.option("--reason", required=True, help="operator assessment of external effects and recovery")
+def stand_deployment_resolve(attempt_id, reason):
+    """Acknowledge a cleaned attempt; does not deploy or mark the stand ready."""
+    import json
+    from greatminds.domain.stand_deployments import DeploymentLedger
+    _deployment_recovery_operator("deployment-resolve")
+    click.echo(json.dumps(DeploymentLedger(find_coord_dir()).resolve(attempt_id, reason=reason), indent=2))
 
 
 @stand.command(name="deploy")

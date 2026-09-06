@@ -12,6 +12,7 @@ from greatminds.core.paths import project_runtime_dir
 from greatminds.core.schema import load_schema_snapshot
 from greatminds.domain.results import ResultService
 from greatminds.domain.maintenance import MaintenanceService
+from greatminds.domain.stand_deployments import DeploymentLedger
 from .config import load_execution_config
 from .store import RunStore, TERMINAL, TaskRevision
 from .supervisor import Supervisor
@@ -106,6 +107,7 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
             active: dict[str, asyncio.Task] = {}
             results = ResultService(store, environment=supervisor.environment)
             maintenance = MaintenanceService(store, schema, environment=supervisor.environment)
+            deployments = DeploymentLedger(store.runtime)
             dispatched_once = False
             try:
                 while not stop.is_set():
@@ -118,6 +120,7 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                             del active[run_id]
                     await _domain_reconcile(loop, domain_pool, results)
                     await _domain_reconcile(loop, domain_pool, maintenance)
+                    await _domain_reconcile(loop, domain_pool, deployments)
                     for run in store.snapshot()["runs"].values():
                         control = run.get("control")
                         if not control or control["status"] == "completed":

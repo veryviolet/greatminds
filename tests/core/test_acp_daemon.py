@@ -351,3 +351,21 @@ def test_operator_cancel_reaches_running_acp_daemon(tmp_path):
             daemon.kill()
             daemon.wait()
         daemon.stderr.close()
+
+
+def test_idle_daemon_reconciles_deployment_without_agent_or_external_replay(tmp_path):
+    from greatminds.domain.stand_deployments import DeploymentLedger
+    root = project(tmp_path, tasks=False)
+    ledger = DeploymentLedger(root/'.greatminds')
+    attempt = ledger.begin({'lease_id': 'orphan-before-launch'})
+    snapshot = asyncio.run(serve(root, once=True, environment={}))
+    assert snapshot['runs'] == {}
+    receipt = ledger.snapshot()['attempts'][attempt]
+    assert receipt['cleanup'] == 'confirmed' and receipt['status'] == 'needs_recovery'
+    before = ledger.path.read_bytes()
+    asyncio.run(serve(root, once=True, environment={}))
+    assert ledger.path.read_bytes() == before
+    assert not (root/'agent-starts.log').exists()
+    status = CliRunner().invoke(cli, ['run', 'status', '--project-dir', str(root)])
+    assert status.exit_code == 0, status.output
+    assert json.loads(status.output)['stand_deployments'] == ledger.snapshot()

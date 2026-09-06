@@ -413,8 +413,30 @@ process restarts. `greatminds stand deployment-status` exposes these attempts as
 versioned JSON. Executor exceptions retain an unresolved intent; coordinator
 retries cannot bypass it. A malformed ledger also blocks execution.
 
-Owner process identity is not evidence that all deployment children have exited.
-Child-process tracking, recovery controls for unknown external outcomes, and ACP
-daemon stand scheduling remain required. There is currently no automatic replay
-or general operator resolution of uncertain attempts. Preserve the ledger for
-recovery; changing or releasing a lease does not resolve its external outcome.
+Managed profile execution starts a fresh Linux session through an exec gate.
+The child PID, boot ID, start ticks, process group/session, command digest, and
+working directory are durably recorded before the gate opens. Failure to record
+identity closes the gate without executing the external command. Normal exit,
+exceptions, and timeouts use the common bounded process-group cleanup. An omitted
+timeout defaults to 1800 seconds for managed deployments. The returned process
+status is recorded separately from the domain result. Internal attempt metadata
+is excluded from Ansible extra variables.
+
+`stand deployment-recover ATTEMPT_ID` holds the project deployment lock, cleans
+the tracked group, and records cleanup without resolving external effects.
+`stand deployment-resolve ATTEMPT_ID --reason TEXT` requires confirmed cleanup,
+rechecks group absence, and records an operator assessment. It neither marks a
+stand ready nor manufactures a successful result; the existing stand state is
+preserved. A separate authorized deploy is required to execute again. Assigned
+ACP run credentials cannot use these operator decisions.
+
+Attempts predating gated child tracking cannot claim automatic cleanup. Process
+group cleanup covers the owned Linux session, not remote changes or processes
+that deliberately leave that group. Those external effects require operator
+assessment. The ACP daemon sweeps orphan attempts automatically, respecting the
+same deployment lock; unchanged cleanup is not repeatedly written. It reconciles
+recorded stand transitions before cleaning uncertain attempts and never starts
+an agent or replays an external command for this sweep. `run status` includes the
+same versioned deployment ledger. Local workflows without a stand ledger create
+no stand state. ACP daemon deployment scheduling remains to be integrated;
+changing a lease alone never resolves an unknown outcome.

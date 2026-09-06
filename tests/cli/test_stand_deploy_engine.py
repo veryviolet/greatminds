@@ -313,3 +313,58 @@ def test_completed_stand_transition_recovers_receipt_without_execution(tmp_path,
     before = ledger.path.read_bytes()
     ledger.reconcile_applied()
     assert ledger.path.read_bytes() == before
+
+
+def test_managed_profile_uses_gated_process_and_excludes_private_context(tmp_path, monkeypatch):
+    import sys
+    from greatminds.cli import stand_state as ss
+    from greatminds.cli.stand_profile import ProfileSpec
+    from greatminds.domain.stand_deployments import DeploymentLedger
+    coord = tmp_path / 'coordination'
+    _prepare(coord)
+    ss.update_stand_state(coord, lambda s: s['active_lease'].update(worktree=str(tmp_path)))
+    profile = tmp_path / 'profile.yaml'
+    profile.write_text('[]')
+    spec = ProfileSpec(name='full-deploy', format='yaml', path=profile)
+    monkeypatch.setattr('greatminds.cli.stand_profile.load_profile', lambda *a, **k: spec)
+    monkeypatch.setattr(stand, '_file_inbox_info', lambda *a, **k: None)
+    binary = tmp_path / 'fake-ansible'
+    binary.write_text('#!' + sys.executable + '\n' + '''import json,os,pathlib,sys
+record = next(iter(json.loads(pathlib.Path('.stand/deployments.json').read_text())['attempts'].values()))
+assert record['process']['pid'] == os.getpid()
+values = json.loads(pathlib.Path(sys.argv[sys.argv.index('--extra-vars')+1][1:]).read_text())
+assert '_deployment_attempt_id' not in values
+print('PLAY RECAP\\nsynthetic : ok=1 changed=1')
+''')
+    binary.chmod(0o700)
+    rc, log = stand.deploy_lease(coord, lease_id='L1', ansible_playbook=str(binary))
+    assert rc == 0 and 'ok=1' in log
+    attempt = next(iter(DeploymentLedger(coord).snapshot()['attempts'].values()))
+    assert attempt['status'] == 'applied'
+    assert attempt['process_status'] == 'exited'
+    assert _state(coord)['state'] == 'ready'
+
+
+def test_recovery_controls_require_operator_and_preserve_stand_state(tmp_path, monkeypatch):
+    from click.testing import CliRunner
+    from greatminds.domain.stand_deployments import DeploymentLedger
+    coord = tmp_path / 'coordination'
+    _prepare(coord)
+    ledger = DeploymentLedger(coord)
+    attempt = ledger.begin(_state(coord)['active_lease'])
+    monkeypatch.setattr(stand, 'find_coord_dir', lambda: coord)
+    monkeypatch.delenv('GREATMINDS_ROLE', raising=False)
+    monkeypatch.delenv('GREATMINDS_RUN_ID', raising=False)
+    monkeypatch.delenv('GREATMINDS_RUN_TOKEN', raising=False)
+    before = _state(coord)
+    runner = CliRunner()
+    for command in (['deployment-recover', attempt], ['deployment-resolve', attempt, '--reason', 'checked']):
+        denied = runner.invoke(stand.stand, command, env={'GREATMINDS_RUN_TOKEN': 'assigned-token'})
+        assert denied.exit_code != 0
+        assert 'operator' in denied.output
+    recovered = runner.invoke(stand.stand, ['deployment-recover', attempt])
+    assert recovered.exit_code == 0, recovered.output
+    resolved = runner.invoke(stand.stand, ['deployment-resolve', attempt, '--reason', 'No external command launched'])
+    assert resolved.exit_code == 0, resolved.output
+    assert ledger.snapshot()['attempts'][attempt]['status'] == 'resolved'
+    assert _state(coord) == before

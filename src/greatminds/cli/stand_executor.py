@@ -160,7 +160,7 @@ def _build_extra_vars(lease_meta: dict[str, Any]) -> dict[str, Any]:
     for k, v in (lease_meta or {}).items():
         if not isinstance(k, str):
             continue
-        if k in legacy_inventory:
+        if k in legacy_inventory or k == "_deployment_attempt_id":
             continue
         # Stringify None so ansible doesn't see ``null``.
         out[k] = "" if v is None else v
@@ -268,7 +268,16 @@ def execute_yaml_profile(
         # never crashes the executor.
         hb_handle = _start_heartbeat_refresher(coord, "stand-keeper")
         try:
-            cp = subprocess.run(
+            run_command = subprocess.run
+            if lease_meta.get("_deployment_attempt_id"):
+                from functools import partial
+                from greatminds.domain.stand_deployments import DeploymentLedger
+                from greatminds.runtime.deployment_process import run_deployment_command
+                if coord is None:
+                    raise GreatMindsError("managed deployment requires runtime directory", exit_code=4)
+                run_command = partial(run_deployment_command, ledger=DeploymentLedger(coord),
+                                      attempt_id=lease_meta["_deployment_attempt_id"])
+            cp = run_command(
                 cmd,
                 capture_output=capture_output,
                 text=True,

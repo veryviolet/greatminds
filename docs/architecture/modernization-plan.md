@@ -690,6 +690,28 @@ M4 durable deployment intent checkpoint:
   resolution of uncertain external outcomes, ACP daemon deployment scheduling,
   and dead-holder lease reclamation. Owner identity alone cannot prove child exit.
 
+M4 gated deployment process and operator recovery checkpoint:
+
+- Managed profile execution now uses a fresh Linux session and an exec gate.
+  Child identity is saved before authorization; a failed write prevents execution.
+  Timeout/default 1800 seconds and exit paths clean the owned process group.
+- `stand deployment-recover` cleans recorded orphan groups under the deployment
+  lock; `deployment-resolve --reason` requires cleanup and operator assessment.
+  Resolution does not change stand state or create successful evidence. Assigned
+  ACP credentials cannot approve recovery. Older untracked attempts fail closed.
+- Real local subprocess fixtures prove identity-before-exec, refusal after failed
+  persistence, timeout cleanup of descendants, recovery after killing the owner,
+  and profile-engine integration. These fixtures invoke no remote deployment.
+- ACP daemon sweeps now reconcile completed transitions and clean orphan process
+  groups without an agent turn or external replay. Active deployment locks are
+  respected; unchanged cleanup is deduplicated. `run status` includes the ledger.
+- Full regression: 1867 passed, 2 skipped. Subsequent daemon integration passed
+  all 53 targeted tests; final crash-window/document checks passed all 16.
+  Installed-wheel gated command, daemon cleanup, and explicit resolution passed.
+- Next: integrate stand scheduling into the ACP daemon, then expire dead-holder
+  leases with explicit liveness evidence. Extend command output bounds and
+  source/environment evidence to stand receipts.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility

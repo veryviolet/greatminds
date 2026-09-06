@@ -28,6 +28,8 @@ def status(project_dir):
     project = project_dir.resolve() if project_dir else find_project_dir()
     store = RunStore(project_runtime_dir(project))
     snapshot = store.snapshot()
+    from greatminds.domain.stand_deployments import DeploymentLedger
+    snapshot["stand_deployments"] = DeploymentLedger(store.runtime).snapshot()
     source = project / "coordination" / "execution.yaml"
     snapshot["assignments"] = []
     if source.is_file():
