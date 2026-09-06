@@ -14,6 +14,7 @@ import hmac
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import uuid
@@ -322,6 +323,38 @@ class CommandService:
         return self._update(request_id, status=status, reason=reason, exit_code=exit_code,
                             finished_at=self.store.clock(), source_before=before, source_after=after,
                             environment_identity=environment_identity, output=output_records)
+
+    def output_preview(self, request_id, *, limit=8192):
+        """Return bounded text only from intact daemon-owned output artifacts."""
+        if type(limit) is not int or not 0 <= limit <= 65536:
+            raise GreatMindsError("output preview limit must be between 0 and 65536 bytes")
+        item = self.get(request_id)
+        previews = {}
+        for name, record in item.get("output", {}).items():
+            expected = self.store.directory / "command-output" / request_id / name
+            if (name not in {"stdout", "stderr"} or Path(record["path"]) != expected
+                    or expected.resolve() != expected):
+                raise GreatMindsError("command output path is not the recorded local artifact", exit_code=3)
+            try:
+                fd = os.open(expected, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+                with os.fdopen(fd, "rb") as stream:
+                    if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                        raise GreatMindsError("command output is not a regular file", exit_code=3)
+                    digest, size, preview = hashlib.sha256(), 0, bytearray()
+                    while chunk := stream.read(65536):
+                        digest.update(chunk)
+                        size += len(chunk)
+                        if size > record["stored_bytes"]:
+                            raise GreatMindsError("command output artifact changed", exit_code=3)
+                        preview.extend(chunk[:max(0, limit - len(preview))])
+            except OSError as exc:
+                raise GreatMindsError("cannot read command output artifact", exit_code=4) from exc
+            if size != record["stored_bytes"] or digest.hexdigest() != record["sha256"]:
+                raise GreatMindsError("command output artifact changed", exit_code=3)
+            previews[name] = {"text": preview.decode("utf-8", errors="replace"),
+                              "truncated": record["truncated"] or size > limit,
+                              "bytes": record["bytes"], "sha256": record["sha256"]}
+        return previews
 
     def evidence(self, run, request_id, *, require_success=True):
         item = self.get(request_id)

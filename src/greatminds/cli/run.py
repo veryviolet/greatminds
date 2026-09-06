@@ -75,7 +75,8 @@ def retry(run_id):
 @click.argument("command_id")
 @click.option("--request-id")
 @click.option("--wait", "wait_seconds", default=0.0, type=click.FloatRange(min=0))
-def command(command_id, request_id, wait_seconds):
+@click.option("--output-limit", default=8192, type=click.IntRange(min=0, max=65536))
+def command(command_id, request_id, wait_seconds, output_limit):
     """Request a configured command from the daemon; optionally wait for its receipt."""
     from greatminds.runtime.commands import CommandService, UNRESOLVED
 
@@ -88,16 +89,27 @@ def command(command_id, request_id, wait_seconds):
     while receipt["status"] in UNRESOLVED - {"needs_recovery"} and time.monotonic() < deadline:
         time.sleep(min(0.2, max(0, deadline - time.monotonic())))
         receipt = service.get(receipt["id"])
+    receipt["output_preview"] = service.output_preview(receipt["id"], limit=output_limit)
     click.echo(json.dumps(receipt, ensure_ascii=False, indent=2))
 
 
 @run.command("command-status")
 @click.argument("request_id")
-def command_status(request_id):
+@click.option("--output-limit", default=8192, type=click.IntRange(min=0, max=65536))
+def command_status(request_id, output_limit):
     """Inspect an executed command and its output artifact paths."""
     from greatminds.runtime.commands import CommandService
     service = CommandService(RunStore(project_runtime_dir(find_project_dir())))
-    click.echo(json.dumps(service.get(request_id), ensure_ascii=False, indent=2))
+    receipt = service.get(request_id)
+    run_id, token = os.environ.get("GREATMINDS_RUN_ID"), os.environ.get("GREATMINDS_RUN_TOKEN")
+    if run_id or token:
+        if not run_id or not token:
+            raise GreatMindsError("command inspection requires the assigned run credential", exit_code=3)
+        service.store.authorize(run_id, token)
+        if receipt["run_id"] != run_id:
+            raise GreatMindsError("command belongs to another run", exit_code=3)
+    receipt["output_preview"] = service.output_preview(request_id, limit=output_limit)
+    click.echo(json.dumps(receipt, ensure_ascii=False, indent=2))
 
 
 @run.command("command-resolve")
@@ -127,15 +139,20 @@ def repair(operation_id, abandon, reason):
 
 
 @run.command("submit")
-@click.option("--file", "source", required=True,
+@click.option("--file", "source",
               type=click.Path(exists=True, dir_okay=False, path_type=Path))
-def submit(source):
+@click.option("--json", "inline_json", help="Submit a JSON decision directly without creating a file")
+def submit(source, inline_json):
     """Receive a typed result using the assigned run's environment credential."""
     run_id, token = os.environ.get("GREATMINDS_RUN_ID"), os.environ.get("GREATMINDS_RUN_TOKEN")
     if not run_id or not token:
         raise GreatMindsError("result submission requires an assigned run credential", exit_code=3)
+    if (source is None) == (inline_json is None):
+        raise GreatMindsError("provide exactly one of --json or --file", exit_code=2)
+    if inline_json is not None and len(inline_json.encode()) > 65536:
+        raise GreatMindsError("inline result exceeds 64 KiB; use --file", exit_code=2)
     try:
-        document = json.loads(source.read_text(encoding="utf-8"))
+        document = json.loads(inline_json if inline_json is not None else source.read_text(encoding="utf-8"))
     except (OSError, TypeError, ValueError) as exc:
         raise GreatMindsError(f"invalid result envelope: {exc}", exit_code=2) from exc
     receipt = RunStore(project_runtime_dir(find_project_dir())).submit_decision(document, run_id=run_id, token=token)
@@ -152,4 +169,23 @@ def permission(request_id, option_id):
         raise GreatMindsError("permission decisions require the operator", exit_code=3)
     service = PermissionService(RunStore(project_runtime_dir(find_project_dir())))
     result = service.get(request_id) if option_id is None else service.answer(request_id, option_id)
+    click.echo(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+@run.command("contract")
+@click.option("--schema", "full_schema", is_flag=True, help="Show this run's pinned schema instead of its assigned context")
+def contract(full_schema):
+    """Read the assigned context or frozen schema using the run credential."""
+    from greatminds.core.schema import SchemaSnapshot
+    from greatminds.runtime.context import context_document
+    from greatminds.runtime.store import Claim
+    run_id, token = os.environ.get("GREATMINDS_RUN_ID"), os.environ.get("GREATMINDS_RUN_TOKEN")
+    if not run_id or not token:
+        raise GreatMindsError("contract inspection requires an assigned run credential", exit_code=3)
+    store = RunStore(project_runtime_dir(find_project_dir()))
+    assigned = store.authorize(run_id, token)
+    frozen = store.contracts(run_id)["schema"]
+    schema = SchemaSnapshot(store.directory / "contracts" / f"schema-{assigned['schema_sha256']}.json",
+                            frozen["text"], assigned["schema_sha256"])
+    result = schema.document if full_schema else context_document(store, Claim(assigned, token), schema)
     click.echo(json.dumps(result, ensure_ascii=False, indent=2))

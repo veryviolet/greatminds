@@ -96,6 +96,7 @@ def test_compact_decision_gets_stable_identity_and_duplicate_delivery(runtime):
     document = {"decision": "no_change", "payload": {"reason": "needs further analysis"}}
     receipt = store.submit_decision(document, run_id=claim.run["id"], token=claim.token)
     assert document == {"decision": "no_change", "payload": {"reason": "needs further analysis"}}
+
     envelope = receipt["envelope"]
     assert envelope["result_id"] == claim.run["id"] + "-result"
     for name in ("task_id", "task_revision", "schema_sha256"):
@@ -107,6 +108,27 @@ def test_compact_decision_gets_stable_identity_and_duplicate_delivery(runtime):
                               run_id=claim.run["id"], token=claim.token)
 
 
+def test_inline_cli_submission_uses_same_receipt_without_creating_files(runtime, monkeypatch):
+    import json
+    from click.testing import CliRunner
+    from greatminds.cli.main import cli
+    store, claim, _ = running(runtime)
+    monkeypatch.setenv("GREATMINDS_PROJECT_DIR", str(runtime.parent))
+    monkeypatch.setenv("GREATMINDS_RUN_ID", claim.run["id"])
+    monkeypatch.setenv("GREATMINDS_RUN_TOKEN", claim.token)
+    args = ["run", "submit", "--json", json.dumps({"decision": "no_change", "payload": {"reason": "checked"}})]
+    first = CliRunner().invoke(cli, args)
+    assert first.exit_code == 0, first.output
+    second = CliRunner().invoke(cli, args)
+    assert second.exit_code == 0 and json.loads(second.output) == json.loads(first.output)
+    assert len(store.snapshot()["results"]) == 1
+    assert not list(runtime.parent.glob("*.json"))
+    assert CliRunner().invoke(cli, ["run", "submit"]).exit_code == 2
+    source = runtime.parent / "decision.json"
+    source.write_text("{}")
+    assert CliRunner().invoke(cli, [*args, "--file", str(source)]).exit_code == 2
+
+
 @pytest.mark.parametrize("field", ["run_id", "task_id", "task_revision", "schema_sha256"])
 def test_compact_decision_cannot_override_assignment(runtime, field):
     store, claim, _ = running(runtime)
@@ -114,6 +136,35 @@ def test_compact_decision_cannot_override_assignment(runtime, field):
         store.submit_decision({"decision": "no_change", "payload": {}, field: "other"},
                               run_id=claim.run["id"], token=claim.token)
     assert store.snapshot()["results"] == {}
+
+
+def test_contract_cli_reads_the_run_snapshot_after_schema_changes(runtime, monkeypatch):
+    import json
+    import yaml
+    from click.testing import CliRunner
+    from greatminds.cli.main import cli
+    store, claim, _ = running(runtime)
+    original = load_schema_snapshot().document
+    changed = dict(original, version="future-test-version")
+    canon = runtime.parent / "replacement-canon"
+    canon.mkdir()
+    (canon / "schema.yaml").write_text(yaml.safe_dump(changed))
+    monkeypatch.setenv("GREATMINDS_CANON_DIR", str(canon))
+    monkeypatch.setenv("GREATMINDS_PROJECT_DIR", str(runtime.parent))
+    monkeypatch.setenv("GREATMINDS_RUN_ID", claim.run["id"])
+    monkeypatch.setenv("GREATMINDS_RUN_TOKEN", claim.token)
+    result = CliRunner().invoke(cli, ["run", "contract", "--schema"])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output) == original
+    result = CliRunner().invoke(cli, ["run", "contract"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["schema_sha256"] == claim.run["schema_sha256"]
+    assert "blocks" not in data["decision_payload_fields"]["no_change"]
+    assert data["generated_block_fields"]["review"] == ["reviewed_by", "reviewed_at"]
+    assert claim.token not in result.output
+    monkeypatch.setenv("GREATMINDS_RUN_TOKEN", "wrong")
+    assert CliRunner().invoke(cli, ["run", "contract"]).exit_code == 3
 
 
 def test_compact_decision_still_requires_the_run_credential(runtime):

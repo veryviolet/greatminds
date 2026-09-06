@@ -639,6 +639,21 @@ M2 mixed pipeline / M7 local validation preparation:
   merge, cleanup, and restart smoke passed; this is fixture evidence, not a real
   harness review result.
 
+M2 completed mixed pipeline and scoped CLI checkpoint:
+
+- The retained Codex → Claude → Grok task now reached `verified`: all three
+  receipts applied, daemon merge and worktree cleanup completed, six tests pass
+  in the main checkout, and idle restart preserves runs/results/commands.
+- Grok required an explicit retry with a 600-second budget and one-time operator
+  permissions. The earlier partial evidence remains; completed evidence is in
+  `evidence/acp-mixed-pipeline-completed-2026-09-06.json`.
+- Inline JSON submission removes result-file creation. Bounded, integrity-checked
+  command previews remove separate log reads. Credential-scoped `run contract`
+  exposes pinned schema and generated fields without rediscovering current canon.
+- Installed-wheel three-role fixture pipeline, merge, cleanup, and restart passed.
+- Full regression: 1834 passed, 2 skipped. The whole modernization plan remains
+  active; one completed local task does not establish every harness/role policy.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility
@@ -646,8 +661,9 @@ matrix, not the lifetime of a desktop conversation. Current focus: finish M2 rea
 integration and operator policies, then the outstanding M3–M7 items above. The full
 plan is still active. A successful synthetic response is not completion of M2.
 
-Continue by simplifying scoped submission and command-output delivery, then finish
-the retained real pipeline and remaining interactive input handling. Durable
+Continue with remaining interactive input handling and the outstanding M3–M7
+work. Scoped submission, command output, and the retained real pipeline now have
+completion evidence. Durable
 one-time permission callbacks and real command approval now
 have evidence; complete harness permission-policy parity is still required. Session
 load, history continuity, and cancellation after streaming now have real evidence;

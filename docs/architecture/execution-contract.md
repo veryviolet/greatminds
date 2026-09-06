@@ -242,9 +242,27 @@ The shared task lock keeps a stable inode after release. File existence is not
 proof of ownership; the kernel flock is. Removing a lock file can strand existing
 waiters on a different inode and break mutual exclusion.
 
+## Scoped context and command output
+
+`greatminds run contract` returns the current assignment with accepted decision
+fields and daemon-generated block fields. `--schema` returns the schema pinned to
+that run, even if the current canon has since changed. Both require the assigned
+run credential.
+
+`run command` and `run command-status` include a bounded `output_preview` for
+stdout and stderr (default 8192 bytes per stream; `--output-limit` accepts 0–65536).
+The daemon checks the recorded file location, regular-file type, size, and hash
+before returning text. Previews are not persisted into receipt metadata and do
+not replace source freshness checks. Assigned credentials can inspect only their
+own run's command receipts; an operator without assigned credentials can inspect
+all receipts.
+
 ## Lifecycle and result receipts
 
-`greatminds run submit --file /absolute/path/result.json` accepts a compact
+`greatminds run submit --json '{"decision":"no_change","payload":{"reason":"..."}}'`
+accepts an inline decision (up to 65536 bytes). Pass JSON as one literal shell
+argument. `--file /absolute/path/result.json` remains available for larger input;
+exactly one input option is required. Both accept a compact
 decision: `{"decision": "no_change", "payload": {"reason": "..."}}`. The CLI
 fills run/task/schema identity from the current assignment and chooses one stable
 result ID per run. Exact repeated submission returns the existing receipt, even

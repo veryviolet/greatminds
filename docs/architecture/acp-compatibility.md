@@ -143,11 +143,15 @@ a typed implementation handoff. Claude SDK 0.3.257 independently inspected it,
 requested its own test execution, and submitted a typed tests handoff. Both
 receipts passed domain gates and the task reached `feature_review`.
 
-Grok 1.0.13 exhausted its 240-second prompt budget while waiting for an operator
-permission during review. There is no real review result, merge, or `verified`
-completion yet. Operator wait and repeated CLI/schema discovery contributed to
-the overhead. The existing task and run state are retained for continuation;
-the completed developer and tester work need not be repeated.
+Grok 1.0.13 initially exhausted its 240-second prompt budget while waiting for an
+operator permission. The [completed continuation](evidence/acp-mixed-pipeline-completed-2026-09-06.json)
+records an explicit reviewer retry with a 600-second budget and one-time operator
+approvals. Grok independently ran all six tests and submitted an approved review
+through `run submit --json`. The daemon applied all three results, merged the
+implementation and transitioned the task to `verified`, with worktree cleanup. All six
+tests pass in the main checkout; an idle daemon restart changes no runs, results,
+or commands. This is operator-assisted evidence for one synthetic local task,
+not an unattended pipeline or a controlled performance comparison.
 
 The [pipeline probe](../../tools/acp_pipeline_probe.py) takes `--config FILE`
 with three ACP bindings for DEVELOPER, TESTER, and ARCHITECT-REVIEWER. It copies

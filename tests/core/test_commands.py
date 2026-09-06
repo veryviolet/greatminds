@@ -46,6 +46,42 @@ def execute(service, claim, request_id="check-one"):
     return asyncio.run(service.execute(request["id"], "owner"))
 
 
+def test_output_preview_is_bounded_and_rejects_modified_or_linked_artifacts(tmp_path):
+    from pathlib import Path
+    store, claim, service = setup(tmp_path, "print('abcdefghij')")
+    item = execute(service, claim)
+    preview = service.output_preview(item["id"], limit=4)
+    assert preview["stdout"]["text"] == "abcd"
+    assert preview["stdout"]["truncated"] and preview["stdout"]["bytes"] == 11
+    assert preview["stderr"]["text"] == "" and not preview["stderr"]["truncated"]
+    assert "output_preview" not in store.snapshot()["commands"][item["id"]]
+    output = Path(item["output"]["stdout"]["path"])
+    output.write_text("changed!!!!")
+    with pytest.raises(GreatMindsError, match="artifact changed"):
+        service.output_preview(item["id"])
+    outside = tmp_path / "unrelated.txt"
+    outside.write_text("abcdefghij\n")
+    output.unlink()
+    output.symlink_to(outside)
+    with pytest.raises(GreatMindsError, match="recorded local artifact"):
+        service.output_preview(item["id"])
+
+
+def test_command_status_scopes_agent_reads_and_includes_preview(tmp_path, monkeypatch):
+    from click.testing import CliRunner
+    from greatminds.cli.main import cli
+    store, claim, service = setup(tmp_path)
+    item = execute(service, claim)
+    monkeypatch.setenv("GREATMINDS_PROJECT_DIR", str(tmp_path))
+    monkeypatch.setenv("GREATMINDS_RUN_ID", claim.run["id"])
+    monkeypatch.setenv("GREATMINDS_RUN_TOKEN", claim.token)
+    result = CliRunner().invoke(cli, ["run", "command-status", item["id"]])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["output_preview"]["stdout"]["text"] == "checked\n"
+    monkeypatch.setenv("GREATMINDS_RUN_TOKEN", "incorrect")
+    assert CliRunner().invoke(cli, ["run", "command-status", item["id"]]).exit_code == 3
+
+
 def test_recorded_command_and_output_are_bound_to_result(tmp_path):
     store, claim, service = setup(tmp_path)
     pending = service.request(claim.run["id"], "check", token=claim.token, request_id="check-one")

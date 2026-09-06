@@ -97,6 +97,7 @@ for line in sys.stdin:
                                          capture_output=True, text=True, check=True)
                 evidence = json.loads(checked.stdout)
                 assert evidence["status"] == "succeeded", evidence
+                assert "Ran 6 tests" in evidence["output_preview"]["stderr"]["text"]
                 commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
                 if role == "DEVELOPER":
                     target, block = "feature_test", {"kind": "implementation", "base_commit": commit,
@@ -108,14 +109,10 @@ for line in sys.stdin:
                         "gate_check_at": datetime.now(timezone.utc).isoformat(), "ready_for_review": True}
                 else:
                     target, block = "verified", {"kind": "review", "outcome": "approved", "commit": commit}
-                with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as handle:
-                    json.dump({"decision": "handoff", "payload": {"to_queue": target,
-                        "blocks": [block], "command_evidence": [evidence["id"]], "artifacts": ["clamp.py"]}}, handle)
-                try:
-                    subprocess.run([*context["cli_argv"], "run", "submit", "--file", handle.name],
-                                   capture_output=True, text=True, check=True)
-                finally:
-                    Path(handle.name).unlink()
+                decision = {"decision": "handoff", "payload": {"to_queue": target,
+                    "blocks": [block], "command_evidence": [evidence["id"]], "artifacts": ["clamp.py"]}}
+                subprocess.run([*context["cli_argv"], "run", "submit", "--json", json.dumps(decision)],
+                               capture_output=True, text=True, check=True)
             if scenario in {"submit", "handoff", "command"}:
                 context = json.loads(message["params"]["prompt"][0]["text"].split("\n\n", 1)[1])
                 envelope = context["result_format"]

@@ -21,6 +21,23 @@ def _digest(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+DECISION_PAYLOAD_FIELDS = {
+    "handoff": {"to_queue", "blocks", "artifacts", "reason"},
+    "blocked": {"reason", "dependencies", "resume_to", "artifacts"},
+    "needs_input": {"question", "artifacts"},
+    "no_change": {"reason", "artifacts"},
+}
+
+GENERATED_BLOCK_FIELDS = {
+    "plan": ("written_by", "written_at"),
+    "implementation": ("closed_by", "closed_at"),
+    "tests": ("closed_by", "closed_at"),
+    "reader_review": ("reviewed_by", "reviewed_at"),
+    "review": ("reviewed_by", "reviewed_at"),
+    "blocked": ("blocked_by", "blocked_at"),
+}
+
+
 class ResultService:
     def __init__(self, store: RunStore, *, checkpoint: Callable[[str], None] | None = None,
                  environment: dict | None = None):
@@ -44,13 +61,7 @@ class ResultService:
         envelope = receipt["envelope"]
         payload = envelope["payload"]
         decision = envelope["decision"]
-        allowed = {
-            "handoff": {"to_queue", "blocks", "artifacts", "reason"},
-            "blocked": {"reason", "dependencies", "resume_to", "artifacts"},
-            "needs_input": {"question", "artifacts"},
-            "no_change": {"reason", "artifacts"},
-        }
-        if set(payload) - (allowed[decision] | {"command_evidence"}):
+        if set(payload) - (DECISION_PAYLOAD_FIELDS[decision] | {"command_evidence"}):
             raise GreatMindsError("unknown fields in decision payload", exit_code=2)
         revision = TaskRevision(run["task_id"], run["task_path"], run["task_revision"])
         self.store._check_revision(revision)
@@ -118,12 +129,7 @@ class ResultService:
                     fields.update(generated)
                 if "worktree_fingerprint" in fields:
                     raise GreatMindsError("worktree fingerprint is recorded by the daemon", exit_code=3)
-                names = {"plan": ("written_by", "written_at"),
-                         "implementation": ("closed_by", "closed_at"),
-                         "tests": ("closed_by", "closed_at"),
-                         "reader_review": ("reviewed_by", "reviewed_at"),
-                         "review": ("reviewed_by", "reviewed_at"),
-                         "blocked": ("blocked_by", "blocked_at")}.get(kind)
+                names = GENERATED_BLOCK_FIELDS.get(kind)
                 if names:
                     if names[0] in fields and fields[names[0]] != run["role"]:
                         raise GreatMindsError("block cannot impersonate another role", exit_code=3)
