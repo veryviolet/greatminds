@@ -4,6 +4,25 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## Unreleased
+
+### Added
+
+- `greatminds project schema` prints the effective installed contract.
+  `--json` includes its source, version, SHA-256 identity, and project-copy
+  status; `--check` detects missing, unreadable, or different generated copies
+  without rewriting them.
+
+### Fixed
+
+- Daemon service selection now uses the same canon schema as task validation
+  and driven dispatch instead of trusting a potentially stale project copy.
+  Codex service selection also requires the configured window mode to be driven.
+- Agent bootstrap reads the effective schema through the CLI. Explicit canon
+  overrides apply consistently; project copies remain generated mirrors.
+- Daemon tests isolate user configuration paths and inherited auth environment,
+  so install helpers can be tested without writing the operator's systemd files.
+
 ## 2.6.0 — 2026-06-18
 
 ### Fixed

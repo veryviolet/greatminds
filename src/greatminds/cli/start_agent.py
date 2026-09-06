@@ -510,7 +510,7 @@ def start_agent(role: str, tool: str, mode: str,
         prompt = bootstrap_md.read_text(encoding="utf-8").rstrip()
     else:
         prompt = (f"You are {role}, a greatminds agent. Read "
-                  f".greatminds/schema.yaml (roles.{role}), "
+                  f"`greatminds project schema` (roles.{role}), "
                   f".greatminds/COORDINATE.md, coordination/PROJECT.md; "
                   f"follow your lifecycle; runtime access via the "
                   f"greatminds CLI only. Act on your tick.")

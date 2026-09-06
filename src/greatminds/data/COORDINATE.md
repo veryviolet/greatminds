@@ -3,22 +3,28 @@
 This document is the contract for a file-based finite state machine that
 coordinates Claude agents on a product. Mechanics (queue names, transitions,
 required front-matter fields, watchdog thresholds) are defined in the
-machine-readable `.greatminds/schema.yaml`. This document is the prose version: it
+machine-readable schema printed by `greatminds project schema`. This document is the prose version: it
 explains the philosophy and the invariants that hold the system together.
 
-When `.greatminds/schema.yaml` and this prose disagree,
-`.greatminds/schema.yaml` is authoritative
+References below to `.greatminds/schema.yaml` refer to the generated mirror of
+the installed contract. Read `greatminds project schema` for the effective
+contract; `greatminds project schema --check` detects a stale or missing mirror.
+Project copies do not override CLI or daemon policy. An explicit
+`GREATMINDS_CANON_DIR` selects the canon used by both.
+
+When the effective schema and this prose disagree,
+the effective schema is authoritative
 for mechanics, and the prose is authoritative for the spirit of the
 invariants. Fix whichever is wrong, do not paper over the conflict.
 
 Project-specific values live in the installed `coordination/PROJECT.md`
 (canon refers to them as `${...}` variables). Each agent's system prompt is
 the single static `.greatminds/bootstrap.md`; it reads the installed canon
-(`.greatminds/schema.yaml` + `.greatminds/COORDINATE.md`) plus
+(`greatminds project schema` + `.greatminds/COORDINATE.md`) plus
 `coordination/PROJECT.md` at the start of every tick.
 
 Every installed agent reads `.greatminds/COORDINATE.md`,
-`.greatminds/schema.yaml`, its own role contract, and
+the output of `greatminds project schema`, its own role contract, and
 `coordination/PROJECT.md` before acting.
 
 ---

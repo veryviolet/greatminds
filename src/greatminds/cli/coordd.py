@@ -505,12 +505,11 @@ def load_schema_roles(canon_dir: Path) -> dict:
     before without stale-kick claim-queue awareness."""
     if yaml is None:
         return {}
-    p = canon_dir / "schema.yaml"
-    if not p.is_file():
-        return {}
     try:
-        data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
-    except (OSError, yaml.YAMLError):
+        from greatminds.core.schema import load_schema_snapshot
+        from greatminds.core.errors import GreatMindsError
+        data = load_schema_snapshot(canon_dir).document
+    except GreatMindsError:
         return {}
     roles = data.get("roles") or {}
     return roles if isinstance(roles, dict) else {}

@@ -386,6 +386,22 @@ Integrate in small reviewable changes; no whole-project rewrite.
 - Publish upgrade instructions, actual compatibility, failure diagnostics, and
   a reproducible mixed-fleet acceptance scenario before a modernization release.
 
-The next implementation step is M0 followed by the shared run contract in M1.
+## Progress
+
+M0 implemented on 2026-09-06:
+
+- Daemon tests isolate user-state paths and strip inherited capture-eligible
+  credentials. The seven baseline installation failures are resolved.
+- The installed canon is the effective contract. Service selection, task
+  validation, daemon role loading, and agent schema output share that source.
+- Content-addressed schema snapshots retain their contents across source changes;
+  project mirrors are inspected read-only through `project schema --check`.
+- Agent bootstrap and operational docs identify the effective contract and
+  require process restart after a package/canon update. Per-run schema pinning
+  remains part of the upcoming run lifecycle implementation.
+- Full regression suite: 1,665 passed, 2 skipped. Wheel and sdist build succeeded.
+
+The next implementation step is the shared run contract in M1. ACP execution
+and automatic workflow controllers are still pending, not implemented by M0.
 This document authorizes no release or migration of existing live fleets by
 itself; those operations are separate from developing and testing the changes.

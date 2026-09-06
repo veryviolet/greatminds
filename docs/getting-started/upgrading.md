@@ -45,6 +45,14 @@ Run:
 greatminds --help
 greatminds daemon status
 greatminds watchdog
+greatminds project schema --check
 ```
 
 Then smoke one or two low-risk roles before restarting a whole fleet.
+
+The installed canon schema governs CLI validation, daemon dispatch, and service
+selection. `.greatminds/schema.yaml` is a generated mirror, not a project policy
+override. If the check reports drift, inspect it against
+`greatminds project schema` before refreshing generated files with
+`greatminds setup`. Restart running processes after updating the installed
+package or an explicit `GREATMINDS_CANON_DIR` so cached contracts agree.

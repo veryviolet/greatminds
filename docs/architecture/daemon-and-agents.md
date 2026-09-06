@@ -23,6 +23,11 @@ The role's lifecycle is declared in the packaged schema copied to
 Driven dispatch requires both the schema lifecycle and the installed
 `coordination/coord.yaml` window mode to be `driven`.
 
+Print the effective installed contract with `greatminds project schema`.
+The project schema is a generated mirror and does not override dispatch or
+service installation. `greatminds project schema --check` detects a stale mirror.
+Restart running processes after updating the installed package or canon.
+
 ## coordd
 
 `coordd` watches `.greatminds/` for inbox, queue-file, and stand-state

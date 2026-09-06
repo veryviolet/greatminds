@@ -49,6 +49,7 @@ import yaml
 
 from greatminds.core.errors import GreatMindsError
 from greatminds.core.paths import find_canon_dir, find_coord_dir
+from greatminds.core.schema import load_schema_snapshot
 from greatminds.core.util import ISO_FMT, now_iso  # noqa: F401  (ISO_FMT re-exported)
 
 
@@ -114,11 +115,7 @@ def schema() -> dict[str, Any]:
     global _schema_cache
     if _schema_cache is not None:
         return _schema_cache
-    p = find_canon_dir() / "schema.yaml"
-    try:
-        _schema_cache = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
-    except (OSError, yaml.YAMLError) as exc:
-        raise GreatMindsError(f"failed to load schema.yaml: {exc}")
+    _schema_cache = load_schema_snapshot(find_canon_dir()).document
     return _schema_cache
 
 

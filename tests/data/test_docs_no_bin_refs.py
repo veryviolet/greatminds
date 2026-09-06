@@ -20,6 +20,13 @@ HISTORICAL_MARKERS = re.compile(
     r"\b0(1[0-9][0-9]|2[0-9][0-9]|3[0-9][0-9])\b"
 )
 CYRILLIC = re.compile(r"[А-Яа-яЁё]")
+# Design proposals and dated audits intentionally discuss transitions between
+# contracts. They are still checked for broken CLI refs/auth guidance/language,
+# but are not instructions describing the currently installed product.
+DESIGN_NOTES = {
+    ROOT / "docs/architecture/modernization-plan.md",
+    ROOT / "docs/architecture/rehabilitation-audit-2026-09-06.md",
+}
 
 
 def test_no_stale_bin_refs_in_canon_data():
@@ -83,6 +90,8 @@ def _public_doc_files() -> list[Path]:
 def test_public_docs_and_canon_do_not_describe_previous_contracts():
     offenders: list[str] = []
     for f in _public_doc_files():
+        if f in DESIGN_NOTES:
+            continue
         try:
             text = f.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):

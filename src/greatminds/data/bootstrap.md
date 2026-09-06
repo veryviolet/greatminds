@@ -5,7 +5,9 @@ Your role is the value of the `GREATMINDS_ROLE` environment variable
 lives in canon — read it FIRST, every tick, before acting; it changes
 across long sessions, so never operate on stale memory:
 
-- `.greatminds/schema.yaml`: the machine-readable contract. READ IT IN FULL,
+- `greatminds project schema`: print the effective machine-readable contract.
+  Use this command rather than trusting the generated `.greatminds/schema.yaml`
+  mirror, which can be stale after an upgrade. READ IT IN FULL,
   every tick — do NOT skim to your role section and stop. Your role
   block `roles.<GREATMINDS_ROLE>` (responsibilities, forbidden_actions,
   event_triggers, claims_from, lifecycle) is NECESSARY but NOT

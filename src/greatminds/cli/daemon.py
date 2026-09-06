@@ -40,8 +40,8 @@ from greatminds.core.paths import (
     coord_yaml_path,
     find_canon_dir,
     project_env_file,
-    project_schema_path,
 )
+from greatminds.core.schema import load_schema_snapshot
 from greatminds.cli._colors import err, info, ok, warn
 
 
@@ -690,19 +690,13 @@ def _appserver_instance_unit(name: str) -> str:
 
 
 def _schema_lifecycles(project_dir: Path) -> dict[str, str]:
-    """Read ``roles[<ROLE>].lifecycle`` from the project's schema.yaml
-    (preferred) or the packaged canon schema (fallback). Role keys are
-    upper-cased for case-insensitive matching against coord.yaml roles."""
-    doc = _safe_yaml(project_schema_path(project_dir))
-    if doc is None:
-        doc = _safe_yaml(project_dir / "coordination" / "schema.yaml")
-    if doc is None:
-        doc = _safe_yaml(project_dir / "schema.yaml")
-    if doc is None:
-        try:
-            doc = _safe_yaml(find_canon_dir() / "schema.yaml")
-        except Exception:  # noqa: BLE001
-            doc = None
+    """Use the same installed contract as coordd and task validation.
+
+    Project mirrors can be stale after an upgrade and must not change which
+    services are installed. Explicit canon overrides still apply to all paths.
+    """
+    del project_dir  # Retain the helper signature for existing callers.
+    doc = load_schema_snapshot(find_canon_dir()).document
     out: dict[str, str] = {}
     for role, spec in ((doc or {}).get("roles") or {}).items():
         if isinstance(role, str) and isinstance(spec, dict):
@@ -740,7 +734,8 @@ def has_driven_codex_roles(project_dir: Path) -> bool:
         if (win.get("tool") or "").lower() != "codex":
             continue
         role = (win.get("role") or "").upper()
-        if role and lifecycles.get(role) == "driven":
+        if (role and lifecycles.get(role) == "driven"
+                and (win.get("mode") or "").lower() == "driven"):
             return True
     return False
 
