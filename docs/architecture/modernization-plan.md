@@ -863,6 +863,24 @@ M5 explicit conversation closure checkpoint:
 - Next: terminal presentation and task attachment, followed by the outstanding
   real interactive harness/input/VS Code scenarios and M3/M6/M7 scope.
 
+M5 terminal conversation client checkpoint:
+
+- `chat attach --text` renders messages and outcomes with a reconnect cursor.
+  `chat talk` accepts messages, streams responses, and presents explicit numbered
+  one-time permission choices. It does not launch its own agent or auto-approve.
+- Detach/EOF/Ctrl-C retain work; `/close` requests daemon cleanup. The client prints
+  a reconnect command on exit. Escaping terminal controls prevents streamed text,
+  including split escape sequences, from issuing terminal commands.
+- Initial terminal tests: 4 passed, including separate CLI subprocesses against
+  the daemon/ACP fixture, explicit permission rejection, read-only replay, and
+  detach during work. Existing conversation tests: 16 passed.
+  Expanded terminal/conversation/documentation regression: 28 passed.
+  Final terminal checks after permission-detail rendering: 4 passed. Installed-wheel
+  terminal input, streamed reply, and detach/reconnect cursor smoke passed with
+  the local ACP fixture; live-provider interactive validation remains outstanding.
+- Next: task attachment, richer input and interactive live-harness coverage, then
+  VS Code/default migration and the remaining deterministic/product work.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility

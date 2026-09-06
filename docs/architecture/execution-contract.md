@@ -615,6 +615,8 @@ greatminds chat create BINDING
 greatminds chat send CONVERSATION --request-id MESSAGE_ID --message 'User request'
 greatminds chat attach CONVERSATION --follow
 greatminds chat attach CONVERSATION --after LAST_CURSOR --follow
+greatminds chat attach CONVERSATION --text --follow
+greatminds chat talk CONVERSATION --after LAST_CURSOR
 greatminds chat interrupt CONVERSATION MESSAGE_ID
 greatminds chat close CONVERSATION
 ```
@@ -636,6 +638,15 @@ survives changed configuration or capacity holds. Known environment secrets are
 redacted from normalized assistant chunks on a best-effort basis; this is not a
 guarantee against secrets split across chunks or unrecognized secret values.
 
-This initial surface provides structured CLI interaction. A terminal conversation
-view, task attachment, richer non-permission input, VS Code integration, and real
+`attach --text` renders messages and outcomes, then prints a reconnect cursor.
+`talk` reads the conversation, accepts one message at a time, streams its response,
+and presents pending one-time permission options for an explicit numbered choice.
+It never chooses a permission by default. `/detach`, EOF, or Ctrl-C leave work
+running; `/close` requests the daemon closure described above. A reconnect command
+with the last displayed cursor is printed on exit. During a response, another
+client can enqueue further messages or use `chat interrupt`; talk waits for queued
+work before asking for its next message. Terminal control characters in user and
+assistant text are escaped rather than executed, including across stream chunks.
+
+Task attachment, richer non-permission input, VS Code integration, and real
 interactive harness validation remain outstanding M5 work.
