@@ -160,3 +160,21 @@ def test_nonzero_profile_result_is_reported_as_failed_without_replay(tmp_path,mo
     before=(runtime/'.stand/deployments.json').read_bytes()
     asyncio.run(serve(tmp_path,once=True,environment={}))
     assert (runtime/'.stand/deployments.json').read_bytes()==before
+
+
+@pytest.mark.parametrize('changed',['source','profile','environment'])
+def test_changed_deployment_inputs_cannot_mark_stand_ready(tmp_path,monkeypatch,changed):
+    target={'source':'../source.py','profile':'../coordination/stand-profiles/smoke.yaml','environment':'PROJECT.env'}[changed]
+    script=f"import pathlib;pathlib.Path({target!r}).write_text('SECRET=changed-value');print('PLAY RECAP\\nsynthetic : ok=1')"
+    runtime=setup(tmp_path,monkeypatch,script=script)
+    asyncio.run(serve(tmp_path,once=True,environment={}))
+    assert ss.read_stand_state(runtime)['state']=='preparing'
+    ledger=(runtime/'.stand/deployments.json').read_text()
+    attempt=next(iter(json.loads(ledger)['attempts'].values()))
+    assert attempt['process_returncode']==0
+    assert attempt['status']=='needs_recovery' and attempt['inputs_match'] is False
+    assert attempt['inputs_before']!=attempt['inputs_after']
+    if changed=='environment':
+        assert attempt['inputs_before']['source']==attempt['inputs_after']['source']
+        assert attempt['inputs_before']['environment']!=attempt['inputs_after']['environment']
+    assert 'changed-value' not in ledger

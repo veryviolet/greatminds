@@ -521,4 +521,26 @@ unresolved external effects still require deployment recovery/resolution first.
 tickets retain exception type and known policy error text with environment-value
 redaction; arbitrary exception text and process output are not copied there.
 Existing bounded capture, exec gating, orphan cleanup, and no-replay rules remain
-in effect. Source/environment identity for stand evidence is still being extended.
+in effect. Managed profile inputs are checked as described below.
+
+
+## Managed deployment input identity
+
+Before launching a managed profile, the engine records the workspace source
+identity, selected profile path/content hash, executable identity/content hash,
+and an HMAC of the process environment plus effective playbook variables. The
+shared command-evidence primitive owns the private HMAC key; environment values
+are not copied into the deployment ledger. Workspace identity includes uncommitted
+source and uses Git ignore rules, or a file walk for non-Git fixtures. Runtime
+metadata is excluded so logging and bookkeeping cannot invalidate deployment.
+
+After normal command completion, the engine records another input snapshot.
+A mismatch leaves the attempt unresolved and cannot publish `ready`, even when
+the process returned zero. The actual process result and bounded output remain
+available for assessment. Failure/timeout paths lacking a complete snapshot pair
+do not assert stable inputs.
+
+This records and compares local inputs at the execution boundaries. It does not
+attest remote machine state or prevent transient changes that are reverted between
+snapshots. Revalidation when domain evidence is subsequently consumed, and declared
+revisions for external environment changes, remain to be integrated.

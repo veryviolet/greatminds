@@ -266,6 +266,15 @@ def execute_yaml_profile(
         # ansible runs so watchdog doesn't flag the lease cycle as a
         # dead pid during a multi-minute remote deploy. Best-effort;
         # never crashes the executor.
+        attempt_id = lease_meta.get("_deployment_attempt_id")
+        execution_environment = {**os.environ, "ANSIBLE_FORCE_COLOR": "0"}
+        before = None
+        if attempt_id:
+            from greatminds.domain.stand_deployments import DeploymentLedger
+            from greatminds.domain.stand_evidence import deployment_inputs
+            before = deployment_inputs(coord, lease_meta["worktree"], spec.path, cmd,
+                                       execution_environment, extra_vars)
+            DeploymentLedger(coord).inputs(attempt_id, before=before)
         hb_handle = _start_heartbeat_refresher(coord, "stand-keeper")
         try:
             run_command = subprocess.run
@@ -289,7 +298,7 @@ def execute_yaml_profile(
                 # ansible falls back to the implicit localhost an add_host
                 # bootstrap play uses.
                 cwd=str(coord) if coord is not None else None,
-                env={**os.environ, "ANSIBLE_FORCE_COLOR": "0"},
+                env=execution_environment,
             )
         except subprocess.TimeoutExpired as exc:
             msg = (f"ansible-playbook timed out after "
@@ -307,6 +316,14 @@ def execute_yaml_profile(
             # (success, timeout, FileNotFoundError, unexpected raise).
             _stop_heartbeat_refresher(hb_handle)
 
+        if attempt_id:
+            after = deployment_inputs(coord, lease_meta["worktree"], spec.path, cmd,
+                {**os.environ, "ANSIBLE_FORCE_COLOR": "0"},
+                {**read_project_env(coord), **_build_extra_vars(lease_meta)})
+            DeploymentLedger(coord).inputs(attempt_id, after=after)
+            if before != after:
+                raise GreatMindsError("deployment source or environment changed during execution; "
+                                     "external outcome requires assessment", exit_code=4)
         log = ""
         if capture_output:
             log = (cp.stdout or "") + (cp.stderr or "")

@@ -767,6 +767,22 @@ M4 authorized ACP stand scheduler checkpoint:
 - Next: stand source/environment evidence and remaining deterministic maintenance,
   then interactive ACP roles, default migration, and product simplification (M5–M7).
 
+M4 managed stand input identity checkpoint:
+
+- Managed profile execution records source/profile/executable identities and an
+  HMAC of effective process environment plus playbook variables before execution.
+  It reuses the configured-command evidence primitive and private key.
+- A post-command mismatch prevents ready publication, preserving the real process
+  result and unresolved outcome. Runtime metadata is excluded from source checks;
+  environment values are absent from the ledger.
+- Focused command/stand/evidence regression: 69 passed; expanded stand/ACP/command
+  and documentation regression: 307 passed, 1 skipped. Fixtures return zero while
+  changing source, profile, or PROJECT.env and still cannot mark the stand ready.
+  Final shared-context regression passed 45 tests. Installed-wheel stable-input
+  success and changed-source refusal passed on local synthetic profiles.
+- Next: revalidate stand evidence at domain consumption, declare external environment
+  revisions, and complete remaining maintenance / interactive ACP / migration work.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility

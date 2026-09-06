@@ -102,6 +102,25 @@ def source_identity(workspace: Path, runtime: Path) -> dict:
     return {"commit": commit, "source_sha256": fingerprint(records)}
 
 
+def environment_identity(directory, env, argv, cwd, *, context=None):
+    """Hash executable contents and authenticate environment values without storing them."""
+    keyfile = directory / "evidence.key"
+    with file_lock(directory / "evidence-key.lock", label="command evidence key"):
+        if not keyfile.exists():
+            atomic_bytes(keyfile, os.urandom(32))
+        key = keyfile.read_bytes()
+    search_path = os.pathsep.join(str((cwd / entry).resolve())
+                                  for entry in env.get("PATH", os.defpath).split(os.pathsep))
+    executable = shutil.which(argv[0], path=search_path)
+    if "/" in argv[0]:
+        executable = str((cwd / argv[0]).resolve())
+    if not executable or not Path(executable).is_file():
+        raise GreatMindsError("configured command executable is unavailable")
+    values = env if context is None else {"environment": env, "context": context}
+    return {"environment_hmac": hmac.new(key, json.dumps(values, sort_keys=True).encode(), hashlib.sha256).hexdigest(),
+            "executable": str(Path(executable).resolve()), "executable_sha256": _sha(Path(executable))}
+
+
 class CommandService:
     def __init__(self, store, *, environment=None):
         self.store = store
@@ -180,20 +199,7 @@ class CommandService:
         return env
 
     def _environment_identity(self, env, argv, cwd):
-        keyfile = self.store.directory / "evidence.key"
-        with file_lock(self.store.directory / "evidence-key.lock", label="command evidence key"):
-            if not keyfile.exists():
-                atomic_bytes(keyfile, os.urandom(32))
-            key = keyfile.read_bytes()
-        search_path = os.pathsep.join(str((cwd / entry).resolve())
-                                      for entry in env.get("PATH", os.defpath).split(os.pathsep))
-        executable = shutil.which(argv[0], path=search_path)
-        if "/" in argv[0]:
-            executable = str((cwd / argv[0]).resolve())
-        if not executable or not Path(executable).is_file():
-            raise GreatMindsError("configured command executable is unavailable")
-        return {"environment_hmac": hmac.new(key, json.dumps(env, sort_keys=True).encode(), hashlib.sha256).hexdigest(),
-                "executable": str(Path(executable).resolve()), "executable_sha256": _sha(Path(executable))}
+        return environment_identity(self.store.directory, env, argv, cwd)
 
     async def recover(self, owner_id):
         for item in self.store.snapshot().get("commands", {}).values():

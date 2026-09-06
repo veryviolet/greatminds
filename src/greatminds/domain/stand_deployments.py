@@ -160,6 +160,15 @@ class DeploymentLedger:
                      status='resolved', resolution=reason, resolved_at=now_iso())
         return self.snapshot()['attempts'][attempt_id]
 
+    def inputs(self, attempt_id, *, before=None, after=None):
+        fields = {}
+        if before is not None:
+            fields['inputs_before'] = before
+        if after is not None:
+            fields['inputs_after'] = after
+            fields['inputs_match'] = self.snapshot()['attempts'][attempt_id].get('inputs_before') == after
+        self._update(attempt_id, {'started'}, **fields)
+
     def finished(self, attempt_id, rc, log):
         # Raw logs may contain credentials; the ledger only retains identity.
         self._update(attempt_id, {'started'}, status='command_finished', exit_code=rc,
