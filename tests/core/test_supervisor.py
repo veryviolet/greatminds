@@ -38,6 +38,80 @@ def supervisor(tmp_path, store, schema, config):
     return Supervisor(project=tmp_path, store=store, schema=schema, config=config, environment={})
 
 
+@pytest.mark.parametrize("repository", [True, False])
+def test_required_workspace_precedes_agent_launch(tmp_path, repository):
+    store, schema, config, task = setup(tmp_path)
+    path = store.runtime / task.path
+    path.write_text("id: 0001-test\nkind: feature\ntitle: Test\n")
+    task = TaskRevision.capture(store.runtime, path)
+    if repository:
+        subprocess.run(["git", "init", "-b", "main", str(tmp_path)], check=True, capture_output=True)
+        subprocess.run(["git", "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+                        "commit", "--allow-empty", "-m", "Initial"], cwd=tmp_path, check=True, capture_output=True)
+
+    async def check():
+        async with supervisor(tmp_path, store, schema, config) as service:
+            claim = service.claim(task, config.bindings[0])
+            result = await service.execute(claim, binding=config.bindings[0], prompt="work")
+            if repository:
+                assert result["state"] == "completed", result
+                workspace = tmp_path / ".worktrees" / "0001-test"
+                assert result["workspace"] == str(workspace)
+                assert result["workspace_identity"]["branch"] == "task/0001-test"
+                assert (workspace / "agent-starts.log").exists()
+                kinds = [event["kind"] for event in store.snapshot()["events"]]
+                assert kinds.index("workspace_ready") < kinds.index("process_recorded")
+            else:
+                assert result["state"] == "failed"
+                assert "process" not in result
+            assert not (tmp_path / "agent-starts.log").exists()
+    asyncio.run(check())
+
+
+def test_cancelled_workspace_preparation_drains_worker(monkeypatch):
+    import threading
+    from greatminds.runtime import workspaces
+    entered, released, finished = threading.Event(), threading.Event(), threading.Event()
+    def prepare(*args):
+        entered.set()
+        assert released.wait(2)
+        finished.set()
+    monkeypatch.setattr(workspaces, "prepare_workspace", prepare)
+    async def check():
+        task = asyncio.create_task(workspaces.prepare_workspace_async())
+        while not entered.is_set():
+            await asyncio.sleep(0.01)
+        task.cancel()
+        await asyncio.sleep(0.02)
+        assert not task.done()
+        released.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert finished.is_set()
+    asyncio.run(check())
+
+
+def test_existing_workspace_wrong_branch_never_launches_agent(tmp_path):
+    store, schema, config, task = setup(tmp_path)
+    path = store.runtime / task.path
+    path.write_text("id: 0001-test\nkind: feature\ntitle: Test\n")
+    task = TaskRevision.capture(store.runtime, path)
+    subprocess.run(["git", "init", "-b", "main", str(tmp_path)], check=True, capture_output=True)
+    subprocess.run(["git", "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+                    "commit", "--allow-empty", "-m", "Initial"], cwd=tmp_path, check=True, capture_output=True)
+    workspace = tmp_path / ".worktrees" / "0001-test"
+    subprocess.run(["git", "worktree", "add", "-b", "unrelated", str(workspace)],
+                   cwd=tmp_path, check=True, capture_output=True)
+    async def check():
+        async with supervisor(tmp_path, store, schema, config) as service:
+            claim = service.claim(task, config.bindings[0])
+            result = await service.execute(claim, binding=config.bindings[0], prompt="work")
+            assert result["state"] == "failed"
+            assert "process" not in result
+            assert not (workspace / "agent-starts.log").exists()
+    asyncio.run(check())
+
+
 def test_supervised_acp_turn_has_durable_process_and_metrics(tmp_path):
     store, schema, config, task = setup(tmp_path)
     async def check():

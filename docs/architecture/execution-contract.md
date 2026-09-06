@@ -40,6 +40,13 @@ does not verify the executable's version or negotiated protocol capabilities.
 `argv` is an array, never a shell expression. Environment entries map child
 variable names to parent variable names. Secret values are resolved at launch
 time and do not enter the configuration fingerprint or saved contracts.
+For task kinds requiring a worktree in the effective schema, the daemon prepares
+the task worktree before starting ACP. A `workspace: .` binding uses that task
+worktree; an explicit workspace must be inside it. Existing worktrees are checked
+against the expected branch and repository. Other task kinds use the configured
+workspace directly. The resolved path and starting Git identity are recorded in
+the run, and supplied to the agent's context and permission policy.
+
 Bindings choose workspace, scheduling, permission, session, model, mode, and
 account independently of the harness. Unknown fields and unsupported values
 fail validation. Workspaces are explicit trusted local paths and must exist

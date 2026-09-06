@@ -472,7 +472,21 @@ M4 domain-application foundation:
   background domain processing with explicit worker shutdown. Built-wheel
   smoke verifies ACP submission, gated queue advancement, and restart deduplication.
 
-Automatic workflow controllers, deterministic command/workspace services, live harness
+M4 workspace preparation:
+
+- Before ACP startup the daemon checks the claimed revision, records a workspace
+  intent, and prepares the schema-required task worktree. A default `.` binding
+  selects that worktree for task kinds requiring isolation; other kinds retain
+  their configured workspace.
+- Existing worktrees must match the expected branch and Git repository. The run
+  retains the resolved workspace and starting Git identity before agent launch.
+- Git preparation runs outside the ACP event loop. Cancellation drains it before
+  releasing run ownership; Git operations have bounded command deadlines.
+- Focused supervisor/store/domain regression: 64 passed. ACP daemon integration:
+  23 passed before the additional workspace fixtures. Real harness testing remains
+  pending.
+
+Automatic workflow controllers, deterministic command services, live harness
 compatibility, interactive attach, and complete migration/removal of the
 existing launch paths remain pending. M2 is not complete until the real
 integration campaign and remaining client policies have passed.

@@ -17,6 +17,7 @@ from .acp_transport import AcpTransport, Callbacks
 from .config import ExecutionConfig, RoleBinding
 from .processes import process_identity, terminate_group
 from .store import Claim, RunStore, TERMINAL, TaskRevision
+from .workspaces import prepare_workspace_async
 
 
 class Supervisor:
@@ -73,7 +74,7 @@ class Supervisor:
         return self.store.transition(run_id, owner_id=self.id, event_id=uuid.uuid4().hex,
                                      target=target, **kwargs)
 
-    async def execute(self, claim: Claim, *, binding: RoleBinding, prompt: str) -> dict:
+    async def execute(self, claim: Claim, *, binding: RoleBinding, prompt: str | None = None) -> dict:
         if self._lease is None or claim.run["owner_id"] != self.id:
             raise RuntimeError("run belongs to a different or inactive supervisor")
         if binding.sha256 != claim.run["binding_sha256"]:
@@ -82,7 +83,7 @@ class Supervisor:
         started = time.monotonic()
         self._transition(run_id, "starting")
         agent = self.config.agent(binding.agent)
-        metrics = {"context_bytes": len(prompt.encode()), "updates": 0, "stop_reason": None}
+        metrics = {"context_bytes": 0, "updates": 0, "stop_reason": None}
 
         async def record_spawn(process):
             identity = process_identity(process.pid)
@@ -121,6 +122,12 @@ class Supervisor:
         try:
             if any(not self.environment.get(name) for name in agent.required_env):
                 raise RequestError.auth_required()
+            run = await prepare_workspace_async(self.store, claim.run, binding, self.schema, self.id)
+            claim = Claim(run, claim.token)
+            if prompt is None:
+                from .context import compile_context
+                prompt = compile_context(self.store, claim, self.schema)
+            metrics["context_bytes"] = len(prompt.encode())
             env = agent.environment_values(self.environment)
             env.update(GREATMINDS_PROJECT_DIR=str(self.project), GREATMINDS_ROLE=binding.role,
                        GREATMINDS_RUN_ID=run_id, GREATMINDS_RUN_TOKEN=claim.token)

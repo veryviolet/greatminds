@@ -125,10 +125,13 @@ def _run_git(cmd: list[str], cwd: Path | None = None,
              check: bool = True) -> subprocess.CompletedProcess:
     """Run ``git`` and return CompletedProcess. Raises GreatMindsError
     on non-zero unless ``check=False`` (caller wants to inspect)."""
-    cp = subprocess.run(
-        ["git", *cmd], cwd=str(cwd) if cwd else None,
-        capture_output=True, text=True,
-    )
+    try:
+        cp = subprocess.run(
+            ["git", *cmd], cwd=str(cwd) if cwd else None,
+            capture_output=True, text=True, timeout=60,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise GreatMindsError("Git worktree operation exceeded its 60-second deadline") from exc
     if check and cp.returncode != 0:
         raise GreatMindsError(
             f"git {' '.join(cmd)} failed (exit {cp.returncode}): "

@@ -12,7 +12,6 @@ from greatminds.core.paths import project_runtime_dir
 from greatminds.core.schema import load_schema_snapshot
 from greatminds.domain.results import ResultService
 from .config import load_execution_config
-from .context import compile_context
 from .store import RunStore, TERMINAL, TaskRevision
 from .supervisor import Supervisor
 from .processes import terminate_group
@@ -128,13 +127,8 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                             if exc.exit_code == 4:
                                 raise
                             continue  # Claims recheck capacity and revision under locks.
-                        try:
-                            prompt = compile_context(store, claim, schema)
-                        except (OSError, GreatMindsError):
-                            supervisor._transition(claim.run["id"], "interrupted", reason="context_invalid")
-                            continue
                         active[claim.run["id"]] = asyncio.create_task(
-                            supervisor.execute(claim, binding=binding, prompt=prompt))
+                            supervisor.execute(claim, binding=binding))
                     if once:
                         if active:
                             await asyncio.gather(*active.values())

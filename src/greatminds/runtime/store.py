@@ -305,6 +305,23 @@ class RunStore:
                 run["process"] = copy.deepcopy(identity)
                 self._event(state, "process_recorded", run_id, identity)
 
+    def workspace_plan(self, run_id: str, *, owner_id: str, plan: dict) -> None:
+        with self._transaction() as state:
+            run = self._run(state, run_id)
+            if run["owner_id"] != owner_id or run["state"] != "starting":
+                _error("workspace preparation requires the starting run's supervisor", 3)
+            run["workspace_plan"] = copy.deepcopy(plan)
+            self._event(state, "workspace_preparing", run_id, plan)
+
+    def workspace_ready(self, run_id: str, *, owner_id: str, path: str, identity: dict) -> dict:
+        with self._transaction() as state:
+            run = self._run(state, run_id)
+            if run["owner_id"] != owner_id or run["state"] != "starting":
+                _error("workspace preparation requires the starting run's supervisor", 3)
+            run.update(workspace=path, workspace_identity=identity)
+            self._event(state, "workspace_ready", run_id, {"path": path, "identity": identity})
+            return {key: copy.deepcopy(value) for key, value in run.items() if key != "token_sha256"}
+
     def request_control(self, run_id: str, kind: str) -> dict:
         if kind not in {"cancel", "retry"}:
             _error("unknown operator control")
