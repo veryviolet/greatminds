@@ -72,7 +72,7 @@ def attach(context, conversation_id, after, follow):
             after = page['cursor']
             if page['has_more']:
                 continue
-            if not follow:
+            if not follow or page['closed']:
                 break
             time.sleep(.2)
     except KeyboardInterrupt:
@@ -90,3 +90,14 @@ def interrupt(context, conversation_id, request_id):
     turn = store.snapshot()['turns'][request_id]
     click.echo(json.dumps({'request_id': request_id, 'status': turn['status'],
                           'cancel_requested': turn['cancel_requested']}))
+
+
+@chat.command('close')
+@click.argument('conversation_id')
+@click.pass_obj
+def close(context, conversation_id):
+    """Stop admission and ask the daemon to cancel work and release the session."""
+    store = ConversationStore(context['runtime'], conversation_id)
+    store.request_close()
+    click.echo(json.dumps({'conversation_id': store.id, 'closed': store.snapshot()['closed'],
+                          'close_requested': True}))

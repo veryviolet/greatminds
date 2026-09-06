@@ -84,7 +84,7 @@ class ConversationStore:
                 if existing['prompt_sha256'] != digest:
                     _fail('request identity already belongs to a different prompt')
                 return copy.deepcopy(existing)
-            if document['closed']:
+            if document['closed'] or document.get('close_requested'):
                 _fail('conversation is closed')
             if len(document['turns']) >= MAX_TURNS:
                 _fail('conversation turn limit reached; create a new conversation')
@@ -129,6 +129,8 @@ class ConversationStore:
     def claim_next(self, owner_id):
         with self._transaction() as document:
             self._owned(document, owner_id)
+            if document.get('close_requested'):
+                return None
             if any(t['status'] == 'running' for t in document['turns'].values()):
                 return None
             queued = [t for t in document['turns'].values() if t['status'] == 'queued']
@@ -198,6 +200,35 @@ class ConversationStore:
                 document['dispatch'] = value
                 self._event(document, 'dispatch', None, **value)
 
+    def request_close(self):
+        """Stop admission immediately; the daemon acknowledges after cleanup."""
+        with self._transaction() as document:
+            if document['closed'] or document.get('close_requested'):
+                return
+            document['close_requested'] = True
+            self._event(document, 'close_requested', None)
+            for turn in document['turns'].values():
+                if turn['status'] == 'queued':
+                    turn.update(status='cancelled', reason='conversation_closed')
+                    self._event(document, 'cancelled', turn['id'], reason='conversation_closed')
+                elif turn['status'] == 'running':
+                    turn['cancel_requested'] = True
+
+    def finish_close(self, owner_id):
+        """Exclusive supervisor only, after every conversation run is cleaned up."""
+        safe_name(owner_id)
+        with self._transaction() as document:
+            if document['closed']:
+                return
+            if not document.get('close_requested'):
+                _fail('conversation closure was not requested')
+            for turn in document['turns'].values():
+                if turn['status'] == 'running':
+                    turn.update(status='interrupted', reason='supervisor_restart')
+                    self._event(document, 'interrupted', turn['id'], reason='supervisor_restart')
+            document.update(closed=True, owner_id=owner_id, dispatch={'status': 'closed', 'reason': None})
+            self._event(document, 'closed', None)
+
     def events(self, *, after=0, limit=100):
         if type(after) is not int or after < 0 or type(limit) is not int or not 1 <= limit <= 1000:
             _fail('invalid conversation cursor or page size')
@@ -207,4 +238,5 @@ class ConversationStore:
         page = document['events'][after:after + limit]
         return {'events': page, 'cursor': page[-1]['sequence'] if page else after,
                 'has_more': after + len(page) < len(document['events']),
+                'closed': document['closed'], 'close_requested': document.get('close_requested', False),
                 'dispatch': document.get('dispatch')}

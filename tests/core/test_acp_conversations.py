@@ -194,3 +194,71 @@ def test_conversation_shares_background_capacity_and_cannot_submit_task_result(t
         store.receive_result(ResultEnvelope('result',claim.run['id'],claim.run['task_id'],
             claim.run['task_revision'],schema.sha256,'no_change',{}),token=claim.token)
     assert store.snapshot()['results']=={}
+
+
+@pytest.mark.parametrize('phase',['queued','active','idle'])
+def test_close_stops_admission_and_releases_daemon_session(tmp_path,phase):
+    from greatminds.core.errors import GreatMindsError
+    from greatminds.runtime.store import RunStore, TERMINAL
+    store=setup(tmp_path,scenario='cancel-output' if phase=='active' else 'echo')
+    store.enqueue('first',request_id='first')
+    async def check():
+        daemon=None
+        try:
+            if phase!='queued':
+                daemon=asyncio.create_task(serve(tmp_path,interval=.2,environment={}))
+                async with asyncio.timeout(8):
+                    while True:
+                        journal=store.snapshot()
+                        if phase=='idle' and journal['turns']['first']['status']=='completed':
+                            break
+                        if phase=='active' and any(e['kind']=='text' for e in journal['events']):
+                            break
+                        await asyncio.sleep(.05)
+            store.request_close()
+            store.request_close()
+            with pytest.raises(GreatMindsError,match='closed'):
+                store.enqueue('cannot race shutdown',request_id='new')
+            if daemon is None:
+                await serve(tmp_path,once=True,interval=.2,environment={})
+            else:
+                async with asyncio.timeout(8):
+                    while not store.snapshot()['closed']:
+                        await asyncio.sleep(.05)
+            assert store.snapshot()['closed']
+            assert sum(e['kind']=='closed' for e in store.events()['events'])==1
+            runs=RunStore(tmp_path/'.greatminds').snapshot()['runs']
+            assert all(run['state'] in TERMINAL for run in runs.values())
+            from greatminds.runtime.processes import group_members
+            assert all(not group_members(run['process']) for run in runs.values() if run.get('process'))
+            if phase=='queued':
+                assert not runs
+                assert store.snapshot()['turns']['first']['status']=='cancelled'
+        finally:
+            if daemon is not None:
+                daemon.cancel()
+                await asyncio.gather(daemon,return_exceptions=True)
+    asyncio.run(check())
+    before=store.path.read_bytes()
+    asyncio.run(serve(tmp_path,once=True,interval=.2,environment={}))
+    assert store.path.read_bytes()==before
+
+
+def test_close_works_after_contract_change_and_attach_follow_ends(tmp_path):
+    import json
+    from click.testing import CliRunner
+    from greatminds.cli.main import cli
+    store=setup(tmp_path)
+    store.enqueue('queued',request_id='first')
+    path=tmp_path/'coordination/execution.yaml'
+    config=yaml.safe_load(path.read_text());config['bindings']={}
+    path.write_text(yaml.safe_dump(config))
+    args=['chat','--project-dir',str(tmp_path)]
+    runner=CliRunner()
+    result=runner.invoke(cli,[*args,'close',store.id])
+    assert result.exit_code==0,result.output
+    assert json.loads(result.output)['close_requested']
+    asyncio.run(serve(tmp_path,once=True,interval=.2,environment={}))
+    result=runner.invoke(cli,[*args,'attach',store.id,'--follow'])
+    assert result.exit_code==0,result.output
+    assert json.loads(result.output)['closed']

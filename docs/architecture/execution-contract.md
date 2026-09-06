@@ -616,12 +616,18 @@ greatminds chat send CONVERSATION --request-id MESSAGE_ID --message 'User reques
 greatminds chat attach CONVERSATION --follow
 greatminds chat attach CONVERSATION --after LAST_CURSOR --follow
 greatminds chat interrupt CONVERSATION MESSAGE_ID
+greatminds chat close CONVERSATION
 ```
 
 Each command accepts `chat --project-dir PATH` before its subcommand. `attach`
 streams JSON pages with reconnect cursors; Ctrl-C detaches without cancelling work.
 `interrupt` cancels queued input or requests active ACP cancellation, closing that
-run's connection. Stop an idle connected session using `run cancel RUN_ID`.
+run's connection. `close` immediately rejects new messages, cancels queued input,
+and requests daemon cancellation of the active run. The daemon acknowledges closure
+after run cleanup; the journal remains readable and follow readers exit at closure.
+Closure works even if the binding/configuration has changed and no longer permits
+dispatch. Repeated close requests are idempotent; closed conversations cannot reopen.
+Without a running daemon, closure stays requested until the next daemon sweep.
 Permission questions remain visible in `run status`; inspect or answer one using
 `run permission REQUEST_ID --option OPTION_ID`. Assigned agent credentials cannot
 use chat operator controls.

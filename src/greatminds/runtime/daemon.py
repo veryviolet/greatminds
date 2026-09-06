@@ -142,9 +142,21 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                     await supervisor.commands.poll(supervisor.id)
                     stand_scheduler.poll()
                     from .interactions import ConversationStore
+                    closing = False
                     for path in sorted((store.directory / 'conversations').glob('*/state.json')):
                         conversation = ConversationStore(store.runtime, path.parent.name)
                         document = conversation.snapshot()
+                        if document.get('close_requested') and not document['closed']:
+                            live = [r for r in store.snapshot()['runs'].values()
+                                    if r.get('conversation_id') == conversation.id and r['state'] not in TERMINAL]
+                            if live:
+                                closing = True
+                                for run in live:
+                                    if not run.get('control') or run['control']['status'] == 'completed':
+                                        store.request_control(run['id'], 'cancel')
+                            else:
+                                conversation.finish_close(supervisor.id)
+                            continue
                         if document['closed'] or any(r.get('conversation_id') == conversation.id
                                 and r['state'] not in TERMINAL for r in store.snapshot()['runs'].values()):
                             continue
@@ -177,7 +189,7 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                         active[claim.run["id"]] = asyncio.create_task(
                             supervisor.execute(claim, binding=binding))
                     dispatched_once = True
-                    if once and not active and not stand_scheduler.busy:
+                    if once and not active and not stand_scheduler.busy and not closing:
                         await _domain_reconcile(loop, domain_pool, results)
                         await _domain_reconcile(loop, domain_pool, maintenance)
                         break

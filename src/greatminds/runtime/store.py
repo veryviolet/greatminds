@@ -187,7 +187,8 @@ class RunStore:
             from .interactions import ConversationStore
             conversation = ConversationStore(self.runtime, conversation_id).snapshot()
             if (task != TaskRevision.conversation(self.runtime, conversation_id)
-                    or conversation['closed'] or conversation['binding_sha256'] != binding.sha256
+                    or conversation['closed'] or conversation.get('close_requested')
+                    or conversation['binding_sha256'] != binding.sha256
                     or conversation['config_sha256'] != config.sha256
                     or conversation['schema_sha256'] != schema.sha256
                     or conversation['workspace'] != str(binding.workspace_path(project))):

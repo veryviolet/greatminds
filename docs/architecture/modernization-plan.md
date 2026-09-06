@@ -847,6 +847,22 @@ M5 daemon-owned conversation integration checkpoint:
   richer input events, real interactive harness checks, and VS Code integration.
   Default migration/removal of legacy execution and remaining M3/M7 remain open.
 
+M5 explicit conversation closure checkpoint:
+
+- `chat close` stops admission, cancels queued messages and requests cancellation
+  of the connected run. Only the daemon acknowledges closure after cleanup;
+  the history remains readable. Follow readers stop after the closed event.
+- Closure is independent of current binding/configuration compatibility and does
+  not start an agent just to close a never-dispatched dialogue. The once-mode loop
+  drains pending closure controls before returning.
+- Focused closure/journal tests: 25 passed. Expanded conversation, daemon,
+  contract, and documentation regression: 80 passed. Checks include empty process
+  groups before closure acknowledgement and unchanged journals after restart.
+  Installed-wheel connected-session close, retained history, and follow-reader
+  exit passed using the local ACP fixture and the project's resolved runtime path.
+- Next: terminal presentation and task attachment, followed by the outstanding
+  real interactive harness/input/VS Code scenarios and M3/M6/M7 scope.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility
