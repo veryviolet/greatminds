@@ -952,6 +952,22 @@ M6 ACP launch surface checkpoint:
 - Next: explicit fleet configuration migration and default setup/driver removal.
   This does not complete M6 or the remaining M3/M5/M7 acceptance scope.
 
+M6 explicit execution migration review checkpoint:
+
+- Added read-only migration review for an explicitly supplied ACP contract. It
+  exposes source/target role policies and missing/added/repeated roles, supports
+  explicit retirement declarations, and pins reviewed configuration/schema bytes.
+  It does not infer adapters, model identities, permissions, or credentials.
+- Existing ACP projects cannot re-enter native setup through plain setup or
+  migrate/update refresh. Combined configuration/runtime layouts are held for
+  explicit migration instead of silently creating an empty second runtime.
+- The migration review does not apply changes. Next: quiescence proof, backups,
+  durable contract publication and generated-artifact retirement, then the default
+  switch and actual driver removal. Role coverage alone is not migration readiness.
+- Migration/bootstrap/setup regression: 37 passed; documentation: 8 passed.
+  Installed-wheel review detected missing roles, accepted explicit retirement,
+  and left project files unchanged. No live fleet migration was performed.
+
 ## Recovery checkpoint
 
 The authoritative continuation point is this committed plan and the compatibility

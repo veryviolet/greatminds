@@ -1385,6 +1385,10 @@ def _install_git_pre_commit_hook(project_dir: Path) -> str:
 def setup(project_dir: Path | None, force: bool, lang: str,
           session: str | None, pre_trust: bool, execution_config: Path | None = None) -> None:
     project_dir = (project_dir or Path.cwd()).resolve()
+    if execution_config is None and (project_dir/'coordination/execution.yaml').exists():
+        if not (project_dir/'.greatminds').is_dir():
+            raise click.ClickException('ACP project requires explicit runtime layout migration before setup')
+        execution_config = project_dir/'coordination/execution.yaml'
     if execution_config is not None:
         if force or pre_trust or session is not None or lang != 'en':
             raise click.ClickException('ACP setup accepts --project-dir and --execution-config; configure other policies explicitly')

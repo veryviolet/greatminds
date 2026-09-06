@@ -64,3 +64,11 @@ def test_custom_schema_and_ignore_entries_are_preserved(tmp_path):
     assert bootstrap(project,source)['schema_mirror']=='drifted'
     assert (project/'.greatminds/schema.yaml').read_text()=='custom mirror'
     assert (project/'.gitignore').read_text().startswith('keep-me\n')
+
+
+def test_plain_setup_of_acp_project_cannot_seed_native_configuration(tmp_path):
+    source=manifest(tmp_path);project=tmp_path/'project';bootstrap(project,source)
+    result=CliRunner().invoke(cli,['setup','--project-dir',str(project)])
+    assert result.exit_code==0,result.output
+    assert json.loads(result.output)['bindings']==1
+    assert not (project/'coordination/coord.yaml').exists()

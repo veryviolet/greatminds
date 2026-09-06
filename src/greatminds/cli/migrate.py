@@ -190,6 +190,9 @@ def remove_legacy_artifacts(project_dir: Path) -> list[str]:
 
 def run_migration(project_dir: Path, run_setup: bool = True) -> None:
     """The full project migration (used by ``migrate`` + ``update``)."""
+    if (project_dir/'coordination/execution.yaml').exists():
+        info('ACP execution contract retained; native fleet migration does not apply.')
+        return
     if run_setup:
         info("==> canon refresh (greatminds setup)...")
         gm = __import__("shutil").which("greatminds")
@@ -249,9 +252,20 @@ def run_migration(project_dir: Path, run_setup: bool = True) -> None:
               help="project root (default: cwd).")
 @click.option("--no-setup", is_flag=True, default=False,
               help="skip the canon refresh (setup) step.")
-def migrate(project_dir: str | None, no_setup: bool) -> None:
+@click.option('--execution-config', type=click.Path(exists=True, dir_okay=False, path_type=Path),
+              help='Preview an explicit ACP migration contract as JSON; writes nothing.')
+@click.option('--retire-role', multiple=True, help='Explicitly retire a source role in the ACP review.')
+def migrate(project_dir: str | None, no_setup: bool, execution_config: Path | None = None,
+            retire_role=()) -> None:
     """Bring a project's coord.yaml / canon / queues up to the installed
     greatminds version. Idempotent; backs up coord.yaml."""
     pd = Path(project_dir).resolve() if project_dir else Path.cwd()
+    if execution_config is not None:
+        import json
+        from greatminds.runtime.execution_migration import plan_execution_migration
+        click.echo(json.dumps(plan_execution_migration(pd, execution_config, retire_roles=retire_role), indent=2))
+        return
+    if retire_role:
+        raise click.ClickException('--retire-role requires --execution-config')
     run_migration(pd, run_setup=not no_setup)
     ok("==> migration complete")

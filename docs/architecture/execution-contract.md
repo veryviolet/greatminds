@@ -707,3 +707,28 @@ configuration for an ACP project; use its project directory. A project without
 an execution contract still uses the other launcher while default migration is
 being completed. Generating an ACP workspace does not remove pre-existing fleet
 artifacts; that belongs to the explicit project migration.
+
+## Execution migration review
+
+`greatminds migrate --project-dir PATH --execution-config PROPOSED.yaml` prints a
+read-only ACP migration review. It compares the source coord.yaml role/window
+metadata with the explicit proposed bindings: agent/version, model, workspace,
+scheduling, session, permission, account, and capacity. Observer windows, repeated
+source roles, added roles, missing roles, and declared stand policy are visible.
+No adapter, model, authentication identity, or role mapping is guessed from a tool
+name. Raw launch argv and environment references are excluded from the report.
+
+Missing source roles remain incomplete unless explicitly named with repeatable
+`--retire-role ROLE`; a target binding and retirement for the same role conflict.
+`role_coverage_complete` only reports coverage, not deployment readiness. The review
+pins source bytes, proposed bytes, the effective schema, and any installed execution
+contract using hashes. `review_sha256` changes when those reviewed inputs change.
+The command performs no setup, cleanup, service operation, or contract publication;
+`applied` is false. Quiescence checks and durable application are subsequent migration
+work. This preview is available now; it is not an implementation of migration apply.
+
+Ordinary migrate/update project refresh retains an existing ACP contract and skips
+native fleet migration. Plain setup for an ACP project with a dedicated runtime uses
+shared ACP bootstrap. An ACP project using the combined configuration/runtime layout
+requires explicit layout migration before setup; setup does not create a second
+runtime and abandon its task state.
