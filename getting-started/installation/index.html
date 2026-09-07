@@ -648,6 +648,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../uv-project/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    uv Projects and Python 3.8
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../local-web/" class="md-nav__link">
         
   
@@ -1583,7 +1611,14 @@
 cleanup use these Linux interfaces. Native macOS and Windows daemon execution
 are not supported; a Linux environment must satisfy the same requirements.
 Harness compatibility is tracked separately from host support.</p>
-<p>Install Greatminds in the Python environment that will run the CLI and daemon:</p>
+<p>For a uv-managed project, use a separate tool environment. This also supports
+working on projects whose Python version is below 3.11:</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.13<span class="w"> </span>greatminds
+greatminds<span class="w"> </span>--help
+</code></pre></div>
+<p>If the executable is not on PATH, run <code>uv tool update-shell</code> and open a new
+terminal. Greatminds does not need to be a project dependency.</p>
+<p>Alternatively, install Greatminds in a dedicated Python 3.11+ environment:</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>greatminds
 greatminds<span class="w"> </span>--help
 </code></pre></div>
