@@ -33,3 +33,18 @@ def test_same_lease_history_without_attempt_identity_does_not_prove_application(
     assert ledger.snapshot()['attempts'][attempt]['status'] == 'command_finished'
     with pytest.raises(GreatMindsError):
         ledger.require_resolved()
+
+
+def test_resolution_repeat_preserves_receipt_and_rejects_changed_explanation(tmp_path):
+    ledger = DeploymentLedger(tmp_path)
+    attempt = ledger.begin({'lease_id': 'L1'})
+    with pytest.raises(GreatMindsError, match='cleanup'):
+        ledger.resolve(attempt, reason='inspected')
+    ledger.recover_process(attempt)  # No process was launched through the gate.
+    resolved = ledger.resolve(attempt, reason='inspected')
+    before = ledger.path.read_bytes()
+    assert ledger.resolve(attempt, reason='inspected') == resolved
+    assert ledger.path.read_bytes() == before
+    with pytest.raises(GreatMindsError, match='different explanation'):
+        ledger.resolve(attempt, reason='different')
+    assert ledger.path.read_bytes() == before

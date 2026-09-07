@@ -45,6 +45,11 @@ def test_recovery_findings_are_stable_without_raw_operation_content(tmp_path):
     assert first['summary']['info'] == 1
     codes = {(f['component'], f['code']) for f in first['findings']}
     assert ('commands', 'operation_needs_recovery') in codes
+    command_finding = next(row for row in first['findings'] if row['component'] == 'commands')
+    resolve = next(action for action in command_finding['recovery_actions'] if action['id'] == 'resolve_command')
+    assert resolve['argv'] == ['greatminds', 'run', 'command-resolve', 'command-one']
+    assert resolve['environment'] == {'GREATMINDS_PROJECT_DIR': str(tmp_path)}
+    assert resolve['required_options'] == ['--reason']
     assert ('results', 'operation_needs_recovery') in codes
     assert 'DO_NOT_LEAK' not in json.dumps(first)
     assert files(tmp_path) == before

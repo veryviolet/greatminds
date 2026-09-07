@@ -99,11 +99,17 @@ def test_changed_dependency_holds_recovery_and_bounded_repair_rechecks_it(tmp_pa
     with pytest.raises(GreatMindsError, match="incomplete system operation"):
         with task_file_lock(service.store.runtime, "0001"):
             pytest.fail("CLI alias acquired an incomplete task")
-    restarted.request_repair(operation["id"])
+    repaired = restarted.request_repair(operation["id"])
+    before_repeat = service.store.snapshot()
+    assert restarted.request_repair(operation["id"]) == repaired
+    assert service.store.snapshot() == before_repeat
     restarted.reconcile()
     assert service.store.snapshot()["maintenance"][operation["id"]]["status"] == "needs_recovery"
     dependency.write_bytes(original)
-    restarted.request_repair(operation["id"])
+    repaired = restarted.request_repair(operation["id"])
+    before_repeat = service.store.snapshot()
+    assert restarted.request_repair(operation["id"]) == repaired
+    assert service.store.snapshot() == before_repeat
     restarted.reconcile()
     assert service.store.snapshot()["maintenance"][operation["id"]]["status"] == "applied"
 
@@ -121,7 +127,12 @@ def test_abandon_uncommitted_intent_preserves_task_changes_and_allows_fresh_evid
     restarted.reconcile()
     operation = next(iter(service.store.snapshot()["maintenance"].values()))
     original = source.read_bytes()
-    restarted.abandon(operation["id"], reason="Prerequisite changed; prepare fresh evidence")
+    abandoned = restarted.abandon(operation["id"], reason="Prerequisite changed; prepare fresh evidence")
+    before_repeat = service.store.snapshot()
+    assert restarted.abandon(operation["id"], reason=abandoned["resolution"]) == abandoned
+    assert service.store.snapshot() == before_repeat
+    with pytest.raises(GreatMindsError, match="different explanation"):
+        restarted.abandon(operation["id"], reason="changed explanation")
     assert source.read_bytes() == original
     restarted.reconcile()
     states = {op["status"] for op in service.store.snapshot()["maintenance"].values()}
@@ -308,6 +319,9 @@ def test_abandon_cannot_discard_a_move_that_already_happened(tmp_path):
     with pytest.raises(GreatMindsError, match="may already have moved"):
         restarted.abandon(operation["id"], reason="cannot throw away the moved task")
     target.write_bytes(original)
-    restarted.request_repair(operation["id"])
+    repaired = restarted.request_repair(operation["id"])
+    before_repeat = service.store.snapshot()
+    assert restarted.request_repair(operation["id"]) == repaired
+    assert service.store.snapshot() == before_repeat
     restarted.reconcile()
     assert service.store.snapshot()["maintenance"][operation["id"]]["status"] == "applied"

@@ -57,8 +57,10 @@ def diagnose(project, *, environment=None):
     report = {'version': 1, 'verification': 'local_inspection', 'checks': {}, 'findings': []}
 
     def finding(component, code, severity, action, **evidence):
+        from .recovery_actions import recovery_actions
         report['findings'].append({'component': component, 'code': code, 'severity': severity,
-                                   'action': action, 'evidence': evidence})
+                                   'action': action, 'evidence': evidence,
+                                   'recovery_actions': recovery_actions(component, code, evidence, project=project)})
 
     def inspect(name, function):
         try:

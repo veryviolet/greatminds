@@ -212,6 +212,9 @@ class MaintenanceService:
         """Retry reconciliation only; validation and source hashes remain mandatory."""
         with self.store._transaction() as state:
             operation = state.get("maintenance", {}).get(operation_id)
+            if (operation and operation["status"] in {"prepared", "applied"}
+                    and "repair_requested_at" in operation):
+                return copy.deepcopy(operation)
             if not operation or operation["status"] != "needs_recovery":
                 raise GreatMindsError("operation is not awaiting recovery")
             operation.update(status="prepared", repair_requested_at=self.store.clock())
@@ -227,6 +230,10 @@ class MaintenanceService:
             raise GreatMindsError("unknown system operation")
         with task_lock(self.store.runtime, operation["task_id"]), self.store._transaction() as state:
             current = state["maintenance"][operation_id]
+            if current["status"] == "abandoned":
+                if current.get("resolution") != reason:
+                    raise GreatMindsError("system intent was abandoned with a different explanation")
+                return copy.deepcopy(current)
             if current["status"] != "needs_recovery":
                 raise GreatMindsError("only an unresolved system intent can be abandoned")
             source, destination = self.store.runtime / current["source"], self.store.runtime / current["destination"]

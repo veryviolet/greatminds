@@ -53,6 +53,11 @@ def doctor(project_dir, as_json, bundle):
         for item in report["findings"]:
             click.echo(terminal_text(f"{item['severity']}: {item['component']}/{item['code']} "
                                     f"{item['evidence']} — {item['action']}"))
+            import shlex
+            for action in item.get('recovery_actions', []):
+                required = ', '.join(action['required_options']) or 'none'
+                scoped = ['env', 'GREATMINDS_PROJECT_DIR=' + action['environment']['GREATMINDS_PROJECT_DIR'], *action['argv']]
+                click.echo(terminal_text(f"  {shlex.join(scoped)} (required options: {required})"))
         click.echo(f"Local inspection: {report['status']}; provider login and ACP compatibility were not probed.")
     if report["summary"]["error"]:
         raise click.exceptions.Exit(1)
@@ -159,7 +164,7 @@ def command_status(request_id, output_limit):
 def command_resolve(request_id, reason):
     """Acknowledge an uncertain command after inspection; grant no passing evidence."""
     from greatminds.runtime.commands import CommandService
-    if os.environ.get("GREATMINDS_RUN_ID"):
+    if os.environ.get("GREATMINDS_RUN_ID") or os.environ.get("GREATMINDS_RUN_TOKEN"):
         raise GreatMindsError("uncertain command resolution requires the operator", exit_code=3)
     service = CommandService(RunStore(project_runtime_dir(find_project_dir())))
     click.echo(json.dumps(service.resolve(request_id, reason=reason), ensure_ascii=False, indent=2))
@@ -172,7 +177,7 @@ def command_resolve(request_id, reason):
 def repair(operation_id, abandon, reason):
     """Request bounded reconciliation of an incomplete system operation."""
     from greatminds.domain.maintenance import MaintenanceService
-    if os.environ.get("GREATMINDS_RUN_ID"):
+    if os.environ.get("GREATMINDS_RUN_ID") or os.environ.get("GREATMINDS_RUN_TOKEN"):
         raise GreatMindsError("system operation repair requires the operator", exit_code=3)
     service = MaintenanceService(RunStore(project_runtime_dir(find_project_dir())), load_schema_snapshot())
     result = service.abandon(operation_id, reason=reason) if abandon else service.request_repair(operation_id)

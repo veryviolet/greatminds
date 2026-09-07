@@ -158,6 +158,10 @@ class DeploymentLedger:
             raise GreatMindsError('deployment requires confirmed process cleanup before resolution', exit_code=4)
         if attempt.get('process') and group_members(attempt['process']):
             raise GreatMindsError('deployment process group is still alive', exit_code=4)
+        if attempt['status'] == 'resolved':
+            if attempt.get('resolution') != reason:
+                raise GreatMindsError('deployment was resolved with a different explanation', exit_code=2)
+            return attempt
         self._update(attempt_id, {'started', 'needs_recovery', 'command_finished'},
                      status='resolved', resolution=reason, resolved_at=now_iso())
         return self.snapshot()['attempts'][attempt_id]

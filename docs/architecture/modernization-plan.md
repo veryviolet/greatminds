@@ -1924,3 +1924,35 @@ C5 still requires consolidation of bounded repair actions with their preconditio
 and evidence. The previous full-suite checkpoint (1407 passed, 1 skipped) predates
 this extraction; current validation is the affected suites above. Full-plan
 compatibility, pipeline presets, performance acceptance and retention remain open.
+
+### Scoped bounded recovery descriptions and idempotent controls (2026-09-07)
+
+Diagnostic findings now expose supported recovery_actions with argv, explicit
+project environment/cwd, effect, required inputs and preconditions. Text doctor
+prints scoped suggestions. Actions are descriptions only; existing services
+still enforce operation state, revision/dependency gates, source/destination
+conditions and deployment cleanup/locking. No generic forced-repair or external
+command replay was introduced. Bundles omit executable descriptors containing
+raw project paths and operation identifiers.
+
+Command/deployment resolution and maintenance abandonment return the original
+receipt when repeated with the same explanation; different explanations are
+rejected. Repeated previously requested prepared/applied maintenance repair
+returns existing state without another event. Failed reconciliation can still
+be explicitly requested again after correcting its cause. Partial agent context
+(RUN_TOKEN alone as well as RUN_ID) is rejected by all mutating recovery controls.
+Resolution never manufactures passing evidence or deployment readiness.
+
+Validation: 62 initial command/maintenance/deployment/diagnostic checks passed in
+14.69s; 87 expanded recovery, process, diagnosis and bundle checks passed in
+17.15s; final 23 recovery-surface/diagnostic/public-help checks passed in 2.00s.
+Tests include immutable repeated receipts, conflicting explanations, unchanged
+state/events on duplicate requests, deployment cleanup prerequisites, token-only
+operator denial and a suggested command executed from another cwd against the
+correct project. Strict docs build passed in 1.50s. No live provider was invoked.
+
+C5 now has aggregate local findings, shared filesystem scans, private bounded
+exports and descriptions backed by existing deterministic recovery services.
+Full milestone acceptance still requires auditing their combined coverage;
+remaining C2 presets, C4 comparative performance/resource work and real harness
+compatibility requirements are not satisfied by these diagnostic controls.

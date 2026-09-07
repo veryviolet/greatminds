@@ -289,3 +289,38 @@ task worktrees. A finding is a reason to inspect, not permission to delete a
 worktree or intent. Unreadable directories yield an unavailable/failed component
 instead of an empty healthy result. Files that disappear during a concurrent
 transition are skipped; repeated observation can see the new location.
+
+## Explicit recovery actions
+
+Applicable `run doctor` findings include `recovery_actions` with an argv array,
+project environment/cwd, effect, preconditions and required options. The text
+view prints project-scoped command suggestions. These descriptions do not execute
+repairs. A frontend must preserve the project environment and require the stated
+operator input; command services revalidate their preconditions when invoked.
+No action automatically clears run credentials to gain operator authority.
+
+- Uncertain commands: inspect `run command-status REQUEST_ID`, then use
+  `run command-resolve REQUEST_ID --reason EXPLANATION` after inspecting effects.
+  Resolution does not rerun a command or create passing command evidence.
+- System maintenance: `run repair --operation OPERATION_ID` requests daemon
+  reconciliation with revision/dependency/gate rechecks. `--abandon --reason`
+  cancels only an unresolved, uncommitted intent whose source remains a regular
+  file and destination does not exist. It preserves task files.
+- Deployment attempts: inspect `stand deployment-status`; use
+  `stand deployment-recover ATTEMPT_ID` for tracked process cleanup when needed.
+  `stand deployment-resolve ATTEMPT_ID --reason EXPLANATION` requires confirmed
+  cleanup and no live tracked group, and records an operator assessment. It does
+  not deploy or mark the stand ready. Exclusive deployment locking still applies.
+
+Repeating a completed resolution/abandonment with the same explanation returns
+the original receipt without adding another event. A different explanation is
+rejected rather than rewriting evidence. A repeated requested maintenance repair
+returns the existing prepared/applied receipt; if reconciliation fails again,
+a new explicit request can ask the daemon to recheck corrected conditions.
+
+Mutating recovery controls reject either `GREATMINDS_RUN_ID` or
+`GREATMINDS_RUN_TOKEN`: a partial agent credential is not operator context.
+Other role and deployment controls remain in force. For findings without a
+supported bounded action, inspect the relevant evidence instead of deleting
+state or synthesizing a successful receipt. Diagnostic exports omit executable
+recovery descriptors containing local project paths and raw operation IDs.

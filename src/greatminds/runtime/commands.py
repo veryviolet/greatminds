@@ -183,6 +183,10 @@ class CommandService:
             raise GreatMindsError("command resolution requires an operator explanation")
         with self.store._transaction() as state:
             record = state.get("commands", {}).get(request_id)
+            if record and record["status"] == "resolved":
+                if record.get("resolution") != reason:
+                    raise GreatMindsError("command was resolved with a different explanation")
+                return copy.deepcopy(record)
             if not record or record["status"] != "needs_recovery":
                 raise GreatMindsError("only an uncertain command can be resolved")
             record.update(status="resolved", resolution=reason, resolved_at=self.store.clock())

@@ -186,6 +186,11 @@ def test_uncertain_command_is_held_and_never_replayed_on_recovery(tmp_path):
         store.request_control(claim.run["id"], "retry")
     resolved = service.resolve(record["id"], reason="Inspected effects; authorize a new run separately")
     assert resolved["status"] == "resolved"
+    snapshot = store.snapshot()
+    assert service.resolve(record["id"], reason=resolved["resolution"]) == resolved
+    assert store.snapshot() == snapshot
+    with pytest.raises(GreatMindsError, match="different explanation"):
+        service.resolve(record["id"], reason="changed explanation")
     with pytest.raises(GreatMindsError, match="not a successful"):
         service.evidence(claim.run, record["id"])
     assert store.request_control(claim.run["id"], "retry")["kind"] == "retry"
