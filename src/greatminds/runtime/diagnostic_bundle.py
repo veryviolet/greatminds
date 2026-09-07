@@ -27,7 +27,8 @@ CODES = set(ACTIONS) | {'inspection_failed', 'mirror_not_current', 'agent_prereq
 EVENTS = STATES | {'run_claimed', 'claimed', 'run_stage_observed', 'prompt_input_reserved',
                    'run_recovered', 'process_recorded', 'workspace_ready', 'workspace_preparing',
                    'result_received', 'result_applied', 'result_rejected', 'control_requested',
-                   'control_completed', 'control_processing', 'dispatch_paused', 'dispatch_resumed'}
+                   'control_completed', 'control_processing', 'dispatch_paused', 'dispatch_resumed',
+                   'events_pruned', 'event_retention_configured'}
 
 
 def number(value):
@@ -71,6 +72,7 @@ def collect_bundle(project, *, report=None, environment=None, run_limit=100, eve
     try:
         schema, config = configuration(project)
         bundle['configuration'] = {'schema_sha256': schema.sha256, 'execution_sha256': config.sha256,
+            'max_runtime_events': config.max_runtime_events,
             'agents': [{'reference': ref(a.id), 'manifest_sha256': a.sha256,
                         'required_environment_count': len(a.required_env)} for a in config.agents],
             'bindings': [{'reference': ref(b.id), 'agent_reference': ref(b.agent),
@@ -100,7 +102,11 @@ def collect_bundle(project, *, report=None, environment=None, run_limit=100, eve
                    'kind': event.get('kind') if event.get('kind') in EVENTS else 'other',
                    'run_reference': ref(event.get('run_id'))} for event in state['events'][-event_limit:]]
         bundle['runs'], bundle['events'] = rows, events
-        bundle['truncated'].update(runs=len(runs) > run_limit, events=len(state['events']) > event_limit)
+        retention = state.get('event_retention', {})
+        bundle['event_retention'] = {key: number(retention.get(key)) for key in
+                                     ('max_events', 'discarded_count', 'discarded_through', 'updated_at')}
+        bundle['truncated'].update(runs=len(runs) > run_limit,
+            events=bool(retention.get('discarded_count')) or len(state['events']) > event_limit)
         bundle['collection']['runtime'] = 'inspected'
     except Exception:
         bundle['collection']['runtime'] = 'unavailable'

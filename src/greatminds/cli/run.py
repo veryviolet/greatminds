@@ -75,7 +75,16 @@ def events(project_dir, after, limit, follow, interval):
     store = RunStore(project_runtime_dir(project))
     try:
         while True:
-            batch = [event for event in store.snapshot()["events"] if event["sequence"] > after][:limit]
+            snapshot = store.snapshot()
+            retention = snapshot.get('event_retention', {})
+            through = retention.get('discarded_through', 0)
+            if after < through:
+                click.echo(json.dumps({'kind': 'events_gap', 'sequence': through,
+                    'at': retention.get('updated_at'), 'run_id': None,
+                    'data': {'requested_after': after, 'discarded_through': through,
+                             'first_available_sequence': snapshot['events'][0]['sequence']}}, sort_keys=True))
+                after = through
+            batch = [event for event in snapshot["events"] if event["sequence"] > after][:limit]
             for event in batch:
                 click.echo(json.dumps(event, ensure_ascii=True, sort_keys=True))
                 after = event["sequence"]

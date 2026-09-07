@@ -2082,3 +2082,39 @@ and telemetry settings, preserves local logs, and bounds/cleans its process grou
 C7's real extension-host smoke now exists and passes. Remaining B2 retention,
 protocol/harness coverage and final requirement-by-requirement acceptance are
 still open; this does not mark the full modernization complete.
+
+### Atomic bounded runtime event retention (2026-09-07)
+
+Added project max_runtime_events (100..1,000,000; default 10,000). The exclusive
+supervisor installs the policy; runtime transactions enforce it atomically with
+their own writes. Overflow retains roughly 80% of the configured tail and appends
+one events_pruned marker, with cumulative discard metadata in the snapshot. This
+avoids a new scan/controller on every daemon tick and avoids a marker per write.
+Run and event sequences now derive from the last durable sequence, not list length.
+
+Run identities, event/result idempotency receipts, contracts, task files, command
+and deployment evidence and conversation history are untouched. Pruning bounds
+the runtime event count, not total project storage. The optional systemd journal
+continues to use host policy; ACP stderr and command/chat outputs retain their
+existing per-output bounds. No raw native executor logs remain in the managed path.
+
+run events emits an explicit synthetic events_gap before the retained page when a
+cursor is too old; follow advances once past that gap. Diagnostic bundles preserve
+numeric retention metadata and report truncated history even when all retained
+events fit the export. Failed atomic publication leaves the original operation
+and log together intact. Repeating the same policy is byte-preserving.
+
+Validation so far: 66 existing runtime/bundle/event/daemon checks passed in 48.79s;
+38 budget/account/idle and new boundary checks passed in 13.24s (two new tests first
+needed their existing fixture imported, then passed); all 11 retention cases passed
+in 2.81s; final 15 retention/cursor cases passed in 2.91s. Cases exercise durable
+deduplication after old events disappear, monotonic later claims, actual task bytes,
+atomic-write failure, invalid limits, expired cursors between follow polls, bundle
+truncation, and daemon restart with zero harness launches. Strict docs passed in
+1.56s. Full-suite validation is running and will be recorded separately.
+
+The 50-conversation idle benchmark still performs a constant 19 runtime reads per
+complete daemon invocation (18 before the one startup policy transaction), rather
+than one additional read per conversation. The timing sample overlapped the full
+suite and is not used as a new latency comparison. The prior completed goal turn
+was progress: real extension-host acceptance and a committed CLI launch fix.

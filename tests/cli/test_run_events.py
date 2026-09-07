@@ -46,3 +46,24 @@ def test_removed_native_commands_are_unavailable():
         result = CliRunner().invoke(cli, [command, '--help'])
         assert result.exit_code == 2
         assert 'No such command' in result.output
+
+
+def test_follow_reports_retention_gap_once_when_history_expires_between_polls(tmp_path, monkeypatch):
+    from greatminds.cli import run
+    store = RunStore(project_runtime_dir(tmp_path))
+    store.configure_event_retention(100)
+    waits = []
+    def tick(interval):
+        waits.append(interval)
+        if len(waits) > 1:
+            raise KeyboardInterrupt
+        with store._transaction() as state:
+            for index in range(250):
+                store._event(state, 'fixture_observation', None, {'index': index})
+    monkeypatch.setattr(run.time, 'sleep', tick)
+    result = CliRunner().invoke(cli, ['run', 'events', '--project-dir', str(tmp_path), '--follow'])
+    assert result.exit_code == 0, result.output
+    rows = [json.loads(line) for line in result.output.splitlines()]
+    assert sum(row['kind'] == 'events_gap' for row in rows) == 1
+    assert [row['sequence'] for row in rows] == sorted({row['sequence'] for row in rows})
+    assert rows[-1] == store.snapshot()['events'][-1]

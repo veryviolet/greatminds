@@ -917,3 +917,33 @@ and reconciliation; it excludes fixture construction and warm-up. It is not an
 LLM latency or task-completion benchmark. The daemon now indexes live conversation
 runs from one observation per pass, while every claim still validates current
 capacity and identity under the authoritative lock. No journal data is dropped.
+
+### Runtime event retention
+
+`max_runtime_events` is a project-level integer from 100 to 1,000,000, default
+10,000. The daemon installs this policy under its exclusive supervisor lease.
+All runtime writers enforce the persisted policy in the same atomic transaction
+as their changes; no periodic model turn or extra per-tick scan is needed. Before
+an explicit daemon policy is installed, the default limit applies.
+
+On overflow the event tail shrinks to approximately 80% of the limit and records
+an `events_pruned` event. This headroom avoids pruning on every subsequent write.
+`event_retention` in the runtime snapshot records the configured bound, cumulative
+discarded count and last discarded sequence. Run and event sequences remain
+monotonic across pruning and restart. A failed atomic write leaves both the
+operation and the previous event history unchanged.
+
+`run events` emits a synthetic `events_gap` record before its normal event page
+when `--after` predates the retained tail. Its sequence is the last discarded
+sequence; `data` includes the requested cursor and first available sequence.
+The gap record is additional to `--limit` and is not itself appended to the
+journal. Clients should show the missing-history notice, use current snapshots
+for authoritative state, and continue from the emitted sequence. Diagnostic
+bundles mark events as truncated when history was pruned, even when the complete
+remaining tail fits the export limit.
+
+This policy bounds event count, not total project disk usage. Task files, run
+identities and idempotency receipts, immutable contracts, command/deployment
+receipts and their evidence, and conversation history remain intact. ACP stderr
+capture and per-command/per-conversation output already have separate bounds.
+The optional systemd service's external journal follows the host's journal policy.

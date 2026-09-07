@@ -156,6 +156,7 @@ class ExecutionConfig:
     stand: StandDeploymentPolicy | None = None
     account_retry_initial_seconds: int = 5
     account_retry_max_seconds: int = 60
+    max_runtime_events: int = 10000
 
     @property
     def sha256(self) -> str:
@@ -168,7 +169,7 @@ class ExecutionConfig:
 def parse_execution_config(document: Any, *, roles: set[str]) -> ExecutionConfig:
     root = _mapping(document, "root", {"version", "agents", "bindings", "max_running",
                                        "account_limits", "commands", "stand",
-                                       "account_retry_initial_seconds", "account_retry_max_seconds"})
+                                       "account_retry_initial_seconds", "account_retry_max_seconds", "max_runtime_events"})
     if type(root.get("version")) is not int or root["version"] != 1:
         _fail("version must be 1")
     agents = []
@@ -271,12 +272,15 @@ def parse_execution_config(document: Any, *, roles: set[str]) -> ExecutionConfig
         stand = StandDeploymentPolicy(profiles, authorized,
             _positive(item.get("timeout_seconds", 1800), "stand timeout"), limit,
             _string(item.get("environment_revision", "1"), "stand environment revision"))
+    max_events = _positive(root.get("max_runtime_events", 10000), "max_runtime_events")
+    if not 100 <= max_events <= 1000000:
+        _fail("max_runtime_events must be between 100 and 1000000")
     return ExecutionConfig(tuple(agents), tuple(bindings),
                            _positive(root.get("max_running", 4), "max_running"),
                            tuple((safe_name(k), _positive(v, "account limit"))
                                  for k, v in sorted(limits.items())), tuple(commands), stand,
                            _positive(root.get("account_retry_initial_seconds", 5), "account_retry_initial_seconds"),
-                           _positive(root.get("account_retry_max_seconds", 60), "account_retry_max_seconds"))
+                           _positive(root.get("account_retry_max_seconds", 60), "account_retry_max_seconds"), max_events)
 
 
 def load_execution_config(path: Path, *, roles: set[str]) -> ExecutionConfig:

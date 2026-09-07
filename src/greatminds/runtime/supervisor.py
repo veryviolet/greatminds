@@ -46,6 +46,7 @@ class Supervisor:
                                 label="ACP supervisor", timeout=0)
         try:
             self._lease.__enter__()
+            self.store.configure_event_retention(self.config.max_runtime_events)
             await self.recover()
             return self
         except BaseException:

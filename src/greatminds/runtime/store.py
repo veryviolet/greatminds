@@ -24,6 +24,7 @@ from greatminds.core.errors import GreatMindsError
 from greatminds.core.schema import SchemaSnapshot
 from greatminds.core.storage import atomic_json, file_lock, safe_name, task_lock
 from .config import ExecutionConfig, RoleBinding, fingerprint
+from .event_retention import next_sequence, prune_events
 
 
 TERMINAL = frozenset({"completed", "failed", "cancelled", "interrupted"})
@@ -145,6 +146,7 @@ class RunStore:
             before = copy.deepcopy(state)
             yield state
             if state != before or not self.path.exists():
+                prune_events(state, self.clock())
                 atomic_json(self.path, state)
 
     def snapshot(self) -> dict:
@@ -167,9 +169,18 @@ class RunStore:
         return {key: copy.deepcopy(value) for key, value in run.items() if key != "token_sha256"}
 
     def _event(self, state: dict, kind: str, run_id: str | None, data: dict) -> None:
-        state["events"].append({"sequence": len(state["events"]) + 1,
+        state["events"].append({"sequence": next_sequence(state),
                                 "at": self.clock(), "kind": kind,
                                 "run_id": run_id, "data": copy.deepcopy(data)})
+
+    def configure_event_retention(self, max_events: int) -> None:
+        if type(max_events) is not int or not 100 <= max_events <= 1000000:
+            _error("max_runtime_events must be between 100 and 1000000")
+        with self._transaction() as state:
+            policy = state.setdefault('event_retention', {})
+            if policy.get('max_events') != max_events:
+                policy['max_events'] = max_events
+                self._event(state, 'event_retention_configured', None, {'max_events': max_events})
 
     def set_paused(self, paused: bool) -> None:
         if type(paused) is not bool:
@@ -254,7 +265,7 @@ class RunStore:
                 "schema_sha256": schema.sha256, "schema_version": schema.version,
                 "workspace": workspace, "account": binding.account,
                 "permission": binding.permission, "state": "claimed", "created_at": self.clock(),
-                "sequence": len(state["events"]) + 1,
+                "sequence": next_sequence(state),
                 "updated_at": self.clock(), "session_id": None, "event_receipts": {},
                 "token_sha256": hashlib.sha256(token.encode()).hexdigest(),
             }
