@@ -20,27 +20,11 @@ refuses a wedged opted-in task.
 """
 from __future__ import annotations
 
-import os
 
 import yaml
 
 from greatminds.cli import agent as agent_mod
 from greatminds.cli import task as task_mod
-REGISTRY_DIR = ".agent_registry"  # Fixture data only.
-
-
-CODEX_LOGIN_TIMEOUT_PANE = """\
-  Welcome to Codex, OpenAI's command-line coding agent
-
-  Sign in with ChatGPT to use your plan, or provide your own API key.
-
-  > 3. Provide your own API key
-  Press enter to continue
-
-  Login timed out
-"""
-
-
 # ---------------------------------------------------------------------------
 # LIST_FIELDS membership + coerce_value (the exact ``--field`` path)
 # ---------------------------------------------------------------------------
@@ -90,20 +74,10 @@ def test_coerced_list_activates_required_live_roles() -> None:
 # ---------------------------------------------------------------------------
 
 def _coord(tmp_path):
-    coord = tmp_path / "proj" / "coordination"
-    (coord / REGISTRY_DIR).mkdir(parents=True)
-    (coord / "feature_blocked").mkdir()
-    (coord / "verified").mkdir()
-    (coord / "verified" / "0387-fix.yaml").write_text("id: x\n", encoding="utf-8")
+    from test_remote_live_roles_context_0389 import acp_project
+    coord, _ = acp_project(tmp_path / "proj", "waiting_auth")
+    (coord / "verified/0387-fix.yaml").write_text("id: 0387-fix\n")
     return coord
-
-
-def _write_reg(coord, role_lower, **fields):
-    import json
-    payload = {"role": role_lower.upper(), "tool": "codex"}
-    payload.update(fields)
-    (coord / REGISTRY_DIR / f"{role_lower}.json").write_text(
-        json.dumps(payload), encoding="utf-8")
 
 
 def test_append_block_via_cli_stores_list_and_guard_refuses(
@@ -119,7 +93,6 @@ def test_append_block_via_cli_stores_list_and_guard_refuses(
                         "priority": "high", "title": "campaign",
                         "blocks": []}),
         encoding="utf-8")
-    _write_reg(coord, "architect-planner", pid=os.getpid())
 
     monkeypatch.setattr(task_mod, "find_coord_dir", lambda: coord)
     monkeypatch.setenv("GREATMINDS_ROLE", "ARCHITECT-REVIEWER")
@@ -146,11 +119,8 @@ def test_append_block_via_cli_stores_list_and_guard_refuses(
     assert agent_mod.required_live_roles(data, blk) == ["ARCHITECT-PLANNER"]
 
     # And the resume validator now refuses while the planner is wedged.
-    monkeypatch.setattr(
-        agent_mod, "_pane_text_for_role",
-        lambda _c, r: CODEX_LOGIN_TIMEOUT_PANE if "planner" in r else None)
     err = task_mod._check_all_dependencies_exist(
         data, "feature_blocked", "review_sessions")
     assert err is not None
-    assert "wedged" in err
+    assert "required_role_authentication" in err
     assert "ARCHITECT-PLANNER" in err

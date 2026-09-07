@@ -1351,3 +1351,21 @@ wake-check JSON and the domain resume validator agree on readiness in eight
 local/remote state scenarios. Claims/states are synthetic and use the test
 process identity; no live provider was invoked. Required-live-role enforcement
 is retained. Other broad-suite failures and native fallback cleanup remain open.
+
+### Complete broad-suite traversal and fixture porting (2026-09-07)
+
+The broad suite now reached its end: 1359 passed, 9 failed, 1 skipped, 5 errors
+in 272.48 seconds (/tmp/greatminds-modernization-suite-6.txt). Remaining failures
+were references to deleted native inotify/deploy globals and obsolete --lang
+setup fixtures. Retired native backlog, coord.yaml generation, staged keystroke
+launch and inotify/deploy-driver tests. Kept domain live-developer/stand rules;
+ported the actual requires_live_roles append-block test to a waiting_auth ACP
+run, and user-feedback/body-file tests to current setup without weakening their
+assertions. Native force-down/retry tests are not evidence for the new deployment
+ledger's explicit recovery policy; its own tests remain required.
+
+Validation after porting: 49 ACP-daemon/live-role/default setup checks passed;
+45 user-feedback/body-file/stand/stale-lease checks passed. The full suite has not
+yet been rerun after these final fixture updates, so a green full-suite result
+remains unproven. Next: rerun the complete suite, investigate any real failures,
+then continue removing obsolete runtime fallback paths and shipped native assets.

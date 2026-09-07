@@ -27,7 +27,7 @@ import yaml
 def _setup_project(tmp_path: Path) -> Path:
     cp = subprocess.run(
         [sys.executable, "-m", "greatminds.cli.main", "setup",
-         "--project-dir", str(tmp_path), "--lang", "en"],
+         "--project-dir", str(tmp_path)],
         capture_output=True, text=True,
     )
     assert cp.returncode == 0, f"setup failed: {cp.stderr}"

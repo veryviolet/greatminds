@@ -14,7 +14,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-from greatminds.cli import launch as launch_mod
 from greatminds.cli import task as task_mod
 from greatminds.core.paths import find_canon_dir
 
@@ -133,41 +132,6 @@ def _env_setup():
     return launch_mod.gm_env.EnvSetup(env_type=None, activation="", source="(test)")
 
 
-def test_launch_staged_pane_pretypes_without_enter(tmp_path: Path, monkeypatch):
-    """A staged window gets its window created and the start-agent
-    command pre-typed, but NOT submitted (no trailing Enter) — the USER
-    starts the session."""
-    calls: list = []
-    import subprocess as _sp
-    monkeypatch.setattr(
-        launch_mod.subprocess, "run",
-        lambda args, **kw: (
-            calls.append(list(args))
-            or _sp.CompletedProcess(
-                args=args, returncode=1 if "has-session" in args else 0,
-                stdout="", stderr="")))
-    cfg = {
-        "session": "test",
-        "windows": [
-            {"name": "maintainer", "role": "MAINTAINER", "tool": "claude",
-             "mode": "loop"},
-            {"name": "live", "role": "LIVE-DEVELOPER", "tool": "claude",
-             "mode": "staged"},
-        ],
-    }
-    launch_mod._emit_tmux(tmp_path, cfg, _env_setup(), recreate=False)
-    # The live window is created.
-    created = {c[c.index("-n") + 1] for c in calls if "-n" in c}
-    assert "live" in created
-    # The start-agent command for LIVE-DEVELOPER is sent, but the
-    # send-keys call carrying it must NOT end with "Enter".
-    live_sends = [c for c in calls
-                  if c[:2] == ["tmux", "send-keys"]
-                  and any(isinstance(a, str) and "start-agent LIVE-DEVELOPER" in a
-                          for a in c)]
-    assert live_sends, "staged pane must pre-type the start-agent command"
-    for c in live_sends:
-        assert c[-1] != "Enter", "staged command must NOT be submitted (no Enter)"
 
 
 # ---------- validators ----------

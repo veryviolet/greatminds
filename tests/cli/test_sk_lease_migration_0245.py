@@ -23,23 +23,8 @@ from greatminds.cli import coordd as coordd_mod
 # ---------- coordd inotify includes .stand ----------
 
 
-def test_inotify_watches_stand_state_dir() -> None:
-    """0245 contract: coordd's INOTIFY_QUEUE_DIRS includes the
-    ``.stand`` directory so state.yaml transitions fire wakes
-    sub-second instead of waiting for the next poll tick."""
-    assert ".stand" in coordd_mod.INOTIFY_QUEUE_DIRS
 
 
-def test_inotify_watcher_registers_stand_when_dir_exists(
-    tmp_path: Path,
-) -> None:
-    """0245 wiring pin: _InotifyWatcher's wd→queue mapping records
-    .stand when the directory exists on the watched project."""
-    pytest.importorskip("inotify_simple")
-    coord = tmp_path / "coord"
-    (coord / ".stand").mkdir(parents=True)
-    w = coordd_mod._InotifyWatcher(coord, verbose=False)
-    assert ".stand" in set(w._wd_to_queue.values())
 
 
 # Role-doc lease-API prose pins removed: the per-role prose docs are
