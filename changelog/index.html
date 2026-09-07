@@ -1234,6 +1234,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/daemon-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Daemon Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1492,6 +1520,20 @@
 <p>All notable changes to <strong>greatminds</strong> are documented here. Format follows
 <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a> loosely; versions
 follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
+<h2 id="310-2026-09-07">3.1.0 — 2026-09-07<a class="headerlink" href="#310-2026-09-07" title="Permanent link">&para;</a></h2>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<ul>
+<li>CLI and web share independent background daemon control without requiring
+  systemd. Closing the web server or launching terminal leaves the daemon running.</li>
+<li><code>daemon start/stop/restart/status</code> operate on the canonical project directory.
+  Startup waits for readiness; status includes verified process identity and
+  heartbeat. Detached logs rotate independently of the starting client.</li>
+<li><code>coordd</code> starts in the background by default; use <code>--foreground</code> for terminal
+  debugging. <code>--once</code> remains a foreground single pass. Update process-owning
+  scripts and existing systemd units to use <code>--foreground</code>.</li>
+<li>Optional systemd controls require <code>--systemd</code>. Re-run <code>daemon install</code> to refresh
+  an existing unit before using that optional manager.</li>
+</ul>
 <h2 id="300-2026-09-07">3.0.0 — 2026-09-07<a class="headerlink" href="#300-2026-09-07" title="Permanent link">&para;</a></h2>
 <h3 id="upgrade-notes">Upgrade notes<a class="headerlink" href="#upgrade-notes" title="Permanent link">&para;</a></h3>
 <ul>
@@ -1500,7 +1542,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
   driven execution is no longer supported. See the upgrading guide and local
   web workspace documentation. Harness authentication remains host-managed.</li>
 </ul>
-<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>All managed background and interactive execution uses the shared ACP client.
   Harness manifests, role bindings, model/mode choices, permissions and scheduling
@@ -1697,7 +1739,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
   the real daemon/profile failure modes.</li>
 </ul>
 <h2 id="270-2026-06-26">2.7.0 — 2026-06-26<a class="headerlink" href="#270-2026-06-26" title="Permanent link">&para;</a></h2>
-<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
+<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Stand deploy failures are now lease-scoped instead of globally downing the
   singleton stand. A non-zero profile run fails the active lease, records
@@ -1873,7 +1915,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
   payload probe, and stand release back to <code>free</code>.</li>
 </ul>
 <h2 id="200-2026-06-13">2.0.0 — 2026-06-13<a class="headerlink" href="#200-2026-06-13" title="Permanent link">&para;</a></h2>
-<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
+<h3 id="changed_3">Changed<a class="headerlink" href="#changed_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Clean v2 FSM/autonomy baseline.</strong> Driven roles now expose retry/backoff
   state on disk, restore retry state after coordd restart, fail fast on missing
@@ -1940,7 +1982,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
 </ul>
 <h2 id="167-2026-06-05">1.6.7 — 2026-06-05<a class="headerlink" href="#167-2026-06-05" title="Permanent link">&para;</a></h2>
 <p>Host-agnostic stand deploys + autonomous backlog recovery.</p>
-<h3 id="changed_3">Changed<a class="headerlink" href="#changed_3" title="Permanent link">&para;</a></h3>
+<h3 id="changed_4">Changed<a class="headerlink" href="#changed_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>greatminds no longer owns host topology.</strong> <code>execute_yaml_profile</code> hands
   the WHOLE <code>coordination/PROJECT.env</code> (plus lease meta) to ansible as
@@ -2273,7 +2315,7 @@ FSM path, and a read-only PROJECT.md surface.</p>
   agents to read PROJECT.md, but it lives under <code>coordination/</code> and the
   mutations-via-CLI rule left no sanctioned CLI to obtain it.</li>
 </ul>
-<h3 id="changed_4">Changed<a class="headerlink" href="#changed_4" title="Permanent link">&para;</a></h3>
+<h3 id="changed_5">Changed<a class="headerlink" href="#changed_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>bootstrap.md now insists on reading the contract IN FULL.</strong> The old
   wording ("YOUR contract is <code>roles.&lt;ROLE&gt;</code>") let agents — codex
@@ -2422,7 +2464,7 @@ implement, advance the FSM).</p>
   UI-DEVELOPER FAST chat variant; scenario C is now LIVE-DEVELOPER. Ships
   a <code>vite-dev</code> stand-profile example (backend + Vite HMR).</li>
 </ul>
-<h3 id="changed_5">Changed<a class="headerlink" href="#changed_5" title="Permanent link">&para;</a></h3>
+<h3 id="changed_6">Changed<a class="headerlink" href="#changed_6" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Single static bootstrap.</strong> An agent's whole instruction surface is
   now <code>COORDINATE.md</code> (philosophy) + <code>schema.yaml</code> (machine contract +
@@ -2625,7 +2667,7 @@ documentation refresh.</p>
   singleton lock.</p>
 </li>
 </ul>
-<h3 id="changed_6">Changed<a class="headerlink" href="#changed_6" title="Permanent link">&para;</a></h3>
+<h3 id="changed_7">Changed<a class="headerlink" href="#changed_7" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0326 unify <code>greatminds task</code> subcommand id intake (DOD2).</strong>
@@ -2847,7 +2889,7 @@ prose + public mkdocs site mirror the model.</p>
   workers run driven; ARCHITECT-REVIEWER stays non-driven for now.</p>
 </li>
 </ul>
-<h3 id="changed_7">Changed<a class="headerlink" href="#changed_7" title="Permanent link">&para;</a></h3>
+<h3 id="changed_8">Changed<a class="headerlink" href="#changed_8" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0325 canon docs for the reactive-fleet lifecycle model (Phase 4).</strong>
   <code>COORDINATE.md</code> §2.1 (new) carries the lifecycle vocabulary + the

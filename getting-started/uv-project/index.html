@@ -1365,6 +1365,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/daemon-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Daemon Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1804,7 +1832,9 @@ greatminds<span class="w"> </span>web<span class="w"> </span>--port<span class="
 </code></pre></div>
 <p>This opens the saved configuration and starts or attaches to the project's daemon.
 Select an existing conversation in its role tab to continue. Keep the terminal
-running. Ctrl+C stops the web server and a daemon it owns; project history remains.</p>
+running while using the browser. Ctrl+C stops only the web server; the daemon
+and its agent work continue. To stop execution explicitly, use the web toolbar
+or <code>greatminds daemon stop</code> from the project. Project history remains.</p>
 <p>If the port is occupied, use another one, such as <code>--port 8766</code>, and open the
 printed URL. Each project has its own server, port and runtime state.</p>
 <h2 id="what-changes-in-your-repository">What changes in your repository<a class="headerlink" href="#what-changes-in-your-repository" title="Permanent link">&para;</a></h2>

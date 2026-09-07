@@ -10,29 +10,31 @@
       
       
       
-        <link rel="canonical" href="https://veryviolet.github.io/greatminds/">
+        <link rel="canonical" href="https://veryviolet.github.io/greatminds/operations/daemon-lifecycle/">
       
       
+        <link rel="prev" href="../runbook/">
       
-        <link rel="next" href="getting-started/installation/">
+      
+        <link rel="next" href="../../recipes/filing-a-bug/">
       
       
         
       
       
-      <link rel="icon" href="assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>greatminds</title>
+        <title>Daemon Lifecycle - greatminds</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -51,7 +53,7 @@
       
     
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -76,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#greatminds" class="md-skip">
+        <a href="#independent-project-daemon" class="md-skip">
           Skip to content
         </a>
       
@@ -90,7 +92,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="." title="greatminds" class="md-header__button md-logo" aria-label="greatminds" data-md-component="logo">
+    <a href="../.." title="greatminds" class="md-header__button md-logo" aria-label="greatminds" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -110,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Home
+              Daemon Lifecycle
             
           </span>
         </div>
@@ -219,11 +221,9 @@
   
   
   
-    
   
-  
-    <li class="md-tabs__item md-tabs__item--active">
-      <a href="." class="md-tabs__link">
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
         
   
   
@@ -244,7 +244,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="getting-started/installation/" class="md-tabs__link">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
           
   
   
@@ -264,7 +264,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="concepts/queues/" class="md-tabs__link">
+        <a href="../../concepts/queues/" class="md-tabs__link">
           
   
   
@@ -282,7 +282,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="cli-reference/" class="md-tabs__link">
+      <a href="../../cli-reference/" class="md-tabs__link">
         
   
   
@@ -303,7 +303,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="architecture/overview/" class="md-tabs__link">
+        <a href="../../architecture/overview/" class="md-tabs__link">
           
   
   
@@ -319,11 +319,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="operations/runbook/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../runbook/" class="md-tabs__link">
           
   
   
@@ -343,7 +345,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="recipes/filing-a-bug/" class="md-tabs__link">
+        <a href="../../recipes/filing-a-bug/" class="md-tabs__link">
           
   
   
@@ -361,7 +363,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="changelog/" class="md-tabs__link">
+      <a href="../../changelog/" class="md-tabs__link">
         
   
   
@@ -396,7 +398,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="." title="greatminds" class="md-nav__button md-logo" aria-label="greatminds" data-md-component="logo">
+    <a href="../.." title="greatminds" class="md-nav__button md-logo" aria-label="greatminds" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -423,37 +425,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Home
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="." class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -469,48 +444,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#start-a-project" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Start a project
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#work-and-observe" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Work and observe
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -574,7 +507,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting-started/installation/" class="md-nav__link">
+      <a href="../../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -602,7 +535,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting-started/first-project/" class="md-nav__link">
+      <a href="../../getting-started/first-project/" class="md-nav__link">
         
   
   
@@ -630,7 +563,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting-started/uv-project/" class="md-nav__link">
+      <a href="../../getting-started/uv-project/" class="md-nav__link">
         
   
   
@@ -658,7 +591,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting-started/local-web/" class="md-nav__link">
+      <a href="../../getting-started/local-web/" class="md-nav__link">
         
   
   
@@ -686,7 +619,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting-started/upgrading/" class="md-nav__link">
+      <a href="../../getting-started/upgrading/" class="md-nav__link">
         
   
   
@@ -773,7 +706,7 @@
   
   
     <li class="md-nav__item">
-      <a href="concepts/queues/" class="md-nav__link">
+      <a href="../../concepts/queues/" class="md-nav__link">
         
   
   
@@ -801,7 +734,7 @@
   
   
     <li class="md-nav__item">
-      <a href="concepts/roles/" class="md-nav__link">
+      <a href="../../concepts/roles/" class="md-nav__link">
         
   
   
@@ -829,7 +762,7 @@
   
   
     <li class="md-nav__item">
-      <a href="concepts/codex-profiles/" class="md-nav__link">
+      <a href="../../concepts/codex-profiles/" class="md-nav__link">
         
   
   
@@ -857,7 +790,7 @@
   
   
     <li class="md-nav__item">
-      <a href="concepts/scenarios/" class="md-nav__link">
+      <a href="../../concepts/scenarios/" class="md-nav__link">
         
   
   
@@ -885,7 +818,7 @@
   
   
     <li class="md-nav__item">
-      <a href="concepts/stand-operations/" class="md-nav__link">
+      <a href="../../concepts/stand-operations/" class="md-nav__link">
         
   
   
@@ -913,7 +846,7 @@
   
   
     <li class="md-nav__item">
-      <a href="concepts/stand-gate/" class="md-nav__link">
+      <a href="../../concepts/stand-gate/" class="md-nav__link">
         
   
   
@@ -941,7 +874,7 @@
   
   
     <li class="md-nav__item">
-      <a href="concepts/inbox/" class="md-nav__link">
+      <a href="../../concepts/inbox/" class="md-nav__link">
         
   
   
@@ -976,7 +909,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cli-reference/" class="md-nav__link">
+      <a href="../../cli-reference/" class="md-nav__link">
         
   
   
@@ -1055,7 +988,7 @@
   
   
     <li class="md-nav__item">
-      <a href="architecture/overview/" class="md-nav__link">
+      <a href="../../architecture/overview/" class="md-nav__link">
         
   
   
@@ -1083,7 +1016,7 @@
   
   
     <li class="md-nav__item">
-      <a href="architecture/contract-reference/" class="md-nav__link">
+      <a href="../../architecture/contract-reference/" class="md-nav__link">
         
   
   
@@ -1111,7 +1044,7 @@
   
   
     <li class="md-nav__item">
-      <a href="architecture/filesystem-layout/" class="md-nav__link">
+      <a href="../../architecture/filesystem-layout/" class="md-nav__link">
         
   
   
@@ -1139,7 +1072,7 @@
   
   
     <li class="md-nav__item">
-      <a href="architecture/transitions/" class="md-nav__link">
+      <a href="../../architecture/transitions/" class="md-nav__link">
         
   
   
@@ -1167,7 +1100,7 @@
   
   
     <li class="md-nav__item">
-      <a href="architecture/daemon-and-agents/" class="md-nav__link">
+      <a href="../../architecture/daemon-and-agents/" class="md-nav__link">
         
   
   
@@ -1195,7 +1128,7 @@
   
   
     <li class="md-nav__item">
-      <a href="architecture/lifecycle/" class="md-nav__link">
+      <a href="../../architecture/lifecycle/" class="md-nav__link">
         
   
   
@@ -1227,26 +1160,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
             
   
   
@@ -1264,7 +1202,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1282,7 +1220,7 @@
   
   
     <li class="md-nav__item">
-      <a href="operations/runbook/" class="md-nav__link">
+      <a href="../runbook/" class="md-nav__link">
         
   
   
@@ -1307,10 +1245,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="operations/daemon-lifecycle/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Daemon Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1326,6 +1291,70 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#stop-and-restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stop and restart
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#identity-status-and-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Identity, status and logs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#foreground-diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Foreground diagnostics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optional-systemd-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional systemd integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1397,7 +1426,7 @@
   
   
     <li class="md-nav__item">
-      <a href="recipes/filing-a-bug/" class="md-nav__link">
+      <a href="../../recipes/filing-a-bug/" class="md-nav__link">
         
   
   
@@ -1425,7 +1454,7 @@
   
   
     <li class="md-nav__item">
-      <a href="recipes/planning-a-feature/" class="md-nav__link">
+      <a href="../../recipes/planning-a-feature/" class="md-nav__link">
         
   
   
@@ -1453,7 +1482,7 @@
   
   
     <li class="md-nav__item">
-      <a href="recipes/e2e-testing/" class="md-nav__link">
+      <a href="../../recipes/e2e-testing/" class="md-nav__link">
         
   
   
@@ -1481,7 +1510,7 @@
   
   
     <li class="md-nav__item">
-      <a href="recipes/cutting-a-release/" class="md-nav__link">
+      <a href="../../recipes/cutting-a-release/" class="md-nav__link">
         
   
   
@@ -1516,7 +1545,7 @@
   
   
     <li class="md-nav__item">
-      <a href="changelog/" class="md-nav__link">
+      <a href="../../changelog/" class="md-nav__link">
         
   
   
@@ -1563,10 +1592,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#start-a-project" class="md-nav__link">
+  <a href="#stop-and-restart" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Start a project
+        Stop and restart
       
     </span>
   </a>
@@ -1574,10 +1603,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#work-and-observe" class="md-nav__link">
+  <a href="#identity-status-and-logs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Work and observe
+        Identity, status and logs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#foreground-diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Foreground diagnostics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optional-systemd-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional systemd integration
       
     </span>
   </a>
@@ -1604,55 +1655,70 @@
   
 
 
-<h1 id="greatminds">greatminds<a class="headerlink" href="#greatminds" title="Permanent link">&para;</a></h1>
-<p>Greatminds coordinates coding agents through ACP. A local daemon assigns work,
-owns sessions, supervises processes, runs configured commands and applies validated
-workflow transitions. Agents perform reasoning and submit typed results. Task
-files, events and evidence remain inspectable on the local filesystem.</p>
-<h2 id="start-a-project">Start a project<a class="headerlink" href="#start-a-project" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>greatminds
-mkdir<span class="w"> </span>-p<span class="w"> </span>/tmp/greatminds-demo
-<span class="nb">cd</span><span class="w"> </span>/tmp/greatminds-demo
-greatminds<span class="w"> </span>setup
+<h1 id="independent-project-daemon">Independent project daemon<a class="headerlink" href="#independent-project-daemon" title="Permanent link">&para;</a></h1>
+<p>CLI and web controls manage the same daemon for a canonical project directory.
+No systemd, registration or service installation is required for normal use.</p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>/path/to/project
+greatminds<span class="w"> </span>daemon<span class="w"> </span>start
+greatminds<span class="w"> </span>daemon<span class="w"> </span>status
+greatminds<span class="w"> </span>web<span class="w"> </span>--port<span class="w"> </span><span class="m">8765</span>
 </code></pre></div>
-<p>Setup creates an empty <code>coordination/execution.yaml</code> and runtime queues under
-<code>.greatminds/</code>. It preserves existing project data and configuration. Install and
-authenticate your chosen ACP harness separately, then add a manifest and role
-binding. The <a href="getting-started/first-project/">first-project guide</a> walks through
-configuration and a daemon-owned conversation.</p>
-<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>project<span class="w"> </span>execution
-greatminds<span class="w"> </span>daemon<span class="w"> </span>doctor<span class="w"> </span>--json
-greatminds<span class="w"> </span>coordd
+<p><code>start</code> waits for recovery and readiness before returning. <code>greatminds coordd</code>
+is another way to start the same independent daemon. Repeating either command
+reports the existing process. Separate projects run separate daemons.</p>
+<p>Closing the browser, stopping the web server, or closing the launching terminal
+does not stop this daemon or its agents. Start/stop buttons in any web instance
+operate on the same project process, including one started from the CLI.</p>
+<h2 id="stop-and-restart">Stop and restart<a class="headerlink" href="#stop-and-restart" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>daemon<span class="w"> </span>stop
+greatminds<span class="w"> </span>daemon<span class="w"> </span>restart
 </code></pre></div>
-<p>Doctor validates configuration and executable/environment prerequisites without
-starting an agent. It does not prove provider authentication or live protocol
-support. The <a href="architecture/acp-compatibility/">compatibility matrix</a> records
-verified and unverified harness scenarios.</p>
-<h2 id="work-and-observe">Work and observe<a class="headerlink" href="#work-and-observe" title="Permanent link">&para;</a></h2>
-<p>In a second terminal, create a conversation using a configured binding:</p>
-<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>chat<span class="w"> </span>create<span class="w"> </span>planner
-<span class="c1"># Use the returned conversation ID:</span>
-greatminds<span class="w"> </span>chat<span class="w"> </span>talk<span class="w"> </span>CONVERSATION_ID
+<p>Stop requests orderly shutdown and waits for the daemon to finish its active
+operations and clean up agents. If this takes too long, it reports a timeout;
+it does not silently escalate to killing processes. Inspect status and logs
+before retrying. Restart waits for shutdown before starting a replacement.
+Broken execution configuration does not prevent stopping an identified daemon.</p>
+<p>Start and restart validate configuration before launching. Startup failure or
+readiness timeout is an error, not a successful detached launch. After a timeout,
+check status before retrying: initialization may still be in progress.</p>
+<h2 id="identity-status-and-logs">Identity, status and logs<a class="headerlink" href="#identity-status-and-logs" title="Permanent link">&para;</a></h2>
+<p>A kernel file lock held throughout supervisor execution prevents duplicate
+owners, including simultaneous starts and paths through symlinks. Control
+operations also serialize through a project lock. Lock files are never deleted
+to force admission; the kernel releases their locks on process exit.</p>
+<p>Status reports the held supervisor lock, process identity, readiness/heartbeat,
+configuration changes requiring restart, and the log path. PID, boot identity
+and process start time are checked; signals use pidfds to avoid PID reuse races.
+Missing or invalid owner identity is reported as unknown and is not signalled.
+A heartbeat older than ten seconds is unresponsive, not proof of process exit.</p>
+<p>Detached stdout, stderr and daemon logs are saved privately to
+<code>.greatminds/.runtime/daemon.log</code>, with three rotated backups and a 2 MiB limit
+per file. Logs are independent of the starting client. Foreground output stays
+in its terminal.</p>
+<p>A crash releases the lock automatically. The next start runs the existing
+recovery protocol for unfinished work and agent processes; uncertain effects
+remain subject to recovery gates. A detached process does not automatically
+restart after a crash or machine reboot.</p>
+<h2 id="foreground-diagnostics">Foreground diagnostics<a class="headerlink" href="#foreground-diagnostics" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>coordd<span class="w"> </span>--foreground<span class="w"> </span>--project-dir<span class="w"> </span>/path/to/project
 </code></pre></div>
-<p>For automatic work, configure queue-scheduled role bindings. The daemon claims
-concrete task revisions and compiles their context. Completion requires valid
-typed results and applicable evidence; a finished ACP prompt is not task approval.
-Role, harness, model, workspace, permission policy and account are separate
-configuration choices.</p>
-<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>run<span class="w"> </span>status
-greatminds<span class="w"> </span>run<span class="w"> </span>events<span class="w"> </span>--follow
-greatminds<span class="w"> </span>wake-check<span class="w"> </span>--json
-greatminds<span class="w"> </span>watchdog
+<p>This explicit mode stays in the terminal and exits on Ctrl+C. It uses the same
+exclusive supervisor lock, so it cannot run alongside another project daemon.
+<code>--once</code> remains a foreground single-pass command for diagnostics and tests.</p>
+<h2 id="optional-systemd-integration">Optional systemd integration<a class="headerlink" href="#optional-systemd-integration" title="Permanent link">&para;</a></h2>
+<p>Use this only when you want a user service manager to restart a failed daemon or
+start it at the user manager's default target. Stop a manually started daemon
+before enabling this alternative lifecycle owner:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>daemon<span class="w"> </span>stop
+greatminds<span class="w"> </span>daemon<span class="w"> </span>install<span class="w"> </span>--name<span class="w"> </span>my-project
+greatminds<span class="w"> </span>daemon<span class="w"> </span>start<span class="w"> </span>--systemd<span class="w"> </span>--project<span class="w"> </span>my-project
+greatminds<span class="w"> </span>daemon<span class="w"> </span>status<span class="w"> </span>--systemd<span class="w"> </span>--project<span class="w"> </span>my-project
+greatminds<span class="w"> </span>daemon<span class="w"> </span>stop<span class="w"> </span>--systemd<span class="w"> </span>--project<span class="w"> </span>my-project
 </code></pre></div>
-<p>Tmux, VS Code workspace tasks and a systemd user service are optional operator
-surfaces. Local ACP operation does not require Ansible or a deployed stand.
-Install <code>greatminds[stands]</code> only for Ansible-backed profiles, and configure their
-explicit deployment policy. Tasks declaring stand requirements retain their
-lease and evidence gates.</p>
-<p>See the <a href="architecture/execution-contract/">execution contract</a>,
-<a href="architecture/daemon-and-agents/">daemon architecture</a>,
-<a href="cli-reference/">CLI reference</a> and
-<a href="operations/runbook/">operations runbook</a>.</p>
+<p>The generated unit runs <code>coordd --foreground</code>. Systemd owns restart policy: use
+its explicit controls to stop it, otherwise its configured restart policy may
+start it again after a direct process stop. Host/user-manager configuration
+determines whether it starts before login and survives logout.</p>
 
 
 
@@ -1704,10 +1770,10 @@ lease and evidence gates.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

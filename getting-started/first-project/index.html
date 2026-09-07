@@ -1332,6 +1332,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/daemon-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Daemon Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1728,7 +1756,7 @@ See the <a href="../../architecture/execution-contract/">execution contract</a> 
 mode, environment reference and capability requirements. Store secrets outside
 the execution manifest and task files.</p>
 <h2 id="start-the-daemon-and-a-conversation">Start the daemon and a conversation<a class="headerlink" href="#start-the-daemon-and-a-conversation" title="Permanent link">&para;</a></h2>
-<p>In one terminal:</p>
+<p>Start the independent background daemon:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>coordd<span class="w"> </span>--project-dir<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">"</span>
 </code></pre></div>
 <p>In another terminal in the same project:</p>
@@ -1747,10 +1775,9 @@ conversation. For an existing workflow task, use
 <span class="c1"># Or generate ACP workspace tasks:</span>
 greatminds<span class="w"> </span>launch<span class="w"> </span>--target<span class="w"> </span>vscode
 </code></pre></div>
-<p>On Linux, you can use an optional systemd user service instead of the foreground
-daemon:</p>
+<p>On Linux, you can use an optional systemd user service for automatic restart and login startup:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>daemon<span class="w"> </span>install<span class="w"> </span>--name<span class="w"> </span>my-project<span class="w"> </span>--project-dir<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">"</span>
-greatminds<span class="w"> </span>daemon<span class="w"> </span>start<span class="w"> </span>--project<span class="w"> </span>my-project
+greatminds<span class="w"> </span>daemon<span class="w"> </span>start<span class="w"> </span>--systemd<span class="w"> </span>--project<span class="w"> </span>my-project
 </code></pre></div>
 <p>Use a single daemon owner for the project. See the
 <a href="../../operations/runbook/">operations runbook</a> for environment setup, updates and

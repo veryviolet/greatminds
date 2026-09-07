@@ -16,7 +16,7 @@
         <link rel="prev" href="../../architecture/lifecycle/">
       
       
-        <link rel="next" href="../../recipes/filing-a-bug/">
+        <link rel="next" href="../daemon-lifecycle/">
       
       
         
@@ -1420,6 +1420,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../daemon-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Daemon Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1834,12 +1862,15 @@ greatminds<span class="w"> </span>journal<span class="w"> </span>tail
 <p>If a CLI result conflicts with a remembered state or a directory listing, trust
 the CLI.</p>
 <h2 id="fleet-launch-and-environments">Fleet Launch And Environments<a class="headerlink" href="#fleet-launch-and-environments" title="Permanent link">&para;</a></h2>
-<p>Run the ACP daemon in the project environment:</p>
+<p>Start the independent ACP daemon from the project directory:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>coordd<span class="w"> </span>--project-dir<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">"</span>
 </code></pre></div>
-<p>Alternatively, install the optional user service once, then start it:</p>
+<p>The command returns after startup; closing the terminal does not stop the daemon.
+Use <code>greatminds daemon status</code>, <code>stop</code>, or <code>restart</code> in the project. For logs,
+read <code>.greatminds/.runtime/daemon.log</code>. See <a href="../daemon-lifecycle/">daemon lifecycle</a>.</p>
+<p>Alternatively, install the optional systemd user service once, then start it:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>daemon<span class="w"> </span>install<span class="w"> </span>--project-dir<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">"</span>
-greatminds<span class="w"> </span>daemon<span class="w"> </span>start<span class="w"> </span>--project-dir<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">"</span>
+greatminds<span class="w"> </span>daemon<span class="w"> </span>start<span class="w"> </span>--systemd<span class="w"> </span>--project-dir<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">"</span>
 </code></pre></div>
 <p><code>greatminds launch --target tmux</code> opens daemon/operator surfaces; the VS Code
 and Cursor IDE targets generate ACP workspace tasks. Interactive roles use

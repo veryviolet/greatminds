@@ -2444,6 +2444,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/daemon-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Daemon Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -4071,29 +4099,17 @@ greatminds check-git-permission push
                               install.
   --interval-sec FLOAT RANGE  [x&gt;=0.2]
   -v, --verbose
+  --foreground                Run in this terminal instead of starting an
+                              independent daemon.
   --once                      Reconcile and execute one dispatch batch, then
                               exit.
   -h, --help                  Show this message and exit.
 </code></pre></div>
 <h3 id="greatminds-daemon">greatminds daemon<a class="headerlink" href="#greatminds-daemon" title="Permanent link">&para;</a></h3>
-<p>greatminds daemon — per-project coordination daemon supervision.</p>
-<p>Wraps <code>systemctl --user</code> to manage instances of the
-<code>greatminds-daemon@&lt;project&gt;.service</code> template unit. Each greatminds
-project on the host gets ONE daemon instance keyed by its
-registered project name (or the project directory name by default),
-so multiple projects on the same user can run their daemons
-concurrently without colliding on a global unit name.</p>
-<p>Subcommands::</p>
-<pre><code>greatminds daemon install [--name NAME] [--project-dir DIR]
-greatminds daemon start    [--project NAME] [--project-dir DIR]
-greatminds daemon stop     [--project NAME] [--project-dir DIR]
-greatminds daemon restart  [--project NAME] [--project-dir DIR]
-greatminds daemon status   [--project NAME] [--project-dir DIR]
-greatminds daemon list
-</code></pre>
-<p><code>install</code> is idempotent: it writes the template unit if missing and
-adds the <code>{name → project_dir}</code> entry to the per-user registry at
-<code>~/.config/greatminds/projects.json</code>.</p>
+<p>Manage independent per-project background daemons.</p>
+<p>start/stop/restart/status use the same project lifecycle as the web interface.
+No installation or systemd is required. Optional <code>install</code> and <code>--systemd</code>
+commands integrate with a user service manager for login startup and restart.</p>
 <p><strong>Usage:</strong></p>
 <div class="highlight"><pre><span></span><code>greatminds daemon [OPTIONS] COMMAND [ARGS]...
 </code></pre></div>
@@ -4129,7 +4145,8 @@ adds the <code>{name → project_dir}</code> entry to the per-user registry at
 <div class="highlight"><pre><span></span><code>greatminds daemon list [OPTIONS]
 </code></pre></div>
 <p><strong>Options:</strong></p>
-<div class="highlight"><pre><span></span><code>  -h, --help  Show this message and exit.
+<div class="highlight"><pre><span></span><code>  --systemd   Inspect optional installed user services.
+  -h, --help  Show this message and exit.
 </code></pre></div>
 <h4 id="greatminds-daemon-repair">greatminds daemon repair<a class="headerlink" href="#greatminds-daemon-repair" title="Permanent link">&para;</a></h4>
 <p>Idempotently enable the project's daemon instance.</p>
@@ -4151,6 +4168,7 @@ adds the <code>{name → project_dir}</code> entry to the per-user registry at
 <div class="highlight"><pre><span></span><code>  --project TEXT           project name (default: registry or project
                            directory name)
   --project-dir DIRECTORY  project root (default: cwd)
+  --systemd                Use the optional installed systemd user service.
   -h, --help               Show this message and exit.
 </code></pre></div>
 <h4 id="greatminds-daemon-start">greatminds daemon start<a class="headerlink" href="#greatminds-daemon-start" title="Permanent link">&para;</a></h4>
@@ -4162,6 +4180,7 @@ adds the <code>{name → project_dir}</code> entry to the per-user registry at
 <div class="highlight"><pre><span></span><code>  --project TEXT           project name (default: registry or project
                            directory name)
   --project-dir DIRECTORY  project root (default: cwd)
+  --systemd                Use the optional installed systemd user service.
   -h, --help               Show this message and exit.
 </code></pre></div>
 <h4 id="greatminds-daemon-status">greatminds daemon status<a class="headerlink" href="#greatminds-daemon-status" title="Permanent link">&para;</a></h4>
@@ -4173,6 +4192,8 @@ adds the <code>{name → project_dir}</code> entry to the per-user registry at
 <div class="highlight"><pre><span></span><code>  --project TEXT           project name (default: registry or project
                            directory name)
   --project-dir DIRECTORY  project root (default: cwd)
+  --systemd                Inspect the optional installed systemd user
+                           service.
   -h, --help               Show this message and exit.
 </code></pre></div>
 <h4 id="greatminds-daemon-stop">greatminds daemon stop<a class="headerlink" href="#greatminds-daemon-stop" title="Permanent link">&para;</a></h4>
@@ -4184,6 +4205,7 @@ adds the <code>{name → project_dir}</code> entry to the per-user registry at
 <div class="highlight"><pre><span></span><code>  --project TEXT           project name (default: registry or project
                            directory name)
   --project-dir DIRECTORY  project root (default: cwd)
+  --systemd                Use the optional installed systemd user service.
   -h, --help               Show this message and exit.
 </code></pre></div>
 <h3 id="greatminds-dashboard">greatminds dashboard<a class="headerlink" href="#greatminds-dashboard" title="Permanent link">&para;</a></h3>

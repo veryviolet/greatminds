@@ -1321,6 +1321,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/daemon-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Daemon Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1630,7 +1658,9 @@ conversation. Package installation alone does not establish provider access.</p>
 <ul>
 <li><code>tmux</code> for <code>greatminds launch --target tmux</code>.</li>
 <li>A systemd user manager on Linux for <code>greatminds daemon install</code> and service
-  control. You can also run <code>greatminds coordd</code> in a terminal.</li>
+  integration using explicit <code>--systemd</code> controls. Normal daemon and web commands
+  do not require a service manager. <code>greatminds coordd --foreground</code> is available
+  for terminal debugging.</li>
 <li>The <code>stands</code> extra for Ansible-backed YAML stand profiles:</li>
 </ul>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'greatminds[stands]'</span>
