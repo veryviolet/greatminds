@@ -2506,3 +2506,23 @@ independent systemd environment parsers also passed (six checks). CI now install
 the stands extra after its base-wheel smoke and puts the test environment's bin
 directory on PATH, so the optional playbook syntax test is actually exercised.
 This is local syntax validation, not a remote deployment.
+
+### G6 — explicit authentication and pending-permission cancellation (2026-09-07)
+
+Revalidated installed Qwen, Kimi, Gemini, OpenHands and Cursor session gates, then
+explicit advertised authentication where appropriate. Repeated Cline's synthetic
+prompt. The sanitized auth evidence distinguishes required credentials/configuration,
+discontinued Gemini individual serving and Cursor's inconclusive ACP timeout despite
+cached native login. No account, provider, model or global installation was changed.
+
+Added --cancel-while-pending to the permission probe and a real subprocess fixture.
+Live Claude, Codex and Grok runs all cancelled the unanswered permission, left the
+write marker absent and cleaned up their process groups. Claude's unknown optional
+notification warning is recorded rather than hidden. These assertions do not prove
+provider billing cancellation or optional extension support.
+
+The compatibility document now declares every agent role against all nine harnesses,
+separating completed domain roles, synthetic permission-only coverage, unverified
+roles and auth/configuration gates. Both dated evidence files are retained in
+architecture/evidence. G6 remains open; no unsupported cell is marked as passed.
+This checkpoint also records recovery after another desktop client interruption.

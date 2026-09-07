@@ -24,7 +24,7 @@ were inspected. It does not turn fixture coverage into live harness coverage.
 | A2: permission callbacks, path policy and explicit waiting | `runtime/permissions.py`, supervisor; pending/answered/denied/expired/stale/crash fixtures and live callback evidence | Confirmed. Filesystem/terminal callbacks are not advertised; unavailable methods fail explicitly |
 | A2: normalized protocol diagnostics with bounded raw evidence | Bounded `run.protocol` negotiation/tool/error/stop facts, private summary export; real supervisor privacy/saturation/crash fixtures and delayed-update RPC-error regression | Confirmed G1: managed-path evidence, with no raw payloads or transcripts |
 | A3: two upstream bridges and a native ACP implementation on one client | Codex + Claude bridges and native Grok; [completed mixed pipeline](evidence/acp-mixed-pipeline-completed-2026-09-06.json), lifecycle/permission evidence | Confirmed tested versions and completed local pipeline; no cross-harness history transfer claimed |
-| A4: Qwen/Kimi/Grok/Cline/Gemini/OpenHands/Cursor distribution, auth, session, worktree, model and cancellation | Per-stage [campaign evidence](acp-compatibility.md); fresh Cline 3.0.61 prompt failure requires renewed authentication | **Open G6:** only initialized/session-created status for several installations; authentication and complete scenarios remain necessary |
+| A4: Qwen/Kimi/Grok/Cline/Gemini/OpenHands/Cursor distribution, auth, session, worktree, model and cancellation | Per-stage [campaign evidence and role matrix](acp-compatibility.md); fresh explicit auth attempts and pending-permission cancellation on three harnesses | **Open G6:** only initialized/session-created status for several installations; authentication and complete scenarios remain necessary |
 | A5: daemon-owned interactive prompts, streamed output, permission, reconnect and interrupt | Conversation FIFO, task-bound claims, shared broker; `test_acp_conversations.py`, `test_chat_tasks.py`, `test_chat_terminal.py` | Confirmed fixture coverage; live coverage remains explicitly narrower than all roles/harnesses |
 | A5: common tmux/VS Code surfaces and removal of native dispatch | `runtime/frontends.py`, thin `cli/coordd.py`, extension CLI terminals; launch tests and [real extension host](evidence/vscode-extension-host-2026-09-07.json) | Confirmed managed execution routes through ACP; host smoke does not exercise Quick Picks or live chat |
 
@@ -140,9 +140,12 @@ were inspected. It does not turn fixture coverage into live harness coverage.
    cycle and rejection of stale identities and agent credentials.
 7. **G6 — remaining live coverage.** Revalidate configured authentication before
    classifying an external blocker, then complete session/worktree/model/cancel
-   scenarios and a declared role-by-harness evidence table. Current Cline evidence
-   specifically identifies a re-authentication requirement; other earlier auth
-   failures do not prove credentials are currently absent.
+   scenarios. The declared role-by-harness evidence table is now present. Fresh
+   authentication checks distinguish missing Qwen configuration, Kimi/Cline login,
+   OpenHands agent configuration, discontinued Gemini individual access and an
+   inconclusive Cursor ACP timeout despite cached native login. Cancellation while
+   permission is pending passed on Claude/Codex/Grok. These checks do not establish
+   the remaining domain-role or harness scenarios.
 
 After these items, rerun the complete suite and relevant package/host checks,
 inspect every row again, and record the resulting milestone verdicts. Current

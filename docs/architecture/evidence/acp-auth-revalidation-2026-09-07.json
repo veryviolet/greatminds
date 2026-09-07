@@ -1,0 +1,201 @@
+{
+  "version": 1,
+  "date": "2026-09-07",
+  "scope": "Fresh live ACP authentication/session revalidation using existing installations and account settings",
+  "client_source_commit": "627e5d2",
+  "sdk_version": "0.11.1",
+  "probe_sha256": "f2cc80a38a34b4118fae60d1a8f9ab509d6f67ea647137185ff6dc032cb9df05",
+  "harnesses": [
+    {
+      "harness": "qwen",
+      "initial": {
+        "tested_at": "2026-09-07T05:21:06.410387+00:00",
+        "status": "waiting_auth",
+        "agent_info": {
+          "name": "qwen-code",
+          "title": "Qwen Code",
+          "version": "0.19.6"
+        },
+        "auth_methods": [
+          "openai"
+        ],
+        "session_created": null,
+        "inference": false,
+        "error_type": "RequestError",
+        "error_code": -32000,
+        "process_exited": true
+      },
+      "initial_report_sha256": "f0dd562d7cd5a87a072ef1cc8b758a43f3c4f6143a4c12c456e242e507edfbe5",
+      "explicit": {
+        "tested_at": "2026-09-07T05:22:55.602432+00:00",
+        "status": "failed",
+        "auth_method": "openai",
+        "authenticated": null,
+        "session_created": null,
+        "inference": false,
+        "error_type": "RequestError",
+        "error_code": -32603,
+        "process_exited": true
+      },
+      "explicit_report_sha256": "84ad3f30d35e0c607f8b26c8cd1ff008cc1da0ebb1eadd95b58ce4a3be884356",
+      "interpretation": "The sole advertised method openai requires OPENAI_API_KEY; this variable is absent in the probe environment and explicit authenticate returned -32603."
+    },
+    {
+      "harness": "kimi",
+      "initial": {
+        "tested_at": "2026-09-07T05:21:10.785824+00:00",
+        "status": "waiting_auth",
+        "agent_info": {
+          "name": "Kimi Code CLI",
+          "title": null,
+          "version": "0.39.1"
+        },
+        "auth_methods": [
+          "login"
+        ],
+        "session_created": null,
+        "inference": false,
+        "error_type": "RequestError",
+        "error_code": -32000,
+        "process_exited": true
+      },
+      "initial_report_sha256": "69452501519bbdd8092b065f1e18bd404d66e386b0762ac6e46e5e33a0abd58c",
+      "explicit": {
+        "tested_at": "2026-09-07T05:30:22.747812+00:00",
+        "status": "waiting_auth",
+        "auth_method": "login",
+        "authenticated": null,
+        "session_created": null,
+        "inference": false,
+        "error_type": "RequestError",
+        "error_code": -32000,
+        "process_exited": true
+      },
+      "explicit_report_sha256": "5536a753b058eaca8799285e37aa2e6208614fa879e90a61ad356f0fe9db959d",
+      "interpretation": "Session creation and explicit authenticate(login) both returned -32000. Native doctor found no config.toml or tui.toml; login help describes a device-code flow."
+    },
+    {
+      "harness": "gemini",
+      "initial": {
+        "tested_at": "2026-09-07T05:21:14.392492+00:00",
+        "status": "waiting_auth",
+        "agent_info": {
+          "name": "gemini-cli",
+          "title": "Gemini CLI",
+          "version": "0.49.0"
+        },
+        "auth_methods": [
+          "oauth-personal",
+          "gemini-api-key",
+          "vertex-ai",
+          "gateway"
+        ],
+        "session_created": null,
+        "inference": false,
+        "error_type": "RequestError",
+        "error_code": -32000,
+        "process_exited": true
+      },
+      "initial_report_sha256": "80e32ed9d9335870450b973d3284f590bf3ad69234207241ac3d571b37483a7a",
+      "explicit": {
+        "tested_at": "2026-09-07T05:22:50.758167+00:00",
+        "status": "waiting_auth",
+        "auth_method": "oauth-personal",
+        "authenticated": null,
+        "session_created": null,
+        "inference": false,
+        "error_type": "RequestError",
+        "error_code": -32000,
+        "process_exited": true
+      },
+      "explicit_report_sha256": "c7531882ccc80bde34f46abcb9c01a615bdf131f0b2e20df1040044e67bf8034",
+      "interpretation": "Configured oauth-personal authentication was explicitly attempted. The server rejected this client for individual accounts and directed migration to Antigravity. This is not classified as merely missing cached credentials."
+    },
+    {
+      "harness": "openhands",
+      "initial": {
+        "tested_at": "2026-09-07T05:21:19.747000+00:00",
+        "status": "waiting_auth",
+        "agent_info": {
+          "name": "OpenHands CLI ACP Agent",
+          "title": null,
+          "version": "1.16.0"
+        },
+        "auth_methods": [
+          "oauth"
+        ],
+        "session_created": null,
+        "inference": false,
+        "error_type": "RequestError",
+        "error_code": -32000,
+        "process_exited": true
+      },
+      "initial_report_sha256": "29acf7f8d27477399af2bc5e71cab64e51a466ab3e5fb86d6fa0bc7638b29f3c",
+      "interpretation": "Local ACP new_session returned -32000. Installed local agent code maps MissingAgentSpec from load_agent_specs to this response; an agent/model configuration is required. The advertised oauth handler starts a Cloud device login and was not invoked to silently choose new settings."
+    },
+    {
+      "harness": "cursor",
+      "initial": {
+        "tested_at": "2026-09-07T05:21:23.574797+00:00",
+        "status": "waiting_auth",
+        "agent_info": null,
+        "auth_methods": [
+          "cursor_login"
+        ],
+        "session_created": null,
+        "inference": false,
+        "error_type": "RequestError",
+        "error_code": -32000,
+        "process_exited": true
+      },
+      "initial_report_sha256": "11389533bf93d43e1f97afd9ea643610d26628e83f50217c4f919bb20ecba322",
+      "explicit": {
+        "tested_at": "2026-09-07T05:24:17.024430+00:00",
+        "status": "failed",
+        "auth_method": "cursor_login",
+        "authenticated": null,
+        "session_created": null,
+        "inference": false,
+        "error_type": "TimeoutError",
+        "error_code": null,
+        "process_exited": true
+      },
+      "explicit_report_sha256": "f732b54da23267b4a1b0f24392a903badd6ba4ac5bc4f92a599488222ab97678",
+      "interpretation": "Native status reports a cached login, but explicit ACP cursor_login reached the 30-second request deadline. No session/prompt passed; credentials are not declared absent."
+    },
+    {
+      "harness": "cline",
+      "initial": {
+        "tested_at": "2026-09-07T05:25:48.074955+00:00",
+        "status": "failed",
+        "agent_info": {
+          "name": "cline",
+          "title": null,
+          "version": "3.0.61"
+        },
+        "auth_methods": [
+          "cline",
+          "cline-pass",
+          "openai-codex"
+        ],
+        "session_created": true,
+        "inference": true,
+        "error_type": "RequestError",
+        "error_code": -32603,
+        "process_exited": true
+      },
+      "initial_report_sha256": "5b7f0c9a1bbbea814e428fb4331cd88a305318d08de02fb59787682692d60442",
+      "interpretation": "Session creation succeeded; the exact synthetic prompt returned -32603 with no assistant text. Private stderr again identified required re-authentication."
+    }
+  ],
+  "external_sources": [
+    "https://github.com/google-gemini/gemini-cli/discussions/28017",
+    "https://cursor.com/docs/cli/acp"
+  ],
+  "limitations": [
+    "No credentials or account identities are included. Only explicitly selected advertised auth methods were invoked.",
+    "No inference was requested except the one synthetic Cline prompt attempt.",
+    "Cursor timeout is inconclusive about the underlying cause; a cached login is not a successful ACP session.",
+    "No global harness installation, account, model, provider or authentication setting was changed."
+  ]
+}

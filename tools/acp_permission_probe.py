@@ -2,6 +2,8 @@
 
 The probe never approves a request. Inspect/answer the printed project's request
 with `greatminds run permission ID --option ID` from an operator terminal.
+With --cancel-while-pending it cancels the supervised run after observing an
+unanswered permission, and verifies cleanup without executing the command.
 """
 
 import argparse
@@ -15,6 +17,7 @@ from greatminds.core.schema import load_schema_snapshot
 from greatminds.runtime.config import parse_execution_config
 from greatminds.runtime.store import RunStore, TaskRevision
 from greatminds.runtime.supervisor import Supervisor
+from greatminds.runtime.processes import group_members, process_identity
 
 
 PROMPT = ('Use your shell tool to execute exactly: python3 -c "from pathlib import Path; '
@@ -49,6 +52,8 @@ async def probe(args, argv):
                            if item["status"] == "pending"]
                 if pending:
                     observed_before_marker = not marker.exists()
+                    if args.cancel_while_pending:
+                        work.cancel()
                     break
                 await asyncio.sleep(.05)
             result = await work
@@ -58,15 +63,24 @@ async def probe(args, argv):
                 await work
         requests = list(store.snapshot().get("permissions", {}).values())
         report = {"run_id": result["id"], "state": result["state"], "reason": result["reason"],
+                  "cancel_while_pending": args.cancel_while_pending,
                   "permission_observed_before_marker": observed_before_marker,
                   "marker": marker.read_text() if marker.exists() else None,
                   "permissions": [{key: item.get(key) for key in
                                    ("id", "status", "option_id", "created_at", "answered_at", "consumed_at")}
                                   for item in requests]}
+        identity = result.get('process')
+        report['process_group_exited'] = not identity or (
+            process_identity(identity['pid']) != identity and not group_members(identity))
         report["passed"] = (result["state"] == "completed" and report["marker"] == "permission-ok"
                             and observed_before_marker and any(item["status"] == "consumed" and any(
                                 option["optionId"] == item["option_id"] and option["kind"] == "allow_once"
                                 for option in item["options"]) for item in requests))
+        if args.cancel_while_pending:
+            report['passed'] = (result['state'] == 'cancelled' and observed_before_marker
+                and not marker.exists() and bool(requests)
+                and all(item['status'] == 'cancelled' for item in requests)
+                and report['process_group_exited'])
         print(json.dumps(report), flush=True)
         return 0 if report["passed"] else 1
 
@@ -78,6 +92,7 @@ def main():
     parser.add_argument("--mode")
     parser.add_argument("--timeout", type=int, default=90)
     parser.add_argument("--prompt-prefix", default="")
+    parser.add_argument("--cancel-while-pending", action="store_true")
     parser.add_argument("argv", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     argv = args.argv[1:] if args.argv[:1] == ["--"] else args.argv

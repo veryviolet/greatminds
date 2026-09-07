@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "date": "2026-09-07",
+  "scope": "Live supervisor cancellation while an ACP permission callback is pending",
+  "inference": true,
+  "client_source_commit": "627e5d2",
+  "probe_sha256": "9cb751bd1e7e3c2298283f30bc2406122e66dc4f6e43e2396d06beb097939015",
+  "installations": {
+    "codex": {
+      "adapter": "1.10.0",
+      "harness": "0.153.4",
+      "mode": "read-only",
+      "trigger": "explicit sandbox_permissions=require_escalated for the synthetic workspace write"
+    },
+    "claude": {
+      "adapter": "0.75.1",
+      "sdk": "0.3.257"
+    },
+    "grok": {
+      "harness": "1.0.13",
+      "build": "5e9a58528b76",
+      "options": [
+        "--no-auto-update",
+        "--permission-mode",
+        "default",
+        "agent",
+        "--no-leader",
+        "stdio"
+      ]
+    }
+  },
+  "harnesses": [
+    {
+      "harness": "claude",
+      "state": "cancelled",
+      "reason": "operator_cancelled",
+      "cancel_while_pending": true,
+      "permission_observed_before_marker": true,
+      "marker": null,
+      "process_group_exited": true,
+      "passed": true,
+      "permissions": [
+        {
+          "status": "cancelled",
+          "answered": false,
+          "consumed": false
+        }
+      ],
+      "raw_report_sha256": "b3d591f40f8232fdb328b6dcde5d7c5772ed1822a74cb20d3577973e510911e1"
+    },
+    {
+      "harness": "codex",
+      "state": "cancelled",
+      "reason": "operator_cancelled",
+      "cancel_while_pending": true,
+      "permission_observed_before_marker": true,
+      "marker": null,
+      "process_group_exited": true,
+      "passed": true,
+      "permissions": [
+        {
+          "status": "cancelled",
+          "answered": false,
+          "consumed": false
+        }
+      ],
+      "raw_report_sha256": "46a8e74e14ea5634e3c3e3d2fd68382efdfb6ba911eceee99d016164d7c577a3"
+    },
+    {
+      "harness": "grok",
+      "state": "cancelled",
+      "reason": "operator_cancelled",
+      "cancel_while_pending": true,
+      "permission_observed_before_marker": true,
+      "marker": null,
+      "process_group_exited": true,
+      "passed": true,
+      "permissions": [
+        {
+          "status": "cancelled",
+          "answered": false,
+          "consumed": false
+        }
+      ],
+      "raw_report_sha256": "106b8f3dcf779430774dfd0dce08a6800f5c554b1bd10c5b8239e9013fe77c01"
+    }
+  ],
+  "limitations": [
+    "Each test uses a developer-bound synthetic permission request, not a complete domain task.",
+    "The run task is cancelled through the supervisor cancellation path after observing a pending callback; no permission is granted.",
+    "Passed means cancelled local permission state, absent write marker and bounded process-group cleanup. It does not attest provider-side billing cancellation or an ACP cancelled stop response.",
+    "Claude emitted a nonstandard $/cancel_request notification which the pinned SDK logged as method-not-found; the required cancellation/cleanup assertions still passed."
+  ]
+}

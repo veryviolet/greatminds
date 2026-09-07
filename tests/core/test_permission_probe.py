@@ -8,6 +8,20 @@ from greatminds.runtime.permissions import PermissionService
 from greatminds.runtime.store import RunStore
 
 
+def test_permission_probe_cancels_pending_callback_without_side_effect():
+    repo = Path(__file__).resolve().parents[2]
+    result = subprocess.run([sys.executable, str(repo / 'tools/acp_permission_probe.py'),
+        '--adapter-version', 'fixture', '--harness-version', 'fixture', '--timeout', '10',
+        '--cancel-while-pending', '--', sys.executable,
+        str(repo / 'tests/fixtures/acp_server.py'), 'permission-marker'],
+        capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout.splitlines()[-1])
+    assert report['passed'] and report['state'] == 'cancelled'
+    assert report['marker'] is None and report['process_group_exited']
+    assert all(item['status'] == 'cancelled' for item in report['permissions'])
+
+
 def test_permission_probe_observes_operator_gate_and_fixture_side_effect(tmp_path):
     repo = Path(__file__).resolve().parents[2]
     output = tmp_path / "probe.jsonl"

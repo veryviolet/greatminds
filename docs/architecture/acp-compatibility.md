@@ -56,7 +56,7 @@ An authentication-required response does not prove that cached credentials are
 absent. Some servers require explicit ACP authentication before using an existing
 login. Manifests may specify `auth_method`; the supervisor verifies it was advertised
 and calls `authenticate` before creating or loading a session. It does not guess a
-method or silently choose another identity. Real explicit-auth flows remain untested.
+method or silently choose another identity. Fresh explicit-auth attempts and their limitations are recorded below.
 
 ## Restart, context, configuration, and cancellation
 
@@ -287,3 +287,69 @@ ACP server completed the same three-role task, command checks, merge, cleanup an
 restart assertions. A separate installed dependency smoke confirmed idempotent setup
 and one SYSTEM resume with zero agent runs. This packaging evidence is distinct
 from the live Codex result above.
+
+## Authentication revalidation, 2026-09-07
+
+[Fresh evidence](evidence/acp-auth-revalidation-2026-09-07.json) separates session
+creation, explicit authentication and inference. Existing installations and account
+settings were used; no provider or identity was selected implicitly.
+
+| Harness | Fresh result | Remaining prerequisite |
+| --- | --- | --- |
+| Qwen 0.19.6 | Only `openai` advertised; explicit authentication returned -32603 | Installed method requires `OPENAI_API_KEY`, absent in the probe environment |
+| Kimi 0.39.1 | Session and explicit `login` returned -32000 | Complete native login; doctor found no local configuration |
+| Cline 3.0.61 | Session created; synthetic prompt returned -32603 without assistant text | Native re-authentication, identified by private stderr |
+| OpenHands 1.16.0 | Local session returned -32000 | Configure agent/model: installed local handler maps missing agent specification to this response |
+| Gemini 0.49.0 | Configured `oauth-personal` explicitly rejected | Individual access through this client was discontinued; an applicable supported access method is required |
+| Cursor 2026.06.15-18-00-12-6f5a2cf | Native status reports cached login; explicit `cursor_login` timed out after 30 seconds | Resolve ACP authentication; underlying cause remains inconclusive |
+
+Gemini's response agrees with the [upstream individual-access announcement](https://github.com/google-gemini/gemini-cli/discussions/28017).
+It is not evidence of missing cached credentials. Cursor's documented
+[ACP authentication sequence](https://cursor.com/docs/cli/acp) was attempted;
+a cached native login does not prove an ACP session works. No inference was
+requested in these auth checks except the separate synthetic Cline attempt.
+All probe processes exited during bounded cleanup.
+
+## Cancellation while permission is pending, 2026-09-07
+
+[Live cancellation evidence](evidence/acp-pending-permission-cancel-2026-09-07.json)
+confirms Claude adapter 0.75.1 / SDK 0.3.257, Codex adapter 1.10.0 / CLI 0.153.4,
+and native Grok 1.0.13. The common supervisor task was cancelled after observing
+an unanswered permission. Every permission became cancelled, the requested write
+marker remained absent, and the process group exited. The probe supports this
+scenario with `--cancel-while-pending`; its fixture covers the same assertions.
+
+Codex required an explicit escalated shell request; selecting `read-only` alone
+is not evidence that ordinary workspace writes ask for permission. Grok used
+explicit default permission mode. Claude emitted `$/cancel_request`, which the
+pinned SDK logged as method-not-found; required cleanup still passed. This scope
+proves local cancellation and cleanup, not provider billing cancellation, an ACP
+cancelled stop response, public CLI cancellation, or optional extension parity.
+
+## Declared role coverage, 2026-09-07
+
+This table records live evidence, not restrictions on manifest role assignment.
+**D** = completed domain role with accepted typed result; **P** = only a synthetic
+DEVELOPER-bound permission test; **U** = no live domain-role proof; **B** = broader
+live campaign cannot proceed past the auth/configuration issue above. USER is a
+human role and SYSTEM actions are deterministic daemon work, so neither is a
+harness assignment. Generic lifecycle tests do not fill domain-role cells.
+
+| Role | Codex | Claude | Grok | Qwen | Kimi | Cline | OpenHands | Gemini | Cursor |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ARCHITECT-PLANNER | U | U | U | B | B | B | B | B | B |
+| ARCHITECT-REVIEWER | D | U | D | B | B | B | B | B | B |
+| DEVELOPER | D | P | P | B | B | B | B | B | B |
+| UI-DEVELOPER | U | U | U | B | B | B | B | B | B |
+| LIVE-DEVELOPER | U | U | U | B | B | B | B | B | B |
+| TECHNICAL-WRITER | U | U | U | B | B | B | B | B | B |
+| TESTER | D | D | U | B | B | B | B | B | B |
+| READER | U | U | U | B | B | B | B | B | B |
+| EXPLORER | U | U | U | B | B | B | B | B | B |
+| MAINTAINER | U | U | U | B | B | B | B | B | B |
+
+D cells derive from the [single-harness local preset](evidence/acp-local-preset-2026-09-07.json)
+and [operator-assisted mixed pipeline](evidence/acp-mixed-pipeline-completed-2026-09-06.json).
+P cells derive from [permission approval](evidence/acp-permissions-2026-09-06.json)
+and pending-permission cancellation above. This is deliberately narrower than
+all roles on all harnesses. G6 and overall modernization acceptance remain open.
