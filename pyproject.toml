@@ -64,9 +64,9 @@ packages = ["src/greatminds"]
 
 [tool.hatch.build.targets.sdist]
 include = [
-  "src/greatminds",
-  "vscode-extension",
-  "LICENSE",
-  "README.md",
-  "pyproject.toml",
+  "/src/greatminds",
+  "/vscode-extension",
+  "/LICENSE",
+  "/README.md",
+  "/pyproject.toml",
 ]
