@@ -129,7 +129,7 @@ were inspected. It does not turn fixture coverage into live harness coverage.
    [Installed-wheel evidence](evidence/contract-reference-2026-09-07.json) confirms
    reproducibility on Python 3.11/3.12/3.13 and real offline pipelines on 3.11/3.12.
    CI, documentation and release workflows check drift. Two actual CI smoke steps
-   now validate the current package/setup, replacing removed native artifacts.
+   validate the current packaged resources and fresh project setup contract.
 6. **G7 — combined repair acceptance: verified.**
    `test_aggregate_repair_cycle.py` invokes public `run doctor --json`, executes
    the exact emitted command-resolution argv/environment/cwd, repeats resolution

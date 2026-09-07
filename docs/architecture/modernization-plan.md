@@ -2532,3 +2532,12 @@ all ten agent roles, including LIVE-DEVELOPER. All ten passed: two FIFO prompts 
 one daemon-owned session, emit text, create no task result and do not launch again
 on an idle restart. This is fixture evidence for role-independent interaction,
 not a claim that the remaining live role/harness matrix cells passed.
+
+Recovery checkpoint regression: the full suite completed with 1539 passes, zero
+skips and one documentation current-contract wording failure in 376.82 seconds.
+Corrected that phrase in modernization-acceptance.md; all 14 documentation/reference
+checks then passed, as did the generated-reference drift check and strict MkDocs.
+No runtime fix was needed. The full suite had already collected before the six
+additional conversation role parameters; all ten parameters passed separately.
+The full suite was not repeated after the wording-only fix. Exact scope is retained
+in evidence/recovery-regression-2026-09-07.json. Overall acceptance remains open at G6.

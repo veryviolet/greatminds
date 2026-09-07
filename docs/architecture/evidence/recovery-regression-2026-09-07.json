@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "date": "2026-09-07",
+  "scope": "Recovery checkpoint regression; G6 and final acceptance remain open",
+  "full_suite": {
+    "passed": 1539,
+    "failed": 1,
+    "skipped": 0,
+    "seconds": 376.82,
+    "log_sha256": "7e0ada945e54b80f26d74604ebc2dbaedf89328fb025b06952f4c7cdf9d068c9",
+    "failure": "Public documentation current-contract wording assertion in modernization-acceptance.md",
+    "resolution": "Describe only current packaged resources and fresh setup contract; no runtime code changed"
+  },
+  "followup": {
+    "documentation_tests_passed": 14,
+    "documentation_tests_seconds": 1.73,
+    "strict_mkdocs_passed": true,
+    "generated_reference_check_passed": true,
+    "all_agent_role_conversation_cases_passed": 10,
+    "conversation_seconds": 27.23
+  },
+  "limitations": [
+    "Full suite was collected before six additional conversation role parameters were added; all ten parameters passed separately.",
+    "The full suite was not repeated after the documentation-only wording correction; the failing check and relevant documentation checks all passed.",
+    "This does not establish missing live harness/domain-role scenarios."
+  ]
+}
