@@ -1754,7 +1754,9 @@ login waits have distinct labels. The indicator stops when the turn ends. Reduce
 motion preferences disable the text reveal and spinner animation.</p>
 <p>Use the toolbar's light/dark theme switch. The first visit follows the system
 color preference; an explicit choice is saved in this browser for the same origin.
-The theme applies to the chat, dashboards, settings, forms and code previews.</p>
+The theme applies to the chat, dashboards, settings, forms and code previews.
+The version below the product logo identifies the running web server. Restart
+the web server after upgrading the package so its backend uses the new version.</p>
 <h2 id="history-and-storage">History and storage<a class="headerlink" href="#history-and-storage" title="Permanent link">&para;</a></h2>
 <p>The browser reads the same filesystem state as the CLI and daemon. Viewing a page
 or reconnecting does not launch an agent. Dashboard requests are polled every 1.5 seconds; active chat requests every 350 ms;
@@ -1789,8 +1791,10 @@ default; changing the interface language does not require a daemon restart.</p>
 headings, links, inline code and fenced code blocks. Streaming reconciles existing
 blocks so completed paragraphs remain stable. HTML is sanitized locally;
 embedded forms, scripts and images cannot execute. No CDN is used.</p>
-<p>In each role binding, click <strong>Load models and reasoning</strong>. This explicitly starts
-a temporary ACP connection and opens a session without sending a prompt. The
+<p>Opening execution settings automatically loads model and reasoning choices.
+Bindings sharing an executor, workspace and model reuse one temporary ACP
+connection; results are cached for one minute. <strong>Load models and reasoning</strong>
+refreshes the choices on demand. Discovery opens a session without sending a prompt. The
 installed executor must already be available and authenticated. Models come from
 its advertised <code>model</code> selector, and reasoning from <code>thought_level</code>; no provider
 model list is hardcoded. Choosing another model refreshes the reasoning options.
