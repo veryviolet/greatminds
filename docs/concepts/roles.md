@@ -4,6 +4,9 @@ Roles divide responsibility across the workflow. Queue ownership and allowed
 transitions come from the effective installed schema. The project schema file
 is a diagnostic mirror.
 
+The [generated contract reference](../architecture/contract-reference.md#roles)
+contains complete role declarations and is checked against the source contracts.
+
 | Role | Responsibility |
 | --- | --- |
 | `ARCHITECT-PLANNER` | Intake, triage, planning and routing |

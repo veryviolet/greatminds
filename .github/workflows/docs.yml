@@ -26,6 +26,8 @@ jobs:
       - name: Install docs deps
         run: |
           pip install -e '.[docs]'
+      - name: Check generated contract reference
+        run: python tools/generate_contract_reference.py --check
       - name: Configure git author for gh-deploy commit
         run: |
           git config user.name  'github-actions[bot]'

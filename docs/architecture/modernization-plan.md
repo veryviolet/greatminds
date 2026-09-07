@@ -2461,3 +2461,48 @@ G7's missing connection is now exercised rather than inferred from component tes
 G5 generated reference and G6 remaining live coverage remain open; the overall plan
 is still active. The previous goal turn was progress: original baseline evidence
 and measured ACP import/schema optimization were committed as f7b3237 and 5434074.
+
+### G5 — reproducible mechanical reference and current CI smoke (2026-09-07)
+
+Added tools/generate_contract_reference.py and docs/architecture/contract-reference.md.
+The artifact includes all role declarations, queues, task transitions including
+dynamic selectors, declared SYSTEM operations, runtime state transitions, normalized
+dataclass fields with typed/default distinctions and validated YAML for every shipped
+preset. Role/queue references and registered transition requirements are checked;
+each preset is parsed by the actual execution validator. Generation uses this
+checkout's canon, rejects ambient canon overrides and mismatched imported source,
+and fingerprints schema, generator and relevant validator/controller source files.
+The --check mode never repairs or creates stale output; the build must regenerate it
+explicitly. This reference is not a substitute for runtime evidence gates and is not
+presented as a complete YAML validation grammar.
+
+Fourteen generator/public-documentation tests passed in 1.72s, covering reproducibility,
+invalid references, unknown validators, drift refusal without writes, explicit
+regeneration and ambient canon rejection. Independently installed base wheels on
+Python 3.11.15, 3.12.3 and 3.13.7 reproduce the same artifact. The 3.11/3.12 environments
+needed public PyYAML/Pydantic wheels absent from the offline cache; dependencies were
+installed only into their /tmp environments. Their real deterministic ACP pipelines
+also completed all three roles, commands, six independent tests, merge, cleanup and
+restart checks. They ran concurrently for functional coverage, not speed comparison.
+Evidence is evidence/contract-reference-2026-09-07.json. This is not a full regression
+suite on those two interpreters or a claimed GitHub Actions run.
+
+While wiring drift checks into CI, found its packaged-resource and fresh-setup smoke
+still required removed native integration files, coord.yaml and automatic environment/
+prose copies. Updated these assertions to current packaged templates/service/schema
+and setup's execution.yaml contract/queues/mirror. Executed both literal smoke scripts
+against the installed 3.13 wheel with disposable project/home/config directories;
+both passed. CI, docs publication and release workflows now all check the generated
+artifact before their final work. No remote workflow, deployment or publication was
+triggered. Strict MkDocs generation passed. G5 is closed; G6 real harness coverage and
+the final requirement-by-requirement completion audit remain. The previous goal turn
+was progress: account admission and aggregate repair acceptance were committed as
+8c39f6f, with 1531 full-suite passes, one skip and the additional public repair case.
+
+Revalidated the full suite's single skip: ansible-playbook was installed in .venv
+but absent from PATH. The skipped full-deploy syntax check passed with that bin
+directory on the child PATH and a private /tmp Ansible working directory. The
+independent systemd environment parsers also passed (six checks). CI now installs
+the stands extra after its base-wheel smoke and puts the test environment's bin
+directory on PATH, so the optional playbook syntax test is actually exercised.
+This is local syntax validation, not a remote deployment.

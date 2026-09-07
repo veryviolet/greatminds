@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "date": "2026-09-07",
+  "source_commit": "8c39f6f",
+  "scope": "Installed Python 3.11/3.12 functional compatibility and generated-reference reproducibility",
+  "pipeline_samples": [
+    {
+      "implementation": {
+        "version": "2.6.0",
+        "package_sha256": "33d20ee390227a41bb9121e595f77d8a45d137b03985e2699759ac08c7dcc9bf",
+        "python": "3.11.15",
+        "dependencies": {
+          "agent-client-protocol": "0.11.1",
+          "pydantic": "2.13.5",
+          "pydantic-core": "2.46.5",
+          "pyyaml": "6.0.3",
+          "click": "8.5.0",
+          "packaging": "26.3"
+        },
+        "schema_sha256": "fbfb3fd8230fe6f62e4b3a093f3e3c1fd1ffbe35498b6c4239e97a3ff16ed4d2",
+        "installed": true
+      },
+      "raw_report_sha256": "d441a8b33c24473060ed59abd2e90f9ce470cda2baeb559c4edf0d2292a5b611",
+      "verified": true,
+      "daemon_owned_checks": 3,
+      "independent_test_cases": 6,
+      "agent_invocations": 3,
+      "idle_invocations": 0,
+      "restart_unchanged": true,
+      "inference": false,
+      "fixture_sha256": "fe948507b2913009d472bd2bc85fc23560552e16387b73cdb0d520c4ce1a916d",
+      "probe_sha256": "1c6e7facb3ac49eda75fe603efc8b6576b9bdef17e1b1bfd3a615043119e7946",
+      "project_builder_sha256": "a71c1d57ce3a406d04bec3cd1e94074d4188a070191d78a4c5c1cf2db5f2b2c6"
+    },
+    {
+      "implementation": {
+        "version": "2.6.0",
+        "package_sha256": "33d20ee390227a41bb9121e595f77d8a45d137b03985e2699759ac08c7dcc9bf",
+        "python": "3.12.3",
+        "dependencies": {
+          "agent-client-protocol": "0.11.1",
+          "pydantic": "2.13.5",
+          "pydantic-core": "2.46.5",
+          "pyyaml": "6.0.3",
+          "click": "8.5.0",
+          "packaging": "26.3"
+        },
+        "schema_sha256": "fbfb3fd8230fe6f62e4b3a093f3e3c1fd1ffbe35498b6c4239e97a3ff16ed4d2",
+        "installed": true
+      },
+      "raw_report_sha256": "12b4fccc107d5f6b25cc077cb7fc26a60ede6cb8611f184092bc141bb994cec2",
+      "verified": true,
+      "daemon_owned_checks": 3,
+      "independent_test_cases": 6,
+      "agent_invocations": 3,
+      "idle_invocations": 0,
+      "restart_unchanged": true,
+      "inference": false,
+      "fixture_sha256": "fe948507b2913009d472bd2bc85fc23560552e16387b73cdb0d520c4ce1a916d",
+      "probe_sha256": "1c6e7facb3ac49eda75fe603efc8b6576b9bdef17e1b1bfd3a615043119e7946",
+      "project_builder_sha256": "a71c1d57ce3a406d04bec3cd1e94074d4188a070191d78a4c5c1cf2db5f2b2c6"
+    }
+  ],
+  "generated_reference_check_python": [
+    "3.11.15",
+    "3.12.3",
+    "3.13.7"
+  ],
+  "ci_resource_and_setup_smoke_python": "3.13.7",
+  "limitations": [
+    "Pipeline samples ran concurrently and are not a performance comparison.",
+    "All executor prompts used deterministic fixtures, not live models.",
+    "This is not a full regression-suite run on Python 3.11/3.12 or a remote GitHub Actions execution."
+  ]
+}

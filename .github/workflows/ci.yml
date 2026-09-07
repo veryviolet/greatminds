@@ -59,10 +59,8 @@ jobs:
           for needed in [
               "schema.yaml",
               "COORDINATE.md",
-              "bootstrap.md",
-              "codex/profiles/developer.config.toml",
-              "plugins/coordination-protocol/.claude-plugin/plugin.json",
-              "mcp/canon.json",
+              "systemd/greatminds-daemon@.service",
+              "templates/stand-profiles.yaml",
               "templates/PROJECT.md.template",
           ]:
               assert data.joinpath(needed).is_file(), needed
@@ -72,20 +70,21 @@ jobs:
       - name: smoke — setup scaffolds a fresh project
         run: |
           .venv-test/bin/greatminds setup --project-dir /tmp/gm_ci_test
-          test -f /tmp/gm_ci_test/coordination/coord.yaml
-          test -f /tmp/gm_ci_test/coordination/PROJECT.md
+          test -f /tmp/gm_ci_test/coordination/execution.yaml
+          .venv-test/bin/greatminds project execution --config /tmp/gm_ci_test/coordination/execution.yaml > /dev/null
           test -d /tmp/gm_ci_test/.greatminds/feature_inbox
           test ! -e /tmp/gm_ci_test/schema.yaml
           test ! -e /tmp/gm_ci_test/COORDINATE.md
           test ! -e /tmp/gm_ci_test/coord.yaml
           test -f /tmp/gm_ci_test/.greatminds/schema.yaml
-          test -f /tmp/gm_ci_test/.greatminds/COORDINATE.md
-          test -f /tmp/gm_ci_test/.greatminds/PROJECT.env
 
       - name: install test deps + run pytest regression suite
         run: |
-          .venv-test/bin/pip install --quiet pytest pyyaml
-          .venv-test/bin/pytest tests/ -v
+          .venv-test/bin/pip install --quiet pytest pyyaml 'greatminds[stands]'
+          PATH="$PWD/.venv-test/bin:$PATH" .venv-test/bin/pytest tests/ -v
+
+      - name: check generated contract reference against installed wheel
+        run: .venv-test/bin/python tools/generate_contract_reference.py --check
 
       - name: test VS Code extension harness
         run: npm test --prefix vscode-extension

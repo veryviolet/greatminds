@@ -1,8 +1,11 @@
 # Transitions
 
-Allowed transitions are encoded in the packaged schema copied to
-`.greatminds/schema.yaml` in an installed project. The CLI enforces the current
+Allowed transitions come from the effective installed schema; the project copy
+at `.greatminds/schema.yaml` is a diagnostic mirror. The CLI enforces the current
 role, current queue, target queue, and required readiness evidence.
+
+See the [generated contract reference](contract-reference.md#task-transitions)
+for the current mechanical transition table and registered requirement names.
 
 `verified/` is not an absolute sink. If later review finds that verified work
 is wrong, invalid, or already reverted, `ARCHITECT-REVIEWER` can append a

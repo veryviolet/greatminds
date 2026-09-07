@@ -59,7 +59,7 @@ were inspected. It does not turn fixture coverage into live harness coverage.
 | C5: aggregate stable findings, scoped repair, private bundle and no model turn | Doctor/bundle suites; public doctor → exact emitted command resolution → repeat diagnosis; account hold repair cycle; maintenance/deployment recovery fixtures | Confirmed G7 concrete fault cycles with unchanged task data, idempotent resolution, no command/agent execution and no implicit retry |
 | C6: run-bound authority, stale/wrong-role rejection, explicit trust boundary | Token/revision/role/workspace checks; domain/command/permission tests | Confirmed cooperative shared-filesystem boundary; no OS isolation claim |
 | C7: maintainable service boundaries, package examples and release evidence | Runtime/domain services; source and wheel scenarios; current changelog updated by this audit | Present and exercised; existing CLI validators remain shared during incremental extraction |
-| C7: generated mechanical reference from validated contracts | JSON `project schema`/`project execution` and generated assigned context exist | **Open G5:** no reproducible checked-in mechanical reference generator was found; add and verify the reference artifact |
+| C7: generated mechanical reference from validated contracts | [Generated reference](contract-reference.md), exact-text `--check`, role/queue/validator checks, all presets through execution validation | Confirmed G5: deterministic source fingerprints and drift tests; installed-wheel generation matches on Python 3.11/3.12/3.13; CI/docs/release workflows enforce the check |
 | C7: real extension-host smoke | [VS Code 1.92.2 evidence](evidence/vscode-extension-host-2026-09-07.json), isolated launcher, process argv/cleanup assertions | Confirmed limited host smoke, distinct from mock UI tests |
 | C8: local operation, evidence, recovery and optional integrations; documented host envelope | Filesystem runtime, base-wheel fixture, installed docs/README corrected to Linux `/proc` + pidfd | Confirmed current host/scope statement; native macOS/Windows daemon support is not claimed |
 | Next phase: local web workspace | Agreed plan explicitly places it after modernization | Deferred as requested; no database migration, distributed scheduler or automatic model selection introduced |
@@ -79,7 +79,7 @@ were inspected. It does not turn fixture coverage into live harness coverage.
    crash uncertainty; retry cannot reset cost. The pinned schema contradicts
    itself about token scope, so these samples cannot support a token budget.
    Cost limits are reactive and allow one bootstrap prompt for a new session;
-   they do not promise a hard spending cap. G5 and G6 below remain open.
+   they do not promise a hard spending cap. G6 below remains open.
 3. **G3 — task timing and comparison: implemented and measured.** Add the missing observable queue/validation/
    accepted-progress intervals, keeping unknowable times unknown. Compare an
    equivalent workload before/after; existing mixed-model durations are not a
@@ -118,8 +118,18 @@ were inspected. It does not turn fixture coverage into live harness coverage.
    credential inference, model switching or implicit live harness mapping exists.
    An [independently installed base-wheel fixture](evidence/account-admission-2026-09-07.json)
    confirms restart admission, explicit CLI resume and stale-action rejection.
-5. **G5 — generated contract reference.** Produce mechanical role/transition/runtime
-   reference from the validated contract and verify it cannot silently drift.
+5. **G5 — generated contract reference: implemented and verified.**
+   `tools/generate_contract_reference.py` emits complete role declarations, queue
+   and transition tables, declared SYSTEM operations, run states, normalized record
+   fields/defaults and validated examples of all presets. Unknown references or
+   unregistered requirement validators fail generation. `--check` detects missing
+   or stale output without rewriting it; source fingerprints include the validators
+   and controllers behind declarations. The reference deliberately distinguishes
+   record fields from the full input-validation grammar and dynamic domain gates.
+   [Installed-wheel evidence](evidence/contract-reference-2026-09-07.json) confirms
+   reproducibility on Python 3.11/3.12/3.13 and real offline pipelines on 3.11/3.12.
+   CI, documentation and release workflows check drift. Two actual CI smoke steps
+   now validate the current package/setup, replacing removed native artifacts.
 6. **G7 — combined repair acceptance: verified.**
    `test_aggregate_repair_cycle.py` invokes public `run doctor --json`, executes
    the exact emitted command-resolution argv/environment/cwd, repeats resolution

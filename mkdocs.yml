@@ -63,6 +63,7 @@ nav:
   - CLI Reference: cli-reference/index.md
   - Architecture:
       - Overview: architecture/overview.md
+      - Generated Contract Reference: architecture/contract-reference.md
       - Filesystem Layout: architecture/filesystem-layout.md
       - Transitions: architecture/transitions.md
       - Daemon and Agents: architecture/daemon-and-agents.md

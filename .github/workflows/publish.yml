@@ -67,6 +67,9 @@ jobs:
             .venv-test/bin/greatminds "$sub" --help > /dev/null
           done
 
+      - name: check generated contract reference
+        run: .venv-test/bin/python tools/generate_contract_reference.py --check
+
       - name: test VS Code extension harness
         run: npm test --prefix vscode-extension
 
