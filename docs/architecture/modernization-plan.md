@@ -2563,3 +2563,12 @@ for this live conversation proof, retaining D exclusively for domain completion.
 This advances A5/M5 without asserting unsupported domain work or other installations.
 No model/provider/account configuration was changed. G6's recorded external access
 and configuration issues remain; overall goal completion is still unproven.
+
+Cursor follow-up used only the native debug log tied to the exact earlier probe PID
+and the installed ACP handler source. It shows failed cached-login validation,
+starting browser login and waiting for its result; shared-service initialization
+was not reached. No additional auth request or inference was sent. This changes the
+next action from generic timeout diagnosis to completing valid native login, while
+leaving the reason cache validation failed unknown. Only allowlisted markers and
+source/log fingerprints are recorded in evidence/acp-cursor-auth-diagnosis-2026-09-07.json;
+no authorization URL, token or account identity is retained in repository evidence.

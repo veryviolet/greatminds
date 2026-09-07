@@ -301,7 +301,7 @@ settings were used; no provider or identity was selected implicitly.
 | Cline 3.0.61 | Session created; synthetic prompt returned -32603 without assistant text | Native re-authentication, identified by private stderr |
 | OpenHands 1.16.0 | Local session returned -32000 | Configure agent/model: installed local handler maps missing agent specification to this response |
 | Gemini 0.49.0 | Configured `oauth-personal` explicitly rejected | Individual access through this client was discontinued; an applicable supported access method is required |
-| Cursor 2026.06.15-18-00-12-6f5a2cf | Native status reports cached login; explicit `cursor_login` timed out after 30 seconds | Resolve ACP authentication; underlying cause remains inconclusive |
+| Cursor 2026.06.15-18-00-12-6f5a2cf | Native status reports cached login; explicit `cursor_login` timed out after 30 seconds | Complete a valid Cursor login; the recorded ACP handler waited for browser authentication |
 
 Gemini's response agrees with the [upstream individual-access announcement](https://github.com/google-gemini/gemini-cli/discussions/28017).
 It is not evidence of missing cached credentials. Cursor's documented
@@ -383,3 +383,18 @@ prove domain plan generation, live code editing, mid-turn crash recovery, stream
 terminal detach, Quick Picks or vendor extensions. C cells therefore remain
 distinct from D cells. G6's other installations still need their recorded access
 or configuration issues resolved before full live scenarios can run.
+
+## Cursor authentication diagnosis, 2026-09-07
+
+[Read-only diagnosis](evidence/acp-cursor-auth-diagnosis-2026-09-07.json) matched the
+native debug log to the exact process recorded in the explicit-auth probe. It shows
+`cursor_login` returned a false login check, started browser authentication and
+waited for its result. Shared-service initialization and successful authentication
+were not reached before the deadline. The installed handler source confirms this
+sequence. No additional authentication or model request was sent for this diagnosis.
+
+This narrows the earlier timeout to an unfinished login flow. Native `status`
+reporting cached login is insufficient for this ACP handler. The precise reason
+the cache failed validation remains unknown; credentials, account identities and
+authorization URLs were not exported. A valid completed native login is needed
+before repeating Cursor's session/model/worktree/cancellation scenarios.

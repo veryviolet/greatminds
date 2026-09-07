@@ -143,7 +143,8 @@ were inspected. It does not turn fixture coverage into live harness coverage.
    scenarios. The declared role-by-harness evidence table is now present. Fresh
    authentication checks distinguish missing Qwen configuration, Kimi/Cline login,
    OpenHands agent configuration, discontinued Gemini individual access and an
-   inconclusive Cursor ACP timeout despite cached native login. Cancellation while
+   Cursor ACP browser-login wait despite cached native status (confirmed in the
+   exact probe process log; the reason cache validation failed remains unknown). Cancellation while
    permission is pending passed on Claude/Codex/Grok. Public CLI planner/live-developer
    conversations also passed session recall after daemon restart, duplicate delivery
    and cursor reconnect on all three. These checks do not establish the remaining
