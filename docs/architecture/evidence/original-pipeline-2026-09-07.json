@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "date": "2026-09-07",
+  "scope": "Original native versus continuous ACP daemon; deterministic local task, no inference",
+  "inference": false,
+  "execution_order": [
+    "original-6",
+    "continuous-1",
+    "original-7",
+    "continuous-2",
+    "original-8",
+    "continuous-3"
+  ],
+  "implementations": {
+    "original": {
+      "source_commit": "b8b13f127fc0363cdaa8492954d2c54f3f7970f2",
+      "wheel_sha256": "c041081aae688259d72acf3ae368ce41bff9835c093e76b842a70c150899356a",
+      "native_driver": true,
+      "original_schema_sha256": "55a933465ae8ccb77c9866b817eaba0cf93eab8fd159c48a8a1f827caacef56d",
+      "effective_schema_sha256": "9bd298d965a414ba06525e950c6daa646db4e11af263d7c354dde24f70787f9b",
+      "schema_override": {
+        "auto_update.mode": "disabled"
+      },
+      "fixture_sha256": "56d6e74f7d90ced76372c841c90a1bb5a6a4505f79d42e1dd63fbc9a812948ec",
+      "probe_sha256": "5651de41dfe1dcd2470707466cd362f8a2021842d1f14d1c2b77099cf88f3fe7",
+      "project_builder_sha256": "a71c1d57ce3a406d04bec3cd1e94074d4188a070191d78a4c5c1cf2db5f2b2c6",
+      "samples": [
+        {
+          "elapsed_seconds": 4.633691554889083,
+          "verified": true,
+          "independent_test_cases": 6,
+          "agent_invocations": 5,
+          "idle_invocations": 2,
+          "restart_unchanged": true,
+          "sample": 6,
+          "raw_report_sha256": "0bfc36ecdcf43c8d3ef8e809602b220ad88920ea9e7abd401069d92d798e0e69"
+        },
+        {
+          "elapsed_seconds": 4.692284616874531,
+          "verified": true,
+          "independent_test_cases": 6,
+          "agent_invocations": 5,
+          "idle_invocations": 2,
+          "restart_unchanged": true,
+          "sample": 7,
+          "raw_report_sha256": "5d7ebd0103f016d8d7fbfe226e6de6d227323491d36c0db2a85e12d47f34d0d2"
+        },
+        {
+          "elapsed_seconds": 4.684643866959959,
+          "verified": true,
+          "independent_test_cases": 6,
+          "agent_invocations": 5,
+          "idle_invocations": 2,
+          "restart_unchanged": true,
+          "sample": 8,
+          "raw_report_sha256": "5cb33d01bf394980f736e9c16647c7215995eab623ef2b2057fa2ce104e9484f"
+        }
+      ],
+      "median_seconds": 4.684643866959959,
+      "python": "3.13.7",
+      "dependencies": {
+        "resolvelib": "1.0.1",
+        "MarkupSafe": "3.0.3",
+        "inotify-simple": "2.0.1",
+        "packaging": "26.3",
+        "pycparser": "3.0",
+        "click": "8.5.0",
+        "greatminds": "2.6.0",
+        "ansible-core": "2.17.14",
+        "PyYAML": "6.0.3",
+        "cffi": "2.1.1",
+        "Jinja2": "3.1.6",
+        "cryptography": "50.0.1"
+      }
+    },
+    "acp": {
+      "source_commit": "4961016641140c0d331d8537de5422b85ebec282",
+      "wheel_sha256": "5fb7bd1a13acaac3fc0eb19f0a1842210c0e468507ed92087ed666c2ca818fd3",
+      "version": "2.6.0",
+      "package_sha256": "17075ae4e78a9cebe591b24d77156a901c84949df4b00d9de450ac6ce5a7bf9c",
+      "python": "3.13.7",
+      "dependencies": {
+        "agent-client-protocol": "0.11.1",
+        "pydantic": "2.13.5",
+        "pydantic-core": "2.46.5",
+        "pyyaml": "6.0.3",
+        "click": "8.5.0",
+        "packaging": "26.3"
+      },
+      "schema_sha256": "fbfb3fd8230fe6f62e4b3a093f3e3c1fd1ffbe35498b6c4239e97a3ff16ed4d2",
+      "installed": true,
+      "fixture_sha256": "f5ca65e474286a561519f536304f3b73c55680fbbb6923cb21edd9bac63127b4",
+      "probe_sha256": "1c6e7facb3ac49eda75fe603efc8b6576b9bdef17e1b1bfd3a615043119e7946",
+      "project_builder_sha256": "a71c1d57ce3a406d04bec3cd1e94074d4188a070191d78a4c5c1cf2db5f2b2c6",
+      "samples": [
+        {
+          "elapsed_seconds": 10.596758847823367,
+          "verified": true,
+          "independent_test_cases": 6,
+          "agent_invocations": 3,
+          "idle_invocations": 0,
+          "restart_unchanged": true,
+          "sample": 1,
+          "raw_report_sha256": "02d5209bdedd9d3e1783678dd9078500e976dabbf8f8f864f9dea2f1d89489bf"
+        },
+        {
+          "elapsed_seconds": 11.857386343181133,
+          "verified": true,
+          "independent_test_cases": 6,
+          "agent_invocations": 3,
+          "idle_invocations": 0,
+          "restart_unchanged": true,
+          "sample": 2,
+          "raw_report_sha256": "dbda3c914c31ef02be53a07edcbc602a5638e8728f24f4839a7bd13e3f6b4fe2"
+        },
+        {
+          "elapsed_seconds": 10.231640124926344,
+          "verified": true,
+          "independent_test_cases": 6,
+          "agent_invocations": 3,
+          "idle_invocations": 0,
+          "restart_unchanged": true,
+          "sample": 3,
+          "raw_report_sha256": "66fbef4cde2c8f0e1c519636ca40624e4bab9962a155f6c42fbdda74b39d5951"
+        }
+      ],
+      "median_seconds": 10.596758847823367
+    }
+  },
+  "findings": [
+    "All six samples complete developer/tester/reviewer checks, six independent tests, the intended clamp.py merge, worktree cleanup and unchanged completed work after restart.",
+    "Original median 4.685 seconds; ACP median 10.597 seconds. This is an observed wall-time regression, not acceleration.",
+    "Original launches three useful turns and two idle turns; ACP launches exactly three useful turns. Checks and workflow mutations move from the deterministic agent fixture to the daemon."
+  ],
+  "limitations": [
+    "Three samples per version on one host, no statistical speed guarantee.",
+    "Both continuously running public daemon CLIs use a 0.2-second interval; no idle conversation or run history is seeded. Setup, final independent checks and restart verification are outside the timing.",
+    "Fixtures implement equivalent outcomes through different native versus ACP contracts. Schemas and dependencies necessarily differ; this is an architecture comparison, not a single-change experiment.",
+    "Original package code is unmodified. Its private canon overrides only auto_update.mode=disabled to prevent update checking. Original gates still run.",
+    "The original cline executable is a private deterministic wrapper, not Cline or a provider. No model, login, billed-token or quality claim.",
+    "Original checks restart through public daemon reconcile logs; ACP checks core serve once and exact durable run/result/command equality.",
+    "Earlier exploratory original samples and profiling runs are excluded."
+  ]
+}

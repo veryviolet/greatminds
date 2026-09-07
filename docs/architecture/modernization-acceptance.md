@@ -93,8 +93,13 @@ were inspected. It does not turn fixture coverage into live harness coverage.
    now covers independently installed 3b3db47/4961016 wheels with identical schema,
    dependencies and deterministic task fixture: 1145→355 median daemon state reads,
    17.097→16.567 s observed median wall time. Both are modernization checkpoints;
-   the original pre-modernization pipeline baseline remains unproven. These data
+   these data do not cover the original pre-modernization pipeline. These data
    must not be relabeled as an inference or model-quality comparison.
+   The subsequent [original continuous-daemon comparison](evidence/original-pipeline-2026-09-07.json)
+   covers three samples per version with the same prepared task and outcome:
+   original median 4.685 s versus ACP 10.597 s, five versus three agent calls.
+   This records a latency regression despite eliminating two idle calls. G3 stays
+   open for measured overhead reduction; profiling samples are not benchmark data.
 4. **G4 — account admission for explicit quota signals.** Extend shared admission
    only from unambiguous configured/protocol signals, with bounded recovery and
    operator controls. Do not infer credentials, silently switch providers or parse

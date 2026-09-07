@@ -2343,3 +2343,29 @@ task assertions. No timing campaign overlapped a test run. The previous goal tur
 was progress: durable queue/result/conversation measurements were committed as
 4961016. Next, inspect the original execution baseline for a faithful outcome/time
 comparison and use the new fixture to investigate remaining orchestration cost.
+
+### G3 — original continuous daemon baseline (2026-09-07)
+
+Recovered the unmodified pre-modernization b8b13f1 package in an isolated wheel
+environment. The original public coordd runs its native driven roles through a
+private deterministic cline fixture, not the real harness. A private canon changes
+only auto_update.mode to disabled. Original gates remain active. The same prepared
+clamp task runs through developer, tester and reviewer with actual six-case checks,
+merge, worktree cleanup and a restart check. Current ACP comparison now uses one
+continuous public daemon too; three separate serve-once starts would not be an
+equivalent lifecycle. No idle conversations/history are seeded in this campaign.
+
+Three frozen-probe samples per implementation are recorded in
+evidence/original-pipeline-2026-09-07.json. Original times: 4.634, 4.692, 4.685 s;
+ACP 4961016: 10.597, 11.857, 10.232 s. Median wall time regresses from 4.685 to
+10.597 s, while agent invocations fall from five (two idle) to three (zero idle).
+These are synthetic orchestration results, not inference or model quality.
+Both versions passed checks, intended merge and unchanged completed work on restart.
+Different schemas and dependencies are intentional architecture differences.
+
+The original baseline gap now has concrete evidence, including the regression.
+G3 remains open for investigating and reducing measured current overhead. Initial
+profiling finds eager ACP/Pydantic imports in command clients and repeated parsing
+of pinned schema text in result validation. Profiling timings are excluded from
+the comparison. The three probe files and sanitized evidence form a recovery
+checkpoint after the client crash; no runtime change is included here.
