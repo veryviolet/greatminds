@@ -66,7 +66,7 @@ def agent_rows(project, *, config=None, state=None):
 def snapshot(project):
     """Best-effort observation across stores; claims revalidate before execution."""
     from .daemon import assignments
-    from .retry_policy import startup_retry, account_backoff
+    from .retry_policy import retry_admission, account_backoff, no_progress
     from .stand_scheduler import StandScheduler
     from greatminds.domain.stand_deployments import DeploymentLedger
     from greatminds.domain.stand_leases import StandLeaseService
@@ -84,7 +84,8 @@ def snapshot(project):
     result['maintenance_findings'] = MaintenanceService(store, schema).inspect()
     result['assignments'] = [{'task_id': task.task_id, 'binding': binding.id,
                               'role': binding.role, 'reason': reason,
-                              'retry': startup_retry(result, binding, task, config, schema, store.clock())}
+                              'retry': retry_admission(result, binding, task, config, schema, store.clock()),
+                              'progress': no_progress(result, binding, task)}
                              for binding, task, reason in assignments(store, config, schema, snapshot=result)]
     result['accounts'] = {account: account_backoff(result, account, config, store.clock())
                           for account in sorted({b.account for b in config.bindings})}

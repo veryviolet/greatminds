@@ -783,8 +783,7 @@ permission, revision and unresolved-operation gates still apply.
 
 An explicit operator retry permits one further attempt but does not reset the
 count for that unchanged revision. This startup policy does not implement
-provider-reported rate-limit handling, automatic post-prompt retries, or configurable
-no-progress-turn budgets; those remain separate modernization requirements.
+provider-reported rate-limit handling, automatic post-prompt retries, or provider usage/cost budgets; those remain separate modernization requirements.
 
 ### Shared account startup backoff
 
@@ -809,3 +808,28 @@ This controller handles recognized startup failures. Provider-reported rate
 limits, cross-project account coordination and an operator-resettable circuit
 breaker are not implemented by this delay. Per-revision automatic retry limits
 still bound repeated attempts of one unchanged task.
+
+### Bounded turns without workflow progress
+
+Bindings accept `max_no_progress_turns` (1–20, default 1). Completed background
+turns in the same task queue count until an applied `handoff`/`blocked` receipt
+or an intervening queue stage establishes workflow progress. Changes only to
+task-file bytes, token streams, process liveness and daemon restarts do not reset
+the count. Interactive user-paced conversations are not automatic background
+continuations and do not consume this counter.
+
+At the default, a completed prompt without a transition holds the task with
+`no_progress_limit`. A larger explicitly configured budget allows a subsequent
+normal `turn_ended` attempt after `retry_initial_seconds`, provided the pinned
+contracts still match and no command/result/uncertainty gate prevents it. Failed
+or cancelled post-prompt work is not automatically replayed. Human-input and
+no-change results remain explicit holds, even if their application edited task
+metadata. All existing capacity, account, permissions and revision gates apply.
+
+`run status` exposes a `progress` verdict and count per assignment. Admission
+rechecks the limit atomically and records `no_progress_continuation` for each
+continuation of an unchanged revision. Operator retry authorizes one additional
+attempt but does not erase the counter. An operator who changes task content
+within an exhausted queue stage must explicitly retry it or perform an authorized
+workflow transition. This is a workflow-progress budget, not an estimate of code
+quality or a detector of meaningful text changes.

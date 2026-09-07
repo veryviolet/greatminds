@@ -19,7 +19,7 @@ from .stand_scheduler import StandScheduler
 from .store import RunStore, TERMINAL, TaskRevision
 from .supervisor import Supervisor
 from .processes import terminate_group
-from .retry_policy import startup_retry, account_backoff
+from .retry_policy import retry_admission, account_backoff
 
 
 async def _domain_reconcile(loop, pool, results):
@@ -83,7 +83,9 @@ def assignments(store, config, schema, *, snapshot=None):
                     elif receipts and receipts[-1]["envelope"]["decision"] == "needs_input":
                         reason = "human_input_required"
                     else:
-                        reason = startup_retry(snapshot, binding, task, config, schema, store.clock())["reason"]
+                        reason = retry_admission(snapshot, binding, task, config, schema, store.clock())["reason"]
+                if reason == "ready":
+                    reason = retry_admission(snapshot, binding, task, config, schema, observed_at)["reason"]
                 if reason == "ready":
                     reason = account_delays[binding.account]["reason"]
                 if reason == "ready" and len(active) >= config.max_running:

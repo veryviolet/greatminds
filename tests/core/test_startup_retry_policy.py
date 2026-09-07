@@ -6,7 +6,7 @@ import pytest
 from greatminds.core.errors import GreatMindsError
 from greatminds.runtime.observation import configuration
 from greatminds.runtime.store import RunStore, TaskRevision
-from greatminds.runtime.retry_policy import startup_retry
+from greatminds.runtime.retry_policy import retry_admission
 from greatminds.runtime.daemon import assignments
 from test_acp_daemon import project
 
@@ -43,7 +43,7 @@ def test_delay_survives_restart_and_stops_at_budget(tmp_path):
         with pytest.raises(GreatMindsError, match='retry_backoff'):
             claim()
         restarted = RunStore(store.runtime, clock=lambda: now[0])
-        verdict = startup_retry(restarted.snapshot(), binding, task, config, schema, now[0])
+        verdict = retry_admission(restarted.snapshot(), binding, task, config, schema, now[0])
         assert verdict['next_at'] == now[0] + delay
         now[0] += delay
         assert list(assignments(store, config, schema))[0][2] == 'ready'
@@ -66,7 +66,7 @@ def test_permanent_or_uncertain_outcomes_never_auto_retry(tmp_path, reason, prom
     _, store, schema, config, binding, task, now, claim, fail = fixture(tmp_path)
     fail(claim(), reason=reason, prompt_started=prompt, error_type=error)
     now[0] += 10000
-    assert startup_retry(store.snapshot(), binding, task, config, schema, now[0])['reason'] == 'revision_already_attempted'
+    assert retry_admission(store.snapshot(), binding, task, config, schema, now[0])['reason'] == 'revision_already_attempted'
     with pytest.raises(GreatMindsError):
         claim()
 
@@ -76,8 +76,8 @@ def test_disabled_retry_and_contract_drift_do_not_dispatch(tmp_path):
     fail(claim())
     now[0] += 100
     changed = replace(binding, max_startup_retries=0)
-    assert startup_retry(store.snapshot(), changed, task, config, schema, now[0])['reason'] != 'ready'
-    assert startup_retry(store.snapshot(), binding, task, replace(config, max_running=1), schema, now[0])['reason'] != 'ready'
+    assert retry_admission(store.snapshot(), changed, task, config, schema, now[0])['reason'] != 'ready'
+    assert retry_admission(store.snapshot(), binding, task, replace(config, max_running=1), schema, now[0])['reason'] != 'ready'
 
 
 def test_completed_command_before_prompt_is_not_replayed(tmp_path):
@@ -87,7 +87,7 @@ def test_completed_command_before_prompt_is_not_replayed(tmp_path):
     snapshot = store.snapshot()
     snapshot['commands'] = {'test': {'run_id': run.run['id'], 'status': 'completed'}}
     now[0] += 100
-    assert startup_retry(snapshot, binding, task, config, schema, now[0])['reason'] != 'ready'
+    assert retry_admission(snapshot, binding, task, config, schema, now[0])['reason'] != 'ready'
 
 
 @pytest.mark.parametrize('field,value', [('max_startup_retries', -1), ('max_startup_retries', True),
@@ -131,14 +131,14 @@ def test_configured_zero_and_delay_cap_are_enforced(tmp_path, limit):
     _, store, schema, config, binding, task, now, claim, fail = fixture(
         tmp_path, max_startup_retries=limit, retry_initial_seconds=50, retry_max_seconds=10)
     fail(claim())
-    verdict = startup_retry(store.snapshot(), binding, task, config, schema, now[0])
+    verdict = retry_admission(store.snapshot(), binding, task, config, schema, now[0])
     if limit == 0:
         assert verdict['reason'] == 'startup_retry_limit'
     else:
         assert verdict['next_at'] == now[0] + 10
         now[0] += 10
         fail(claim())
-        assert startup_retry(store.snapshot(), binding, task, config, schema, now[0])['next_at'] == now[0] + 10
+        assert retry_admission(store.snapshot(), binding, task, config, schema, now[0])['next_at'] == now[0] + 10
 
 
 def test_operator_status_exposes_retry_time_and_budget(tmp_path):
@@ -160,4 +160,4 @@ def test_pre_prompt_callback_activity_prevents_automatic_replay(tmp_path):
     fail(run)
     state = store.snapshot()
     state['runs'][run.run['id']]['outcome']['pre_prompt_activity'] = True
-    assert startup_retry(state, binding, task, config, schema, now[0] + 100)['reason'] != 'ready'
+    assert retry_admission(state, binding, task, config, schema, now[0] + 100)['reason'] != 'ready'

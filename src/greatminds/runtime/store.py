@@ -228,12 +228,14 @@ class RunStore:
             if sum(run["account"] == binding.account for run in active) >= limit:
                 _error(f"account {binding.account} execution capacity reached")
             if automatic:
-                from .retry_policy import startup_retry
-                retry = startup_retry(state, binding, task, config, schema, self.clock())
+                from .retry_policy import retry_admission
+                retry = retry_admission(state, binding, task, config, schema, self.clock())
                 if retry['reason'] != 'ready':
                     _error(f"automatic dispatch held: {retry['reason']}")
                 if retry.get('retry_of'):
                     self._event(state, 'startup_retry_dispatch', retry['retry_of'], retry)
+                if retry.get('continue_after'):
+                    self._event(state, 'no_progress_continuation', retry['continue_after'], retry)
             from .retry_policy import account_backoff
             if account_backoff(state, binding.account, config, self.clock())['reason'] != 'ready':
                 _error('account_backoff: wait for the shared account retry time')

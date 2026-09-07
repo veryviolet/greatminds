@@ -1633,3 +1633,36 @@ rate-limit handling, operator-resettable account circuit breaking, health/log
 retention and broader budgets/metrics. Account grouping here is project-local;
 it does not claim cross-project credential coordination. Other full-plan
 acceptance requirements remain open.
+
+### Durable workflow no-progress budget (2026-09-07)
+
+Added max_no_progress_turns per binding (1–20, default 1). Completed background
+turns count within the task's queue stage; token updates, process liveness,
+metadata-only revision changes and daemon restart do not reset the count.
+Applied handoff/blocked receipts or an intervening queue stage reset it. User-paced
+conversations are excluded from automatic background turn counting.
+
+With an explicitly larger budget, normal completed turns can continue after
+retry_initial_seconds when contracts still match and no command/result or other
+admission gate holds the task. Unknown post-prompt failures, including those that
+changed task bytes, do not acquire retry authority from that change. Human-input,
+no-change and rejected result holds survive task metadata updates. Explicit
+operator retry permits one additional run, never erases the prior count.
+
+Renamed the shared admission function to retry_admission to reflect startup and
+no-progress decisions. The scheduler and atomic claim use it; admitted
+continuations emit no_progress_continuation. Run status exposes per-assignment
+progress counters/limits. The default observed reason is now no_progress_limit
+for a completed unadvanced task, rather than the ambiguous revision_already_attempted.
+
+Validation: 78 initial policy/config checks passed; 85 ACP-daemon/conversation/
+observation/policy integration checks passed in 97.93s; after tightening changed
+revision handling, 47 final policy checks passed. Tests cover default/expanded
+budgets, delay, store reopen, explicit retry, metadata churn, command/semantic
+holds, invalid limits and actual local ACP echo processes stopping after exactly
+two configured turns. No live provider was invoked.
+
+Remaining supervision/product work includes provider rate-limit handling,
+operator-resettable account circuit breaking, health/retention, richer budgets
+and performance metrics; native assets, remaining docs and the full milestone
+acceptance audit are also still open.

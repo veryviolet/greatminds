@@ -150,7 +150,7 @@ def test_coordd_routes_explicit_execution_contract_through_acp(tmp_path):
     assert run["agent_id"] == "anything-acp"
     status = runner.invoke(cli, ["run", "status", "--project-dir", str(root)])
     assert status.exit_code == 0, status.output
-    assert json.loads(status.output)["assignments"][0]["reason"] == "revision_already_attempted"
+    assert json.loads(status.output)["assignments"][0]["reason"] == "no_progress_limit"
     again = runner.invoke(cli, ["coordd", "--project-dir", str(root), "--once"])
     assert again.exit_code == 0, again.exception
     assert (root / "agent-starts.log").read_text().splitlines() == ["echo"]
