@@ -2299,3 +2299,47 @@ daemon and fixture subprocesses; reusing an editable current install in a baseli
 subprocess would mix implementations. An earlier modernized checkpoint is not
 automatically evidence about the original pre-modernization pipeline. No new
 performance improvement is claimed by this instrumentation checkpoint.
+
+### G3 — equivalent productive workload in isolated wheels (2026-09-07)
+
+Added tools/productive_benchmark.py. It creates a fresh prepared local clamp task,
+50 idle conversations and 100 cancelled run records, then uses the real ACP daemon
+and deterministic fixture agent for developer/tester/reviewer execution. Every
+sample requires three applied typed results, three passing daemon commands, six
+independent test cases, SYSTEM provenance, the intended merged file only, worktree
+cleanup, preserved idle history and no repeated work after restart. Setup and the
+final independent validation/restart assertions are outside timed execution.
+
+Built 3b3db47 and 4961016 as separate offline wheels and installed them into separate
+Python 3.13.7 environments with the same ten packages. Both daemon and fixture CLI
+subprocesses use their own interpreter and pinned CLI argv. Reports identify actual
+installed package contents, schema/dependency versions, fixture/project-builder/
+benchmark hashes and per-role timing observations. The CLI rejects editable source
+unless explicitly requested for development, rejects canon/project/import overrides
+and refuses to replace an existing report. No provider, service or credential was
+used. Initial venv creation hit the default read-only uv cache; using the existing
+writable /tmp/greatminds-build-cache resolved it without changing user directories.
+
+The first two exploratory runs preceded the final provenance fields and are not
+included in the comparison. The six frozen-script runs alternate B/C/C/B/B/C and
+use identical fixture, helper, script, schema and dependency identities. Baseline
+wall times: 17.097, 17.395, 16.930 s; current: 16.567, 16.691, 16.451 s. Median
+daemon RunStore reads: 1145 versus 355 (69.0% reduction); observed median wall time:
+17.097 versus 16.567 s (3.1% lower). The dated sanitized evidence is
+evidence/productive-pipeline-2026-09-07.json. Raw reports and reviewable projects
+remain under /tmp/greatminds-productive-* and /tmp/greatminds-mixed-pipeline-*.
+
+This measures productive orchestration with real checks/merge and synthetic agents,
+not inference, billed tokens or model quality. Read counts exclude subprocesses
+and conversation journals. Three repetitions do not establish a general speed
+guarantee. The baseline is already modernized, and intervening hardening/timing
+changes prevent attributing the complete wall-time difference to one optimization.
+Original pre-modernization pipeline comparison remains a G3 gap; it is not silently
+replaced by this narrower measurement. Missing earlier timing fields stay null.
+
+The new regression scenario with idle history passed in 9.75s; the source-development
+probe and all six independently installed campaign samples passed their complete
+task assertions. No timing campaign overlapped a test run. The previous goal turn
+was progress: durable queue/result/conversation measurements were committed as
+4961016. Next, inspect the original execution baseline for a faithful outcome/time
+comparison and use the new fixture to investigate remaining orchestration cost.

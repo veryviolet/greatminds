@@ -978,6 +978,41 @@ of process death. Old turns without observations keep unknown intervals. These
 fields describe wall-clock boundaries and can overlap other phase measurements;
 they must not be blindly summed as independent work durations.
 
+### Measuring productive orchestration
+
+`tools/productive_benchmark.py` runs a deterministic ACP fixture through the real
+developer → tester → reviewer pipeline. It asserts three applied results, three
+successful daemon commands, six independent test cases, merge of only the intended
+file, worktree cleanup and unchanged runs/results/commands after restart. A supplied
+plan and fixture agent isolate orchestration from inference. Setup and final
+independent checks are outside the timed three-stage pipeline.
+
+Run the same script with independently installed wheel environments, for example:
+
+```sh
+/tmp/before-env/bin/python tools/productive_benchmark.py --repeats 3 --output /tmp/before.json
+/tmp/after-env/bin/python tools/productive_benchmark.py --repeats 3 --output /tmp/after.json
+```
+
+The default load is 50 idle conversations and 100 cancelled run records, preserved
+throughout productive execution. Reports include package/schema/dependency identity,
+fixture and script hashes, per-role observations and read counts for the daemon
+process's RunStore. They exclude subprocess reads and conversation-file reads.
+Editable source execution requires `--allow-source` and is marked accordingly;
+canon/project/Python import overrides are rejected by the benchmark CLI. An output
+path must be new. Temporary projects remain available for inspection.
+
+The [dated six-run comparison](evidence/productive-pipeline-2026-09-07.json) used
+separate wheels from 3b3db47 and 4961016, identical dependency/schema/fixture inputs,
+and alternating runs. Median daemon runtime reads decreased from 1145 to 355
+(69.0%). Observed median pipeline wall time was 17.097 s versus 16.567 s (3.1%
+lower). Three samples per version on one host are descriptive, not a general speed
+guarantee. Both versions are modernization checkpoints; this does not measure the
+original pre-modernization architecture. Other hardening and instrumentation
+changes occurred between them, so individual latency effects are not isolated.
+Token usage and model quality are not measured. Small context-byte differences
+include the different interpreter paths and are not claimed as prompt optimization.
+
 ### Measuring idle daemon overhead
 
 The checkout includes `tools/daemon_idle_benchmark.py`. Run it with the project

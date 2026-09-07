@@ -1,0 +1,580 @@
+{
+  "version": 1,
+  "date": "2026-09-07",
+  "scope": "Offline productive ACP orchestration; both versions are modernization checkpoints",
+  "fixture": {
+    "fixture_sha256": "f5ca65e474286a561519f536304f3b73c55680fbbb6923cb21edd9bac63127b4",
+    "project_builder_sha256": "a71c1d57ce3a406d04bec3cd1e94074d4188a070191d78a4c5c1cf2db5f2b2c6",
+    "benchmark_sha256": "0f9c8703d78993b5cb38902f5c53064a52366e7f851e93e27daeb75b85149c09",
+    "conversations": 50,
+    "history": 100
+  },
+  "execution_order": [
+    "baseline-2",
+    "current-2",
+    "current-3",
+    "baseline-3",
+    "baseline-4",
+    "current-4"
+  ],
+  "inference": false,
+  "implementations": {
+    "baseline": {
+      "source_commit": "3b3db470af8350f69e98201106e2f7238f77a932",
+      "wheel_sha256": "99c20f6b1278f99aad6f9d8d5ba4d7e459385c2c3208b6d01617eb8a45965582",
+      "version": "2.6.0",
+      "package_sha256": "620d2334060a318cffb11a693ea503b721244e3ea2a3b74a93793e0edee6970b",
+      "python": "3.13.7",
+      "dependencies": {
+        "agent-client-protocol": "0.11.1",
+        "pydantic": "2.13.5",
+        "pydantic-core": "2.46.5",
+        "pyyaml": "6.0.3",
+        "click": "8.5.0",
+        "packaging": "26.3"
+      },
+      "schema_sha256": "fbfb3fd8230fe6f62e4b3a093f3e3c1fd1ffbe35498b6c4239e97a3ff16ed4d2",
+      "samples": [
+        {
+          "sample": 2,
+          "raw_report_sha256": "e38aadb307a87b3bc72a6f93ccac8a519615aa3cbc7e4551112aeae909c943d7",
+          "elapsed_seconds": 17.09709992283024,
+          "daemon_runtime_reads": 1145,
+          "stage_seconds": [
+            5.877149854786694,
+            4.922188670840114,
+            6.297535531921312
+          ],
+          "run_count": 3,
+          "applied_results": 3,
+          "successful_commands": 3,
+          "independent_test_cases": 6,
+          "restart_unchanged": true,
+          "roles": [
+            {
+              "role": "DEVELOPER",
+              "context_bytes": 7977,
+              "run_offsets": {
+                "cleanup_complete": 2.859226,
+                "context_ready": 0.240693,
+                "first_prompt_activity": 2.723456,
+                "first_prompt_started": 0.430708,
+                "first_protocol_activity": 2.708466,
+                "process_recorded": 0.295322,
+                "protocol_ready": 0.351972,
+                "session_ready": 0.397137,
+                "workspace_ready": 0.201455
+              },
+              "queue_scope": null,
+              "queue_wait_seconds": null,
+              "claim_to_transition_seconds": null,
+              "preparation_validation_seconds": null,
+              "preparation_validation_attempts": null,
+              "application_elapsed_seconds": null,
+              "received_to_resolution_seconds": null
+            },
+            {
+              "role": "TESTER",
+              "context_bytes": 9437,
+              "run_offsets": {
+                "cleanup_complete": 2.662947,
+                "context_ready": 0.15341,
+                "first_prompt_activity": 2.621046,
+                "first_prompt_started": 0.313233,
+                "first_protocol_activity": 2.60525,
+                "process_recorded": 0.184477,
+                "protocol_ready": 0.239747,
+                "session_ready": 0.287619,
+                "workspace_ready": 0.118396
+              },
+              "queue_scope": null,
+              "queue_wait_seconds": null,
+              "claim_to_transition_seconds": null,
+              "preparation_validation_seconds": null,
+              "preparation_validation_attempts": null,
+              "application_elapsed_seconds": null,
+              "received_to_resolution_seconds": null
+            },
+            {
+              "role": "ARCHITECT-REVIEWER",
+              "context_bytes": 10539,
+              "run_offsets": {
+                "cleanup_complete": 2.93617,
+                "context_ready": 0.17661,
+                "first_prompt_activity": 2.884851,
+                "first_prompt_started": 0.357379,
+                "first_protocol_activity": 2.864758,
+                "process_recorded": 0.211665,
+                "protocol_ready": 0.259278,
+                "session_ready": 0.322943,
+                "workspace_ready": 0.11759
+              },
+              "queue_scope": null,
+              "queue_wait_seconds": null,
+              "claim_to_transition_seconds": null,
+              "preparation_validation_seconds": null,
+              "preparation_validation_attempts": null,
+              "application_elapsed_seconds": null,
+              "received_to_resolution_seconds": null
+            }
+          ]
+        },
+        {
+          "sample": 3,
+          "raw_report_sha256": "256752065718fe10a7988ab0a1682a6d8c57084218be5a42a4cfd2a74ba8635a",
+          "elapsed_seconds": 17.39515896793455,
+          "daemon_runtime_reads": 1203,
+          "stage_seconds": [
+            5.028630197048187,
+            6.285037057008594,
+            6.081349877174944
+          ],
+          "run_count": 3,
+          "applied_results": 3,
+          "successful_commands": 3,
+          "independent_test_cases": 6,
+          "restart_unchanged": true,
+          "roles": [
+            {
+              "role": "DEVELOPER",
+              "context_bytes": 7977,
+              "run_offsets": {
+                "cleanup_complete": 2.653891,
+                "context_ready": 0.143174,
+                "first_prompt_activity": 2.628181,
+                "first_prompt_started": 0.29868,
+                "first_protocol_activity": 2.611767,
+                "process_recorded": 0.173294,
+                "protocol_ready": 0.225816,
+                "session_ready": 0.269221,
+                "workspace_ready": 0.112007
+              },
+              "queue_scope": null,
+              "queue_wait_seconds": null,
+              "claim_to_transition_seconds": null,
+              "preparation_validation_seconds": null,
+              "preparation_validation_attempts": null,
+              "application_elapsed_seconds": null,
+              "received_to_resolution_seconds": null
+            },
+            {
+              "role": "TESTER",
+              "context_bytes": 9437,
+              "run_offsets": {
+                "cleanup_complete": 3.368319,
+                "context_ready": 0.159052,
+                "first_prompt_activity": 3.16908,
+                "first_prompt_started": 0.326796,
+                "first_protocol_activity": 3.152801,
+                "process_recorded": 0.199673,
+                "protocol_ready": 0.254871,
+                "session_ready": 0.296124,
+                "workspace_ready": 0.11577
+              },
+              "queue_scope": null,
+              "queue_wait_seconds": null,
+              "claim_to_transition_seconds": null,
+              "preparation_validation_seconds": null,
+              "preparation_validation_attempts": null,
+              "application_elapsed_seconds": null,
+              "received_to_resolution_seconds": null
+            },
+            {
+              "role": "ARCHITECT-REVIEWER",
+              "context_bytes": 10539,
+              "run_offsets": {
+                "cleanup_complete": 2.937281,
+                "context_ready": 0.171298,
+                "first_prompt_activity": 2.878213,
+                "first_prompt_started": 0.349757,
+                "first_protocol_activity": 2.831252,
+                "process_recorded": 0.212819,
+                "protocol_ready": 0.266841,
+                "session_ready": 0.313096,
+                "workspace_ready": 0.116973
+              },
+              "queue_scope": null,
+              "queue_wait_seconds": null,
+              "claim_to_transition_seconds": null,
+              "preparation_validation_seconds": null,
+              "preparation_validation_attempts": null,
+              "application_elapsed_seconds": null,
+              "received_to_resolution_seconds": null
+            }
+          ]
+        },
+        {
+          "sample": 4,
+          "raw_report_sha256": "51ed640df220a24b2fc4ede20ea43e354e289d1eb38a84e6efa6e1c9f305b4b3",
+          "elapsed_seconds": 16.930358740035444,
+          "daemon_runtime_reads": 1145,
+          "stage_seconds": [
+            5.994538901140913,
+            5.79529067594558,
+            5.140361288096756
+          ],
+          "run_count": 3,
+          "applied_results": 3,
+          "successful_commands": 3,
+          "independent_test_cases": 6,
+          "restart_unchanged": true,
+          "roles": [
+            {
+              "role": "DEVELOPER",
+              "context_bytes": 7977,
+              "run_offsets": {
+                "cleanup_complete": 2.832187,
+                "context_ready": 0.145805,
+                "first_prompt_activity": 2.638354,
+                "first_prompt_started": 0.325765,
+                "first_protocol_activity": 2.623368,
+                "process_recorded": 0.189997,
+                "protocol_ready": 0.250229,
+                "session_ready": 0.289712,
+                "workspace_ready": 0.111096
+              },
+              "queue_scope": null,
+              "queue_wait_seconds": null,
+              "claim_to_transition_seconds": null,
+              "preparation_validation_seconds": null,
+              "preparation_validation_attempts": null,
+              "application_elapsed_seconds": null,
+              "received_to_resolution_seconds": null
+            },
+            {
+              "role": "TESTER",
+              "context_bytes": 9437,
+              "run_offsets": {
+                "cleanup_complete": 2.856704,
+                "context_ready": 0.158358,
+                "first_prompt_activity": 2.833156,
+                "first_prompt_started": 0.340331,
+                "first_protocol_activity": 2.803803,
+                "process_recorded": 0.207618,
+                "protocol_ready": 0.262444,
+                "session_ready": 0.312182,
+                "workspace_ready": 0.120269
+              },
+              "queue_scope": null,
+              "queue_wait_seconds": null,
+              "claim_to_transition_seconds": null,
+              "preparation_validation_seconds": null,
+              "preparation_validation_attempts": null,
+              "application_elapsed_seconds": null,
+              "received_to_resolution_seconds": null
+            },
+            {
+              "role": "ARCHITECT-REVIEWER",
+              "context_bytes": 10539,
+              "run_offsets": {
+                "cleanup_complete": 2.721087,
+                "context_ready": 0.14991,
+                "first_prompt_activity": 2.703034,
+                "first_prompt_started": 0.33039,
+                "first_protocol_activity": 2.690939,
+                "process_recorded": 0.191002,
+                "protocol_ready": 0.24791,
+                "session_ready": 0.286185,
+                "workspace_ready": 0.119691
+              },
+              "queue_scope": null,
+              "queue_wait_seconds": null,
+              "claim_to_transition_seconds": null,
+              "preparation_validation_seconds": null,
+              "preparation_validation_attempts": null,
+              "application_elapsed_seconds": null,
+              "received_to_resolution_seconds": null
+            }
+          ]
+        }
+      ],
+      "median_seconds": 17.09709992283024,
+      "median_daemon_runtime_reads": 1145
+    },
+    "current": {
+      "source_commit": "4961016641140c0d331d8537de5422b85ebec282",
+      "wheel_sha256": "5fb7bd1a13acaac3fc0eb19f0a1842210c0e468507ed92087ed666c2ca818fd3",
+      "version": "2.6.0",
+      "package_sha256": "17075ae4e78a9cebe591b24d77156a901c84949df4b00d9de450ac6ce5a7bf9c",
+      "python": "3.13.7",
+      "dependencies": {
+        "agent-client-protocol": "0.11.1",
+        "pydantic": "2.13.5",
+        "pydantic-core": "2.46.5",
+        "pyyaml": "6.0.3",
+        "click": "8.5.0",
+        "packaging": "26.3"
+      },
+      "schema_sha256": "fbfb3fd8230fe6f62e4b3a093f3e3c1fd1ffbe35498b6c4239e97a3ff16ed4d2",
+      "samples": [
+        {
+          "sample": 2,
+          "raw_report_sha256": "c89d9755212cde435f799f0ff0220f0cd315feda86a265ad1bdbdf610e6f5f45",
+          "elapsed_seconds": 16.567118116188794,
+          "daemon_runtime_reads": 355,
+          "stage_seconds": [
+            5.602873431053013,
+            5.372635341947898,
+            5.591440385906026
+          ],
+          "run_count": 3,
+          "applied_results": 3,
+          "successful_commands": 3,
+          "independent_test_cases": 6,
+          "restart_unchanged": true,
+          "roles": [
+            {
+              "role": "DEVELOPER",
+              "context_bytes": 7972,
+              "run_offsets": {
+                "cleanup_complete": 2.73223,
+                "context_ready": 0.152894,
+                "first_prompt_activity": 2.634241,
+                "first_prompt_started": 0.356788,
+                "first_protocol_activity": 2.623786,
+                "process_recorded": 0.184551,
+                "protocol_ready": 0.231932,
+                "session_ready": 0.303902,
+                "workspace_ready": 0.124417
+              },
+              "queue_scope": "observed_revision_wait",
+              "queue_wait_seconds": 0.026003599166870117,
+              "claim_to_transition_seconds": 3.9639134407043457,
+              "preparation_validation_seconds": 0.2249331851489842,
+              "preparation_validation_attempts": 1,
+              "application_elapsed_seconds": 0.1686544418334961,
+              "received_to_resolution_seconds": 1.3751318454742432
+            },
+            {
+              "role": "TESTER",
+              "context_bytes": 9432,
+              "run_offsets": {
+                "cleanup_complete": 2.684469,
+                "context_ready": 0.146486,
+                "first_prompt_activity": 2.520719,
+                "first_prompt_started": 0.401355,
+                "first_protocol_activity": 2.498122,
+                "process_recorded": 0.188417,
+                "protocol_ready": 0.24025,
+                "session_ready": 0.335243,
+                "workspace_ready": 0.112327
+              },
+              "queue_scope": "accepted_transition_wait",
+              "queue_wait_seconds": 1.6025450229644775,
+              "claim_to_transition_seconds": 3.81892466545105,
+              "preparation_validation_seconds": 0.1721218810416758,
+              "preparation_validation_attempts": 1,
+              "application_elapsed_seconds": 0.16267681121826172,
+              "received_to_resolution_seconds": 1.352360486984253
+            },
+            {
+              "role": "ARCHITECT-REVIEWER",
+              "context_bytes": 10533,
+              "run_offsets": {
+                "cleanup_complete": 2.769975,
+                "context_ready": 0.158611,
+                "first_prompt_activity": 2.581121,
+                "first_prompt_started": 0.406326,
+                "first_protocol_activity": 2.553403,
+                "process_recorded": 0.198762,
+                "protocol_ready": 0.256437,
+                "session_ready": 0.351187,
+                "workspace_ready": 0.117731
+              },
+              "queue_scope": "accepted_transition_wait",
+              "queue_wait_seconds": 1.5724830627441406,
+              "claim_to_transition_seconds": 3.9620423316955566,
+              "preparation_validation_seconds": 0.1317164390347898,
+              "preparation_validation_attempts": 1,
+              "application_elapsed_seconds": 0.25601863861083984,
+              "received_to_resolution_seconds": 1.5144360065460205
+            }
+          ]
+        },
+        {
+          "sample": 3,
+          "raw_report_sha256": "6a04e0dcf6b6dfa5b62bee1d5cbea840408f97c5efb7e46343bed51aa7f451e4",
+          "elapsed_seconds": 16.691363190067932,
+          "daemon_runtime_reads": 355,
+          "stage_seconds": [
+            5.601948914118111,
+            5.428259026957676,
+            5.66097871796228
+          ],
+          "run_count": 3,
+          "applied_results": 3,
+          "successful_commands": 3,
+          "independent_test_cases": 6,
+          "restart_unchanged": true,
+          "roles": [
+            {
+              "role": "DEVELOPER",
+              "context_bytes": 7972,
+              "run_offsets": {
+                "cleanup_complete": 2.778037,
+                "context_ready": 0.145743,
+                "first_prompt_activity": 2.693973,
+                "first_prompt_started": 0.37664,
+                "first_protocol_activity": 2.672271,
+                "process_recorded": 0.187853,
+                "protocol_ready": 0.251126,
+                "session_ready": 0.319943,
+                "workspace_ready": 0.11957
+              },
+              "queue_scope": "observed_revision_wait",
+              "queue_wait_seconds": 0.024758100509643555,
+              "claim_to_transition_seconds": 4.010199546813965,
+              "preparation_validation_seconds": 0.23787082522176206,
+              "preparation_validation_attempts": 1,
+              "application_elapsed_seconds": 0.15726327896118164,
+              "received_to_resolution_seconds": 1.373368740081787
+            },
+            {
+              "role": "TESTER",
+              "context_bytes": 9432,
+              "run_offsets": {
+                "cleanup_complete": 2.911186,
+                "context_ready": 0.153227,
+                "first_prompt_activity": 2.729626,
+                "first_prompt_started": 0.388338,
+                "first_protocol_activity": 2.691989,
+                "process_recorded": 0.197132,
+                "protocol_ready": 0.246531,
+                "session_ready": 0.337234,
+                "workspace_ready": 0.112272
+              },
+              "queue_scope": "accepted_transition_wait",
+              "queue_wait_seconds": 1.617194652557373,
+              "claim_to_transition_seconds": 3.8325514793395996,
+              "preparation_validation_seconds": 0.17137938598170877,
+              "preparation_validation_attempts": 1,
+              "application_elapsed_seconds": 0.15537333488464355,
+              "received_to_resolution_seconds": 1.1752161979675293
+            },
+            {
+              "role": "ARCHITECT-REVIEWER",
+              "context_bytes": 10533,
+              "run_offsets": {
+                "cleanup_complete": 2.919695,
+                "context_ready": 0.155131,
+                "first_prompt_activity": 2.745194,
+                "first_prompt_started": 0.41089,
+                "first_protocol_activity": 2.728571,
+                "process_recorded": 0.197052,
+                "protocol_ready": 0.262253,
+                "session_ready": 0.352105,
+                "workspace_ready": 0.122715
+              },
+              "queue_scope": "accepted_transition_wait",
+              "queue_wait_seconds": 1.5886554718017578,
+              "claim_to_transition_seconds": 4.008255958557129,
+              "preparation_validation_seconds": 0.1507945330813527,
+              "preparation_validation_attempts": 1,
+              "application_elapsed_seconds": 0.2516670227050781,
+              "received_to_resolution_seconds": 1.3149151802062988
+            }
+          ]
+        },
+        {
+          "sample": 4,
+          "raw_report_sha256": "1f18ad4b0b6e25d3b9f08e86c09b208972bef15970f95c7e08b34395997fbe09",
+          "elapsed_seconds": 16.45087797101587,
+          "daemon_runtime_reads": 355,
+          "stage_seconds": [
+            5.1625477720517665,
+            5.507202971959487,
+            5.780966232996434
+          ],
+          "run_count": 3,
+          "applied_results": 3,
+          "successful_commands": 3,
+          "independent_test_cases": 6,
+          "restart_unchanged": true,
+          "roles": [
+            {
+              "role": "DEVELOPER",
+              "context_bytes": 7972,
+              "run_offsets": {
+                "cleanup_complete": 2.900262,
+                "context_ready": 0.153036,
+                "first_prompt_activity": 2.660402,
+                "first_prompt_started": 0.37394,
+                "first_protocol_activity": 2.643759,
+                "process_recorded": 0.184741,
+                "protocol_ready": 0.242146,
+                "session_ready": 0.315025,
+                "workspace_ready": 0.112766
+              },
+              "queue_scope": "observed_revision_wait",
+              "queue_wait_seconds": 0.02086329460144043,
+              "claim_to_transition_seconds": 3.5599312782287598,
+              "preparation_validation_seconds": 0.23581884405575693,
+              "preparation_validation_attempts": 1,
+              "application_elapsed_seconds": 0.1606307029724121,
+              "received_to_resolution_seconds": 0.9553203582763672
+            },
+            {
+              "role": "TESTER",
+              "context_bytes": 9432,
+              "run_offsets": {
+                "cleanup_complete": 2.891119,
+                "context_ready": 0.15193,
+                "first_prompt_activity": 2.713767,
+                "first_prompt_started": 0.392746,
+                "first_protocol_activity": 2.676384,
+                "process_recorded": 0.178632,
+                "protocol_ready": 0.239725,
+                "session_ready": 0.332142,
+                "workspace_ready": 0.113255
+              },
+              "queue_scope": "accepted_transition_wait",
+              "queue_wait_seconds": 1.6266589164733887,
+              "claim_to_transition_seconds": 3.8205506801605225,
+              "preparation_validation_seconds": 0.17605566699057817,
+              "preparation_validation_attempts": 1,
+              "application_elapsed_seconds": 0.17109417915344238,
+              "received_to_resolution_seconds": 1.1819748878479004
+            },
+            {
+              "role": "ARCHITECT-REVIEWER",
+              "context_bytes": 10533,
+              "run_offsets": {
+                "cleanup_complete": 2.815369,
+                "context_ready": 0.148555,
+                "first_prompt_activity": 2.713446,
+                "first_prompt_started": 0.398304,
+                "first_protocol_activity": 2.699481,
+                "process_recorded": 0.181435,
+                "protocol_ready": 0.241984,
+                "session_ready": 0.334022,
+                "workspace_ready": 0.115168
+              },
+              "queue_scope": "accepted_transition_wait",
+              "queue_wait_seconds": 1.6745591163635254,
+              "claim_to_transition_seconds": 4.125742197036743,
+              "preparation_validation_seconds": 0.13687382289208472,
+              "preparation_validation_attempts": 1,
+              "application_elapsed_seconds": 0.25287342071533203,
+              "received_to_resolution_seconds": 1.4561073780059814
+            }
+          ]
+        }
+      ],
+      "median_seconds": 16.567118116188794,
+      "median_daemon_runtime_reads": 355
+    }
+  },
+  "limitations": [
+    "Deterministic fixture agents, supplied plan, local checks and merge; no inference or model-quality measurement.",
+    "Baseline 3b3db47 is already modernized; this is not an original pre-modernization pipeline measurement.",
+    "Three fresh projects per version on one host; small latency differences are descriptive, not a statistical guarantee.",
+    "Read counts cover RunStore reads in the daemon process, excluding subprocesses and conversation journals.",
+    "Setup and final independent validation/restart assertions are outside the timed three-stage pipeline.",
+    "Intermediate changes include protocol evidence, retention, usage budgets and timing; do not attribute every difference to one optimization.",
+    "Missing baseline queue/validation/progress measurements remain null rather than reconstructed."
+  ],
+  "comparison": {
+    "observed_median_wall_time_reduction_percent": 3.0998345276893713,
+    "median_daemon_runtime_read_reduction_percent": 68.99563318777292
+  }
+}

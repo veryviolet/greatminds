@@ -89,6 +89,12 @@ were inspected. It does not turn fixture coverage into live harness coverage.
    resolution, and timestamps conversational turns. Real three-role pipeline and
    crash/retry fixtures exercise these records. Controlled productive measurements
    and comparison remain open; first model activity is still not useful work.
+   A [six-run productive comparison](evidence/productive-pipeline-2026-09-07.json)
+   now covers independently installed 3b3db47/4961016 wheels with identical schema,
+   dependencies and deterministic task fixture: 1145→355 median daemon state reads,
+   17.097→16.567 s observed median wall time. Both are modernization checkpoints;
+   the original pre-modernization pipeline baseline remains unproven. These data
+   must not be relabeled as an inference or model-quality comparison.
 4. **G4 — account admission for explicit quota signals.** Extend shared admission
    only from unambiguous configured/protocol signals, with bounded recovery and
    operator controls. Do not infer credentials, silently switch providers or parse
