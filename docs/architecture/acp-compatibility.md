@@ -353,3 +353,9 @@ and [operator-assisted mixed pipeline](evidence/acp-mixed-pipeline-completed-202
 P cells derive from [permission approval](evidence/acp-permissions-2026-09-06.json)
 and pending-permission cancellation above. This is deliberately narrower than
 all roles on all harnesses. G6 and overall modernization acceptance remain open.
+
+The offline conversation acceptance case separately exercises all ten agent roles:
+two FIFO user turns share one daemon-owned ACP session, preserve streamed events,
+create no domain result and do not relaunch after an idle restart. All ten cases
+passed on the subprocess fixture. This confirms the common role-independent
+conversation mechanism, not live domain coverage; the matrix above is unchanged.

@@ -2526,3 +2526,9 @@ separating completed domain roles, synthetic permission-only coverage, unverifie
 roles and auth/configuration gates. Both dated evidence files are retained in
 architecture/evidence. G6 remains open; no unsupported cell is marked as passed.
 This checkpoint also records recovery after another desktop client interruption.
+
+Expanded the existing subprocess conversation acceptance case from four roles to
+all ten agent roles, including LIVE-DEVELOPER. All ten passed: two FIFO prompts use
+one daemon-owned session, emit text, create no task result and do not launch again
+on an idle restart. This is fixture evidence for role-independent interaction,
+not a claim that the remaining live role/harness matrix cells passed.

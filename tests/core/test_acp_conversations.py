@@ -27,7 +27,10 @@ def setup(root, scenario='echo', role='ARCHITECT-PLANNER', **limits):
     return store
 
 
-@pytest.mark.parametrize('role',['ARCHITECT-PLANNER','DEVELOPER','TESTER','ARCHITECT-REVIEWER'])
+@pytest.mark.parametrize('role', [
+    'ARCHITECT-PLANNER', 'ARCHITECT-REVIEWER', 'DEVELOPER', 'UI-DEVELOPER',
+    'LIVE-DEVELOPER', 'TECHNICAL-WRITER', 'TESTER', 'READER', 'EXPLORER', 'MAINTAINER',
+])
 def test_multiple_user_turns_use_one_daemon_owned_session_without_task(tmp_path, role):
     store=setup(tmp_path,role=role)
     store.enqueue('first user prompt',request_id='z')
