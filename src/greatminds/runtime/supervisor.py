@@ -20,6 +20,7 @@ from .store import Claim, RunStore, TERMINAL, TaskRevision
 from .workspaces import prepare_workspace_async
 from .commands import CommandService
 from .permissions import PermissionService
+from .input_budget import InputBudgetExceeded, check_prompt
 
 
 class Supervisor:
@@ -190,6 +191,8 @@ class Supervisor:
                 from .context import compile_context
                 prompt = compile_context(self.store, claim, self.schema)
             metrics["context_bytes"] = len(prompt.encode())
+            first_prompt = prompt if current_turn is None else prompt + '\nUser message:\n' + current_turn['prompt']
+            check_prompt(first_prompt, binding)
             env = agent.environment_values(self.environment)
             env.update(GREATMINDS_PROJECT_DIR=str(self.project), GREATMINDS_ROLE=binding.role,
                        GREATMINDS_RUN_ID=run_id, GREATMINDS_RUN_TOKEN=claim.token)
@@ -238,7 +241,16 @@ class Supervisor:
                 if conversation is not None:
                     conversation.set_session(self.id, session_id)
                 prompt_deadline = time.monotonic() + binding.timeout_seconds
+                def reserve(text):
+                    size = check_prompt(text, binding)
+                    reservation = self.store.reserve_prompt_input(
+                        run_id, owner_id=self.id, request_id=uuid.uuid4().hex,
+                        size=size, limit=binding.max_session_input_bytes)
+                    metrics["session_input_bytes_reserved"] = reservation["used_bytes"]
+                    metrics["input_bytes_reserved"] = metrics.get("input_bytes_reserved", 0) + size
+
                 if conversation is None:
+                    reserve(prompt)
                     metrics["prompt_started"] = True
                     result = await transport.prompt(prompt, timeout=binding.timeout_seconds)
                 else:
@@ -256,10 +268,12 @@ class Supervisor:
                         prompt_deadline = time.monotonic() + binding.timeout_seconds
                         self.store._check_revision(TaskRevision(claim.run['task_id'], claim.run['task_path'],
                                                                claim.run['task_revision']))
+                        turn_prompt = prompt + '\nUser message:\n' + current_turn['prompt']
+                        reserve(turn_prompt)
                         accept_output = True
                         metrics["prompt_started"] = True
                         pending = asyncio.create_task(transport.prompt(
-                            prompt + '\nUser message:\n' + current_turn['prompt'], timeout=binding.timeout_seconds))
+                            turn_prompt, timeout=binding.timeout_seconds))
                         try:
                             while not pending.done():
                                 await asyncio.wait({pending}, timeout=.1)
@@ -287,6 +301,9 @@ class Supervisor:
                     target, reason = "completed", "turn_ended"
                 else:
                     target, reason = "failed", f"agent_stop_{result.stop_reason}"
+        except InputBudgetExceeded as exc:
+            target, reason = "failed", "input_budget_exceeded"
+            metrics["input_budget"] = exc.details
         except RequestError as exc:
             target = "waiting_auth" if exc.code == -32000 else "failed"
             reason = "authentication_required" if exc.code == -32000 else "protocol_error"

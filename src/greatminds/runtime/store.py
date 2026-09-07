@@ -346,6 +346,41 @@ class RunStore:
             self._event(state, target, run_id, payload)
             return {k: copy.deepcopy(v) for k, v in run.items() if k != "token_sha256"}
 
+    def reserve_prompt_input(self, run_id: str, *, owner_id: str, request_id: str,
+                             size: int, limit: int) -> dict:
+        """Reserve known input before sending; uncertain sends retain their debit."""
+        from .input_budget import InputBudgetExceeded
+        if type(size) is not int or size < 0 or type(limit) is not int or limit < 1:
+            _error("invalid prompt input reservation")
+        safe_name(request_id)
+        with self._transaction() as state:
+            run = self._run(state, run_id)
+            if run["owner_id"] != owner_id or run["state"] != "running" or not run.get("session_id"):
+                _error("prompt input requires the running session's supervisor", 3)
+            reservations = run.setdefault("input_reservations", {})
+            previous = reservations.get(request_id)
+            if previous is not None:
+                if previous["requested_bytes"] != size or previous["limit_bytes"] != limit:
+                    _error("prompt reservation identity reused with different contents")
+                return copy.deepcopy(previous)
+            history = [other for other in state["runs"].values()
+                       if other["id"] != run_id and all(other.get(key) == run[key] for key in
+                                                       ("agent_sha256", "workspace", "session_id"))]
+            if any(not other.get("input_reservations") and
+                   other.get("outcome", {}).get("prompt_started") is not False for other in history):
+                raise InputBudgetExceeded("session_history_unknown", limit=limit, used=None, requested=size)
+            used = sum(item["requested_bytes"]
+                       for other in state["runs"].values()
+                       if all(other.get(key) == run[key] for key in
+                              ("agent_sha256", "workspace", "session_id"))
+                       for item in other.get("input_reservations", {}).values())
+            if used + size > limit:
+                raise InputBudgetExceeded("session", limit=limit, used=used, requested=size)
+            result = {"requested_bytes": size, "used_bytes": used + size, "limit_bytes": limit}
+            reservations[request_id] = result
+            self._event(state, "prompt_input_reserved", run_id, {"request_id": request_id, **result})
+            return copy.deepcopy(result)
+
     def record_process(self, run_id: str, *, owner_id: str, identity: dict) -> None:
         with self._transaction() as state:
             run = self._run(state, run_id)

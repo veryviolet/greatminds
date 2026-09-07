@@ -13,13 +13,13 @@ from greatminds.runtime.interactions import ConversationStore
 SERVER = Path(__file__).resolve().parents[1] / 'fixtures/acp_server.py'
 
 
-def setup(root, scenario='echo', role='ARCHITECT-PLANNER'):
+def setup(root, scenario='echo', role='ARCHITECT-PLANNER', **limits):
     (root/'coordination').mkdir()
     path=root/'coordination/execution.yaml'
     path.write_text(yaml.safe_dump({'version':1,'agents':{'fixture':{
         'transport':'acp','argv':[sys.executable,str(SERVER),scenario],
         'adapter_version':'fixture','harness_version':'fixture'}},
-        'bindings':{'chat':{'agent':'fixture','role':role,'timeout_seconds':5}}}))
+        'bindings':{'chat':{'agent':'fixture','role':role,'timeout_seconds':5,**limits}}}))
     schema=load_schema_snapshot()
     config=load_execution_config(path,roles=set(schema.document['roles']))
     store=ConversationStore.create(root/'.greatminds',binding=config.bindings[0],

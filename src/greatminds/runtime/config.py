@@ -99,6 +99,8 @@ class RoleBinding:
     account: str = "default"
     max_running: int = 1
     timeout_seconds: int = 1800
+    max_prompt_bytes: int = 262144
+    max_session_input_bytes: int = 1048576
     max_no_progress_turns: int = 1
     max_startup_retries: int = 2
     retry_initial_seconds: int = 5
@@ -220,6 +222,8 @@ def parse_execution_config(document: Any, *, roles: set[str]) -> ExecutionConfig
             account=safe_name(item.get("account", "default")),
             max_running=_positive(item.get("max_running", 1), "max_running"),
             timeout_seconds=_positive(item.get("timeout_seconds", 1800), "timeout_seconds"),
+            max_prompt_bytes=_positive(item.get("max_prompt_bytes", 262144), "max_prompt_bytes"),
+            max_session_input_bytes=_positive(item.get("max_session_input_bytes", 1048576), "max_session_input_bytes"),
             max_startup_retries=retries, max_no_progress_turns=no_progress,
             retry_initial_seconds=_positive(item.get("retry_initial_seconds", 5), "retry_initial_seconds"),
             retry_max_seconds=_positive(item.get("retry_max_seconds", 60), "retry_max_seconds")))

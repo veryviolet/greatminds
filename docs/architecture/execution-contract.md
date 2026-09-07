@@ -835,3 +835,35 @@ attempt but does not erase the counter. An operator who changes task content
 within an exhausted queue stage must explicitly retry it or perform an authorized
 workflow transition. This is a workflow-progress budget, not an estimate of code
 quality or a detector of meaningful text changes.
+
+## Bounded client input
+
+Each binding accepts positive integer `max_prompt_bytes` (default 262144) and
+`max_session_input_bytes` (default 1048576). The first limits one complete
+UTF-8 text prompt, including compiled context and interactive user input. An
+oversized first prompt fails before launching the ACP process. Later interactive
+messages are checked before sending. Text is never silently truncated.
+
+The session limit bounds cumulative client-submitted UTF-8 text for the same
+agent manifest, workspace and ACP session ID in the project store. Each send
+reserves its bytes durably before calling ACP. Repeated context counts each time
+it is sent. Reservations survive process/daemon interruption and session loading;
+an uncertain send retains its debit. Store-level reservation retries with the
+same identity are idempotent. Starting a distinct session creates a distinct
+input budget; the runtime does not silently discard a conversation to do so.
+
+A failed limit produces `input_budget_exceeded`. Run outcome `input_budget`
+identifies prompt/session budget, limit, used and requested bytes. A known older
+session without sufficient reservation evidence reports `session_history_unknown`
+with `used_bytes: null`; it is not treated as empty. Operator remedies include
+reducing the requested input, explicitly configuring a larger budget, or starting
+a new conversation with deliberate context. Existing conversation compatibility
+rules still apply to configuration changes. Background retry policy does not
+automatically retry input-budget failures.
+
+These are client-input limits, not tokenizer counts, model context-window bounds
+or billed cost. Agent output, internal tool context and provider-side compaction
+are not measured by these byte counters. `context_bytes` describes the compiled
+base context; `input_bytes_reserved` and `session_input_bytes_reserved` describe
+input reservations. Detailed reservation events contain counts and IDs, not raw
+prompt content. Separate provider usage counters remain unknown unless reported.

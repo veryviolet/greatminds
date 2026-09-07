@@ -1784,3 +1784,31 @@ has no configured maximum input/context size. Implement explicit bounded
 admission for oversized context without silent truncation or model switching;
 include interactive input and persisted-session limits in the design. Remaining
 compatibility, diagnostics, retention and full milestone acceptance stay open.
+
+### Durable client-input budgets (2026-09-07)
+
+Added binding max_prompt_bytes (262144 default) and max_session_input_bytes
+(1048576 default), validated as positive integers and included in contract
+fingerprints. The supervisor checks complete UTF-8 prompt text, including user
+messages, before sending; an oversized initial prompt never launches ACP.
+Session input is reserved under the store transaction before each ACP send and
+accumulates across loaded runs. Uncertain sends retain their debit. Reservation
+identities are idempotent; unknown prior session input fails explicitly instead
+of appearing as zero. No truncation or implicit session/model replacement.
+
+Run outcomes expose input_budget_exceeded with limit/used/requested bytes;
+reservation events and metrics expose counts without prompt text. These limits
+bound client input, not provider tokens, internal tool context, output, actual
+context-window occupancy or cost. Those distinctions are documented explicitly.
+
+Validation: initial supervisor/runtime regression 63 passed in 22.64s; initial
+input/conversation checks 29 passed in 28.98s; expanded input/supervisor checks
+40 passed in 28.33s; final boundary tests 17 passed in 9.52s. Scenarios include
+UTF-8 boundaries, no process on oversize, actual ACP success at the exact limit,
+multiple interactive messages, session reload, recovery/reopen, duplicate
+reservations, unknown prior usage and distinct-session isolation. Strict docs
+build passed in 1.47s. All ACP calls used local synthetic agents.
+
+C4 still requires broader timing/usage observations and representative baseline
+comparison. C5 aggregate diagnosis/local bundles, retention and the remaining
+real compatibility/acceptance campaign are not closed by this budget feature.
