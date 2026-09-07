@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "date": "2026-09-07",
+  "scope": "Installed base wheel with deterministic ACP account-limit fixture; no provider access",
+  "implementation": {
+    "version": "2.6.0",
+    "package_sha256": "33d20ee390227a41bb9121e595f77d8a45d137b03985e2699759ac08c7dcc9bf",
+    "python": "3.13.7",
+    "dependencies": {
+      "agent-client-protocol": "0.11.1",
+      "pydantic": "2.13.5",
+      "pydantic-core": "2.46.5",
+      "pyyaml": "6.0.3",
+      "click": "8.5.0",
+      "packaging": "26.3"
+    },
+    "schema_sha256": "fbfb3fd8230fe6f62e4b3a093f3e3c1fd1ffbe35498b6c4239e97a3ff16ed4d2",
+    "installed": true
+  },
+  "source_parent_commit": "5434074",
+  "wheel_sha256": "e1802b05f0123fd7af146ac50f2727414190a2887b633fbb75aa8d09ec339f54",
+  "raw_report_sha256": "77d3bdb7f0fee0b50886e73a95ee6cb2ac028f860891cb46f23ad032030c35b5",
+  "checks": {
+    "inference": false,
+    "first_signal_held": true,
+    "restart_no_additional_launch": true,
+    "explicit_resume_admitted_next_task": true,
+    "new_signal_rejects_stale_resume": true,
+    "runs": 2,
+    "results": 0,
+    "commands": 0,
+    "fixture_sha256": "fe948507b2913009d472bd2bc85fc23560552e16387b73cdb0d520c4ce1a916d",
+    "probe_sha256": "855049545b1209f661391c52b904d9563f81f4f31f1848c8e8889581f55a2b55"
+  },
+  "validation": {
+    "full_suite_passed": 1531,
+    "full_suite_skipped": 1,
+    "full_suite_seconds": 357.28,
+    "additional_public_repair_cycle_passed": 1,
+    "additional_public_repair_cycle_seconds": 4.0
+  },
+  "limitations": [
+    "Codes 42901/42902 are fixture application codes, not standard ACP quota codes or live harness mappings.",
+    "Account holds are scoped to explicit labels within one project, not inferred across credentials or projects.",
+    "Already in-flight prompts may finish; cooldown expiry does not prove provider availability or retry a failed prompt.",
+    "The public command-repair cycle was added after full-suite collection and verified separately."
+  ]
+}

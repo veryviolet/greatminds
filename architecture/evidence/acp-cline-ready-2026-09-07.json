@@ -1,0 +1,372 @@
+{
+  "version": 1,
+  "date": "2026-09-07",
+  "client_base_commit": "928559e",
+  "client_change": "Resolve model selection uniquely across all advertised model-category selectors; reject ambiguous values before sending a selection.",
+  "sdk_version": "0.11.1",
+  "installation": {
+    "harness": "cline",
+    "native": "3.0.61",
+    "argv": [
+      "cline",
+      "--acp"
+    ]
+  },
+  "inference": true,
+  "provider": "cline",
+  "model": "anthropic/claude-sonnet-5",
+  "minimal_prompt": {
+    "tested_at": "2026-09-07T07:45:08.960513+00:00",
+    "status": "prompt_ok",
+    "protocol_version": 1,
+    "agent_info": {
+      "name": "cline",
+      "title": null,
+      "version": "3.0.61"
+    },
+    "session_created": true,
+    "session_modes": [
+      "plan",
+      "act"
+    ],
+    "config_categories": [
+      "model",
+      "model",
+      "mode",
+      null
+    ],
+    "selected_model": null,
+    "selected_mode": null,
+    "stop_reason": "end_turn",
+    "expected_text_matches": true,
+    "assistant_bytes": 12,
+    "tool_calls": 0,
+    "permission_requests": 0,
+    "process_exited": true
+  },
+  "explicit_model_and_mode": {
+    "tested_at": "2026-09-07T07:48:53.435026+00:00",
+    "status": "prompt_ok",
+    "protocol_version": 1,
+    "agent_info": {
+      "name": "cline",
+      "title": null,
+      "version": "3.0.61"
+    },
+    "session_created": true,
+    "session_modes": [
+      "plan",
+      "act"
+    ],
+    "config_categories": [
+      "model",
+      "model",
+      "mode",
+      null
+    ],
+    "selected_model": "anthropic/claude-sonnet-5",
+    "selected_mode": "act",
+    "stop_reason": "end_turn",
+    "expected_text_matches": true,
+    "assistant_bytes": 12,
+    "tool_calls": 0,
+    "permission_requests": 0,
+    "process_exited": true
+  },
+  "streaming_cancellation": {
+    "tested_at": "2026-09-07T07:47:10.706582+00:00",
+    "status": "cancel_ok",
+    "protocol_version": 1,
+    "agent_info": {
+      "name": "cline",
+      "title": null,
+      "version": "3.0.61"
+    },
+    "session_created": true,
+    "session_modes": [
+      "plan",
+      "act"
+    ],
+    "config_categories": [
+      "model",
+      "model",
+      "mode",
+      null
+    ],
+    "selected_model": null,
+    "selected_mode": null,
+    "stop_reason": "cancelled",
+    "assistant_bytes": 1,
+    "tool_calls": 0,
+    "permission_requests": 0,
+    "output_before_cancel": true,
+    "cancel_sent": true,
+    "process_exited": true
+  },
+  "selector_metadata": {
+    "model_selectors": [
+      {
+        "id": "provider",
+        "current_value": "cline"
+      },
+      {
+        "id": "model",
+        "current_value": "anthropic/claude-sonnet-5"
+      }
+    ],
+    "modes": [
+      "plan",
+      "act"
+    ]
+  },
+  "public_conversations": [
+    {
+      "role": "ARCHITECT-PLANNER",
+      "run_states": [
+        "completed",
+        "completed"
+      ],
+      "first_reply_exact": true,
+      "resumed_reply_exact": true,
+      "same_session": true,
+      "session_strategies": [
+        "new_context",
+        "loaded"
+      ],
+      "attach_read_only": true,
+      "cursor_excludes_previous_turn": true,
+      "exactly_two_turns": true,
+      "turns_completed": true,
+      "process_groups_exited": true,
+      "no_domain_results": true,
+      "idle_restart_no_work": true,
+      "passed": true
+    },
+    {
+      "role": "LIVE-DEVELOPER",
+      "run_states": [
+        "completed",
+        "completed"
+      ],
+      "first_reply_exact": true,
+      "resumed_reply_exact": true,
+      "same_session": true,
+      "session_strategies": [
+        "new_context",
+        "loaded"
+      ],
+      "attach_read_only": true,
+      "cursor_excludes_previous_turn": true,
+      "exactly_two_turns": true,
+      "turns_completed": true,
+      "process_groups_exited": true,
+      "no_domain_results": true,
+      "idle_restart_no_work": true,
+      "passed": true
+    }
+  ],
+  "pending_permission_cancellation": {
+    "state": "cancelled",
+    "reason": "operator_cancelled",
+    "cancel_while_pending": true,
+    "permission_observed_before_marker": true,
+    "marker": null,
+    "permissions": [
+      {
+        "status": "cancelled",
+        "option_id": null,
+        "answered": false,
+        "consumed": false
+      }
+    ],
+    "process_group_exited": true,
+    "passed": true
+  },
+  "limitations": [
+    "Synthetic conversation and lifecycle checks do not establish all domain roles.",
+    "No cross-harness session history transfer was tested.",
+    "Global provider, model and authentication configuration was not changed.",
+    "Cline developer and tester have applied domain results; reviewer did not complete.",
+    "One explicit reviewer retry confirmed insufficient native Cline Credits; no additional inference was attempted.",
+    "The three-role pipeline remains incomplete: no merge, verified transition or worktree cleanup is claimed.",
+    "Native Cline permission callbacks lack path locations in these observed requests; operator approval was used rather than claiming automatic allow-workspace parity."
+  ],
+  "client_source_commit": "905e5ec",
+  "local_backend": {
+    "argv": [
+      "env",
+      "CLINE_SESSION_BACKEND_MODE=local",
+      "cline",
+      "--acp"
+    ],
+    "public_conversations": [
+      {
+        "role": "ARCHITECT-PLANNER",
+        "run_states": [
+          "completed",
+          "completed"
+        ],
+        "first_reply_exact": true,
+        "resumed_reply_exact": true,
+        "same_session": true,
+        "session_strategies": [
+          "new_context",
+          "loaded"
+        ],
+        "attach_read_only": true,
+        "cursor_excludes_previous_turn": true,
+        "exactly_two_turns": true,
+        "turns_completed": true,
+        "process_groups_exited": true,
+        "no_domain_results": true,
+        "idle_restart_no_work": true,
+        "passed": true
+      },
+      {
+        "role": "LIVE-DEVELOPER",
+        "run_states": [
+          "completed",
+          "completed"
+        ],
+        "first_reply_exact": true,
+        "resumed_reply_exact": true,
+        "same_session": true,
+        "session_strategies": [
+          "new_context",
+          "loaded"
+        ],
+        "attach_read_only": true,
+        "cursor_excludes_previous_turn": true,
+        "exactly_two_turns": true,
+        "turns_completed": true,
+        "process_groups_exited": true,
+        "no_domain_results": true,
+        "idle_restart_no_work": true,
+        "passed": true
+      }
+    ],
+    "pending_permission_cancellation": {
+      "state": "cancelled",
+      "reason": "operator_cancelled",
+      "cancel_while_pending": true,
+      "permission_observed_before_marker": true,
+      "marker": null,
+      "permissions": [
+        {
+          "status": "cancelled",
+          "option_id": null,
+          "answered": false,
+          "consumed": false
+        }
+      ],
+      "process_group_exited": true,
+      "passed": true
+    },
+    "streaming_cancellation": {
+      "tested_at": "2026-09-07T08:04:41.058545+00:00",
+      "status": "cancel_ok",
+      "protocol_version": 1,
+      "agent_info": {
+        "name": "cline",
+        "title": null,
+        "version": "3.0.61"
+      },
+      "session_created": true,
+      "selected_model": null,
+      "selected_mode": null,
+      "stop_reason": "cancelled",
+      "assistant_bytes": 1,
+      "tool_calls": 0,
+      "permission_requests": 0,
+      "output_before_cancel": true,
+      "cancel_sent": true,
+      "process_exited": true
+    },
+    "native_reference": "https://github.com/cline/cline/blob/main/docs/cli/cli-reference.mdx",
+    "installed_binary_sha256": "81fc8b6d834a9c9ab5b22ba6bc2d0dda1d9188a817f59b37df082947b19aa555",
+    "domain_pipeline": {
+      "verified": false,
+      "roles": [
+        "DEVELOPER",
+        "TESTER",
+        "ARCHITECT-REVIEWER",
+        "ARCHITECT-REVIEWER"
+      ],
+      "run_states": [
+        "completed",
+        "completed",
+        "failed",
+        "failed"
+      ],
+      "applied_results": 2,
+      "daemon_owned_checks": 2,
+      "independent_worktree_test_cases": 6,
+      "block_kinds": [
+        "plan",
+        "implementation",
+        "tests"
+      ],
+      "result_provenance": "SYSTEM",
+      "changed_worktree_files": [
+        "clamp.py"
+      ],
+      "task_queue": "feature_review",
+      "worktree_preserved": true,
+      "main_unchanged": true,
+      "agent_and_command_process_groups_exited": true,
+      "idle_restart_no_work": true,
+      "permission_policy": "ask",
+      "one_time_approvals_consumed": 23,
+      "binding_model": "anthropic/claude-sonnet-5",
+      "binding_mode": "act",
+      "timeout_seconds": 600,
+      "explicit_reviewer_retries": 1,
+      "reviewer_retry_rpc_code": -32603,
+      "reviewer_retry_native_diagnostic": "Insufficient Cline Credits balance",
+      "inference": true
+    }
+  },
+  "default_backend_domain_attempt": {
+    "verified": false,
+    "accepted_results": 0,
+    "scoped_contract_error": "contract inspection requires an assigned run credential",
+    "reason": "Default ACP session factory may reuse a shared Hub without the current launch environment.",
+    "permission_policy": "ask",
+    "one_time_approvals_consumed": 7,
+    "one_time_rejection_consumed": 1,
+    "rejected_request": "Environment inspection and root filesystem search were outside this synthetic task.",
+    "final_run_state": "waiting_input",
+    "final_reason": "permission_required",
+    "outstanding_permission_cancelled": true,
+    "timeout_seconds": 300
+  },
+  "validation": {
+    "targeted_acp_tests": {
+      "passed": 48
+    },
+    "full_python_suite": {
+      "passed": 1544,
+      "failed": 1,
+      "skipped": 0,
+      "seconds": 442.91,
+      "failure": "Documentation check rejected the wording historical access failure; wording changed without weakening the check."
+    },
+    "documentation_regression_after_fix": {
+      "passed": 5
+    },
+    "public_docs_and_reference_tests": {
+      "passed": 14,
+      "seconds": 1.62
+    },
+    "strict_mkdocs_build": {
+      "passed": true,
+      "seconds": 1.63
+    }
+  },
+  "probe_sha256": {
+    "acp_probe.py": "f2cc80a38a34b4118fae60d1a8f9ab509d6f67ea647137185ff6dc032cb9df05",
+    "acp_conversation_probe.py": "77e3fdfe3622727c98a416fbcc1bfff7e3dad663770d4dcbf1d977746c07672b",
+    "acp_permission_probe.py": "9cb751bd1e7e3c2298283f30bc2406122e66dc4f6e43e2396d06beb097939015",
+    "acp_pipeline_probe.py": "a71c1d57ce3a406d04bec3cd1e94074d4188a070191d78a4c5c1cf2db5f2b2c6"
+  }
+}

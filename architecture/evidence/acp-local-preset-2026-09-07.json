@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "date": "2026-09-07",
+  "client_sdk": "0.11.1",
+  "harness": {
+    "name": "Codex",
+    "version": "0.153.4",
+    "adapter_version": "1.10.0"
+  },
+  "scenario": "fresh_setup_local_preset_preplanned_task",
+  "command": "python tools/acp_pipeline_probe.py --config CONFIG --local-agent codex",
+  "preset": "local",
+  "permission_policy": "ask",
+  "max_running": 1,
+  "stand_required": false,
+  "agent_manifests": 1,
+  "configured_bindings": 4,
+  "background_runs": 3,
+  "command_receipts": 3,
+  "command_receipts_succeeded": true,
+  "verified": true,
+  "system_applied_blocks": [
+    "implementation",
+    "tests",
+    "review"
+  ],
+  "changed_files": [
+    "clamp.py"
+  ],
+  "worktree_removed": true,
+  "restart_preserved_runs_results_commands": true,
+  "independent_unittest_cases": 6,
+  "permissions_requested": 0,
+  "runs": [
+    {
+      "role": "DEVELOPER",
+      "state": "completed",
+      "reason": "turn_ended",
+      "timings": {
+        "cleanup_complete": 45.042247,
+        "context_ready": 0.096601,
+        "first_prompt_activity": 2.696081,
+        "first_prompt_started": 2.691092,
+        "first_protocol_activity": 1.07866,
+        "process_recorded": 0.111934,
+        "protocol_ready": 0.887112,
+        "session_ready": 2.671983,
+        "workspace_ready": 0.08769
+      },
+      "outcome": {
+        "elapsed_seconds": 45.050675,
+        "context_bytes": 7887,
+        "updates": 127,
+        "stop_reason": "end_turn",
+        "input_bytes_reserved": 7887,
+        "session_input_bytes_reserved": 7887
+      }
+    },
+    {
+      "role": "TESTER",
+      "state": "completed",
+      "reason": "turn_ended",
+      "timings": {
+        "cleanup_complete": 46.680655,
+        "context_ready": 0.074762,
+        "first_prompt_activity": 1.097075,
+        "first_prompt_started": 1.089786,
+        "first_protocol_activity": 0.828436,
+        "process_recorded": 0.097661,
+        "protocol_ready": 0.600428,
+        "session_ready": 1.069626,
+        "workspace_ready": 0.05753
+      },
+      "outcome": {
+        "elapsed_seconds": 46.68548,
+        "context_bytes": 9347,
+        "updates": 135,
+        "stop_reason": "end_turn",
+        "input_bytes_reserved": 9347,
+        "session_input_bytes_reserved": 9347
+      }
+    },
+    {
+      "role": "ARCHITECT-REVIEWER",
+      "state": "completed",
+      "reason": "turn_ended",
+      "timings": {
+        "cleanup_complete": 32.69788,
+        "context_ready": 0.087853,
+        "first_prompt_activity": 1.727069,
+        "first_prompt_started": 1.71612,
+        "first_protocol_activity": 0.83149,
+        "process_recorded": 0.112973,
+        "protocol_ready": 0.628176,
+        "session_ready": 1.69408,
+        "workspace_ready": 0.057772
+      },
+      "outcome": {
+        "elapsed_seconds": 32.709282,
+        "context_bytes": 10419,
+        "updates": 102,
+        "stop_reason": "end_turn",
+        "input_bytes_reserved": 10419,
+        "session_input_bytes_reserved": 10419
+      }
+    }
+  ],
+  "limits": [
+    "Task was supplied with an explicit synthetic plan; interactive planning was not tested.",
+    "Source development environment used; this is not a wheel-install test.",
+    "One local task is not a full role-by-harness compatibility matrix."
+  ]
+}

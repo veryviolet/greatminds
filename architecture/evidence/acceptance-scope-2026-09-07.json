@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "date": "2026-09-07",
+  "source_commit_before_scope_change": "a8eb805",
+  "decision_authority": "owner",
+  "decision": "Limit current delivery to Codex, Claude and Grok; defer other harness integrations.",
+  "current_harnesses": [
+    "codex",
+    "claude",
+    "grok"
+  ],
+  "deferred_harnesses": [
+    "qwen",
+    "kimi",
+    "cline",
+    "gemini",
+    "openhands",
+    "cursor"
+  ],
+  "modernization_status": "complete_for_owner_approved_scope",
+  "scope_effect": "A4/G6/M5 accepted using existing selected-harness evidence. No unverified role matrix cell was promoted.",
+  "evidence": [
+    {
+      "file": "acceptance-local-audit-2026-09-07.json",
+      "sha256": "eb974317afb3d4790d0b9a04185b00c927ba97a9e1ae6847c130bf0b24ffd2ed"
+    },
+    {
+      "file": "acp-mixed-pipeline-completed-2026-09-06.json",
+      "sha256": "42496549a184e43afe4ff5aa501631054d5cecf2c59c24cb7c8808736c607f0d"
+    },
+    {
+      "file": "acp-lifecycle-2026-09-06.json",
+      "sha256": "4150280ba08bca19aae2f9783e2fb651ff8a70484cb150db319bc1c9d5dc40a7"
+    },
+    {
+      "file": "acp-permissions-2026-09-06.json",
+      "sha256": "89bc3838e15f1fb6f4a99902530321cbf3898d9bc96111c9e3ef68460ed3e191"
+    },
+    {
+      "file": "acp-pending-permission-cancel-2026-09-07.json",
+      "sha256": "e842b7d16002ebebaf016721a20e2dc4beaa7c0d0830ad14810106ff87259261"
+    },
+    {
+      "file": "acp-public-conversations-2026-09-07.json",
+      "sha256": "de1d5a0b86e43ff4bfbbc8c7ed66516cb1242457c9f006c7ac1612eeb6f642cd"
+    },
+    {
+      "file": "acp-local-preset-2026-09-07.json",
+      "sha256": "ecf1369b71f63c6b60bd48730f53b2871e27abd48795c5d8c636b10d7308f8c1"
+    },
+    {
+      "file": "acp-cline-ready-2026-09-07.json",
+      "sha256": "5546256d29260c86c089f263017edbada87c5766aadb1fd92c635b5250761c49"
+    }
+  ],
+  "live_evidence_boundary": {
+    "mixed_pipeline": "Codex developer, Claude tester, Grok reviewer; verified, merge, worktree cleanup and idle restart confirmed.",
+    "interactive": "Public planner and live-developer conversations on all three; restart recall, duplicate delivery and cursor reconnect.",
+    "lifecycle": "Session restart, explicit advertised configuration, streaming cancellation, one-time permissions and pending-permission cancellation.",
+    "role_assignment": "All ten agent roles covered by shared subprocess conversation fixtures; live domain coverage remains limited to the declared matrix.",
+    "grok_model_selection": "No model config option advertised; not claimed as exercised."
+  },
+  "preserved_limitations": [
+    "Deferred integrations retain their recorded access/configuration/funding prerequisites.",
+    "The partial Cline task remains at review; it is not a completed pipeline.",
+    "No full Cartesian live role/harness campaign, optional extension parity, or production deployment is claimed.",
+    "Linux/local runtime and reactive budget boundaries remain as documented."
+  ],
+  "changes": "Plan, acceptance verdict and compatibility scope documentation only; no runtime or account changes.",
+  "new_live_inference": false,
+  "next_phase": "Local web workspace using shared daemon/domain operations.",
+  "scope_change_validation": {
+    "public_docs_and_reference_tests": {
+      "passed": 14,
+      "seconds": 1.88
+    },
+    "strict_mkdocs_build": {
+      "passed": true
+    },
+    "evidence_references_sha256_verified": true,
+    "new_runtime_changes": false
+  }
+}

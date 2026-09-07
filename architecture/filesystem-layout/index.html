@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://veryviolet.github.io/greatminds/architecture/filesystem-layout/">
       
       
-        <link rel="prev" href="../overview/">
+        <link rel="prev" href="../contract-reference/">
       
       
         <link rel="next" href="../transitions/">
@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -563,6 +563,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../getting-started/local-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../getting-started/upgrading/" class="md-nav__link">
         
   
@@ -713,7 +741,7 @@
   <span class="md-ellipsis">
     
   
-    Codex Profiles
+    Agent Manifests and Bindings
   
 
     
@@ -945,6 +973,34 @@
     
   
     Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contract-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Contract Reference
   
 
     
@@ -1482,9 +1538,8 @@
 state:</p>
 <div class="highlight"><pre><span></span><code>coordination/
   PROJECT.md
-  coord.yaml
-  mcp.local.json
-  plugins.local/
+  execution.yaml
+  PROJECT.env
   stand-profiles.yaml
   stand-profiles/
 
@@ -1504,7 +1559,11 @@ state:</p>
   inbox/
   intent/
   journal.ndjson
-  heartbeat.&lt;role&gt;
+  schema.yaml
+  .runtime/
+    state.json
+    contracts/
+    command-output/
 </code></pre></div>
 <p>The task file path is meaningful. For example, a product task in
 <code>.greatminds/feature_docs/</code> is owned by <code>TECHNICAL-WRITER</code>; the same file in
@@ -1520,12 +1579,17 @@ the worktree.</p>
 <li><code>journal.ndjson</code>: append-only transition log.</li>
 <li><code>intent/</code>: short-lived files written before moves and cleared after moves.</li>
 <li><code>inbox/</code>: role mailboxes.</li>
-<li><code>heartbeat.*</code>: role liveness files.</li>
+<li><code>.runtime/state.json</code>: durable run, control, result and command state.</li>
+<li><code>.runtime/contracts/</code>: frozen content-addressed execution and schema contracts.</li>
+<li><code>.runtime/command-output/</code>: bounded command output used by execution evidence.</li>
 <li><code>.stand/state.yaml</code>: singleton stand state, active lease, FIFO queue, and
   recent transition history.</li>
 <li><code>.worktrees/&lt;task-id&gt;/</code>: in-flight code for a task. Operators inspect
   worktrees directly.</li>
 </ul>
+<p>Runtime files can contain private context and operation evidence. Inspect them
+through the CLI where possible; deleting runtime state to clear a hold discards
+recovery information. Setup preserves existing tasks and execution configuration.</p>
 
 
 
@@ -1580,7 +1644,7 @@ the worktree.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

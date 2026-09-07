@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "tested_at": "2026-09-07T02:28:41.279692+00:00",
+  "agent_info": {
+    "name": "cline",
+    "title": null,
+    "version": "3.0.61"
+  },
+  "protocol_version": 1,
+  "auth_methods": [
+    "cline",
+    "cline-pass",
+    "openai-codex"
+  ],
+  "inference": true,
+  "session_created": true,
+  "status": "failed",
+  "error_type": "RequestError",
+  "error_code": -32603,
+  "assistant_bytes": 0,
+  "tool_calls": 0,
+  "permission_requests": 0,
+  "process_exited": true,
+  "resume_skipped": "initial_round_failed",
+  "harness": "cline",
+  "scenario": "minimal_prompt_then_restart_load",
+  "diagnostic": "re_authentication_required",
+  "diagnostic_source": "private_stderr_details",
+  "account_or_model_changed": false
+}

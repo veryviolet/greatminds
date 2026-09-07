@@ -1,0 +1,1937 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="File-based multi-agent coordination for agent fleets and task pipelines.">
+      
+      
+      
+        <link rel="canonical" href="https://veryviolet.github.io/greatminds/architecture/rehabilitation-audit-2026-09-06/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Rehabilitation audit — 2026-09-06 - greatminds</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#rehabilitation-audit-2026-09-06" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="greatminds" class="md-header__button md-logo" aria-label="greatminds" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            greatminds
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Rehabilitation audit — 2026-09-06
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/veryviolet/greatminds" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    veryviolet/greatminds
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../concepts/queues/" class="md-tabs__link">
+          
+  
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../cli-reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  CLI Reference
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../operations/runbook/" class="md-tabs__link">
+          
+  
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../recipes/filing-a-bug/" class="md-tabs__link">
+          
+  
+  
+  Recipes
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../changelog/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="greatminds" class="md-nav__button md-logo" aria-label="greatminds" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    greatminds
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/veryviolet/greatminds" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    veryviolet/greatminds
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/first-project/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    First Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/local-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/upgrading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/queues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/roles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/codex-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Manifests and Bindings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/stand-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stand Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/stand-gate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stand Gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/inbox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inbox
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contract-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Contract Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../filesystem-layout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Filesystem Layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transitions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../daemon-and-agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Daemon and Agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lifecycle Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/runbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runbook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Recipes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Recipes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/filing-a-bug/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Filing a Bug
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/planning-a-feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planning a Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/e2e-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E2E Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/cutting-a-release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cutting a Release
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#product-objective" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Product objective
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-architecture-worth-preserving" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current architecture worth preserving
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#existing-harness-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Existing harness support
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deterministic-work-still-delegated-to-agents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deterministic work still delegated to agents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#findings-and-concrete-code-seams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Findings and concrete code seams
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#proposed-execution-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed execution contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-upstream-integration-directions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current upstream integration directions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification-performed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification performed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-sequence-and-acceptance-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation sequence and acceptance criteria
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="rehabilitation-audit-2026-09-06">Rehabilitation audit — 2026-09-06<a class="headerlink" href="#rehabilitation-audit-2026-09-06" title="Permanent link">&para;</a></h1>
+<p>Status: initial code audit and proposed direction, not an implemented redesign.
+Baseline: <code>b8b13f1</code>, package version <code>2.6.0</code>, Python <code>3.13.7</code>.</p>
+<h2 id="product-objective">Product objective<a class="headerlink" href="#product-objective" title="Permanent link">&para;</a></h2>
+<p>Run the supported modern coding harnesses in any product role. Keep everything
+that does not require an LLM in deterministic daemon/domain code. Agents should
+spend their turns planning, implementing, reviewing, and interpreting evidence.
+Scheduling, recovery, state bookkeeping, and mechanically decidable workflow
+steps must not depend on an agent remembering a prompt instruction.</p>
+<p>The repository's June solo handoff agrees with developing greatminds as a normal
+Python project. Historical fleet transcripts are background, not current task
+state. This audit did not start a fleet or run inference through external agents.</p>
+<h2 id="current-architecture-worth-preserving">Current architecture worth preserving<a class="headerlink" href="#current-architecture-worth-preserving" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Filesystem task state: queue directories, typed YAML blocks, transition
+  validation, task locks, intent files, and an append-only journal.</li>
+<li>Separation of editable <code>coordination/</code> configuration from <code>.greatminds/</code>
+  runtime data, with legacy layout fallbacks.</li>
+<li><code>coordd</code>: event watching, backlog reconciliation, driven subprocesses,
+  pending work, persisted retries, hang reporting, and stand deployment.</li>
+<li>Worktrees and singleton stand leases, with Ansible profiles and evidence gates.</li>
+<li>CLI operator surfaces, driven event logs, tmux launching, and a small VS Code
+  extension using the same CLI backend.</li>
+<li>A useful beginning of an adapter boundary in <code>src/greatminds/agents/</code>.</li>
+</ul>
+<p>No database or orchestration framework replacement is justified by this audit.
+First make the existing filesystem transactions and recovery behavior explicit.</p>
+<h2 id="existing-harness-support">Existing harness support<a class="headerlink" href="#existing-harness-support" title="Permanent link">&para;</a></h2>
+<p>This table describes the checked-in implementation, not live compatibility with
+every currently released binary.</p>
+<table>
+<thead>
+<tr>
+<th>Harness</th>
+<th>Interactive launch</th>
+<th>Driven execution</th>
+<th>Greatminds session continuity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Claude Code</td>
+<td>Yes</td>
+<td><code>claude -p</code></td>
+<td>Session IDs and resume</td>
+</tr>
+<tr>
+<td>Codex</td>
+<td>Yes</td>
+<td>app-server over stdio</td>
+<td>Thread IDs; separate interactive discovery</td>
+</tr>
+<tr>
+<td>Cursor</td>
+<td>Yes, systemd scope</td>
+<td>Headless subprocess</td>
+<td>Interactive <code>--continue</code>; driven is one-shot</td>
+</tr>
+<tr>
+<td>Cline</td>
+<td>Yes</td>
+<td>Headless JSON subprocess</td>
+<td>Driven is one-shot</td>
+</tr>
+<tr>
+<td>Gemini CLI</td>
+<td>Yes</td>
+<td>Headless subprocess</td>
+<td>Driven is one-shot</td>
+</tr>
+<tr>
+<td>OpenHands</td>
+<td>Chat advertised</td>
+<td>Headless subprocess</td>
+<td>Driven is one-shot</td>
+</tr>
+<tr>
+<td>Qwen Code</td>
+<td>Absent</td>
+<td>Absent</td>
+<td>Absent</td>
+</tr>
+<tr>
+<td>Kimi Code CLI</td>
+<td>Absent</td>
+<td>Absent</td>
+<td>Absent</td>
+</tr>
+<tr>
+<td>Grok Build</td>
+<td>Absent</td>
+<td>Absent</td>
+<td>Absent</td>
+</tr>
+</tbody>
+</table>
+<p>The registry lists support statically. It does not establish compatibility with
+an installed binary version or negotiate transport capabilities.</p>
+<h2 id="deterministic-work-still-delegated-to-agents">Deterministic work still delegated to agents<a class="headerlink" href="#deterministic-work-still-delegated-to-agents" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Mechanism</th>
+<th>Current boundary</th>
+<th>Proposed owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Periodic recovery</td>
+<td><code>MAINTAINER</code> self-loop and prompt-driven wake rearming</td>
+<td>Daemon scheduler; OS supervisor restarts the daemon itself</td>
+</tr>
+<tr>
+<td>Dead process recovery</td>
+<td>Daemon reports; maintainer diagnoses and invokes restart</td>
+<td>Supervisor executes known bounded recovery; LLM handles unexplained failures</td>
+</tr>
+<tr>
+<td>Blocked dependency completion</td>
+<td><code>wake-check</code> reports readiness; reviewer performs resume</td>
+<td>Dependency reconciler validates and applies the declared resume transition</td>
+</tr>
+<tr>
+<td>Liveness/progress</td>
+<td>Successful CLI calls touch role heartbeats</td>
+<td>Process/transport observations, separate activity and domain-progress timestamps</td>
+</tr>
+<tr>
+<td>Stand lease expiry</td>
+<td>Maintainer contract includes reclaiming expired dead-holder leases</td>
+<td>Lease controller with holder identity and race-safe checks</td>
+</tr>
+<tr>
+<td>Workflow bookkeeping</td>
+<td>Agent reads graph, appends blocks, chooses and invokes moves</td>
+<td>Shared domain service validates structured results and commits eligible transitions</td>
+</tr>
+<tr>
+<td>Test/deployment evidence</td>
+<td>Agents invoke commands and write evidence fields; stand executor already runs deployment</td>
+<td>Deterministic runners record command, exit status, revision, artifacts, and timestamps</td>
+</tr>
+<tr>
+<td>Tick context</td>
+<td>Agent rereads the full schema and coordination guide</td>
+<td>Context builder supplies role, assigned work, relevant rules, and changes</td>
+</tr>
+</tbody>
+</table>
+<p>Automatic transitions must preserve role attribution, review decisions, and
+existing gates. The daemon must not impersonate a reviewer by setting an
+environment variable. Introduce an explicit system actor for mechanical
+transitions, retaining the originating agent decision and evidence.</p>
+<p>Running an agreed test command and recording its exit status is deterministic.
+Choosing whether those tests are adequate, explaining failures, and deciding
+whether an implementation meets intent still require judgment.</p>
+<h2 id="findings-and-concrete-code-seams">Findings and concrete code seams<a class="headerlink" href="#findings-and-concrete-code-seams" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p><strong>The driver abstraction is thin.</strong> <code>cli/coordd.py</code> is 4,125 lines and
+   contains subprocess management, retries, locks, Codex JSON-RPC, stand work,
+   and notifications. <code>agents/driven_drivers.py</code> chooses between callbacks into
+   this module. Extract execution lifecycle and transports behind an actual
+   runtime contract, retaining existing CLI entrypoints during migration.</p>
+</li>
+<li>
+<p><strong>Role and execution mode remain coupled.</strong> Driven dispatch requires both
+   <code>schema.roles[role].lifecycle == driven</code> and a driven window mode
+   (<code>coordd._maybe_drive_driven_role</code>). Maintainer is fixed to <code>self-loop</code>.
+   Move scheduling policy into role bindings, separate from role obligations.
+   <code>AgentToolSpec.start_modes</code> is displayed, but <code>start-agent</code> does not validate
+   the requested mode against it; for example OpenHands advertises chat only.</p>
+</li>
+<li>
+<p><strong>Context is oversized and uneven.</strong> <code>data/bootstrap.md</code> explicitly demands
+   rereading the whole schema and coordination guide every tick: 1,437 and 720
+   lines respectively. Generic driven turns receive this bootstrap instead of
+   an assigned work item. Generic interactive launches also inherit the common
+   short “continue” prompt on subsequent starts despite not receiving a session
+   ID. Build a harness-neutral, versioned work/context envelope.</p>
+</li>
+<li>
+<p><strong>Config delivery has drifted.</strong> Setup generates Codex role instructions and
+   skill configuration under role homes, while active launch code uses the
+   machine home and reads only the role model through <code>codex_auth.py</code>.
+   Interactive session discovery still prefers historical per-role rollout
+   directories. Review delivery of role instructions and skills, and record
+   session identity explicitly. Claude, Codex, and Cursor model selection also
+   follow different paths; generic driven argv builders have no common
+   per-binding provider/model/options input.</p>
+</li>
+<li>
+<p><strong>Schema authority is inconsistent with the documented model.</strong> Agents are
+   told to read <code>.greatminds/schema.yaml</code>, while <code>cli/task.py::schema()</code> reads
+   <code>find_canon_dir()/schema.yaml</code> and caches tables at import. The daemon also
+   reads packaged canon for role dispatch. A project copy can consequently
+   describe different rules from those enforced. Resolve one explicit schema
+   version/snapshot for both execution and agent context.</p>
+</li>
+<li>
+<p><strong>Process completion is not task completion.</strong> Generic headless workers
+   capture output only after exit. <code>_classify_turn_outcome</code> uses a Claude JSON
+   shape plus whole-output keyword scanning; a successful answer discussing
+   “rate limit” can be classified as a failure, while rc=0 with no domain
+   progress can be accepted as <code>ok</code>. Add adapter-specific event parsers and
+   separate transport success, agent result, and verified task progress.</p>
+</li>
+<li>
+<p><strong>Crash recovery needs stronger ownership semantics.</strong> Startup removes all
+   driven locks/pending markers, assuming workers died with the daemon.
+   Run-lock acquisition checks existence and then writes a file. Audit concurrent
+   dispatch and surviving subprocesses, especially foreground daemon mode.
+   Use atomic claims, run identity, process-group ownership, and stale-result
+   rejection. These are code-review risks, not reproduced race failures here.</p>
+</li>
+<li>
+<p><strong>Some shipped documentation describes missing content.</strong> The plugin tree
+   contains seven manifests and a README, with no <code>skills/**/SKILL.md</code> files,
+   although the README and setup helpers describe bundled role/protocol skills.
+   Decide which contracts remain after deterministic responsibilities move out
+   of prompts, then generate and verify the actual artifacts.</p>
+</li>
+</ol>
+<h2 id="proposed-execution-contract">Proposed execution contract<a class="headerlink" href="#proposed-execution-contract" title="Permanent link">&para;</a></h2>
+<p>Keep the role, harness, model/provider, scheduling, session policy, permissions,
+and resource limits as distinct concepts. Existing <code>windows[].tool</code> values
+should migrate into role bindings without changing task ownership semantics.</p>
+<p>Use ACP as the primary common agent interface, including Claude and Codex
+through their existing upstream adapters. Greatminds should own one ACP client,
+not a parallel hand-written control protocol for each harness. Launch manifests
+and capability/configuration handling retain the necessary per-agent differences.
+Native transports in the current implementation are migration compatibility
+paths, not the desired permanent architecture.</p>
+<p>The runtime should accept a work item containing project/worktree, task and
+revision, role contract version, context, expected result kind, and execution
+policy. An adapter supplies preflight/capabilities, session creation/resumption,
+turn start, normalized events, cancellation, and terminal outcome.</p>
+<p>The daemon persists run state before dispatch, applies retries and concurrency
+limits, handles timer and dependency events, and commits eligible domain
+changes through the same service used by the CLI. Late results from superseded
+runs must not change task state. Re-delivery must be idempotent; do not promise
+exactly-once external command execution across crashes.</p>
+<p>Interactive terminals remain useful operator interfaces. Correct scheduling
+and recovery should also work without a live tmux pane or an LLM sleeping in it.
+MCP can expose domain operations; it does not replace the agent lifecycle
+transport.</p>
+<h2 id="current-upstream-integration-directions">Current upstream integration directions<a class="headerlink" href="#current-upstream-integration-directions" title="Permanent link">&para;</a></h2>
+<p>Official documentation checked on 2026-09-06; these are integration candidates,
+not live-tested adapters or a promise of identical features across harnesses.</p>
+<ul>
+<li><a href="https://github.com/agentclientprotocol/codex-acp">codex-acp</a> exposes Codex
+  through ACP and translates to/from the underlying
+  <a href="https://learn.chatgpt.com/docs/app-server">Codex app-server</a>. Prefer this
+  existing bridge to maintaining the translation in Greatminds. Pin the adapter
+  and its compatible Codex dependency together.</li>
+<li><a href="https://github.com/agentclientprotocol/claude-agent-acp">claude-agent-acp</a>
+  exposes the official Claude Agent SDK through ACP, including permission
+  requests, tool activity, MCP, and terminal interactions. These are upstream
+  ACP integration projects, not evidence of a built-in <code>--acp</code> flag in the
+  ordinary Claude/Codex CLI binaries.</li>
+<li>A shared ACP client can serve <a href="https://qwenlm.github.io/qwen-code-docs/en/developers/architecture/">Qwen Code</a>,
+  <a href="https://moonshotai.github.io/kimi-cli/en/reference/kimi-acp.html">Kimi CLI</a>,
+  and <a href="https://docs.x.ai/build/cli/headless-scripting">Grok Build</a>.
+  Their documented entrypoints include <code>qwen --acp</code>, <code>kimi acp</code>, and
+  <code>grok agent stdio</code>. Each still needs its own capability/auth/config tests.</li>
+<li><a href="https://docs.cline.bot/usage/cli-overview">Cline documents JSONL headless execution</a>
+  and <a href="https://docs.cline.bot/getting-started/installing-cline">ACP integration</a>.
+  Its current one-shot adapter should parse events and expose binding options.</li>
+<li><a href="https://docs.openhands.dev/sdk">OpenHands provides a Python/REST Software Agent SDK</a>.
+  Evaluate that alongside the existing CLI adapter for persistent sessions and
+  remote workspaces, rather than assuming headless CLI is the only interface.</li>
+<li><a href="https://agentclientprotocol.com/protocol/v1/overview">ACP's lifecycle</a>
+  provides initialization, authentication, new sessions, prompts, streamed
+  updates, permissions, and cancellation. Session loading is optional and must
+  be negotiated. A shared client must also implement the filesystem and
+  terminal callbacks it advertises. Uniform transport does not imply identical
+  session recovery, model options, usage telemetry, or extension support.</li>
+<li>Evaluate ACP paths for OpenHands, Gemini, and Cursor before adding another
+  native transport. Keep exceptions explicit and justify them with a concrete
+  capability gap. No live ACP compatibility tests were performed in this audit.</li>
+</ul>
+<h2 id="verification-performed">Verification performed<a class="headerlink" href="#verification-performed" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>.venv/bin/python -m pytest -q</code>: <strong>1,640 passed, 2 skipped, 7 failed</strong>, 106.80 s.</li>
+<li>Failures are in <code>test_appserver_unit_0320.py</code> (3) and
+  <code>test_daemon_install_enable_0307.py</code> (4). Their stubs do not isolate newer
+  install side effects. A focused reproduction traced failure through
+  <code>daemon.install_cmd -&gt; install_project_dropin -&gt; Path.write_text</code> to the real
+  user's systemd configuration, which is read-only in this sandbox. Later
+  assertions expecting <code>enable</code> calls also fail because install exited early.</li>
+<li><code>npm test --prefix vscode-extension</code>: passed the syntax checks and Node test
+  harness. This does not validate a real VS Code extension host.</li>
+<li>No live harness inference, full mixed-fleet scenario, wheel build, remote
+  host validation, GitHub issue-status verification, or release was performed.</li>
+<li>Full Python output for this session: <code>/tmp/greatminds-audit-pytest.log</code>.</li>
+</ul>
+<h2 id="implementation-sequence-and-acceptance-criteria">Implementation sequence and acceptance criteria<a class="headerlink" href="#implementation-sequence-and-acceptance-criteria" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Establish an isolated baseline.</strong> Repair daemon-test path/env isolation;
+   reconcile schema authority and record the initial compatibility matrix.
+   Tests must run without writing real user configuration or requiring logins.</li>
+<li><strong>Extract deterministic runtime ownership.</strong> Move run lifecycle, scheduling,
+   cancellation, retries, and recovery out of harness-specific branches. Verify
+   duplicate events, daemon restart, surviving children, timeout, and stale
+   results with fake adapters and subprocess fixtures, without LLM calls.</li>
+<li><strong>Migrate mechanical role duties.</strong> Begin with maintainer recovery and
+   dependency unblocking; then compiled tick context and structured task
+   completion. Preserve semantic review gates and evidence provenance.
+   Idle fleets and routine recovery must require zero LLM turns.</li>
+<li><strong>Unify adapters and bindings.</strong> Implement one ACP client and prove it with
+   Claude and Codex's upstream ACP adapters plus one native ACP agent. Add Qwen,
+   Kimi, Grok and normalize Cline, OpenHands, Gemini, and Cursor through that
+   interface wherever supported. Keep current drivers during migration only.
+   Unsupported capabilities should fail preflight with a concrete reason.</li>
+<li><strong>Prove role interchangeability.</strong> Parameterize role-binding contract tests
+   over every adapter, then run selected real mixed-fleet pipelines with pinned
+   versions. Verify restart, cancellation, auth expiry, rate limits, worktree
+   correctness, domain handoff, and measured no-progress behavior. Publish
+   measured compatibility rather than treating argv-construction tests as E2E.</li>
+</ol>
+<p>The first implementation slice should be baseline isolation plus deterministic
+run supervision. Adding names to the tool registry alone would preserve the
+current dependence on agent-managed orchestration.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "date": "2026-09-07",
+  "scope": "Read-only diagnosis of the previously completed Cursor ACP authentication probe",
+  "harness_version": "2026.06.15-18-00-12-6f5a2cf",
+  "prior_probe": "acp-auth-revalidation-2026-09-07.json",
+  "native_log_sha256": "6ac6b0ddb6accec54ef744e693edccfcad02ff04a996cfb6c94aa6230def6828",
+  "observed_markers": {
+    "ACP authenticate called with methodId: cursor_login": true,
+    "Cursor login check result: false": true,
+    "Starting browser login flow": true,
+    "Waiting for login result": true
+  },
+  "not_observed": [
+    "Initializing shared services after authentication",
+    "Authentication successful"
+  ],
+  "installed_source_sha256": {
+    "189.index.js": "2db14503337a154b8e5ffb43c5366d70c159221b299968813058de80720b3868",
+    "208.index.js": "5aeadfb701796e8be0818b784f417d69ce2f4181ca64fac10816b0fab186efce",
+    "index.js": "253a80420a5b56f3c76838c971221f998660153ff9fb0edfa407e03d5fdaa05b"
+  },
+  "interpretation": "The cursor_login handler rejected cached login validation and entered a browser login flow; the request deadline expired while waiting for the login result. It had not reached shared-service initialization.",
+  "limitations": [
+    "The exact reason the cached login failed validation is not established. The handler can reject invalid/expired/incomplete or incompatible credentials; no credential value was read or exported.",
+    "This diagnosis reads the log tied to the recorded probe process, not an unrelated latest log. No additional authentication request or model prompt was sent.",
+    "No login URL, account identity, token, raw log or local credential path is included."
+  ]
+}

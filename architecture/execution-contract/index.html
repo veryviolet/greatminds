@@ -1,0 +1,2781 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="File-based multi-agent coordination for agent fleets and task pipelines.">
+      
+      
+      
+        <link rel="canonical" href="https://veryviolet.github.io/greatminds/architecture/execution-contract/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Execution contract and durable run store - greatminds</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#execution-contract-and-durable-run-store" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="greatminds" class="md-header__button md-logo" aria-label="greatminds" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            greatminds
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Execution contract and durable run store
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/veryviolet/greatminds" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    veryviolet/greatminds
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../concepts/queues/" class="md-tabs__link">
+          
+  
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../cli-reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  CLI Reference
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../operations/runbook/" class="md-tabs__link">
+          
+  
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../recipes/filing-a-bug/" class="md-tabs__link">
+          
+  
+  
+  Recipes
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../changelog/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="greatminds" class="md-nav__button md-logo" aria-label="greatminds" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    greatminds
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/veryviolet/greatminds" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    veryviolet/greatminds
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/first-project/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    First Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/local-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/upgrading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/queues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/roles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/codex-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Manifests and Bindings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/stand-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stand Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/stand-gate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stand Gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/inbox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inbox
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contract-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Contract Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../filesystem-layout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Filesystem Layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transitions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../daemon-and-agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Daemon and Agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lifecycle Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/runbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runbook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Recipes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Recipes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/filing-a-bug/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Filing a Bug
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/planning-a-feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planning a Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/e2e-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E2E Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/cutting-a-release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cutting a Release
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#operator-permission-requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operator permission requests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configured-commands-and-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configured commands and evidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dependency-maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependency maintenance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#persistence-and-ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistence and ownership
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scoped-context-and-command-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scoped context and command output
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lifecycle-and-result-receipts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lifecycle and result receipts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#delivery-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Delivery status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stand-state-durability-and-deployment-ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stand state durability and deployment ownership
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mechanical-stand-lease-expiry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mechanical stand lease expiry
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bounded-deployment-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bounded deployment output
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authorized-acp-daemon-stand-scheduling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authorized ACP daemon stand scheduling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#managed-deployment-input-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Managed deployment input identity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#daemon-owned-interactive-conversations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Daemon-owned interactive conversations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acp-launch-surfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ACP launch surfaces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acp-defaults-and-cutover" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ACP defaults and cutover
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ACP defaults and cutover">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#explicit-stand-profile-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explicit stand profile selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bounded-startup-retries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bounded startup retries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shared-account-startup-backoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared account startup backoff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bounded-turns-without-workflow-progress" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bounded turns without workflow progress
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reported-usage-observations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reported usage observations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bounded-client-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bounded client input
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#durable-run-stage-timing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Durable run-stage timing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Durable run-stage timing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#queue-validation-and-accepted-transitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Queue, validation and accepted transitions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#measuring-productive-orchestration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measuring productive orchestration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#measuring-idle-daemon-overhead" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measuring idle daemon overhead
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runtime-event-retention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime event retention
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#managed-protocol-diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Managed protocol diagnostics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="execution-contract-and-durable-run-store">Execution contract and durable run store<a class="headerlink" href="#execution-contract-and-durable-run-store" title="Permanent link">&para;</a></h1>
+<p>The modernization runtime separates a role from its ACP executable. Its
+versioned configuration lives in <code>coordination/execution.yaml</code>. Inspect it
+without launching an agent using <code>greatminds project execution</code> (or pass an
+explicit <code>--config</code> path).</p>
+<div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">max_running</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4</span>
+<span class="nt">account_limits</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">local-account</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="nt">agents</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">example-acp</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">transport</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">acp</span>
+<span class="w">    </span><span class="nt">argv</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">example-acp</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--stdio</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">adapter_version</span><span class="p">:</span><span class="w"> </span><span class="s">"1.0.0"</span>
+<span class="w">    </span><span class="nt">harness_version</span><span class="p">:</span><span class="w"> </span><span class="s">"1.0.0"</span>
+<span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">API_KEY</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">EXAMPLE_API_KEY</span>
+<span class="w">    </span><span class="nt">required_env</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">EXAMPLE_API_KEY</span><span class="p p-Indicator">]</span>
+<span class="nt">bindings</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">implementation</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DEVELOPER</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example-acp</span>
+<span class="w">    </span><span class="nt">workspace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="w">    </span><span class="nt">permission</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ask</span>
+<span class="w">    </span><span class="nt">session</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">resume-if-compatible</span>
+<span class="w">    </span><span class="nt">account</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local-account</span>
+<span class="w">    </span><span class="nt">max_running</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">    </span><span class="nt">timeout_seconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1800</span>
+<span class="nt">commands</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">unit-tests</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">argv</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">python</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">-m</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">pytest</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">-q</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">roles</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">DEVELOPER</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">TESTER</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">cwd</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.</span>
+<span class="w">    </span><span class="nt">timeout_seconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">600</span>
+<span class="w">    </span><span class="nt">max_output_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1048576</span>
+<span class="w">    </span><span class="nt">environment_revision</span><span class="p">:</span><span class="w"> </span><span class="s">"1"</span>
+<span class="w">    </span><span class="nt">purpose</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">validation</span>
+</code></pre></div>
+<p>This is a configuration example, not an available agent distribution. Actual
+adapter versions and compatibility evidence belong in the integration matrix.
+The version strings identify the intended installation; parsing configuration
+does not verify the executable's version or negotiated protocol capabilities.</p>
+<p>Assigned context includes <code>cli_argv</code>: the daemon's Python executable followed by
+<code>-I -m greatminds.cli.main</code>. Agents use that invocation for scoped commands and
+result submission. It works without an activated venv or a <code>greatminds</code> executable
+on PATH and prevents a project-local Python module from shadowing the CLI.
+The harness must preserve this launch’s scoped environment in its tool subprocesses.
+A separately running shared harness backend can lose that identity; use an attached
+local backend for managed runs. The <a href="../acp-compatibility/#cline-after-native-login-2026-09-07">Cline compatibility configuration</a>
+records one measured instance and its native setting.</p>
+<p><code>argv</code> is an array, never a shell expression. Environment entries map child
+variable names to parent variable names. Secret values are resolved at launch
+time and do not enter the configuration fingerprint or saved contracts.
+An optional agent <code>auth_method</code> selects one authentication method advertised by
+the ACP server. The supervisor calls it before creating or loading a session;
+an unknown method fails explicitly. Omitting it leaves authentication to the
+server's existing session behavior. Authentication-required responses retain a
+waiting state. Selecting a method can require interactive login according to the
+server; the daemon does not silently select another account or method.
+For task kinds requiring a worktree in the effective schema, the daemon prepares
+the task worktree before starting ACP. A <code>workspace: .</code> binding uses that task
+worktree; an explicit workspace must be inside it. Existing worktrees are checked
+against the expected branch and repository. Other task kinds use the configured
+workspace directly. The resolved path and starting Git identity are recorded in
+the run, and supplied to the agent's context and permission policy.</p>
+<p>Bindings choose workspace, scheduling, permission, session, model, mode, and
+account independently of the harness. Unknown fields and unsupported values
+fail validation. Workspaces are explicit trusted local paths and must exist
+before a claim can be created.</p>
+<h2 id="operator-permission-requests">Operator permission requests<a class="headerlink" href="#operator-permission-requests" title="Permanent link">&para;</a></h2>
+<p>An ACP callback that requires input creates a durable entry in the <code>permissions</code>
+section of <code>greatminds run status</code>. The run enters <code>waiting_input</code> while its
+process and pending prompt remain alive. Inspect and answer the exact request:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>run<span class="w"> </span>permission<span class="w"> </span>REQUEST_ID
+greatminds<span class="w"> </span>run<span class="w"> </span>permission<span class="w"> </span>REQUEST_ID<span class="w"> </span>--option<span class="w"> </span>OPTION_ID
+</code></pre></div>
+<p>Select an advertised <code>allow_once</code> or <code>reject_once</code> option ID. The service rejects
+invented choices and persistent grants. It verifies the supervisor, live process,
+session, deadline, and task revision before accepting and consuming the answer.
+Repeated identical answers before consumption are idempotent; conflicting or late
+answers fail. The agent receives the answer in its existing callback; no new LLM
+turn is created. Assigned agents cannot use the operator CLI to approve themselves.</p>
+<p>The wait is bounded by the callback's 300-second deadline and the remaining prompt
+budget. Timeout leaves an input hold. Cancellation or restart closes unconsumed
+requests, including an answered request whose response was not yet delivered.
+Recovery preserves the run's input hold and never replays an operator decision.
+Inspect the hold and explicitly retry when appropriate; stale request IDs cannot
+authorize a new run. Consumed means handed to the callback, not proof of tool success.</p>
+<p>Permission records retain the tool description, inputs, locations, and offered
+options for review in private runtime state. Known assigned environment values,
+the run credential, sensitive field names, and bearer tokens are redacted. This is
+best-effort redaction of agent-provided content, not a general secret detector.
+Arbitrary vendor metadata is excluded.
+Requests exceeding 256 KiB fail explicitly instead of silently truncating details.</p>
+<p>The <code>ask</code>, <code>deny</code>, and <code>allow-workspace</code> policies govern ACP permission requests.
+They cannot intercept tools that an executable runs without requesting permission.
+Harness approval mode, cached configuration, and sandbox restrictions must also be
+configured and tested. See the <a href="../acp-compatibility/">measured permission behavior</a>.
+The shared-filesystem deployment remains a cooperative trust boundary.</p>
+<h2 id="configured-commands-and-evidence">Configured commands and evidence<a class="headerlink" href="#configured-commands-and-evidence" title="Permanent link">&para;</a></h2>
+<p>An explicit latest plan with <code>stand_required: false</code> selects local validation:
+the scope-specific stand probes and stand observations are not required. Required
+tests blocks, recorded command evidence where configured, task readiness, review,
+and source/environment freshness remain enforced. A missing or ambiguous stand
+declaration does not waive the existing stand-observation checks.</p>
+<p>An assigned agent requests <code>greatminds run command unit-tests --request-id ID
+--wait 60</code>. The CLI queues a durable request for the daemon; it never executes
+the configured command itself. <code>--wait</code> only waits for a receipt and does not
+cancel on expiry. Inspect it later with <code>greatminds run command-status ID</code>.
+One unresolved command is allowed per run. Reusing the same request ID for the
+same run/command returns the existing receipt; a different request is rejected
+until the previous one finishes. Request IDs never cause implicit replay.</p>
+<p>Commands are pinned with the run's execution contract. They specify literal
+argv, allowed roles, relative cwd, timeout, output limit, environment references,
+and an environment revision. There is no interpolation or implicit shell.
+Like agent manifests, commands accept <code>environment</code> and <code>required_env</code> names.
+A <code>purpose: deployment</code> or <code>purpose: publication</code> command additionally requires
+<code>authorized: true</code> in project configuration; a validation exit code grants no
+deployment or publication permission. Configured commands are trusted project
+code, so these labels describe project policy rather than sandboxing commands.</p>
+<p>Before exec, the daemon records the intent and gated process identity. Each
+receipt retains argv/cwd, task/schema/config identities, start/end times, exit
+status, Git commit and source hash before/after, an environment HMAC, executable
+hash, and bounded stdout/stderr artifact paths/hashes. The HMAC key remains a
+private runtime file; environment values do not enter snapshots. Output files
+are private local artifacts (mode 0600), not embedded in operator JSON.</p>
+<p>Git source identity includes tracked and nonignored files, their contents,
+permissions, and internal file symlink targets. Runtime metadata and Git internals
+are excluded. Without Git, source files are scanned directly. External symlinks
+and directory symlinks are not accepted as reproducible source evidence. Respect
+Git ignore rules for generated output; keep result JSON outside the source tree.
+An input change during a command makes its successful exit stale. A later source,
+environment, executable, or output artifact change also invalidates its evidence.
+<code>environment_revision</code> must change when relevant external services or installed
+dependencies change; local hashes alone cannot identify a remote stand's state.
+Stand/lease-bound command scheduling remains a subsequent integration.</p>
+<p>Typed results can reference completed request IDs in <code>payload.command_evidence</code>.
+A tests block may instead specify <code>command_request_id</code>; the daemon supplies
+<code>test_command</code>, <code>test_result</code>, and provenance from the receipt. When validation
+commands are configured for that role, tests blocks must reference a recorded
+command and cannot invent a command/result pair. A recorded nonzero exit supplies
+<code>test_result: fail</code> for a gated handback; a timeout or uncertain execution cannot
+pretend to be a completed test. Test files, adequacy, observations,
+readiness, stand gates, and review decisions still pass existing domain validators.
+A command's success never moves a task to verified on its own.</p>
+<p>Cancellation cleans up the command group before completing the run. Restart
+cancels requests that never passed the launch gate. A process recorded without
+a final outcome becomes <code>needs_recovery</code> after process cleanup and holds task
+retry/result application. No command is replayed automatically. After inspecting
+its effects, an operator can use <code>greatminds run command-resolve ID --reason TEXT</code>
+to acknowledge uncertainty. This produces no passing evidence and does not run
+anything; authorizing another task run is a separate explicit retry operation.</p>
+<h2 id="dependency-maintenance">Dependency maintenance<a class="headerlink" href="#dependency-maintenance" title="Permanent link">&para;</a></h2>
+<p>For ACP projects, the daemon resumes dependency-ready tasks without an agent
+turn. <code>greatminds wake-check --json</code> and <code>greatminds run status</code> expose the same
+versioned findings: ready, waiting/missing dependencies, conflicting terminal
+location, malformed/duplicate identity, cycle, withdrawal, required live-role
+hold, readiness failure, or an unresolved operation. No repeated heartbeat or
+reviewer queue scan is required. Unchanged findings generate no repeated events.</p>
+<p>Dependencies must name an existing task in their declared terminal queue. An
+active task, an archived task when verified was required, or an ambiguous identity
+cannot silently satisfy the condition. Markdown task files require conversion to
+typed YAML before automatic resumption. The
+graph detects entire cycle components without a recursion-depth limit. A required
+live ACP role needs a recorded running process with a matching OS identity;
+configuration alone is not proof that a role is usable. An unavailable explicit
+target context remains a hold.</p>
+<p>The effective schema separately authorizes <code>system_transitions.resume_dependencies</code>.
+SYSTEM is not an agent role and cannot be selected in a binding. The system
+operation uses only the latest blocked block's <code>resume_to</code>, requires an active
+destination, and preserves schema scope/readiness gates. Withdrawn work still
+requires a semantic decision. The original blocking author is retained in the
+system journal rather than impersonated as the actor of the resume.</p>
+<p>Before moving the task, the daemon locks the task and dependency identities in
+stable order, rechecks their revisions, and records an intent with the pinned
+schema and dependency evidence. Claims and CLI mutations hold while the operation
+is incomplete. Recovery finishes a recorded move/journal once; changed evidence
+or conflicting task contents produce <code>needs_recovery</code> without overwriting files.
+The same task revision and dependency evidence cannot resume repeatedly if the
+task reappears unchanged in the blocked queue.</p>
+<p>An operator requests reconciliation with <code>greatminds run repair --operation ID</code>.
+This rechecks the original preconditions; it grants no override. If an intent has
+not moved its task, <code>--abandon --reason TEXT</code> can cancel that intent while preserving
+the source. Changed dependency evidence can then create a fresh intent. An intent
+whose task may already have moved must be reconciled, not abandoned. Agent-scoped
+credentials cannot request these operator actions.</p>
+<p>Projects without an ACP execution contract receive an informational wake report.
+Within ACP, both manual domain decisions and automatic maintenance use the shared
+terminal-dependency and declared-destination checks.</p>
+<h2 id="persistence-and-ownership">Persistence and ownership<a class="headerlink" href="#persistence-and-ownership" title="Permanent link">&para;</a></h2>
+<p>The runtime service stores a versioned snapshot in <code>.runtime/state.json</code> beneath
+the project's runtime directory. It contains project identity, dispatch pause
+state, runs, ordered lifecycle events, and result receipts. Immutable schema and
+execution documents live in <code>.runtime/contracts/</code>. A run retains the content
+hashes of both documents, its role/binding, task revision, workspace, account,
+and supervisor identity. Contract documents are synced before the referencing
+run is published.</p>
+<p>A claim takes the task lock before the store lock, verifies the discovered task
+revision, and checks project, binding, and account capacity in one transaction.
+One task can have only one active run. Waiting runs still consume capacity.
+Task revision includes queue path and file bytes, so a queue move or task edit
+invalidates an outstanding decision. Task files remain the domain authority.</p>
+<p>Metadata writes use a same-directory temporary file, file fsync, atomic replace,
+and directory fsync. An interrupted replacement leaves the snapshot from before
+or after the transaction; a malformed existing snapshot fails closed. Filesystem errors after
+replace can leave a committed write with an uncertain acknowledgement, so
+callers must inspect state before retrying. Run identifiers and receipt identities
+make recovery possible without inferring success from the last console output.</p>
+<p>The shared task lock keeps a stable inode after release. File existence is not
+proof of ownership; the kernel flock is. Removing a lock file can strand existing
+waiters on a different inode and break mutual exclusion.</p>
+<h2 id="scoped-context-and-command-output">Scoped context and command output<a class="headerlink" href="#scoped-context-and-command-output" title="Permanent link">&para;</a></h2>
+<p><code>greatminds run contract</code> returns the current assignment with accepted decision
+fields and daemon-generated block fields. <code>--schema</code> returns the schema pinned to
+that run, even if the current canon has since changed. Both require the assigned
+run credential.</p>
+<p><code>run command</code> and <code>run command-status</code> include a bounded <code>output_preview</code> for
+stdout and stderr (default 8192 bytes per stream; <code>--output-limit</code> accepts 0–65536).
+The daemon checks the recorded file location, regular-file type, size, and hash
+before returning text. Previews are not persisted into receipt metadata and do
+not replace source freshness checks. Assigned credentials can inspect only their
+own run's command receipts; an operator without assigned credentials can inspect
+all receipts.</p>
+<h2 id="lifecycle-and-result-receipts">Lifecycle and result receipts<a class="headerlink" href="#lifecycle-and-result-receipts" title="Permanent link">&para;</a></h2>
+<p><code>greatminds run submit --json '{"decision":"no_change","payload":{"reason":"..."}}'</code>
+accepts an inline decision (up to 65536 bytes). Pass JSON as one literal shell
+argument. <code>--file /absolute/path/result.json</code> remains available for larger input;
+exactly one input option is required. Both accept a compact
+decision: <code>{"decision": "no_change", "payload": {"reason": "..."}}</code>. The CLI
+fills run/task/schema identity from the current assignment and chooses one stable
+result ID per run. Exact repeated submission returns the existing receipt, even
+after completion; changing its contents is a conflict. Full envelopes and explicit
+result IDs remain supported, but cannot override the assigned run's identity.</p>
+<p>Run lifecycle records claimed, starting, running, waiting for input/authentication,
+cancelling, and terminal completed/failed/cancelled/interrupted states. The
+supervisor supplies a unique event ID. Replaying the same event is a no-op;
+reusing its ID for different contents is an error. Terminal runs reject new
+lifecycle transitions. Pausing dispatch prevents new claims while allowing
+active runs to finish.</p>
+<p>An agent receives a random per-run credential. The store persists its hash and
+omits it from operator snapshots. A result envelope names result, run, task,
+task revision, schema hash, decision, and decision payload. Role and provenance
+come from the run. A result for another task/revision, an invalid credential,
+or an inactive run is rejected. Each run accepts one decision; identical
+re-delivery returns the original receipt even after the task moves.</p>
+<p><code>received</code> means durably accepted for domain validation. After the agent stops,
+the result service validates all candidate evidence blocks, role permissions,
+scope routing, readiness flags, and required gates through the same policy
+functions used by the CLI. Validation uses the pinned schema and assigned
+workspace in an explicit context; process-wide cwd and role environment are
+not changed. <code>applied</code> acknowledges the legal domain operation. A completed
+agent turn by itself does not complete a task.</p>
+<p>An accepted operation records candidate task bytes, source/destination, artifact
+hashes, and worktree actions before modifying the task. Recovery checks these
+identities, resumes atomic writes/moves, and deduplicates the journal entry.
+New blocks retain the decision's role and carry run/result/revision provenance;
+the application event names <code>SYSTEM</code> as actor and records the deciding role
+separately. CLI task mutations and new claims are held while an operation is
+incomplete, including when the task is addressed through a short ID.</p>
+<p>The four decision payloads are:</p>
+<ul>
+<li><code>handoff</code>: <code>to_queue</code>, an array of typed <code>blocks</code>, optional <code>artifacts</code> and
+  <code>reason</code>. Block entries contain <code>kind</code> and their evidence fields.</li>
+<li><code>blocked</code>: <code>reason</code>, <code>dependencies</code>, <code>resume_to</code>, and optional <code>artifacts</code>.</li>
+<li><code>needs_input</code>: <code>question</code> and optional <code>artifacts</code>; records the question
+  without changing queues.</li>
+<li><code>no_change</code>: optional <code>reason</code> and <code>artifacts</code>; records a terminal decision
+  without repeating a model turn for the same revision.</li>
+</ul>
+<p>Author/timestamp/provenance fields are assigned by the domain service. Artifact
+paths must identify existing files within the assigned workspace. Invalid
+decisions become <code>rejected</code> without partial task changes. An uncertain merge
+or conflicting recovery state becomes <code>needs_recovery</code>; it is never treated
+as permission to rerun a possibly completed command. Operator repair for these
+states and further deterministic command/evidence services remain in progress.</p>
+<p>This is a cooperative shared-filesystem deployment. Run credentials prevent
+accidental or invalid submissions through the service, but do not isolate a
+process that can read or rewrite the authoritative store. Strong isolation
+requires a daemon-owned store and an actual execution boundary.</p>
+<h2 id="delivery-status">Delivery status<a class="headerlink" href="#delivery-status" title="Permanent link">&para;</a></h2>
+<p>The common stdio transport uses the upstream
+<a href="https://agentclientprotocol.github.io/python-sdk/quickstart/">Python ACP SDK</a>,
+pinned to <code>agent-client-protocol==0.11.1</code>. The SDK supplies protocol models,
+framing, request correlation, and bidirectional dispatch. Greatminds creates
+the child process separately so it can own a process group and enforce bounded
+shutdown of descendants as well as the agent itself.</p>
+<p>Protocol fixtures cover initialization, session creation, streamed updates,
+permission requests during pending prompts, unsupported session loading,
+incompatible versions, disconnection, timeouts, and process-group cleanup.
+These fixtures use an independent JSON-RPC peer, not the SDK's agent classes.
+They establish client behavior, not live harness compatibility.</p>
+<p>Filesystem and terminal callbacks are currently unadvertised and explicitly
+rejected. Permission requests use a supplied policy/operator handler, with a
+deadline and validation against the offered option IDs. Without a handler,
+the client cancels the request and reports that input is needed. The transport
+does not persist raw updates or stderr; the supervisor must apply diagnostic
+redaction and retention when connecting its event sink.</p>
+<p><code>coordd</code> now selects the common ACP supervisor when the project has
+<code>coordination/execution.yaml</code>. Projects without that file still use the existing
+execution path until the migration milestone. <code>coordd --once</code> reconciles and
+executes one dispatch batch in an ACP project, then exits. A continuously running
+daemon also processes operator cancellation and retry requests.</p>
+<p>The supervisor holds one exclusive project lease. Before exec, a child waits
+on a pipe until its PID, boot identity, and process start time have been saved.
+EOF at this gate means the supervisor died before authorizing launch. Restart
+cleanup checks process identities and uses Linux pidfds, through Python or libc,
+before recording interruption. Unknown process state is an error, not permission
+to dispatch a second agent. Authentication and input holds survive restart.</p>
+<p>Dispatch selects concrete tasks from each queue binding's declared role queues.
+Idle, paused, capacity-limited, and already-attempted revisions create no agent
+turn. Blocked dependency sweeps are reserved for the mechanical controller.
+The context compiler provides the assigned task, role, available transitions,
+contract identity, and result format. It removes queue-scanning and heartbeat
+instructions from the assignment. Compatible sessions may be loaded when the
+agent advertises that capability; otherwise context is reconstructed in a new
+session and the strategy is recorded. Model/mode settings must be advertised.</p>
+<p>Operator commands:</p>
+<ul>
+<li><code>greatminds run status</code> returns runs and assignment reasons as versioned JSON.</li>
+<li><code>greatminds run pause</code> and <code>resume</code> control new ACP dispatch.</li>
+<li><code>greatminds run cancel RUN_ID</code> requests bounded cancellation from the daemon.</li>
+<li><code>greatminds run retry RUN_ID</code> authorizes one further attempt after a terminal
+  or waiting run. A pending domain result must be resolved before retry.</li>
+<li><code>greatminds run submit --file /absolute/path/result.json</code> receives a decision
+  using the run credential supplied by the supervisor. CLI output reports the
+  durable receipt status; it does not report a task transition.</li>
+</ul>
+<p>The daemon records context bytes, protocol update count, activity time, elapsed
+time, session strategy, stop reason, and structured failure codes. It does not
+classify failures from keywords in model output. A successful turn with an
+unchanged task revision is held until an explicit retry, rather than being
+automatically repeated. Typed results now pass through domain application and
+its semantic gates. Worktree preparation at dispatch, deterministic command
+evidence, repair controls, and live harness compatibility remain in progress.</p>
+<h2 id="stand-state-durability-and-deployment-ownership">Stand state durability and deployment ownership<a class="headerlink" href="#stand-state-durability-and-deployment-ownership" title="Permanent link">&para;</a></h2>
+<p>Stand state uses a stable <code>.stand/state.lock</code> and an atomic, fsynced replacement
+of <code>.stand/state.yaml</code>. Concurrent readers see complete snapshots. An exception
+or process death before replacement preserves the preceding lease and history.
+All participating writers must use this locking protocol; stop older processes
+before a live upgrade. This change does not migrate a running fleet.</p>
+<p>Both operator and coordinator deployment calls hold <code>.stand/deployment.lock</code>.
+A second call fails before external execution and does not consume coordinator
+retry attempts. Success, failure, and stale-source rejection can update the
+stand only while its preparing state and captured lease still match. A late
+result raises a recovery error without overwriting a replacement lease. Retry
+exhaustion also checks the captured lease before marking the stand down.</p>
+<p>Before external dispatch, the engine persists a deployment attempt in
+<code>.stand/deployments.json</code>. It records lease identity, owner process identity, and
+lifecycle without copying arbitrary lease fields or raw logs. The returned exit
+status and log hash are saved before publishing the stand transition. That
+transition includes the attempt ID; only its exact match can recover a missing
+final receipt after a crash, without executing the command again.</p>
+<p>An attempt with an unknown outcome, or a returned result without a confirmed
+stand transition, blocks further external deployment across lease changes and
+process restarts. <code>greatminds stand deployment-status</code> exposes these attempts as
+versioned JSON. Executor exceptions retain an unresolved intent; coordinator
+retries cannot bypass it. A malformed ledger also blocks execution.</p>
+<p>Managed profile execution starts a fresh Linux session through an exec gate.
+The child PID, boot ID, start ticks, process group/session, command digest, and
+working directory are durably recorded before the gate opens. Failure to record
+identity closes the gate without executing the external command. Normal exit,
+exceptions, and timeouts use the common bounded process-group cleanup. An omitted
+timeout defaults to 1800 seconds for managed deployments. The returned process
+status is recorded separately from the domain result. Internal attempt metadata
+is excluded from Ansible extra variables.</p>
+<p><code>stand deployment-recover ATTEMPT_ID</code> holds the project deployment lock, cleans
+the tracked group, and records cleanup without resolving external effects.
+<code>stand deployment-resolve ATTEMPT_ID --reason TEXT</code> requires confirmed cleanup,
+rechecks group absence, and records an operator assessment. It neither marks a
+stand ready nor manufactures a successful result; the existing stand state is
+preserved. A separate authorized deploy is required to execute again. Assigned
+ACP run credentials cannot use these operator decisions.</p>
+<p>Attempts predating gated child tracking cannot claim automatic cleanup. Process
+group cleanup covers the owned Linux session, not remote changes or processes
+that deliberately leave that group. Those external effects require operator
+assessment. The ACP daemon sweeps orphan attempts automatically, respecting the
+same deployment lock; unchanged cleanup is not repeatedly written. It reconciles
+recorded stand transitions before cleaning uncertain attempts and never starts
+an agent or replays an external command for this sweep. <code>run status</code> includes the
+same versioned deployment ledger. Local workflows without a stand ledger create
+no stand state. Authorized profile dispatch uses the scheduler described below;
+changing a lease alone never resolves an unknown outcome.</p>
+<h2 id="mechanical-stand-lease-expiry">Mechanical stand lease expiry<a class="headerlink" href="#mechanical-stand-lease-expiry" title="Permanent link">&para;</a></h2>
+<p>The ACP daemon checks leases without creating a maintainer turn. A finite,
+positive TTL and a valid grant time must prove expiry. Reclamation also requires
+no active run for the holder role or task, no remaining tracked process group,
+no unresolved task command/result, and no unresolved deployment. Live or unreadable
+holder PID registry records keep the lease held. Invalid or uncertain state does not
+establish an expired, dead holder.</p>
+<p>Reclamation holds the deployment lock, runtime store lock, and stand state lock
+in that order. It rechecks preconditions under these locks before publication,
+preventing a new claim or deployment from racing the decision. A single atomic
+stand update clears the expired lease, records <code>SYSTEM</code> history, and promotes
+the FIFO head using the existing lease policy. A repeated sweep makes no further
+transition. Projects without stand state create none.</p>
+<p><code>run status</code> includes <code>stand_lease</code> with the current expiry or blocking reason.
+Manual <code>stand reclaim</code> uses the same TTL and ACP ownership checks and respects
+the deployment lock and unresolved deployment ledger. Granting/deploying the
+next lease uses the separate authorized profile scheduler below.</p>
+<h2 id="bounded-deployment-output">Bounded deployment output<a class="headerlink" href="#bounded-deployment-output" title="Permanent link">&para;</a></h2>
+<p>Managed deployment stdout and stderr are drained concurrently with a default
+capture limit of 1 MiB per stream. <code>stand deploy --output-limit BYTES</code> accepts
+1–67108864 bytes per stream. Retained prefixes are written atomically to private
+<code>.stand/deployment-output/ATTEMPT_ID/stdout</code> and <code>stderr</code> files. The ledger records
+stream byte counts, full stream hashes, captured byte counts/hashes, file paths,
+and truncation flags; raw output does not enter the JSON ledger.</p>
+<p>A truncated log cannot pass profile result/no-host checks. The process return
+code and bounded artifacts remain available, but the attempt requires operator
+assessment and does not mark the stand ready. Output capture limits do not stop
+draining pipes or hide an incomplete log behind a successful return code.</p>
+<p>The process runner also accepts a cooperative cancellation event for daemon
+workers. Cancellation stops the owned process group and preserves external
+uncertainty. Once the main process exits, remaining group members are cleaned
+without waiting for inherited output pipes to hit the deployment timeout. Output
+pipes remaining open beyond bounded cleanup raise a recovery error. Internal
+<code>_deployment_*</code> metadata is excluded from playbook variables.</p>
+<h2 id="authorized-acp-daemon-stand-scheduling">Authorized ACP daemon stand scheduling<a class="headerlink" href="#authorized-acp-daemon-stand-scheduling" title="Permanent link">&para;</a></h2>
+<p>Automatic profile deployment is opt-in in <code>coordination/execution.yaml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">stand</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">authorized</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">profiles</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">smoke-only</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">full-deploy</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">timeout_seconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1800</span>
+<span class="w">  </span><span class="nt">max_output_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1048576</span>
+</code></pre></div>
+<p>Omitting <code>stand</code>, or setting <code>authorized: false</code>, disables automatic deployment.
+The profile list must be explicit and distinct. This permission does not replace
+registry role restrictions or per-lease approval for profiles requiring explicit
+user approval. Registry/profile-file consistency is checked again at dispatch.</p>
+<p>A dedicated worker runs the existing deployment engine while the daemon continues
+processing agents, command requests, and operator controls. Dispatch pause stops
+new profile selections; existing work may finish. Shutdown signals cooperative
+cancellation and drains the worker before releasing the supervisor lease.
+<code>coordd --once</code> waits for its selected stand deployment as well as agent work.</p>
+<p>Before external work, <code>.stand/schedule.json</code> records a ticket keyed by the complete
+lease snapshot and immutable stand policy. Selection is serialized against pause,
+deployment ownership, and run claims. The engine rechecks the captured lease before
+using it. A failed or interrupted selection is not automatically replayed for the
+same lease/policy, even when no external deployment receipt was written. After
+correcting a preflight issue, an operator may invoke <code>stand deploy</code> explicitly;
+unresolved external effects still require deployment recovery/resolution first.</p>
+<p><code>run status</code> exposes <code>stand_dispatch</code> and the versioned <code>stand_schedule</code>. Failed
+tickets retain exception type and known policy error text with environment-value
+redaction; arbitrary exception text and process output are not copied there.
+Existing bounded capture, exec gating, orphan cleanup, and no-replay rules remain
+in effect. Managed profile inputs are checked as described below.</p>
+<h2 id="managed-deployment-input-identity">Managed deployment input identity<a class="headerlink" href="#managed-deployment-input-identity" title="Permanent link">&para;</a></h2>
+<p>Before launching a managed profile, the engine records the workspace source
+identity, selected profile path/content hash, executable identity/content hash,
+and an HMAC of the process environment plus effective playbook variables. The
+shared command-evidence primitive owns the private HMAC key; environment values
+are not copied into the deployment ledger. Workspace identity includes uncommitted
+source and uses Git ignore rules, or a file walk for non-Git fixtures. Runtime
+metadata is excluded so logging and bookkeeping cannot invalidate deployment.</p>
+<p>After normal command completion, the engine records another input snapshot.
+A mismatch leaves the attempt unresolved and cannot publish <code>ready</code>, even when
+the process returned zero. The actual process result and bounded output remain
+available for assessment. Failure/timeout paths lacking a complete snapshot pair
+do not assert stable inputs.</p>
+<p>Domain transitions, <code>gate-check</code>, and manual <code>stand ready</code> revalidate the latest
+receipt for the cited lease. The receipt must belong to the task, have an applied
+successful outcome and matching input snapshots, and retain complete stdout/stderr
+artifacts whose paths, sizes, and hashes still match. An unresolved later attempt
+cannot fall back to an earlier successful one. Monotonic ledger sequences order
+attempts independently of wall-clock timestamps. Manual ready also requires the
+same deployed lease fields and holds the deployment lock while publishing state.</p>
+<p>Current source, profile, executable, effective variables, and environment identity
+must match the receipt. The ledger stores only the public deployment context needed
+to reconstruct variables; PROJECT.env values remain outside it. Managed playbooks
+and validators use the same environment normalization: run ID/token, role/project
+context, shell working-directory bookkeeping, and terminal presentation variables
+are omitted; ANSIBLE_FORCE_COLOR is fixed to zero. Other environment changes can
+conservatively invalidate evidence, including differences between caller shells.</p>
+<p><code>stand.environment_revision</code> is a nonempty string, defaulting to <code>"1"</code>. Change it
+when relevant external services or installed infrastructure change. This is a
+declared revision, not remote-state discovery. These checks cannot attest remote
+machine state or detect transient changes reverted between snapshots. Projects
+with neither execution.yaml nor a deployment ledger use marker/evidence checks;
+ACP projects require a
+managed receipt and never fall back to a marker or prose.</p>
+<h2 id="daemon-owned-interactive-conversations">Daemon-owned interactive conversations<a class="headerlink" href="#daemon-owned-interactive-conversations" title="Permanent link">&para;</a></h2>
+<p>For a new ACP project, <code>greatminds setup --project-dir PATH --execution-config FILE</code>
+validates and installs the supplied execution contract, creates schema queues,
+adds runtime/worktree ignore entries, and writes a missing runtime schema mirror.
+The contract is published last. Repeating the command preserves existing files;
+an edited schema mirror is reported as drifted and does not override the installed
+schema. This path does not launch an agent, install services, change harness trust,
+or generate native harness configuration. It rejects flags from the other setup
+path that it cannot honor and refuses replacement of an existing execution contract.</p>
+<p>An existing fleet without an execution contract requires explicit migration before
+this bootstrap can apply. Preparation of that migration and the default setup switch
+are in progress; the option above is the available ACP-specific bootstrap entrypoint.</p>
+<p><code>runtime.interactions.ConversationStore</code> backs the <code>chat</code> CLI and ACP daemon.
+Each conversation has a private <code>.runtime/conversations/&lt;id&gt;/state.json</code> and a
+stable lock. The binding, execution/schema hashes, and workspace are pinned at
+creation. Prompt text belongs to this private conversation journal, not the global
+run/event snapshot. Consumers must normalize and redact assistant text before
+appending it; arbitrary tool payloads are not accepted by the text API.</p>
+<p>Caller-supplied request IDs make enqueue retries idempotent. Reusing an ID with a
+different prompt fails. A durable sequence establishes FIFO order independently
+of JSON key order and clock time; only one turn may be running per conversation.
+Cancellation removes a queued turn from dispatch. Cancelling a running turn records
+intent, and the daemon must complete ACP cancellation before recording its outcome.</p>
+<p>A new supervisor owner interrupts already-started turns without re-enqueueing them.
+Queued input and the provider session ID survive. The caller must hold the exclusive
+project supervisor lease before acquiring ownership; this store does not itself
+assert process liveness or implement session loading. Changed contracts require a
+new conversation rather than silently rebinding pending messages. The supervisor
+loads the saved provider session when reopening; missing ACP load support fails
+the turn with <code>session_load_unavailable</code> instead of silently replacing history.
+History updates emitted by session loading are not duplicated in the output feed.</p>
+<p>Reconnect readers page events by monotonically increasing cursor without changing
+execution state. Limits are explicit: 64 KiB per prompt, 64 pending turns, 256 turns
+per conversation, and 1 MiB/4096 text events of captured output per turn. Exceeding
+output capture emits one truncation event while allowing the daemon to finish the
+turn. New prompts exceeding limits are rejected without deleting earlier input.
+Conversations use the same Supervisor, gated ACP transport, permissions broker,
+configured-command service, run cancellation, and project/binding/account admission
+limits as queued work. They reserve a run slot while the session remains connected.
+Dispatch pause prevents new conversation runs; an already connected conversation
+can continue accepting user messages. Continuous coordd keeps that session open
+between messages; <code>--once</code> drains its available messages and closes it. Interactive
+requests are considered before new background assignments, without preempting an
+existing background run. No user prompt is injected into a background task session.</p>
+<p>Any configured role binding can start a conversation without creating a workflow
+task. Its run uses a namespaced conversation subject identity, a pinned role context
+and the binding workspace. It cannot submit a domain result for a nonexistent task.</p>
+<p><code>chat create BINDING --task EXACT_TASK_ID</code> instead pins the current file/revision of
+one workflow task. The binding role must be permitted to claim its queue. Dispatch
+uses the same task lock, worktree policy, compiled context, commands, and domain
+result service as background work; the two paths cannot claim that task together.
+A changed/moved task holds queued input with a stale-revision explanation. The
+revision is checked before each prompt. No message is silently rebound to new task
+contents; create another conversation for the current revision when appropriate.</p>
+<p>A received task result ends the conversation's current run after the prompt ends,
+including in continuous daemon mode, so result application can proceed after
+process cleanup. Waiting for a permission with a live process does not qualify as
+finished execution. Subsequent queued messages retain their identities and remain
+subject to the pinned revision check. Domain transitions and worktree cleanup are
+still performed by the shared result service, not by the terminal client.</p>
+<p>With ACP coordd running for the project:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>chat<span class="w"> </span>create<span class="w"> </span>BINDING
+greatminds<span class="w"> </span>chat<span class="w"> </span>send<span class="w"> </span>CONVERSATION<span class="w"> </span>--request-id<span class="w"> </span>MESSAGE_ID<span class="w"> </span>--message<span class="w"> </span><span class="s1">'User request'</span>
+greatminds<span class="w"> </span>chat<span class="w"> </span>attach<span class="w"> </span>CONVERSATION<span class="w"> </span>--follow
+greatminds<span class="w"> </span>chat<span class="w"> </span>attach<span class="w"> </span>CONVERSATION<span class="w"> </span>--after<span class="w"> </span>LAST_CURSOR<span class="w"> </span>--follow
+greatminds<span class="w"> </span>chat<span class="w"> </span>attach<span class="w"> </span>CONVERSATION<span class="w"> </span>--text<span class="w"> </span>--follow
+greatminds<span class="w"> </span>chat<span class="w"> </span>talk<span class="w"> </span>CONVERSATION<span class="w"> </span>--after<span class="w"> </span>LAST_CURSOR
+greatminds<span class="w"> </span>chat<span class="w"> </span>interrupt<span class="w"> </span>CONVERSATION<span class="w"> </span>MESSAGE_ID
+greatminds<span class="w"> </span>chat<span class="w"> </span>close<span class="w"> </span>CONVERSATION
+</code></pre></div>
+<p>Each command accepts <code>chat --project-dir PATH</code> before its subcommand. <code>attach</code>
+streams JSON pages with reconnect cursors; Ctrl-C detaches without cancelling work.
+<code>interrupt</code> cancels queued input or requests active ACP cancellation, closing that
+run's connection. <code>close</code> immediately rejects new messages, cancels queued input,
+and requests daemon cancellation of the active run. The daemon acknowledges closure
+after run cleanup; the journal remains readable and follow readers exit at closure.
+Closure works even if the binding/configuration has changed and no longer permits
+dispatch. Repeated close requests are idempotent; closed conversations cannot reopen.
+Without a running daemon, closure stays requested until the next daemon sweep.
+Permission questions remain visible in <code>run status</code>; inspect or answer one using
+<code>run permission REQUEST_ID --option OPTION_ID</code>. Assigned agent credentials cannot
+use chat operator controls.
+Admission holds appear in the conversation's dispatch events/status; queued input
+survives changed configuration or capacity holds. Known environment secrets are
+redacted from normalized assistant chunks on a best-effort basis; this is not a
+guarantee against secrets split across chunks or unrecognized secret values.</p>
+<p><code>attach --text</code> renders messages and outcomes, then prints a reconnect cursor.
+<code>talk</code> reads the conversation, accepts one message at a time, streams its response,
+and presents pending one-time permission options for an explicit numbered choice.
+It never chooses a permission by default. <code>/detach</code>, EOF, or Ctrl-C leave work
+running; <code>/close</code> requests the daemon closure described above. A reconnect command
+with the last displayed cursor is printed on exit. During a response, another
+client can enqueue further messages or use <code>chat interrupt</code>; talk waits for queued
+work before asking for its next message. Terminal control characters in user and
+assistant text are escaped rather than executed, including across stream chunks.</p>
+<p><code>chat bindings</code> and <code>chat list</code> expose metadata for interface clients without
+launching agents or including message contents. The VS Code extension uses these
+commands for New ACP Chat, Attach ACP Chat, and Close ACP Chat. Its terminal runs
+the same <code>chat talk</code> client. The daemon remains the process/session owner when an
+editor terminal closes or reconnects.</p>
+<p>Richer non-permission input, real extension-host smoke testing, and live interactive
+harness validation remain outstanding M5 work.</p>
+<h2 id="acp-launch-surfaces">ACP launch surfaces<a class="headerlink" href="#acp-launch-surfaces" title="Permanent link">&para;</a></h2>
+<p>When <code>coordination/execution.yaml</code> exists, <code>greatminds launch --project-dir PATH</code>
+uses the ACP frontend. <code>--target vscode</code> or <code>cursor-ide</code> writes
+<code>greatminds-acp.code-workspace</code> with process tasks for coordd, run status, and
+conversation metadata. It preserves unrelated workspace tasks/settings and does
+not modify the user's <code>.vscode/tasks.json</code>. Open the workspace and use the ACP chat
+extension commands for role conversations. Workspace generation itself starts no
+agent or daemon. The workspace must retain the project as its first folder.</p>
+<p><code>--target tmux</code> creates a project-specific session with a coordd window and an
+operator shell. It sends no synthetic keystrokes and starts no native harness TUI.
+The daemon dispatches according to execution.yaml. Repeated launch reports an
+existing tmux session; it does not kill or replace it. <code>--recreate</code> is refused for
+this path; stop the daemon and close its session explicitly when needed. The
+supervisor's exclusive lease remains responsible for preventing duplicate daemon
+ownership, including when a service already runs coordd.</p>
+<p>The frontend uses the current CLI's Python, or an explicit <code>--venv</code> whose ACP
+runtime imports are checked before launch. <code>--config</code> does not select another
+configuration for an ACP project; use its project directory. A project without
+an execution contract still uses the other launcher while default migration is
+being completed. Generating an ACP workspace does not remove pre-existing fleet
+artifacts; that belongs to the explicit project migration.</p>
+<h2 id="acp-defaults-and-cutover">ACP defaults and cutover<a class="headerlink" href="#acp-defaults-and-cutover" title="Permanent link">&para;</a></h2>
+<p>Operator observations use the same ACP run model across <code>run status</code>,
+<code>agent status --json</code> and <code>dashboard --json</code>. Configured bindings without runs
+are idle; active runs and the latest terminal outcome remain visible, including
+runs whose binding was subsequently changed or deleted. Run lifecycle, recorded
+process identity/liveness, pinned task revision and configuration drift are
+separate fields. A live PID does not turn waiting for authentication or human
+input into readiness, and PID reuse does not identify a live owned process.</p>
+<p><code>agent tools --json</code> lists configured ACP manifests and pinned version labels.
+Its <code>verification: configured</code> field does not assert live harness compatibility.
+The VS Code agent list displays the same distinction. Dashboard includes task
+queues, assignment reasons, stand state and maintenance findings. These read-only
+views exclude run credential hashes and do not probe harnesses or inspect terminal
+panes. Cross-store observations are best effort; execution admission revalidates
+the state before launching or applying a result.</p>
+<p>Tasks that explicitly require live roles can resume only when the target context
+has a running ACP role with a matching live process identity. Missing roles,
+unreadable observations and authentication/input waits hold that explicit gate.
+Tasks without a declared live-role requirement do not acquire one implicitly.</p>
+<p><code>greatminds setup</code> initializes an empty explicit ACP execution contract and shared
+runtime directories. Supplying <code>--execution-config FILE</code> initializes from reviewed
+manifests and bindings instead. Setup preserves existing contract bytes and task
+data, and does not configure harness authentication or install services/plugins.
+It refuses to create a second runtime if task data still resides in coordination.</p>
+<p><code>coordd</code> always uses ACP. A missing or invalid execution contract is an error.
+<code>launch</code> exposes daemon/operator frontends. Use <code>run pause</code>, <code>run resume</code>,
+<code>run cancel</code>, <code>run retry</code> and the <code>chat</code> commands to control work and conversations.</p>
+<p>ACP run cancellation, recovery, permission checks and task revision validation
+remain part of the runtime contract. Follow the modernization plan for the current
+implementation status of diagnostics, service configuration and documentation.</p>
+<h3 id="explicit-stand-profile-selection">Explicit stand profile selection<a class="headerlink" href="#explicit-stand-profile-selection" title="Permanent link">&para;</a></h3>
+<p>When a lease has a worktree, its <code>coordination/stand-profiles/</code> profile wins;
+otherwise the main project's selected profile is used. The chosen path and
+source are recorded with deployment evidence. Files under the package's
+<code>templates/stand-profiles/</code> are examples, never automatic runtime substitutes.
+To evaluate an updated example, explicitly copy or adapt it into the selected
+project/worktree profile and review that change. Setup preserves existing
+profile bytes; package upgrades do not infer permission to replace a profile
+from its content hash. Existing deployment authorization, safety and evidence
+freshness checks still apply.</p>
+<h3 id="bounded-startup-retries">Bounded startup retries<a class="headerlink" href="#bounded-startup-retries" title="Permanent link">&para;</a></h3>
+<p>Queue bindings accept <code>max_startup_retries</code> (0–20, default 2),
+<code>retry_initial_seconds</code> (positive integer, default 5) and <code>retry_max_seconds</code>
+(positive integer, default 60). The delay doubles after each failed startup and
+is capped at the maximum. Zero retries disables automatic repetition.</p>
+<p>Only durable <code>failed</code> outcomes explicitly recording <code>prompt_started: false</code>
+and <code>pre_prompt_activity: false</code> with a startup transport failure or timeout
+qualify. Session updates, permission callbacks or extension notifications before
+the prompt prevent automatic replay. Missing executables,
+permission errors, authentication/input waits, configuration/protocol failures,
+crash-interrupted runs and unknown or post-prompt effects require explicit
+operator action. A recorded command or typed result also prevents automatic
+startup retry. The same task revision and pinned execution/binding/schema
+identities must still match. A contract change does not silently authorize replay.</p>
+<p>Retry time and counts are derived from durable run outcomes; restarting the
+daemon does not reset them. The scheduler exposes <code>retry_backoff</code> and
+<code>startup_retry_limit</code>, and <code>run status</code> includes each assignment's retry time and
+budget. Claim admission rechecks the verdict under the store lock and records
+<code>startup_retry_dispatch</code> when an automatic retry is admitted. Existing capacity,
+permission, revision and unresolved-operation gates still apply.</p>
+<p>An explicit operator retry permits one further attempt but does not reset the
+count for that unchanged revision. This startup policy does not implement
+provider-reported rate-limit handling, automatic post-prompt retries, or provider usage/cost budgets; those remain separate modernization requirements.</p>
+<h3 id="shared-account-startup-backoff">Shared account startup backoff<a class="headerlink" href="#shared-account-startup-backoff" title="Permanent link">&para;</a></h3>
+<p>Project-level <code>account_retry_initial_seconds</code> (default 5) and
+<code>account_retry_max_seconds</code> (default 60) are positive integers. Consecutive
+recognized startup failures across all bindings, tasks and conversations using
+the same <code>account</code> produce a shared exponential delay capped at the maximum.
+New tasks and explicit operator retries wait too. Other account identities are
+independent. Account identity is a configured grouping, not an inferred provider
+or credential identity.</p>
+<p>The delay is derived from persisted completion times and survives daemon restart.
+The first transition to a configured session/running state records immutable
+<code>startup_ready_at</code>, which resets the connectivity failure streak at that original
+time. Permission resumes and crash recovery do not create a newer reset. A run
+without this marker supplies no reset evidence. This demonstrates startup
+recovery only; it does not establish task progress or passing evidence. Existing
+runs are not cancelled, and authentication holds retain their separate policy.
+<code>run status</code> exposes <code>accounts</code> with failure count, next admission time and source
+run. Queue scheduling and atomic claims enforce the same delay; blocked chat
+admission leaves the user message queued.</p>
+<p>This controller handles recognized startup failures. Provider-reported rate
+limits, cross-project account coordination and an operator-resettable circuit
+breaker are not implemented by this delay. Per-revision automatic retry limits
+still bound repeated attempts of one unchanged task.</p>
+<h3 id="bounded-turns-without-workflow-progress">Bounded turns without workflow progress<a class="headerlink" href="#bounded-turns-without-workflow-progress" title="Permanent link">&para;</a></h3>
+<p>Bindings accept <code>max_no_progress_turns</code> (1–20, default 1). Completed background
+turns in the same task queue count until an applied <code>handoff</code>/<code>blocked</code> receipt
+or an intervening queue stage establishes workflow progress. Changes only to
+task-file bytes, token streams, process liveness and daemon restarts do not reset
+the count. Interactive user-paced conversations are not automatic background
+continuations and do not consume this counter.</p>
+<p>At the default, a completed prompt without a transition holds the task with
+<code>no_progress_limit</code>. A larger explicitly configured budget allows a subsequent
+normal <code>turn_ended</code> attempt after <code>retry_initial_seconds</code>, provided the pinned
+contracts still match and no command/result/uncertainty gate prevents it. Failed
+or cancelled post-prompt work is not automatically replayed. Human-input and
+no-change results remain explicit holds, even if their application edited task
+metadata. All existing capacity, account, permissions and revision gates apply.</p>
+<p><code>run status</code> exposes a <code>progress</code> verdict and count per assignment. Admission
+rechecks the limit atomically and records <code>no_progress_continuation</code> for each
+continuation of an unchanged revision. Operator retry authorizes one additional
+attempt but does not erase the counter. An operator who changes task content
+within an exhausted queue stage must explicitly retry it or perform an authorized
+workflow transition. This is a workflow-progress budget, not an estimate of code
+quality or a detector of meaningful text changes.</p>
+<h2 id="reported-usage-observations">Reported usage observations<a class="headerlink" href="#reported-usage-observations" title="Permanent link">&para;</a></h2>
+<p>Run metadata <code>usage</code> retains the latest SDK-decoded <code>usage_update</code> context and
+cost sample, and the latest prompt response's token sample, each timestamped.
+Context <code>used</code>/<code>size</code> describes occupancy, which may decrease after compaction.
+Optional cost describes reported cumulative session cost and its currency; it is
+not a billing statement. Missing and invalid reports are explicit statuses, not
+zero. Raw metadata is discarded. A timestamped sample alone does not establish
+current or cross-run completeness; cost continuity has a separate durable record.</p>
+<p>The pinned SDK schema describes prompt token usage both as per-turn and cumulative.
+The <a href="https://github.com/agentclientprotocol/agent-client-protocol/issues/1860">upstream ambiguity report</a>
+documents the conflict. Token samples therefore have <code>scope: unknown</code>; the daemon
+neither sums successive samples nor adds potentially overlapping token categories.
+These are SDK-decoded values, not a claim that wire values escaped SDK coercion.</p>
+<p>Bindings may configure both <code>max_reported_session_cost</code> (a positive finite number)
+and <code>reported_cost_currency</code> (three uppercase letters, for example <code>USD</code>). The
+limit applies to reported cumulative cost for the same agent manifest, workspace
+and ACP session ID, including loaded sessions. No currency conversion, price
+estimate, billing claim or automatic provider/model switch is performed.</p>
+<p>This is a reactive limit: cost at or above the threshold cancels an active prompt
+through ACP and holds the run with reason <code>reported_usage_budget</code>. A new session
+may make one bootstrap prompt before a cost report is available; that prompt can
+already exceed the limit. A completed prompt must have a fresh cost report for
+budgeted work to continue. Without one the run is held as <code>cost_unavailable</code>.
+This is not a hard spending guarantee or a pre-purchase affordability check.</p>
+<p>The cost accounting record marks a prompt pending before ACP sends it. A crash or
+uncertain cancellation preserves that uncertainty across session loading. Unknown
+prior history, invalid cost, counter regression or currency changes cannot reset
+the budget: the affected session remains held. Reported cost and expected currency
+must match. An operator may explicitly choose a new session or revise budget
+configuration; retry alone does not erase the ledger. Disabled cost budgets do
+not introduce an execution gate, but observations and uncertainty are retained.
+These controls do not remove previously accepted domain results.</p>
+<h2 id="bounded-client-input">Bounded client input<a class="headerlink" href="#bounded-client-input" title="Permanent link">&para;</a></h2>
+<p>Each binding accepts positive integer <code>max_prompt_bytes</code> (default 262144) and
+<code>max_session_input_bytes</code> (default 1048576). The first limits one complete
+UTF-8 text prompt, including compiled context and interactive user input. An
+oversized first prompt fails before launching the ACP process. Later interactive
+messages are checked before sending. Text is never silently truncated.</p>
+<p>The session limit bounds cumulative client-submitted UTF-8 text for the same
+agent manifest, workspace and ACP session ID in the project store. Each send
+reserves its bytes durably before calling ACP. Repeated context counts each time
+it is sent. Reservations survive process/daemon interruption and session loading;
+an uncertain send retains its debit. Store-level reservation retries with the
+same identity are idempotent. Starting a distinct session creates a distinct
+input budget; the runtime does not silently discard a conversation to do so.</p>
+<p>A failed limit produces <code>input_budget_exceeded</code>. Run outcome <code>input_budget</code>
+identifies prompt/session budget, limit, used and requested bytes. A known older
+session without sufficient reservation evidence reports <code>session_history_unknown</code>
+with <code>used_bytes: null</code>; it is not treated as empty. Operator remedies include
+reducing the requested input, explicitly configuring a larger budget, or starting
+a new conversation with deliberate context. Existing conversation compatibility
+rules still apply to configuration changes. Background retry policy does not
+automatically retry input-budget failures.</p>
+<p>These are client-input limits, not tokenizer counts, model context-window bounds
+or billed cost. Agent output, internal tool context and provider-side compaction
+are not measured by these byte counters. <code>context_bytes</code> describes the compiled
+base context; <code>input_bytes_reserved</code> and <code>session_input_bytes_reserved</code> describe
+input reservations. Detailed reservation events contain counts and IDs, not raw
+prompt content. Separate provider usage counters remain unknown unless reported.</p>
+<h2 id="durable-run-stage-timing">Durable run-stage timing<a class="headerlink" href="#durable-run-stage-timing" title="Permanent link">&para;</a></h2>
+<p>Each run's <code>timings</code> records the first observed offset, in seconds from the
+start of that supervisor execution. Offsets use a monotonic clock and are written
+immediately with <code>run_stage_observed</code> events. Recovery preserves observed values;
+it does not invent a completion time for a crashed run. Missing stages mean
+unobserved, not zero latency. Values are available in the common run snapshot.</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Observation boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>workspace_ready</code></td>
+<td>Workspace preparation returned</td>
+</tr>
+<tr>
+<td><code>context_ready</code></td>
+<td>Base context was built or supplied</td>
+</tr>
+<tr>
+<td><code>process_recorded</code></td>
+<td>Launch-gate process identity was durably recorded</td>
+</tr>
+<tr>
+<td><code>protocol_ready</code></td>
+<td>ACP initialize and protocol-version validation returned</td>
+</tr>
+<tr>
+<td><code>session_ready</code></td>
+<td>Session creation/loading and model/mode configuration succeeded</td>
+</tr>
+<tr>
+<td><code>first_prompt_started</code></td>
+<td>Input reserved; supervisor begins the first prompt call</td>
+</tr>
+<tr>
+<td><code>first_protocol_activity</code></td>
+<td>First delivered update, permission or extension event</td>
+</tr>
+<tr>
+<td><code>first_prompt_activity</code></td>
+<td>First such event after a prompt call began</td>
+</tr>
+<tr>
+<td><code>cleanup_complete</code></td>
+<td>Transport, permission and command cleanup returned</td>
+</tr>
+</tbody>
+</table>
+<p>Subtract observed boundary offsets to inspect preparation and startup costs.
+<code>outcome.elapsed_seconds</code> covers the execution including cleanup. These offsets
+do not include time in the queue before a claim or measure provider inference
+in isolation. The launch gate can precede actual harness exec. Prompt-start time
+is a client boundary, not proof the provider received the request.</p>
+<p>A loaded session may emit history before a new prompt, so protocol activity and
+prompt activity are distinct observations. Neither means useful task progress,
+first user-visible text, adequate validation or an approved domain result.
+For a multi-message interactive run these are first-occurrence observations,
+not a per-message latency distribution. Unknown token/cost data remains outside
+this timing contract.</p>
+<h3 id="queue-validation-and-accepted-transitions">Queue, validation and accepted transitions<a class="headerlink" href="#queue-validation-and-accepted-transitions" title="Permanent link">&para;</a></h3>
+<p>The daemon records the first observation of each currently configured queued task
+revision. A claim copies that observation into <code>queue_observation</code>, including
+<code>wait_seconds</code>. Scope <code>observed_revision_wait</code> is a lower bound: it cannot recover
+time before the daemon saw an externally created or edited task. File modification
+time and user-supplied task dates are not substituted for arrival time. Unchanged
+observations are idempotent; the active candidate index drops absent revisions,
+while run copies survive recovery and event pruning.</p>
+<p>An applied domain result also records the destination revision and its acceptance
+time atomically. The next claim has scope <code>accepted_transition_wait</code>: its queue
+interval starts when the preceding transition became accepted by the daemon.
+These scopes remain distinguishable in measurements and exports.</p>
+<p>Result receipts retain a bounded <code>validation</code> record for the latest preparation
+attempt: start/completion timestamps, attempt count, validity and monotonic
+duration. A crash leaves completion/duration unknown. Retrying preparation starts
+a new attempt; recovering an already prepared operation preserves its measurement.
+This measures <code>_prepare</code> checks, not every later live gate recheck or validation
+shell command. Declared commands retain their own execution records.</p>
+<p>Receipt <code>timings</code> records application start, resolution and elapsed wall time.
+Resolution can be applied, rejected or needs-recovery; it is not automatically
+successful completion. These intervals can include a recovery delay. Applied
+handoff/block transitions additionally give the run a <code>domain_progress</code> record
+with acceptance time and claim-to-transition duration. Rejected results, no-change
+receipts and mere prompt completion do not invent accepted transitions. This is
+observable domain progress, not a claim about when the model began useful reasoning.
+Duplicate application leaves timestamps unchanged. Missing, non-finite or backward
+clock intervals remain null. Numeric summaries are included in private bundles.</p>
+<p>Conversation turns record queued/start/resolution timestamps, queue wait and
+start-to-resolution duration. Cancelled queued messages have no execution duration.
+After a crash, resolution is when interruption was observed, not an inferred time
+of process death. Old turns without observations keep unknown intervals. These
+fields describe wall-clock boundaries and can overlap other phase measurements;
+they must not be blindly summed as independent work durations.</p>
+<h3 id="measuring-productive-orchestration">Measuring productive orchestration<a class="headerlink" href="#measuring-productive-orchestration" title="Permanent link">&para;</a></h3>
+<p><code>tools/productive_benchmark.py</code> runs a deterministic ACP fixture through the real
+developer → tester → reviewer pipeline. It asserts three applied results, three
+successful daemon commands, six independent test cases, merge of only the intended
+file, worktree cleanup and unchanged runs/results/commands after restart. A supplied
+plan and fixture agent isolate orchestration from inference. Setup and final
+independent checks are outside the timed three-stage pipeline.</p>
+<p>Run the same script with independently installed wheel environments, for example:</p>
+<div class="highlight"><pre><span></span><code>/tmp/before-env/bin/python<span class="w"> </span>tools/productive_benchmark.py<span class="w"> </span>--repeats<span class="w"> </span><span class="m">3</span><span class="w"> </span>--output<span class="w"> </span>/tmp/before.json
+/tmp/after-env/bin/python<span class="w"> </span>tools/productive_benchmark.py<span class="w"> </span>--repeats<span class="w"> </span><span class="m">3</span><span class="w"> </span>--output<span class="w"> </span>/tmp/after.json
+</code></pre></div>
+<p>The default load is 50 idle conversations and 100 cancelled run records, preserved
+throughout productive execution. Reports include package/schema/dependency identity,
+fixture and script hashes, per-role observations and read counts for the daemon
+process's RunStore. They exclude subprocess reads and conversation-file reads.
+Editable source execution requires <code>--allow-source</code> and is marked accordingly;
+canon/project/Python import overrides are rejected by the benchmark CLI. An output
+path must be new. Temporary projects remain available for inspection.</p>
+<p>The <a href="../evidence/productive-pipeline-2026-09-07.json">dated six-run comparison</a> used
+separate wheels from 3b3db47 and 4961016, identical dependency/schema/fixture inputs,
+and alternating runs. Median daemon runtime reads decreased from 1145 to 355
+(69.0%). Observed median pipeline wall time was 17.097 s versus 16.567 s (3.1%
+lower). Three samples per version on one host are descriptive, not a general speed
+guarantee. Both versions are modernization checkpoints; this does not measure the
+original pre-modernization architecture. Other hardening and instrumentation
+changes occurred between them, so individual latency effects are not isolated.
+Token usage and model quality are not measured. Small context-byte differences
+include the different interpreter paths and are not claimed as prompt optimization.</p>
+<h3 id="measuring-idle-daemon-overhead">Measuring idle daemon overhead<a class="headerlink" href="#measuring-idle-daemon-overhead" title="Permanent link">&para;</a></h3>
+<p>The checkout includes <code>tools/daemon_idle_benchmark.py</code>. Run it with the project
+Python environment to create a temporary fixture, warm up maintenance, and measure
+five complete idle daemon passes. Defaults are 50 open idle conversations and 100
+cancelled claims. All journal entries are created through store APIs;
+the benchmark rejects agent startup and verifies unchanged runtime history.
+<code>--conversations</code>, <code>--history</code>, and <code>--repeats</code> select the synthetic load.</p>
+<p>The <a href="../evidence/daemon-idle-2026-09-07.json">recorded local comparison</a> measured
+67 runtime reads per pass before conversation indexing and 18 after. The median
+was 1.105 s before and 1.008 s after on this host. This includes daemon startup
+and reconciliation; it excludes fixture construction and warm-up. It is not an
+LLM latency or task-completion benchmark. The daemon now indexes live conversation
+runs from one observation per pass, while every claim still validates current
+capacity and identity under the authoritative lock. No journal data is dropped.</p>
+<h3 id="runtime-event-retention">Runtime event retention<a class="headerlink" href="#runtime-event-retention" title="Permanent link">&para;</a></h3>
+<p><code>max_runtime_events</code> is a project-level integer from 100 to 1,000,000, default
+10,000. The daemon installs this policy under its exclusive supervisor lease.
+All runtime writers enforce the persisted policy in the same atomic transaction
+as their changes; no periodic model turn or extra per-tick scan is needed. Before
+an explicit daemon policy is installed, the default limit applies.</p>
+<p>On overflow the event tail shrinks to approximately 80% of the limit and records
+an <code>events_pruned</code> event. This headroom avoids pruning on every subsequent write.
+<code>event_retention</code> in the runtime snapshot records the configured bound, cumulative
+discarded count and last discarded sequence. Run and event sequences remain
+monotonic across pruning and restart. A failed atomic write leaves both the
+operation and the previous event history unchanged.</p>
+<p><code>run events</code> emits a synthetic <code>events_gap</code> record before its normal event page
+when <code>--after</code> predates the retained tail. Its sequence is the last discarded
+sequence; <code>data</code> includes the requested cursor and first available sequence.
+The gap record is additional to <code>--limit</code> and is not itself appended to the
+journal. Clients should show the missing-history notice, use current snapshots
+for authoritative state, and continue from the emitted sequence. Diagnostic
+bundles mark events as truncated when history was pruned, even when the complete
+remaining tail fits the export limit.</p>
+<p>This policy bounds event count, not total project disk usage. Task files, run
+identities and idempotency receipts, immutable contracts, command/deployment
+receipts and their evidence, and conversation history remain intact. ACP stderr
+capture and per-command/per-conversation output already have separate bounds.
+The optional systemd service's external journal follows the host's journal policy.</p>
+<h3 id="managed-protocol-diagnostics">Managed protocol diagnostics<a class="headerlink" href="#managed-protocol-diagnostics" title="Permanent link">&para;</a></h3>
+<p>Each run can retain a <code>protocol</code> record independently of the event-log tail:</p>
+<ul>
+<li><code>negotiated</code>: numeric protocol version and an allowlist of capability flags;</li>
+<li><code>tool_events</code>: at most 64 tool call/update observations with timestamps, phase,
+  run-scoped hashed tool reference, tool kind/status and content/location counts;</li>
+<li><code>tool_events_truncated</code>: explicit saturation indicator, without pretending that
+  missing tool observations did not occur;</li>
+<li><code>error</code>: last numeric JSON-RPC code (when present), bounded exception category and
+  the stage that failed;</li>
+<li><code>stop</code>: last normalized stop reason.</li>
+</ul>
+<p>Phases distinguish preflight, initialization, authentication, session creation or
+loading, configuration and prompting. Repeated identical facts do not append new
+records. Once the tool trace fills, the supervisor stops writing further tool
+samples; aggregate update counts still include all received updates, and terminal
+error/stop facts can still be recorded. These observations do not approve tools
+or substitute for typed results and command evidence.</p>
+<p>Server <code>_meta</code>, tool IDs in clear text, titles, tool arguments/results, locations,
+assistant text and raw exception messages/stderr are excluded from this record.
+The permission broker retains its separately scoped callback identities needed to
+answer approvals. Conversation text remains in the separate conversation journal.
+Diagnostic bundles export a revalidated compact protocol summary, not the tool
+payloads. Run-level protocol records survive event-tail pruning and crash recovery.</p>
+<p>The common client drains preceding session updates before returning either a
+successful prompt response or a JSON-RPC error, with a bounded wait. A failed
+observation sink cannot silently report successful processing.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

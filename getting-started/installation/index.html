@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -572,10 +572,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#requirements" class="md-nav__link">
+  <a href="#optional-components" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Requirements
+        Optional components
       
     </span>
   </a>
@@ -583,10 +583,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#package-contents" class="md-nav__link">
+  <a href="#development-and-documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Package contents
+        Development and documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#project-initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Project initialization
       
     </span>
   </a>
@@ -617,6 +628,34 @@
     
   
     First Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../local-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Workspace
   
 
     
@@ -787,7 +826,7 @@
   <span class="md-ellipsis">
     
   
-    Codex Profiles
+    Agent Manifests and Bindings
   
 
     
@@ -1014,6 +1053,34 @@
     
   
     Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/contract-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Contract Reference
   
 
     
@@ -1458,10 +1525,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#requirements" class="md-nav__link">
+  <a href="#optional-components" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Requirements
+        Optional components
       
     </span>
   </a>
@@ -1469,10 +1536,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#package-contents" class="md-nav__link">
+  <a href="#development-and-documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Package contents
+        Development and documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#project-initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Project initialization
       
     </span>
   </a>
@@ -1500,30 +1578,47 @@
 
 
 <h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
-<p>greatminds is a Python package with one console entry point:</p>
-<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>greatminds
+<p>The managed daemon requires Python 3.11 or newer on Linux, with a readable
+<code>/proc</code> filesystem and working pidfd operations. Process identity and restart
+cleanup use these Linux interfaces. Native macOS and Windows daemon execution
+are not supported; a Linux environment must satisfy the same requirements.
+Harness compatibility is tracked separately from host support.</p>
+<p>Install Greatminds in the Python environment that will run the CLI and daemon:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>greatminds
 greatminds<span class="w"> </span>--help
 </code></pre></div>
-<p>For development or documentation work inside a checkout, install the project in
-editable mode:</p>
-<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
+<p>An ACP agent or adapter must be installed and authenticated separately. See the
+<a href="../../architecture/acp-compatibility/">compatibility matrix</a> for tested versions
+and the <a href="../first-project/">first project guide</a> for configuration and a first
+conversation. Package installation alone does not establish provider access.</p>
+<h2 id="optional-components">Optional components<a class="headerlink" href="#optional-components" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>tmux</code> for <code>greatminds launch --target tmux</code>.</li>
+<li>A systemd user manager on Linux for <code>greatminds daemon install</code> and service
+  control. You can also run <code>greatminds coordd</code> in a terminal.</li>
+<li>The <code>stands</code> extra for Ansible-backed YAML stand profiles:</li>
+</ul>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'greatminds[stands]'</span>
 </code></pre></div>
-<p>To build this documentation site locally, install the docs extra:</p>
-<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s1">&#39;.[docs]&#39;</span>
+<p>Local ACP conversations and queue dispatch do not require Ansible. Installing
+this extra does not configure or deploy a stand.</p>
+<h2 id="development-and-documentation">Development and documentation<a class="headerlink" href="#development-and-documentation" title="Permanent link">&para;</a></h2>
+<p>Inside a source checkout:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
+</code></pre></div>
+<p>To build the documentation:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s1">'.[docs]'</span>
 mkdocs<span class="w"> </span>build<span class="w"> </span>--strict
 </code></pre></div>
-<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Python 3.11 or newer.</li>
-<li>A POSIX-like environment for the filesystem queue model.</li>
-<li><code>tmux</code> when using <code>greatminds launch --target tmux</code>.</li>
-<li><code>systemctl --user</code> when using <code>greatminds daemon</code> to supervise <code>coordd</code>.</li>
-</ul>
-<h2 id="package-contents">Package contents<a class="headerlink" href="#package-contents" title="Permanent link">&para;</a></h2>
-<p>The wheel ships the CLI, coordination schema, role prompts, queue templates,
-Codex profiles, Claude Code plugins, and systemd user unit template. A project
-does not need to vendor the canon files by hand; <code>greatminds setup</code> copies the
-current package data into the project.</p>
+<h2 id="project-initialization">Project initialization<a class="headerlink" href="#project-initialization" title="Permanent link">&para;</a></h2>
+<p>The wheel includes the CLI, ACP runtime, schema and package data. Run
+<code>greatminds setup</code> in your project to create runtime queues under <code>.greatminds/</code>,
+a schema mirror and an empty <code>coordination/execution.yaml</code>. Setup preserves an
+existing execution contract and task data. Configure ACP manifests and role
+bindings in that execution file before dispatching work.</p>
+<p>Setup does not install harnesses, copy provider credentials, generate native
+Codex profiles or Claude plugins, or install a systemd service. Optional stand
+profiles must be selected and configured explicitly.</p>
 
 
 
@@ -1578,7 +1673,7 @@ current package data into the project.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

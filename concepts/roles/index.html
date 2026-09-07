@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -563,6 +563,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../getting-started/local-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../getting-started/upgrading/" class="md-nav__link">
         
   
@@ -728,7 +756,7 @@
   <span class="md-ellipsis">
     
   
-    Codex Profiles
+    Agent Manifests and Bindings
   
 
     
@@ -955,6 +983,34 @@
     
   
     Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/contract-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Contract Reference
   
 
     
@@ -1411,40 +1467,78 @@
 
 
 <h1 id="roles">Roles<a class="headerlink" href="#roles" title="Permanent link">&para;</a></h1>
-<p>Each role owns a small part of the pipeline. Ownership is defined by queue
-location and encoded in the packaged schema copied to <code>.greatminds/schema.yaml</code>.</p>
-<p>Product roles:</p>
-<ul>
-<li><code>ARCHITECT-PLANNER</code>: intake, triage, planning, and routing. Lifecycle:
-  <code>interactive</code>.</li>
-<li><code>DEVELOPER</code>: backend implementation. Lifecycle: <code>driven</code>.</li>
-<li><code>UI-DEVELOPER</code>: UI implementation or direct UI rapid iteration. Pipeline
-  lifecycle: <code>driven</code>.</li>
-<li><code>LIVE-DEVELOPER</code>: USER-paced scenario-C work from <code>feature_live</code> on a leased
-  stand. For that interactive path it authors the implementation block for
-  backend or UI scope, marks it ready after live USER validation, and hands the
-  sprint task directly to <code>feature_review</code>.</li>
-<li><code>TECHNICAL-WRITER</code>: documentation implementation. Lifecycle: <code>driven</code>.</li>
-<li><code>TESTER</code>: validates implemented code and records test evidence. Lifecycle:
-  <code>driven</code>.</li>
-<li><code>READER</code>: reviews documentation as a fresh reader. Lifecycle: <code>driven</code>.</li>
-<li><code>ARCHITECT-REVIEWER</code>: final review, blocked-task wake-up, commit policy.
-  Lifecycle: <code>driven</code>.</li>
-<li><code>EXPLORER</code>: live exploratory review and bug filing. Lifecycle: <code>driven</code>.</li>
-</ul>
-<p>System and entry roles:</p>
-<ul>
-<li><code>USER</code>: files feedback or chats with planner-facing roles. Lifecycle:
-  <code>interactive</code>.</li>
-<li><code>MAINTAINER</code>: non-user-facing infrastructure and fleet operations.
-  Lifecycle: <code>self-loop</code>; USER reaches it through planner-mediated inbox asks
-  rather than direct chat. It handles daemon and agent recovery, venv repair,
-  canon cutover, and escalation of FSM stalls to the planner.</li>
-</ul>
-<p>Every active role has a heartbeat file under <code>.greatminds/</code>. Stale heartbeats
-are reported by <code>greatminds watchdog</code>.</p>
-<p>For lifecycle mechanics across tools, see
-<a href="../../architecture/lifecycle/">Lifecycle Model</a>.</p>
+<p>Roles divide responsibility across the workflow. Queue ownership and allowed
+transitions come from the effective installed schema. The project schema file
+is a diagnostic mirror.</p>
+<p>The <a href="../../architecture/contract-reference/#roles">generated contract reference</a>
+contains complete role declarations and is checked against the source contracts.</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ARCHITECT-PLANNER</code></td>
+<td>Intake, triage, planning and routing</td>
+</tr>
+<tr>
+<td><code>DEVELOPER</code></td>
+<td>Backend implementation</td>
+</tr>
+<tr>
+<td><code>UI-DEVELOPER</code></td>
+<td>UI implementation</td>
+</tr>
+<tr>
+<td><code>LIVE-DEVELOPER</code></td>
+<td>User-paced implementation and live stand iteration</td>
+</tr>
+<tr>
+<td><code>TECHNICAL-WRITER</code></td>
+<td>Documentation implementation</td>
+</tr>
+<tr>
+<td><code>TESTER</code></td>
+<td>Validation and test evidence</td>
+</tr>
+<tr>
+<td><code>READER</code></td>
+<td>Documentation review from a fresh reader's perspective</td>
+</tr>
+<tr>
+<td><code>ARCHITECT-REVIEWER</code></td>
+<td>Final review and commit policy</td>
+</tr>
+<tr>
+<td><code>EXPLORER</code></td>
+<td>Exploratory review and bug filing</td>
+</tr>
+<tr>
+<td><code>MAINTAINER</code></td>
+<td>Infrastructure diagnosis and operations that require judgment</td>
+</tr>
+<tr>
+<td><code>USER</code></td>
+<td>User-originated input and feedback</td>
+</tr>
+</tbody>
+</table>
+<p>Bind a role to an ACP agent in <code>coordination/execution.yaml</code>. Harness, model,
+workspace, permissions and scheduling are separate choices. The same harness
+can serve several roles when its capabilities satisfy their bindings; sharing a
+harness does not combine those roles' authority or bypass review gates.</p>
+<p>Use <code>scheduling: queue</code> to admit eligible workflow tasks automatically and
+<code>on-demand</code> for operator-paced work. Mechanical readiness, blocked-task
+resumption, startup backoff and runtime reconciliation belong to daemon code.
+They do not require a self-polling MAINTAINER conversation.</p>
+<p>Inspect runs and holds through <code>greatminds run status</code> and <code>greatminds watchdog</code>.
+Runtime state and durable outcomes provide execution evidence; a heartbeat or
+stream of tokens alone does not demonstrate task progress.</p>
+<p>See <a href="../codex-profiles/">Agent Manifests and Role Bindings</a> for configuration and
+<a href="../../architecture/lifecycle/">Lifecycle Model</a> for execution behavior.</p>
 
 
 
@@ -1499,7 +1593,7 @@ are reported by <code>greatminds watchdog</code>.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

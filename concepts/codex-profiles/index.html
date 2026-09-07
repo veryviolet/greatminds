@@ -23,15 +23,15 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Codex Profiles - greatminds</title>
+        <title>Agent Manifests and Bindings - greatminds</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#codex-profiles" class="md-skip">
+        <a href="#agent-manifests-and-role-bindings" class="md-skip">
           Skip to content
         </a>
       
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Codex Profiles
+              Agent Manifests and Bindings
             
           </span>
         </div>
@@ -563,6 +563,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../getting-started/local-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../getting-started/upgrading/" class="md-nav__link">
         
   
@@ -720,6 +748,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Manifests and Bindings
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -727,7 +773,7 @@
   <span class="md-ellipsis">
     
   
-    Codex Profiles
+    Agent Manifests and Bindings
   
 
     
@@ -736,6 +782,58 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#model-mode-and-permissions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model, mode and permissions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication-and-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication and environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explicit-account-limit-signals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explicit account limit signals
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -955,6 +1053,34 @@
     
   
     Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/contract-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Contract Reference
   
 
     
@@ -1392,6 +1518,47 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#model-mode-and-permissions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model, mode and permissions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication-and-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication and environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explicit-account-limit-signals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explicit account limit signals
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1410,50 +1577,61 @@
   
 
 
-<h1 id="codex-profiles">Codex Profiles<a class="headerlink" href="#codex-profiles" title="Permanent link">&para;</a></h1>
-<p>Codex roles use generated per-role profile sources instead of Claude plugin
-directories. During <code>greatminds setup</code>, greatminds creates one profile source
-directory for each shipped Codex role:</p>
-<div class="highlight"><pre><span></span><code>&lt;project&gt;/
-  .greatminds/
-    .codex-home/
-      developer/
-        config.toml
-      tester/
-        config.toml
-      technical-writer/
-        config.toml
+<h1 id="agent-manifests-and-role-bindings">Agent manifests and role bindings<a class="headerlink" href="#agent-manifests-and-role-bindings" title="Permanent link">&para;</a></h1>
+<p>Configure all harnesses through <code>coordination/execution.yaml</code>. An agent manifest
+identifies the ACP executable, arguments, version labels, environment references
+and capability requirements. A role binding selects that manifest and defines
+the role, workspace, scheduling, model, mode and permission policy.</p>
+<p>One agent can serve several roles, and several bindings can use different agents
+for the same role. The daemon uses the same ACP lifecycle for each binding and
+builds context from the assigned task and pinned schema. Role-specific review
+and evidence gates still apply when two roles share a harness.</p>
+<h2 id="model-mode-and-permissions">Model, mode and permissions<a class="headerlink" href="#model-mode-and-permissions" title="Permanent link">&para;</a></h2>
+<p>Set model and mode on the binding when needed. The ACP runtime checks support
+and applies those selections to the session. Unsupported selections produce an
+explicit failure; they do not silently choose another model or transport.</p>
+<p>Use <code>permission: ask</code> for explicit operator choices. A background turn needing a
+choice enters a waiting state. Harness-side permissions and workspace access
+also matter: ACP orchestration is not an operating-system sandbox.</p>
+<h2 id="authentication-and-environment">Authentication and environment<a class="headerlink" href="#authentication-and-environment" title="Permanent link">&para;</a></h2>
+<p>Install and authenticate the harness or adapter using its own supported
+procedure. Declare required environment references in the manifest and supply
+the values through the daemon's configured environment. Credentials do not
+belong in task context or execution YAML.</p>
+<p>Greatminds setup does not generate per-role Codex homes, inject native app-server
+instructions, or copy machine authentication. A configured account name groups
+concurrency and startup backoff within this project; it does not select or infer
+a provider identity.</p>
+<p>See the <a href="../../getting-started/first-project/">first project guide</a> for a minimal
+manifest, the <a href="../../architecture/execution-contract/">execution contract</a> for
+configuration and recovery rules, and the
+<a href="../../architecture/acp-compatibility/">compatibility matrix</a> for the scope of
+actual harness validation.</p>
+<h2 id="explicit-account-limit-signals">Explicit account limit signals<a class="headerlink" href="#explicit-account-limit-signals" title="Permanent link">&para;</a></h2>
+<p>An optional manifest <code>account_limit_errors</code> array maps documented, exact ACP
+application error codes to shared admission holds. It is empty by default. For
+example, <strong>only if your adapter documents these example codes</strong>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">account_limit_errors</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">42901</span>
+<span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rate_limit</span>
+<span class="w">    </span><span class="nt">cooldown_seconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">42902</span>
+<span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">quota_exhausted</span>
 </code></pre></div>
-<p>Each <code>config.toml</code> is copied from
-<code>src/greatminds/data/codex/profiles/&lt;role&gt;.config.toml</code> and then split for
-Codex profile-v2 loading:</p>
-<ul>
-<li><code>.greatminds/.codex-home/&lt;role&gt;/config.toml</code> contains the role posture,
-  trusted-project entry, and skill registrations.</li>
-<li><code>.greatminds/.codex-home/&lt;role&gt;/&lt;role&gt;.config.toml</code> contains the role model
-  and execution settings.</li>
-</ul>
-<p>These directories are profile sources only. They are not authentication homes
-and must not contain <code>auth.json</code>.</p>
-<p>Codex-backed roles authenticate through the single machine Codex home. By
-default that is <code>~/.codex</code>; operators may override it with
-<code>GREATMINDS_CODEX_HOME</code>. Greatminds sets <code>CODEX_HOME</code> to that machine home so
-Codex reads the one valid login and refreshes tokens in one place.</p>
-<p>Role-specific behavior is preserved without using a per-role auth home:</p>
-<ul>
-<li>The role bootstrap/contract is passed as the prompt or app-server
-  <code>baseInstructions</code>.</li>
-<li>The role model is read from the generated profile source and injected with a
-  <code>-c model="..."</code> override.</li>
-<li>Driven Codex turns also inject unattended execution settings with <code>-c</code>
-  overrides.</li>
-</ul>
-<p>To inspect or customize a project's Codex posture, edit the generated
-<code>.greatminds/.codex-home/&lt;role&gt;/</code> files after setup. Do not copy or symlink
-machine auth into those directories. To change the defaults for future
-projects, update the canon templates under
-<code>src/greatminds/data/codex/profiles/</code> before running <code>greatminds setup</code> in
-those projects.</p>
+<p>Up to 16 unique signed 32-bit codes are accepted outside the reserved JSON-RPC
+range (-32768 through -32000; <a href="https://www.jsonrpc.org/specification#error_object">JSON-RPC error specification</a>). Authentication, internal, invalid-request and other
+reserved errors cannot be reclassified. A rate-limit cooldown is an integer from
+1 to 86400 seconds; a quota hold has no automatic expiry. These codes are not
+standard ACP quota codes and are not HTTP statuses extracted from error text.
+<a href="https://agentclientprotocol.com/protocol/v1/overview#error-handling">ACP error handling</a>
+uses the JSON-RPC error envelope; this mapping is explicit adapter configuration.</p>
+<p>The reporting run's pinned manifest determines meaning. Holds affect all bindings
+with the same <code>account</code> label in this project, including subsequent prompts in
+open conversations. They survive restart and configuration edits. Other projects
+and account labels are independent. Set consistent account labels yourself; the
+daemon does not inspect credentials to infer account ownership. Read the
+<a href="../../operations/runbook/#retries-and-account-admission">recovery procedure</a> before
+resolving a hold. No built-in harness mapping or provider availability is implied.</p>
 
 
 
@@ -1508,7 +1686,7 @@ those projects.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

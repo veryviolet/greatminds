@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -563,6 +563,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../getting-started/local-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../getting-started/upgrading/" class="md-nav__link">
         
   
@@ -713,7 +741,7 @@
   <span class="md-ellipsis">
     
   
-    Codex Profiles
+    Agent Manifests and Bindings
   
 
     
@@ -965,6 +993,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../contract-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Contract Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../filesystem-layout/" class="md-nav__link">
         
   
@@ -1081,38 +1137,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#coordd" class="md-nav__link">
+  <a href="#daemon-ownership" class="md-nav__link">
     <span class="md-ellipsis">
       
-        coordd
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="coordd">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#event-wake-troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Event-wake troubleshooting
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#visual-event-markers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Visual event markers
+        Daemon ownership
       
     </span>
   </a>
@@ -1120,10 +1148,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pty-launch" class="md-nav__link">
+  <a href="#conversations-and-frontends" class="md-nav__link">
     <span class="md-ellipsis">
       
-        pty launch
+        Conversations and frontends
       
     </span>
   </a>
@@ -1131,10 +1159,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#heartbeats" class="md-nav__link">
+  <a href="#operator-diagnosis" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Heartbeats
+        Operator diagnosis
       
     </span>
   </a>
@@ -1497,38 +1525,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#coordd" class="md-nav__link">
+  <a href="#daemon-ownership" class="md-nav__link">
     <span class="md-ellipsis">
       
-        coordd
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="coordd">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#event-wake-troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Event-wake troubleshooting
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#visual-event-markers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Visual event markers
+        Daemon ownership
       
     </span>
   </a>
@@ -1536,10 +1536,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pty-launch" class="md-nav__link">
+  <a href="#conversations-and-frontends" class="md-nav__link">
     <span class="md-ellipsis">
       
-        pty launch
+        Conversations and frontends
       
     </span>
   </a>
@@ -1547,10 +1547,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#heartbeats" class="md-nav__link">
+  <a href="#operator-diagnosis" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Heartbeats
+        Operator diagnosis
       
     </span>
   </a>
@@ -1577,165 +1577,69 @@
   
 
 
-<h1 id="daemon-and-agents">Daemon and Agents<a class="headerlink" href="#daemon-and-agents" title="Permanent link">&para;</a></h1>
-<p><code>greatminds launch</code> starts the configured agent windows from the environment
-where greatminds is installed, for example <code>greatminds launch --target tmux</code>.
-Each window is defined in <code>coordination/coord.yaml</code> with:</p>
+<h1 id="daemon-and-agents">Daemon and agents<a class="headerlink" href="#daemon-and-agents" title="Permanent link">&para;</a></h1>
+<p>Every managed agent uses the common ACP stdio client. Manifests in
+<code>coordination/execution.yaml</code> declare executable argv, tested version labels,
+environment references and capability requirements. Role bindings choose an
+agent, workspace, model/mode, permission policy, scheduling and concurrency.
+The <a href="../execution-contract/">execution contract</a> specifies those fields.</p>
+<p>The installed schema defines task queues and gates; <code>.greatminds/schema.yaml</code>
+is a generated mirror. <code>greatminds project schema</code> prints the effective schema.
+Runs pin schema/configuration identities so changed contracts cannot silently
+reinterpret an in-flight result.</p>
+<h2 id="daemon-ownership">Daemon ownership<a class="headerlink" href="#daemon-ownership" title="Permanent link">&para;</a></h2>
+<p><code>greatminds coordd</code> loads the execution contract and reconciles durable state.
+Queue-scheduled bindings receive concrete task revisions. Claims are persisted
+before launching the ACP process. A task cannot be independently claimed while
+an active run or unresolved domain operation holds it.</p>
+<p>The ACP client negotiates capabilities, initializes or loads a compatible
+session, sends the compiled prompt, receives updates and handles supported
+callbacks. Required authentication or operator input is represented as a waiting
+state. Permission policy is explicit; missing permission is not automatic approval.
+Cancellation is bounded and can escalate to process-group termination.</p>
+<p>The daemon and shared domain services own mechanically decidable operations:</p>
 <ul>
-<li>window name</li>
-<li>role</li>
-<li>tool (<code>claude</code>, <code>codex</code>, <code>cursor</code>, <code>cline</code>, <code>gemini</code>, <code>openhands</code>, or
-  <code>bash</code>)</li>
-<li>mode (<code>chat</code>, <code>loop</code>, <code>dashboard</code>, <code>logs</code>, <code>staged</code>, or <code>driven</code>)</li>
+<li>Validate and reconcile typed result receipts, rejecting stale or wrong-run work.</li>
+<li>Resume blocked tasks when declared dependencies and readiness gates permit it.</li>
+<li>Record configured command execution and validate evidence freshness.</li>
+<li>Schedule authorized stand operations and reconcile durable deployment records.</li>
+<li>Recover recorded operations without replaying uncertain non-idempotent effects.</li>
 </ul>
-<p>The role's lifecycle is declared in the packaged schema copied to
-<code>.greatminds/schema.yaml</code>:</p>
-<ul>
-<li><code>interactive</code>: human-paced chat. <code>ARCHITECT-PLANNER</code> is the normal
-  user-facing planner.</li>
-<li><code>self-loop</code>: an autonomous watchdog loop. <code>MAINTAINER</code> uses this to recover
-  dead agents, restart coordd, and escalate FSM stalls without waiting for USER.</li>
-<li><code>driven</code>: no persistent agent loop. The pane is idle between turns; <code>coordd</code>
-  runs one turn when an inbox, queue, or stand-state event lands.</li>
-</ul>
-<p>Driven dispatch requires both the schema lifecycle and the installed
-<code>coordination/coord.yaml</code> window mode to be <code>driven</code>.</p>
-<h2 id="coordd">coordd<a class="headerlink" href="#coordd" title="Permanent link">&para;</a></h2>
-<p><code>coordd</code> watches <code>.greatminds/</code> for inbox, queue-file, and stand-state
-activity. It does not own the task FSM and does not decide task transitions.
-Its job is turn delivery: when a producer moves work into another role's queue,
-the consumer can react immediately.</p>
-<p>On Linux, <code>coordd</code> arms an inotify watcher. New inbox files under
-<code>.greatminds/inbox/&lt;role&gt;/</code> and new task files landing in watched queues trigger
-the owning role's event path. For non-driven roles, the wake mechanism is
-selected from <code>.greatminds/schema.yaml</code> under <code>event_wake.by_tool</code>, keyed by
-the role window's <code>coordination/coord.yaml</code> <code>tool:</code> value:</p>
-<ul>
-<li><code>codex</code> and <code>cursor</code>: <code>coordd</code> finds the role's deepest sleeping descendant
-  and sends <code>SIGINT</code>. That interrupts the long sleep wrapper so the next tick
-  starts immediately.</li>
-<li><code>claude</code>: <code>coordd</code> sends the configured <code>tmux send-keys</code> text plus Enter to
-  the role's tmux pane. The default text is defined in
-  <code>event_wake.tmux_send_keys.keys</code>.</li>
-</ul>
-<p>For driven roles, <code>coordd</code> starts one turn instead of waking an existing loop:</p>
-<ul>
-<li><code>claude</code> driven roles run one <code>claude -p</code> / resume turn with the rendered
-  role bootstrap file using an explicit user environment. The daemon sets
-  <code>HOME</code> to the OS user's home directory, ensures <code>$HOME/.local/bin</code> is on
-  <code>PATH</code>, and resolves the Claude binary by absolute path when possible. This
-  matches non-interactive subprocess requirements: Claude Code reads first
-  party credentials from <code>$HOME/.claude</code> and is commonly installed under
-  <code>$HOME/.local/bin</code>.</li>
-<li><code>codex</code> driven roles run one fresh <code>codex app-server</code> stdio process for the
-  turn; the app-server thread id is persisted for continuity.</li>
-<li><code>cursor</code>, <code>cline</code>, <code>gemini</code>, and <code>openhands</code> driven roles run one headless
-  subprocess turn using the tool's own one-shot CLI mode. Cursor turns are
-  wrapped in the same <code>systemd-run --user --slice=cursor.slice --scope</code>
-  resource boundary as interactive Cursor panes and include <code>--trust</code> in
-  print mode. Gemini driven turns include <code>--skip-trust</code>. OpenHands driven
-  turns require the <code>openhands</code> CLI settings and LLM provider to be configured
-  before <code>coordd</code> starts the turn. These adapters are stateless from
-  greatminds' point of view: the full role bootstrap is supplied each turn,
-  and the tool's machine-level auth/configuration must already be valid for
-  the OS user running <code>coordd</code>.</li>
-</ul>
-<p>Driven roles do one tick, then exit. They do not schedule long sleeps or run a
-persistent <code>/loop</code>; their next turn comes from the next inbox, queue, or stand
-event.</p>
-<p><code>coordd</code> also writes a best-effort chronological driven-agent event stream to
-<code>.greatminds/.events/driven.ndjson</code>. The stream is read-only operator
-observability, not FSM authority: task files, locks, stand state, and turn logs
-remain the source of truth. A fresh tmux launch includes a role-less <code>logs</code>
-window that runs <code>greatminds driven-log --follow</code> and shows accepted turns,
-pending markers, completions, retries, and errors in color.</p>
-<p><code>greatminds launch --target vscode</code> writes VS Code tasks for the same operator
-surfaces: dashboard, driven log, coordd foreground, agent status, agent tools,
-stand status, and stand profiles. The <code>vscode-extension/</code> package provides a
-VS Code cockpit that calls the same CLI backend.</p>
-<p>This reactive path replaces short idle polling for normal queue and inbox
-changes. Reaction time should be the daemon watcher interval plus one driven
-spawn or wake signal, not a role's fallback sleep value.</p>
-<p>Stand availability is also treated as a dispatch event. When coordd's own
-auto-deploy thread returns the singleton to <code>free</code> after a failed deploy, it
-immediately reconciles driven backlog. External stand commands such as
-<code>stand up</code> and <code>stand release</code> write a <code>.stand/available-*.yaml</code> event so the
-watcher re-drives roles whose tasks were already parked in stand-dependent
-queues. A separate level-triggered backstop handles the case where coordd
-starts after the stand is already free: while <code>state=free</code>, no active lease is
-present, and stand-consumer queues still contain work, coordd periodically
-re-drives only those consumer roles. The same startup and periodic hook also
-cleans a declared Vite dev-server port when the stand is free and no lease owns
-it.</p>
-<p><code>coordd</code> does not push visual status markers into chat panes. Those markers are
-per-agent utterances: after a successful task move, task block append, or inbox
-send, the agent ends its own chat reply with the matching marker line.</p>
-<h3 id="event-wake-troubleshooting">Event-wake troubleshooting<a class="headerlink" href="#event-wake-troubleshooting" title="Permanent link">&para;</a></h3>
-<p>If a role does not react to new work, check these in order:</p>
-<ol>
-<li>Confirm the daemon is running for the project with <code>greatminds daemon status</code>.</li>
-<li>Confirm the role exists in <code>coordination/coord.yaml</code>, has the expected
-   <code>tool:</code>, and has a live agent registry entry.</li>
-<li>Confirm the role's schema lifecycle and <code>coordination/coord.yaml</code> mode agree
-   with the expected model. Driven roles require both values to be <code>driven</code>.</li>
-<li>For a driven role, inspect coordd logs for the driven spawn result and check
-   the per-role run lock under <code>.greatminds/.locks/</code>.</li>
-<li>Confirm <code>.greatminds/schema.yaml</code> maps that tool in <code>event_wake.by_tool</code> for
-   non-driven roles.</li>
-<li>For non-driven <code>codex</code> or <code>cursor</code>, inspect whether the agent is actually inside a sleep
-   descendant. <code>coordd</code> does not signal the agent process itself when no sleeping
-   child exists.</li>
-<li>For non-driven <code>claude</code>, confirm the tmux session and window name match
-   <code>coordination/coord.yaml</code>.
-   Chat-mode wakes are rate-limited by
-   <code>event_wake.tmux_send_keys.rate_limit_seconds</code>, so a burst of messages may
-   coalesce into one prompt.</li>
-<li>For driven <code>claude</code>, run <code>greatminds daemon doctor --project-dir "$PWD"</code>.
-   It probes <code>claude -p</code> in daemon-equivalent env and reports expired OAuth
-   credentials, missing refresh tokens, and missing captured agent env files.
-   Repair auth with <code>claude setup-token</code> or <code>claude auth login</code> as the daemon's
-   OS user, then restart the daemon.</li>
-<li>Run <code>greatminds watchdog</code> to check dead pids, stale heartbeats, and orphaned
-   intents.</li>
-<li>Run <code>greatminds agent status [ROLE]</code> to inspect the recorded pid, liveness,
-   session id, venv, heartbeat age, and input socket without reading registry
-   files by hand.</li>
-</ol>
-<h2 id="visual-event-markers">Visual event markers<a class="headerlink" href="#visual-event-markers" title="Permanent link">&para;</a></h2>
-<p>Operators can scan live tmux panes by the marker at the end of an agent reply.
-The templates live in <code>.greatminds/schema.yaml</code> under <code>visual_events</code>; docs and
-prompts describe the contract, but the schema is the source of truth for the
-exact emoji and markdown shape.</p>
-<ul>
-<li><code>CLAIMED</code>: an agent moved a task into an implementation or ownership queue it
-  is taking over.</li>
-<li><code>FINISHED</code>: an implementer moved completed work to the next review or test
-  queue.</li>
-<li><code>ACCEPTED</code>: a reviewer moved the task to <code>verified</code>.</li>
-<li><code>REJECTED</code>: review or test feedback sent the task back for more work, or a
-  failure/partial result was recorded.</li>
-<li><code>SENT</code>: an agent sent an inbox message to another role.</li>
-</ul>
-<p>Because these are emitted by the acting agent, they appear only when the agent
-successfully completes the CLI action and replies. Daemon status belongs in
-<code>greatminds dashboard</code> and the driven event log, not in chat-pane overlays.</p>
-<h2 id="pty-launch">pty launch<a class="headerlink" href="#pty-launch" title="Permanent link">&para;</a></h2>
-<p>The launcher wraps agent tools in a pty and records an input socket in the
-agent registry. The socket lets <code>coordd</code> send actual input to the agent process
-instead of writing display text to a terminal.</p>
-<h2 id="heartbeats">Heartbeats<a class="headerlink" href="#heartbeats" title="Permanent link">&para;</a></h2>
-<p>Most CLI calls update the caller role's heartbeat as a side effect. Driven
-Claude and Codex turns also refresh the heartbeat from driver-observed progress:
-subprocess output, Codex app-server activity, and source worktree writes. This
-keeps long active turns from looking stuck merely because the agent has not made
-another <code>greatminds</code> CLI call.</p>
-<p>Driven subprocesses use a progress-based timeout. A turn can run for an
-extended period while it is producing output or changing the lease worktree;
-coordd kills and retries only after the idle progress window is exceeded, or
-after the larger absolute ceiling.</p>
-<p>Watchdog reports stale heartbeats, orphaned intents, dead pids, and stale tasks:</p>
-<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>watchdog
+<p>ACP prompt completion is distinct from a verified workflow transition. Completed turns without workflow progress are bounded by max_no_progress_turns
+(default 1), including across task metadata edits. Startup transport failures before
+prompt dispatch have bounded exponential retries under the
+<a href="../execution-contract/#bounded-startup-retries">execution contract</a>.
+<code>run retry RUN_ID</code> permits an explicit further attempt after its cause is
+resolved. Startup delays are shared by account; provider rate-limit handling
+and broader resource/health policies remain tracked in the
+<a href="../modernization-plan/">modernization plan</a>.</p>
+<h2 id="conversations-and-frontends">Conversations and frontends<a class="headerlink" href="#conversations-and-frontends" title="Permanent link">&para;</a></h2>
+<p><code>greatminds chat create BINDING_ID</code> creates a daemon-owned conversation. <code>chat talk</code>
+handles user messages, streamed output and permission choices. Reconnecting reads
+durable events without replaying completed prompts. Task-bound conversations
+claim the actual task revision; standalone conversations do not create fake tasks.</p>
+<p>Tmux hosts daemon/operator surfaces. VS Code and Cursor IDE targets generate ACP
+workspace process tasks, and the VS Code extension calls the same CLI interfaces.
+Native agent TUIs, synthetic keystrokes, sleeping-child signals and vendor-native
+app-server drivers are not execution transports in Greatminds.</p>
+<h2 id="operator-diagnosis">Operator diagnosis<a class="headerlink" href="#operator-diagnosis" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>project<span class="w"> </span>execution
+greatminds<span class="w"> </span>daemon<span class="w"> </span>doctor<span class="w"> </span>--json
+greatminds<span class="w"> </span>agent<span class="w"> </span>status
+greatminds<span class="w"> </span>run<span class="w"> </span>status
+greatminds<span class="w"> </span>run<span class="w"> </span>events<span class="w"> </span>--follow
+greatminds<span class="w"> </span>wake-check<span class="w"> </span>--json
+greatminds<span class="w"> </span>watchdog
 </code></pre></div>
+<p>Configuration checks are static. Run observations distinguish authentication/input
+waits, lifecycle failures and process identity/liveness. A live PID alone does
+not demonstrate task progress. Dependency inspection uses the daemon's shared
+maintenance service and never moves files itself.</p>
+<p><code>run pause</code> stops new dispatch while allowing active runs to finish. Use explicit
+cancellation when active work must stop. Systemd supervision is optional; the
+<a href="../../operations/runbook/">runbook</a> documents service installation, configured
+environment layering and updates. Runtime observations do not require a model
+turn or a cloud service.</p>
 
 
 
@@ -1790,7 +1694,7 @@ after the larger absolute ceiling.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

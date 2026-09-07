@@ -1,0 +1,2379 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="File-based multi-agent coordination for agent fleets and task pipelines.">
+      
+      
+      
+        <link rel="canonical" href="https://veryviolet.github.io/greatminds/architecture/acp-compatibility/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>ACP compatibility campaign - greatminds</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#acp-compatibility-campaign" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="greatminds" class="md-header__button md-logo" aria-label="greatminds" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            greatminds
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ACP compatibility campaign
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/veryviolet/greatminds" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    veryviolet/greatminds
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../concepts/queues/" class="md-tabs__link">
+          
+  
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../cli-reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  CLI Reference
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../operations/runbook/" class="md-tabs__link">
+          
+  
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../recipes/filing-a-bug/" class="md-tabs__link">
+          
+  
+  
+  Recipes
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../changelog/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="greatminds" class="md-nav__button md-logo" aria-label="greatminds" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    greatminds
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/veryviolet/greatminds" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    veryviolet/greatminds
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/first-project/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    First Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/local-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/upgrading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/queues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/roles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/codex-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Manifests and Bindings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/stand-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stand Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/stand-gate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stand Gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/inbox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inbox
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contract-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Contract Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../filesystem-layout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Filesystem Layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transitions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../daemon-and-agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Daemon and Agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lifecycle Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/runbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runbook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Recipes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Recipes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/filing-a-bug/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Filing a Bug
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/planning-a-feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planning a Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/e2e-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E2E Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/cutting-a-release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cutting a Release
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#recorded-initialization-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recorded initialization results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#session-and-minimal-inference-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Session and minimal inference results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restart-context-configuration-and-cancellation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restart, context, configuration, and cancellation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#live-permission-callbacks-and-operator-responses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live permission callbacks and operator responses
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mixed-domain-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixed domain pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproduce-the-probe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproduce the probe
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#distribution-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Distribution references
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cline-revalidation-on-2026-09-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cline revalidation on 2026-09-07
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#one-harness-local-preset-on-2026-09-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One-harness local preset on 2026-09-07
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication-revalidation-2026-09-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication revalidation, 2026-09-07
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cancellation-while-permission-is-pending-2026-09-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cancellation while permission is pending, 2026-09-07
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#declared-role-coverage-2026-09-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Declared role coverage, 2026-09-07
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#public-conversation-restart-and-reconnect-2026-09-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public conversation restart and reconnect, 2026-09-07
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cursor-authentication-diagnosis-2026-09-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cursor authentication diagnosis, 2026-09-07
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cline-after-native-login-2026-09-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cline after native login, 2026-09-07
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="acp-compatibility-campaign">ACP compatibility campaign<a class="headerlink" href="#acp-compatibility-campaign" title="Permanent link">&para;</a></h1>
+<p>Current delivery scope (owner decision, 2026-09-07): <strong>Codex, Claude and Grok</strong>.
+The other six integrations are deferred; their recorded results below remain
+partial or blocked measurements, not current support claims. See the
+<a href="../modernization-acceptance/">acceptance verdict</a>.</p>
+<p>Measured on 2026-09-06, Linux x86_64, using Greatminds' common <code>AcpTransport</code>
+and <code>agent-client-protocol==0.11.1</code>. Each executable ran in a fresh temporary
+workspace. Initialization and session probes do not send model prompts. A separate
+explicit inference stage sends one synthetic text request per tested installation.</p>
+<h2 id="recorded-initialization-results">Recorded initialization results<a class="headerlink" href="#recorded-initialization-results" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Harness</th>
+<th>Tested installation</th>
+<th>ACP argv</th>
+<th>Initialize</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Codex</td>
+<td>codex-acp 1.10.0, Codex CLI 0.149.1 selected with <code>CODEX_PATH</code></td>
+<td><code>codex-acp</code></td>
+<td>Protocol 1 accepted</td>
+</tr>
+<tr>
+<td>Claude</td>
+<td>claude-agent-acp 0.75.1, Claude Agent SDK 0.3.257</td>
+<td><code>claude-agent-acp</code></td>
+<td>Protocol 1 accepted</td>
+</tr>
+<tr>
+<td>Qwen Code</td>
+<td>0.19.6</td>
+<td><code>qwen --acp</code></td>
+<td>Protocol 1 accepted</td>
+</tr>
+<tr>
+<td>Kimi Code</td>
+<td>0.39.1</td>
+<td><code>kimi acp</code></td>
+<td>Protocol 1 accepted</td>
+</tr>
+<tr>
+<td>Grok</td>
+<td>1.0.13, build 5e9a58528b76</td>
+<td><code>grok --no-auto-update agent stdio</code></td>
+<td>Protocol 1 accepted</td>
+</tr>
+<tr>
+<td>Cline</td>
+<td>3.0.50</td>
+<td><code>cline --acp</code></td>
+<td>Protocol 1 accepted</td>
+</tr>
+<tr>
+<td>Gemini CLI</td>
+<td>0.49.0</td>
+<td><code>gemini --acp</code></td>
+<td>Protocol 1 accepted</td>
+</tr>
+<tr>
+<td>OpenHands CLI</td>
+<td>1.16.0</td>
+<td><code>openhands acp</code></td>
+<td>Protocol 1 accepted</td>
+</tr>
+<tr>
+<td>Cursor CLI</td>
+<td>2026.06.15-18-00-12-6f5a2cf</td>
+<td><code>cursor-agent acp</code></td>
+<td>Protocol 1 accepted</td>
+</tr>
+</tbody>
+</table>
+<p>The <a href="../evidence/acp-initialize-2026-09-06.json">recorded JSON</a> retains the protocol
+responses with arbitrary metadata, host paths, process IDs, and raw logs excluded.
+Capabilities in that file are <strong>advertised</strong>, not exercised. Initialization proves
+that these installations speak to the shared client; it does not yet establish
+tool permissions, task execution, resumption, cancellation during inference, or a
+mixed-agent pipeline. Those remain required for support.</p>
+<h2 id="session-and-minimal-inference-results">Session and minimal inference results<a class="headerlink" href="#session-and-minimal-inference-results" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Harness</th>
+<th>Session without explicit authenticate</th>
+<th>Exact synthetic reply</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Codex CLI 0.149.1 / adapter 1.10.0</td>
+<td>Created</td>
+<td>Failed: selected model requires newer CLI</td>
+</tr>
+<tr>
+<td>Codex CLI 0.153.4 / adapter 1.10.0</td>
+<td>Created</td>
+<td>Passed</td>
+</tr>
+<tr>
+<td>Claude SDK 0.3.257 / adapter 0.75.1</td>
+<td>Created</td>
+<td>Passed</td>
+</tr>
+<tr>
+<td>Grok 1.0.13</td>
+<td>Created</td>
+<td>Passed</td>
+</tr>
+<tr>
+<td>Cline 3.0.50</td>
+<td>Created</td>
+<td>Not tested</td>
+</tr>
+<tr>
+<td>Qwen Code 0.19.6</td>
+<td>Authentication required (-32000)</td>
+<td>Not tested</td>
+</tr>
+<tr>
+<td>Kimi Code 0.39.1</td>
+<td>Authentication required (-32000)</td>
+<td>Not tested</td>
+</tr>
+<tr>
+<td>Gemini CLI 0.49.0</td>
+<td>Authentication required (-32000)</td>
+<td>Not tested</td>
+</tr>
+<tr>
+<td>OpenHands CLI 1.16.0</td>
+<td>Authentication required (-32000)</td>
+<td>Not tested</td>
+</tr>
+<tr>
+<td>Cursor CLI 2026.06.15-18-00-12-6f5a2cf</td>
+<td>Authentication required (-32000)</td>
+<td>Not tested</td>
+</tr>
+</tbody>
+</table>
+<p><a href="../evidence/acp-sessions-prompts-2026-09-06.json">Session and prompt evidence</a>
+records these separate stages. The prompt asks for exactly <code>ACP_PROBE_OK</code> without
+tools. Passing means the streamed text matches, the agent returns <code>end_turn</code>, and
+the process exits during bounded shutdown. No tool or permission requests occurred
+in those prompts. This is not a domain task or mixed-agent pipeline test.</p>
+<p>The older Codex returned a provider error as assistant text followed by <code>end_turn</code>.
+The exact-response assertion correctly rejected it. A stop reason alone is not
+proof of useful work; production task advancement requires validated typed results.
+The separately installed, lockfile-pinned Codex 0.153.4 passed the same request.</p>
+<p>An authentication-required response does not prove that cached credentials are
+absent. Some servers require explicit ACP authentication before using an existing
+login. Manifests may specify <code>auth_method</code>; the supervisor verifies it was advertised
+and calls <code>authenticate</code> before creating or loading a session. It does not guess a
+method or silently choose another identity. Fresh explicit-auth attempts and their limitations are recorded below.</p>
+<h2 id="restart-context-configuration-and-cancellation">Restart, context, configuration, and cancellation<a class="headerlink" href="#restart-context-configuration-and-cancellation" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Harness</th>
+<th>Load after process restart</th>
+<th>Recall previous-turn token</th>
+<th>Cancel after first assistant text</th>
+<th>Explicit config selection</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Codex CLI 0.153.4 / adapter 1.10.0</td>
+<td>Passed</td>
+<td>Passed</td>
+<td><code>cancelled</code></td>
+<td>Model <code>gpt-6-astra</code>, mode <code>read-only</code> confirmed</td>
+</tr>
+<tr>
+<td>Claude SDK 0.3.257 / adapter 0.75.1</td>
+<td>Passed</td>
+<td>Passed</td>
+<td><code>cancelled</code></td>
+<td>Model <code>default</code>, mode <code>default</code> confirmed</td>
+</tr>
+<tr>
+<td>Grok 1.0.13</td>
+<td>Passed</td>
+<td>Passed</td>
+<td><code>cancelled</code></td>
+<td>No model config option advertised; not tested</td>
+</tr>
+</tbody>
+</table>
+<p><a href="../evidence/acp-lifecycle-2026-09-06.json">Lifecycle evidence</a> records each stage.
+Restart tests close the first agent process, then create another in the same
+workspace and call <code>session/load</code> with the privately retained session ID. The
+history test uses a different second prompt which does not contain the token.
+Historical updates emitted during loading are excluded from the second response
+assertion. This proves continuity for these individual harnesses; it does not
+transfer conversation history across different harnesses.</p>
+<p>Cancellation tests wait for nonempty assistant text before sending <code>session/cancel</code>.
+All three returned <code>cancelled</code> and exited during bounded shutdown. Completion
+before the cancellation request is explicitly reported as unconfirmed, not passed.
+These tests do not yet cover cancellation while a tool or permission callback is
+pending. The supervisor and probe share advertised model/mode selection code;
+model configuration responses must confirm the requested value.</p>
+<h2 id="live-permission-callbacks-and-operator-responses">Live permission callbacks and operator responses<a class="headerlink" href="#live-permission-callbacks-and-operator-responses" title="Permanent link">&para;</a></h2>
+<p><a href="../evidence/acp-permissions-2026-09-06.json">Permission evidence</a> records a synthetic
+shell command that writes <code>permission-ok</code> to a file in a temporary project. Claude
+0.75.1/SDK 0.3.257 requested approval; <code>greatminds run permission ID --option ID</code>
+answered once, the same run consumed it, and the file appeared before turn completion.
+Grok and Codex also passed with the explicit settings below. For those two explicit
+tests the file was directly observed absent while the request was pending.</p>
+<p>The initial Grok run inherited <code>ui.permission_mode = auto</code> and performed the write
+without an ACP callback. Using <code>grok --no-auto-update --permission-mode default
+agent --no-leader stdio</code> produced the callback without changing user configuration.
+Codex's default <code>agent</code> mode also performed the ordinary workspace write without
+a callback. Its <code>read-only</code> mode delegates escalated approvals to the user but still
+allows ordinary workspace writes in this adapter version. The successful callback
+test selected that mode and explicitly requested <code>sandbox_permissions=require_escalated</code>
+for the harmless command. These are different approval triggers, not proof that
+every shell command in every harness requires an ACP approval.</p>
+<p>The client <code>ask</code> policy routes callbacks to the operator; it does not override a
+harness's internal approval defaults. The executable's mode, cached settings, and
+execution boundary remain part of compatibility configuration. Complete permission
+policy parity and negotiated filesystem/terminal callbacks remain pending.</p>
+<p>The supervisor permission probe (<code>tools/acp_permission_probe.py</code> in the source checkout) makes the
+scenario reproducible. It prints a temporary project/runtime location, submits one
+synthetic model request, and waits for an operator. It never approves a request.
+From that project's operator terminal, inspect <code>greatminds run status</code>, then inspect
+and answer its exact permission ID. The probe requires an observed pending request
+before the marker exists, a consumed one-time approval, and the expected file.</p>
+<div class="highlight"><pre><span></span><code>.venv/bin/python<span class="w"> </span>tools/acp_permission_probe.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--adapter-version<span class="w"> </span><span class="m">0</span>.75.1<span class="w"> </span>--harness-version<span class="w"> </span>sdk-0.3.257<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--<span class="w"> </span>/absolute/path/to/claude-agent-acp
+</code></pre></div>
+<p>Fixture tests additionally cover explicit rejection, cancellation during a pending
+callback, stale revisions, expired requests, conflicting replies, and SIGKILL before
+delivery of both pending and answered requests. Restart cancels those requests and
+preserves the input hold without spawning another agent. These crash/denial cases
+have not yet been repeated across all real executables.</p>
+<p>OpenHands and Cursor initially could not create their normal per-user runtime
+directories under the filesystem-restricted test runner. Gemini initially could
+not reach its OAuth refresh endpoint. Codex initially could not initialize its
+SQLite runtime. Repeating initialization with normal filesystem/network access
+resolved these startup failures. The test selected the already installed Codex
+CLI explicitly; the adapter's separately installed dependency is Codex 0.153.4.
+That bundled combination subsequently passed the session and minimal inference
+stage above. The global CLI installation was not updated.</p>
+<h2 id="mixed-domain-pipeline">Mixed domain pipeline<a class="headerlink" href="#mixed-domain-pipeline" title="Permanent link">&para;</a></h2>
+<p>The <a href="../evidence/acp-mixed-pipeline-2026-09-06.json">first real pipeline evidence</a>
+is <strong>partial</strong>. A local feature task uses a task worktree and six configured
+unit tests for an inclusive numeric clamp function, including invalid bounds.
+Codex 0.153.4 implemented the function, requested daemon-run tests, and submitted
+a typed implementation handoff. Claude SDK 0.3.257 independently inspected it,
+requested its own test execution, and submitted a typed tests handoff. Both
+receipts passed domain gates and the task reached <code>feature_review</code>.</p>
+<p>Grok 1.0.13 initially exhausted its 240-second prompt budget while waiting for an
+operator permission. The <a href="../evidence/acp-mixed-pipeline-completed-2026-09-06.json">completed continuation</a>
+records an explicit reviewer retry with a 600-second budget and one-time operator
+approvals. Grok independently ran all six tests and submitted an approved review
+through <code>run submit --json</code>. The daemon applied all three results, merged the
+implementation and transitioned the task to <code>verified</code>, with worktree cleanup. All six
+tests pass in the main checkout; an idle daemon restart changes no runs, results,
+or commands. This is operator-assisted evidence for one synthetic local task,
+not an unattended pipeline or a controlled performance comparison.</p>
+<p>The pipeline probe (<code>tools/acp_pipeline_probe.py</code> in the source checkout) takes <code>--config FILE</code>
+with three ACP bindings for DEVELOPER, TESTER, and ARCHITECT-REVIEWER. It copies
+the manifests into a fresh temporary Git project, seeds a synthetic local plan,
+and replaces configured commands with the known local unit-test command. It
+never approves permissions or silently retries a held run. Its full fixture
+regression covers all three role transitions, evidence validation, daemon merge,
+worktree cleanup, main-branch test execution, and restart without duplicate work.
+That fixture result does not establish completion of the real pipeline.</p>
+<p>The real run exposed two integration issues. Assigned context now identifies the
+CLI through the daemon's Python executable rather than assuming <code>greatminds</code> is
+on PATH; the final implementation also isolates module lookup from workspace
+files. Explicit <code>stand_required: false</code> plans no longer require fabricated stand
+observations. Local test blocks and configured command evidence still pass domain
+validation; stand-required or unspecified plans retain scope-specific stand gates.</p>
+<h2 id="reproduce-the-probe">Reproduce the probe<a class="headerlink" href="#reproduce-the-probe" title="Permanent link">&para;</a></h2>
+<p>From an editable Greatminds checkout:</p>
+<div class="highlight"><pre><span></span><code>.venv/bin/python<span class="w"> </span>tools/acp_probe.py<span class="w"> </span>--<span class="w"> </span>qwen<span class="w"> </span>--acp
+.venv/bin/python<span class="w"> </span>tools/acp_probe.py<span class="w"> </span>--session<span class="w"> </span>--<span class="w"> </span>kimi<span class="w"> </span>acp
+<span class="nv">CODEX_PATH</span><span class="o">=</span>/absolute/path/to/codex<span class="w"> </span>.venv/bin/python<span class="w"> </span>tools/acp_probe.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--env<span class="w"> </span>CODEX_PATH<span class="w"> </span>--<span class="w"> </span>/absolute/path/to/codex-acp
+.venv/bin/python<span class="w"> </span>tools/acp_probe.py<span class="w"> </span>--timeout<span class="w"> </span><span class="m">45</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--prompt<span class="w"> </span><span class="s1">'Reply with exactly ACP_PROBE_OK and nothing else. Do not call any tools.'</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--expect<span class="w"> </span>ACP_PROBE_OK<span class="w"> </span>--<span class="w"> </span>/absolute/path/to/claude-agent-acp
+.venv/bin/python<span class="w"> </span>tools/acp_probe.py<span class="w"> </span>--timeout<span class="w"> </span><span class="m">45</span><span class="w"> </span>--resume<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--prompt<span class="w"> </span><span class="s1">'Remember TOKEN_42. Reply only SAVED.'</span><span class="w"> </span>--expect<span class="w"> </span>SAVED<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--resume-prompt<span class="w"> </span><span class="s1">'Return only the token from my previous message.'</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--resume-expect<span class="w"> </span>TOKEN_42<span class="w"> </span>--<span class="w"> </span>/absolute/path/to/codex-acp
+.venv/bin/python<span class="w"> </span>tools/acp_probe.py<span class="w"> </span>--timeout<span class="w"> </span><span class="m">45</span><span class="w"> </span>--cancel-after<span class="w"> </span><span class="m">0</span>.1<span class="w"> </span>--cancel-on-output<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--prompt<span class="w"> </span><span class="s1">'Write the integers from 1 to 3000, one per line. Do not use tools.'</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--<span class="w"> </span>/absolute/path/to/codex-acp
+</code></pre></div>
+<p>The default probe sends only <code>initialize</code> and performs bounded transport shutdown.
+<code>--session</code> additionally creates a session. <code>--auth-method ID</code> explicitly selects an
+advertised authentication flow, which may require interactive login depending on
+the server and cached account. <code>--prompt TEXT</code> explicitly sends a model request and
+may consume provider usage; <code>--expect TEXT</code> checks the observed assistant response.
+<code>--model ID</code> and <code>--mode ID</code> require advertised choices. <code>--resume</code> restarts the
+process and loads its session; <code>--resume-prompt</code> and <code>--resume-expect</code> check a distinct
+follow-up. <code>--cancel-after</code> tests cancellation of a pending prompt; add
+<code>--cancel-on-output</code> to wait for streaming text first. Resume and cancellation are
+separate scenarios and cannot be combined in one invocation.
+It prints a versioned JSON report and returns nonzero on failure. Each probe retains
+a private report, process identity, stderr, and any assistant response in its temporary
+directory. Extra environment values are passed only through explicit <code>--env NAME</code>
+references; their values, assistant text, and arbitrary protocol metadata are excluded
+from stdout. Sensitive values must not be placed in executable arguments.</p>
+<p>The adapter package definition (<code>tools/acp_adapters/package.json</code>) and
+npm lockfile (<code>tools/acp_adapters/package-lock.json</code>) pin the Codex and Claude
+test adapter installations, including resolved dependencies. Copy those two files
+to a separate writable test directory and run <code>npm ci --ignore-scripts --no-audit
+--no-fund</code> there. Select executables from that directory's <code>node_modules/.bin/</code>.
+The Node runtime used for the recorded test was 22.13.0. Installing test dependencies
+does not alter the global harness installations or a project's execution bindings.</p>
+<h2 id="distribution-references">Distribution references<a class="headerlink" href="#distribution-references" title="Permanent link">&para;</a></h2>
+<p><a href="https://github.com/agentclientprotocol/codex-acp">Codex's upstream adapter</a>
+exposes ACP over the Codex App Server and supports an explicit <code>CODEX_PATH</code> override.
+<a href="https://github.com/agentclientprotocol/claude-agent-acp">Claude's upstream adapter package</a>
+uses the Claude Agent SDK. These adapters stay at the executable boundary; the
+Greatminds scheduler has no separate Codex or Claude wire protocol path in ACP mode.</p>
+<p><a href="https://docs.x.ai/build/cli/headless-scripting">Grok documents its stdio ACP command and update suppression</a>.
+<a href="https://docs.openhands.dev/openhands/usage/cli/ide/overview">OpenHands documents its ACP CLI entrypoint</a>,
+and <a href="https://cursor.com/docs/cli/acp">Cursor documents ACP sessions and extension requests</a>.
+Blocking extension requests and provider-specific optional capabilities must be
+explicitly negotiated or handled before the corresponding workflows can be declared
+supported. A listed command or an accepted initialization response is not a substitute
+for those tests.</p>
+<h2 id="cline-revalidation-on-2026-09-07">Cline revalidation on 2026-09-07<a class="headerlink" href="#cline-revalidation-on-2026-09-07" title="Permanent link">&para;</a></h2>
+<p>The executable currently on this host reports Cline <strong>3.0.61</strong>, whereas the earlier
+session-only evidence records 3.0.50. A fresh common-client probe created a session
+and sent a synthetic exact-response request without tools. <code>session/prompt</code> returned
+JSON-RPC <code>-32603</code> (<code>Internal error</code>) with no assistant text. The private stderr
+diagnostic identified required re-authentication. The process exited during bounded
+cleanup, and the requested restart/load stage was skipped because the initial prompt
+failed. No account or model selection was changed.</p>
+<p><a href="../evidence/acp-cline-auth-2026-09-07.json">Sanitized evidence</a> records this failure.
+This access failure was resolved after the operator completed native
+login; the successful revalidation below supersedes the Cline access blocker.
+Creating an ACP session alone does not establish working provider credentials.</p>
+<h2 id="one-harness-local-preset-on-2026-09-07">One-harness local preset on 2026-09-07<a class="headerlink" href="#one-harness-local-preset-on-2026-09-07" title="Permanent link">&para;</a></h2>
+<p>A fresh temporary Git repository completed the local clamp task using ordinary
+<code>greatminds setup</code>, <code>project preset local --agent codex --apply</code>, and the common
+daemon. The manifest used Codex 0.153.4 with codex-acp 1.10.0. The preset kept
+<code>permission: ask</code>; this task generated no permission callbacks. One manifest
+served developer, tester and reviewer in separate runs, while the planner remained
+on demand. The task supplied an explicit synthetic plan with no stand requirement.</p>
+<p><a href="../evidence/acp-local-preset-2026-09-07.json">Recorded evidence</a> confirms three applied
+typed handoffs, three successful daemon command receipts, SYSTEM provenance for
+all resulting decision blocks, a merge changing only <code>clamp.py</code>, removal of the
+task worktree, six independently rerun unit tests, and restart without additional
+runs/results/commands. No native transport, deployment or publication was involved.</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th style="text-align: right;">Compiled context bytes</th>
+<th style="text-align: right;">Start to first prompt</th>
+<th style="text-align: right;">Run duration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Developer</td>
+<td style="text-align: right;">7,887</td>
+<td style="text-align: right;">2.691 s</td>
+<td style="text-align: right;">45.051 s</td>
+</tr>
+<tr>
+<td>Tester</td>
+<td style="text-align: right;">9,347</td>
+<td style="text-align: right;">1.090 s</td>
+<td style="text-align: right;">46.685 s</td>
+</tr>
+<tr>
+<td>Reviewer</td>
+<td style="text-align: right;">10,419</td>
+<td style="text-align: right;">1.716 s</td>
+<td style="text-align: right;">32.709 s</td>
+</tr>
+</tbody>
+</table>
+<p>These are observed client byte counts and elapsed durations for this task, not
+provider token counts, billed cost, or proof of useful work at the first activity
+boundary. The source environment was used for live inference; wheel installation
+and interactive planning are separate checks. Reproduce from a checkout with an
+execution YAML containing the named manifest:</p>
+<div class="highlight"><pre><span></span><code>.venv/bin/python<span class="w"> </span>tools/acp_pipeline_probe.py<span class="w"> </span>--config<span class="w"> </span>/path/to/execution.yaml<span class="w"> </span>--local-agent<span class="w"> </span>codex
+</code></pre></div>
+<p>This opt-in command consumes provider usage, creates a new temporary repository,
+and keeps operator permissions explicit. Its validation commands are deliberately
+replaced by the synthetic task's Python unit tests.</p>
+<p>A separate <a href="../evidence/installed-local-preset-2026-09-07.json">installed-wheel fixture run</a>
+used a fresh isolated environment with the base wheel and no Ansible extra. The
+module resolved from site-packages. The public setup/preset commands and a synthetic
+ACP server completed the same three-role task, command checks, merge, cleanup and
+restart assertions. A separate installed dependency smoke confirmed idempotent setup
+and one SYSTEM resume with zero agent runs. This packaging evidence is distinct
+from the live Codex result above.</p>
+<h2 id="authentication-revalidation-2026-09-07">Authentication revalidation, 2026-09-07<a class="headerlink" href="#authentication-revalidation-2026-09-07" title="Permanent link">&para;</a></h2>
+<p><a href="../evidence/acp-auth-revalidation-2026-09-07.json">Fresh evidence</a> separates session
+creation, explicit authentication and inference. Existing installations and account
+settings were used; no provider or identity was selected implicitly.</p>
+<table>
+<thead>
+<tr>
+<th>Harness</th>
+<th>Fresh result</th>
+<th>Remaining prerequisite</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Qwen 0.19.6</td>
+<td>Only <code>openai</code> advertised; explicit authentication returned -32603</td>
+<td>Installed method requires <code>OPENAI_API_KEY</code>, absent in the probe environment</td>
+</tr>
+<tr>
+<td>Kimi 0.39.1</td>
+<td>Session and explicit <code>login</code> returned -32000</td>
+<td>Complete native login; doctor found no local configuration</td>
+</tr>
+<tr>
+<td>Cline 3.0.61</td>
+<td>Initial prompt required re-authentication; subsequent native login and live probes passed</td>
+<td>Resolved; use the local-backend configuration below for managed tasks</td>
+</tr>
+<tr>
+<td>OpenHands 1.16.0</td>
+<td>Local session returned -32000</td>
+<td>Configure agent/model: installed local handler maps missing agent specification to this response</td>
+</tr>
+<tr>
+<td>Gemini 0.49.0</td>
+<td>Configured <code>oauth-personal</code> explicitly rejected</td>
+<td>Individual access through this client was discontinued; an applicable supported access method is required</td>
+</tr>
+<tr>
+<td>Cursor 2026.06.15-18-00-12-6f5a2cf</td>
+<td>Native status reports cached login; explicit <code>cursor_login</code> timed out after 30 seconds</td>
+<td>Complete a valid Cursor login; the recorded ACP handler waited for browser authentication</td>
+</tr>
+</tbody>
+</table>
+<p>Gemini's response agrees with the <a href="https://github.com/google-gemini/gemini-cli/discussions/28017">upstream individual-access announcement</a>.
+It is not evidence of missing cached credentials. Cursor's documented
+<a href="https://cursor.com/docs/cli/acp">ACP authentication sequence</a> was attempted;
+a cached native login does not prove an ACP session works. No inference was
+requested in these auth checks except the separate synthetic Cline attempt.
+All probe processes exited during bounded cleanup.</p>
+<h2 id="cancellation-while-permission-is-pending-2026-09-07">Cancellation while permission is pending, 2026-09-07<a class="headerlink" href="#cancellation-while-permission-is-pending-2026-09-07" title="Permanent link">&para;</a></h2>
+<p><a href="../evidence/acp-pending-permission-cancel-2026-09-07.json">Live cancellation evidence</a>
+confirms Claude adapter 0.75.1 / SDK 0.3.257, Codex adapter 1.10.0 / CLI 0.153.4,
+and native Grok 1.0.13. The common supervisor task was cancelled after observing
+an unanswered permission. Every permission became cancelled, the requested write
+marker remained absent, and the process group exited. The probe supports this
+scenario with <code>--cancel-while-pending</code>; its fixture covers the same assertions.</p>
+<p>Codex required an explicit escalated shell request; selecting <code>read-only</code> alone
+is not evidence that ordinary workspace writes ask for permission. Grok used
+explicit default permission mode. Claude emitted <code>$/cancel_request</code>, which the
+pinned SDK logged as method-not-found; required cleanup still passed. This scope
+proves local cancellation and cleanup, not provider billing cancellation, an ACP
+cancelled stop response, public CLI cancellation, or optional extension parity.</p>
+<h2 id="declared-role-coverage-2026-09-07">Declared role coverage, 2026-09-07<a class="headerlink" href="#declared-role-coverage-2026-09-07" title="Permanent link">&para;</a></h2>
+<p>This table records live evidence, not restrictions on manifest role assignment.
+<strong>D</strong> = completed domain role with accepted typed result; <strong>C</strong> = synthetic live
+conversation through the public CLI, including restart and recall; <strong>P</strong> = only a synthetic
+DEVELOPER-bound permission test; <strong>U</strong> = no live domain-role proof; <strong>B</strong> = broader
+live campaign cannot proceed past the auth/configuration issue above. USER is a
+human role and SYSTEM actions are deterministic daemon work, so neither is a
+harness assignment. Generic lifecycle tests do not fill domain-role cells.</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Codex</th>
+<th>Claude</th>
+<th>Grok</th>
+<th>Qwen</th>
+<th>Kimi</th>
+<th>Cline</th>
+<th>OpenHands</th>
+<th>Gemini</th>
+<th>Cursor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ARCHITECT-PLANNER</td>
+<td>C</td>
+<td>C</td>
+<td>C</td>
+<td>B</td>
+<td>B</td>
+<td>C</td>
+<td>B</td>
+<td>B</td>
+<td>B</td>
+</tr>
+<tr>
+<td>ARCHITECT-REVIEWER</td>
+<td>D</td>
+<td>U</td>
+<td>D</td>
+<td>B</td>
+<td>B</td>
+<td>U</td>
+<td>B</td>
+<td>B</td>
+<td>B</td>
+</tr>
+<tr>
+<td>DEVELOPER</td>
+<td>D</td>
+<td>P</td>
+<td>P</td>
+<td>B</td>
+<td>B</td>
+<td>D</td>
+<td>B</td>
+<td>B</td>
+<td>B</td>
+</tr>
+<tr>
+<td>UI-DEVELOPER</td>
+<td>U</td>
+<td>U</td>
+<td>U</td>
+<td>B</td>
+<td>B</td>
+<td>U</td>
+<td>B</td>
+<td>B</td>
+<td>B</td>
+</tr>
+<tr>
+<td>LIVE-DEVELOPER</td>
+<td>C</td>
+<td>C</td>
+<td>C</td>
+<td>B</td>
+<td>B</td>
+<td>C</td>
+<td>B</td>
+<td>B</td>
+<td>B</td>
+</tr>
+<tr>
+<td>TECHNICAL-WRITER</td>
+<td>U</td>
+<td>U</td>
+<td>U</td>
+<td>B</td>
+<td>B</td>
+<td>U</td>
+<td>B</td>
+<td>B</td>
+<td>B</td>
+</tr>
+<tr>
+<td>TESTER</td>
+<td>D</td>
+<td>D</td>
+<td>U</td>
+<td>B</td>
+<td>B</td>
+<td>D</td>
+<td>B</td>
+<td>B</td>
+<td>B</td>
+</tr>
+<tr>
+<td>READER</td>
+<td>U</td>
+<td>U</td>
+<td>U</td>
+<td>B</td>
+<td>B</td>
+<td>U</td>
+<td>B</td>
+<td>B</td>
+<td>B</td>
+</tr>
+<tr>
+<td>EXPLORER</td>
+<td>U</td>
+<td>U</td>
+<td>U</td>
+<td>B</td>
+<td>B</td>
+<td>U</td>
+<td>B</td>
+<td>B</td>
+<td>B</td>
+</tr>
+<tr>
+<td>MAINTAINER</td>
+<td>U</td>
+<td>U</td>
+<td>U</td>
+<td>B</td>
+<td>B</td>
+<td>U</td>
+<td>B</td>
+<td>B</td>
+<td>B</td>
+</tr>
+</tbody>
+</table>
+<p>D cells derive from the <a href="../evidence/acp-local-preset-2026-09-07.json">single-harness local preset</a>
+and <a href="../evidence/acp-mixed-pipeline-completed-2026-09-06.json">operator-assisted mixed pipeline</a>,
+plus the two accepted <a href="../evidence/acp-cline-ready-2026-09-07.json">Cline domain stages</a>.
+P cells derive from <a href="../evidence/acp-permissions-2026-09-06.json">permission approval</a>
+and pending-permission cancellation above. This is deliberately narrower than
+all roles on all harnesses. G6 and overall modernization are accepted for the
+owner-selected Codex/Claude/Grok scope; other integrations are deferred.</p>
+<p>The offline conversation acceptance case separately exercises all ten agent roles:
+two FIFO user turns share one daemon-owned ACP session, preserve streamed events,
+create no domain result and do not relaunch after an idle restart. All ten cases
+passed on the subprocess fixture. This confirms the common role-independent
+conversation mechanism, not live domain coverage; the matrix above is unchanged.</p>
+<h2 id="public-conversation-restart-and-reconnect-2026-09-07">Public conversation restart and reconnect, 2026-09-07<a class="headerlink" href="#public-conversation-restart-and-reconnect-2026-09-07" title="Permanent link">&para;</a></h2>
+<p><a href="../evidence/acp-public-conversations-2026-09-07.json">Live evidence</a> records six
+scenarios: ARCHITECT-PLANNER and LIVE-DEVELOPER on each tested Codex, Claude and
+Grok installation. The reproducible tool is <code>tools/acp_conversation_probe.py</code>: pass
+<code>--config</code> with a manifest file and <code>--agent</code> with its name. It creates a disposable
+project and uses public <code>chat create</code>, <code>chat send</code>, <code>chat attach --after</code> and
+separate <code>coordd --once</code> processes. It uses model usage and denies permissions.</p>
+<p>Every first reply matched a random token. The next daemon process loaded the same
+ACP session and recalled that token, which the second prompt did not contain.
+Duplicate delivery of the second request ID created no extra turn. Cursor reads
+left the conversation journal unchanged and excluded the first turn's events.
+Both runs completed, their process groups exited, and an idle restart preserved
+runs, results and commands. No domain result was created.</p>
+<p>The subprocess fixture verifies this orchestration and rejects a peer without
+loadSession. Live evidence is specific to synthetic conversations: it does not
+prove domain plan generation, live code editing, mid-turn crash recovery, streaming
+terminal detach, Quick Picks or vendor extensions. C cells therefore remain
+distinct from D cells. Deferred installations still need their recorded access
+or configuration issues resolved before their live campaign resumes.</p>
+<h2 id="cursor-authentication-diagnosis-2026-09-07">Cursor authentication diagnosis, 2026-09-07<a class="headerlink" href="#cursor-authentication-diagnosis-2026-09-07" title="Permanent link">&para;</a></h2>
+<p><a href="../evidence/acp-cursor-auth-diagnosis-2026-09-07.json">Read-only diagnosis</a> matched the
+native debug log to the exact process recorded in the explicit-auth probe. It shows
+<code>cursor_login</code> returned a false login check, started browser authentication and
+waited for its result. Shared-service initialization and successful authentication
+were not reached before the deadline. The installed handler source confirms this
+sequence. No additional authentication or model request was sent for this diagnosis.</p>
+<p>This narrows the earlier timeout to an unfinished login flow. Native <code>status</code>
+reporting cached login is insufficient for this ACP handler. The precise reason
+the cache failed validation remains unknown; credentials, account identities and
+authorization URLs were not exported. A valid completed native login is needed
+before repeating Cursor's session/model/worktree/cancellation scenarios.</p>
+<h2 id="cline-after-native-login-2026-09-07">Cline after native login, 2026-09-07<a class="headerlink" href="#cline-after-native-login-2026-09-07" title="Permanent link">&para;</a></h2>
+<p><a href="../evidence/acp-cline-ready-2026-09-07.json">Fresh Cline 3.0.61 evidence</a> confirms
+exact synthetic replies, model <code>anthropic/claude-sonnet-5</code> and mode <code>act</code> selection,
+streaming cancellation with <code>cancelled</code>, and cancellation while a permission is
+pending without executing the requested write. Public CLI ARCHITECT-PLANNER and
+LIVE-DEVELOPER conversations both preserved the token after a daemon restart,
+used the same loaded session, deduplicated delivery, reconnected by event cursor
+and performed no new work on an idle restart. Process cleanup passed.</p>
+<p>Cline advertises both provider and model selectors in category <code>model</code>. The common
+client previously selected the first entry and rejected the actual model. It now
+finds the unique selector advertising the requested value and rejects ambiguity
+before sending a configuration request. The explicit probe used the already
+configured provider/model; no global account or provider settings changed.</p>
+<p>For managed Cline execution, use the native attached local backend explicitly:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">agents</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">cline</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">transport</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">acp</span>
+<span class="w">    </span><span class="nt">argv</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">env</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">CLINE_SESSION_BACKEND_MODE=local</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">cline</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--acp</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">adapter_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">native-3.0.61</span>
+<span class="w">    </span><span class="nt">harness_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.0.61</span>
+</code></pre></div>
+<p>This is a fragment for <code>coordination/execution.yaml</code>; role bindings remain separate.
+<code>env</code> is a real executable in the argv array, and this non-secret setting affects
+only the launched process. Provider authentication stays in Cline's native settings.
+The backend option is documented in the <a href="https://github.com/cline/cline/blob/main/docs/cli/cli-reference.mdx">Cline CLI reference</a>
+and was verified in the installed executable. Its ACP session factory uses the
+backend selected by that environment variable. The default backend can reuse a
+shared Hub whose environment lacks the current Greatminds run credential. In the
+first task attempt, scoped contract inspection was correctly rejected for missing
+credentials; the run reached its permission deadline without an accepted result.
+The local backend preserved the scoped identity. No credential was added to model
+prompts, shell arguments, or configuration files. Local-backend conversation restart
+and both cancellation scenarios were also repeated successfully.</p>
+<p>The local-backend domain test completed DEVELOPER and TESTER: both typed handoffs
+were applied, both daemon-owned test requests passed, and all six tests passed
+again independently in the task worktree. The reviewer returned <code>-32603</code>; one
+explicit retry returned the native diagnostic “Insufficient balance” for Cline
+Credits. That funding requirement is separate from the now-working login. No
+further model request was sent. This is a <strong>partial pipeline</strong>, not a completed
+review or merge. The task remains in <code>feature_review</code>, its worktree is preserved,
+main is unchanged, all recorded agent/command process groups exited, and another
+daemon process performed no additional work. Twenty-three inspected one-time
+approvals were consumed across these domain attempts; no persistent approval was
+granted. The raw balance and account data are excluded from the evidence file.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

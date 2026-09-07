@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "vscode": "1.92.2",
+  "activation": true,
+  "cliBackend": true,
+  "terminalProcesses": [
+    {
+      "command": "openRunEvents",
+      "argv": [
+        "run",
+        "events",
+        "--follow"
+      ],
+      "processObserved": true
+    },
+    {
+      "command": "openCoordd",
+      "argv": [
+        "coordd",
+        "--verbose"
+      ],
+      "processObserved": true
+    },
+    {
+      "command": "openDashboard",
+      "argv": [
+        "dashboard"
+      ],
+      "processObserved": true
+    }
+  ],
+  "agentRuns": 0,
+  "limits": [
+    "Quick-pick interactions and live ACP chat were not exercised in this host smoke."
+  ],
+  "date": "2026-09-07",
+  "platform": "Linux x86_64",
+  "temporary_profile": true,
+  "cli_path_contains_shell_metacharacters": true,
+  "terminal_cleanup_observed": true
+}

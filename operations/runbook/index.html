@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -563,6 +563,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../getting-started/local-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../getting-started/upgrading/" class="md-nav__link">
         
   
@@ -713,7 +741,7 @@
   <span class="md-ellipsis">
     
   
-    Codex Profiles
+    Agent Manifests and Bindings
   
 
     
@@ -940,6 +968,34 @@
     
   
     Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/contract-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Contract Reference
   
 
     
@@ -1218,10 +1274,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#daemon-agent-auth-checks" class="md-nav__link">
+  <a href="#acp-configuration-and-authentication-checks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Daemon Agent Auth Checks
+        ACP configuration and authentication checks
       
     </span>
   </a>
@@ -1262,10 +1318,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#stuck-driven-turns" class="md-nav__link">
+  <a href="#inspecting-acp-runs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Stuck Driven Turns
+        Inspecting ACP Runs
       
     </span>
   </a>
@@ -1273,10 +1329,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#driven-retry-backoff" class="md-nav__link">
+  <a href="#retries-and-account-admission" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Driven Retry Backoff
+        Retries and Account Admission
       
     </span>
   </a>
@@ -1288,6 +1344,39 @@
     <span class="md-ellipsis">
       
         No-Git Deploy Payloads
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aggregate-local-diagnosis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aggregate local diagnosis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-diagnostic-bundle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local diagnostic bundle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explicit-recovery-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explicit recovery actions
       
     </span>
   </a>
@@ -1557,10 +1646,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#daemon-agent-auth-checks" class="md-nav__link">
+  <a href="#acp-configuration-and-authentication-checks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Daemon Agent Auth Checks
+        ACP configuration and authentication checks
       
     </span>
   </a>
@@ -1601,10 +1690,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#stuck-driven-turns" class="md-nav__link">
+  <a href="#inspecting-acp-runs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Stuck Driven Turns
+        Inspecting ACP Runs
       
     </span>
   </a>
@@ -1612,10 +1701,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#driven-retry-backoff" class="md-nav__link">
+  <a href="#retries-and-account-admission" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Driven Retry Backoff
+        Retries and Account Admission
       
     </span>
   </a>
@@ -1627,6 +1716,39 @@
     <span class="md-ellipsis">
       
         No-Git Deploy Payloads
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aggregate-local-diagnosis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aggregate local diagnosis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-diagnostic-bundle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local diagnostic bundle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explicit-recovery-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explicit recovery actions
       
     </span>
   </a>
@@ -1664,11 +1786,11 @@ directly, or touch heartbeat files manually. The CLI validates role ownership,
 schema fields, transition readiness, intent files, journal lines, and heartbeat
 side effects as one operation.</p>
 <p>Common mutation commands:</p>
-<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>task<span class="w"> </span>new<span class="w"> </span>--stream<span class="w"> </span>product<span class="w"> </span>--kind<span class="w"> </span>feature<span class="w"> </span>--scope<span class="w"> </span>backend<span class="w"> </span>--title<span class="w"> </span><span class="s2">&quot;...&quot;</span>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>task<span class="w"> </span>new<span class="w"> </span>--stream<span class="w"> </span>product<span class="w"> </span>--kind<span class="w"> </span>feature<span class="w"> </span>--scope<span class="w"> </span>backend<span class="w"> </span>--title<span class="w"> </span><span class="s2">"..."</span>
 greatminds<span class="w"> </span>task<span class="w"> </span>append-block<span class="w"> </span>implementation<span class="w"> </span>--id<span class="w"> </span>TASK_ID<span class="w"> </span>--field<span class="w"> </span><span class="nv">files</span><span class="o">=</span>docs/index.md<span class="w"> </span>--field<span class="w"> </span><span class="nv">ready_for_test</span><span class="o">=</span><span class="nb">true</span>
 greatminds<span class="w"> </span>task<span class="w"> </span>mv<span class="w"> </span>TASK_ID<span class="w"> </span>feature_test
-greatminds<span class="w"> </span>inbox<span class="w"> </span>send<span class="w"> </span>ARCHITECT-PLANNER<span class="w"> </span>--kind<span class="w"> </span>ask<span class="w"> </span>--task<span class="w"> </span>TASK_ID<span class="w"> </span>--body<span class="w"> </span><span class="s2">&quot;...&quot;</span>
-greatminds<span class="w"> </span>stand<span class="w"> </span>lease<span class="w"> </span>--task<span class="w"> </span>TASK_ID<span class="w"> </span>--worktree<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>greatminds<span class="w"> </span>worktree<span class="w"> </span>path<span class="w"> </span>TASK_ID<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span>--profile<span class="w"> </span>full-deploy
+greatminds<span class="w"> </span>inbox<span class="w"> </span>send<span class="w"> </span>ARCHITECT-PLANNER<span class="w"> </span>--kind<span class="w"> </span>ask<span class="w"> </span>--task<span class="w"> </span>TASK_ID<span class="w"> </span>--body<span class="w"> </span><span class="s2">"..."</span>
+greatminds<span class="w"> </span>stand<span class="w"> </span>lease<span class="w"> </span>--task<span class="w"> </span>TASK_ID<span class="w"> </span>--worktree<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>greatminds<span class="w"> </span>worktree<span class="w"> </span>path<span class="w"> </span>TASK_ID<span class="k">)</span><span class="s2">"</span><span class="w"> </span>--profile<span class="w"> </span>full-deploy
 greatminds<span class="w"> </span>stand<span class="w"> </span>release<span class="w"> </span>--lease-id<span class="w"> </span>LEASE_ID<span class="w"> </span>--result<span class="w"> </span>pass
 </code></pre></div>
 <p>Authoritative read-only checks:</p>
@@ -1684,10 +1806,24 @@ greatminds<span class="w"> </span>journal<span class="w"> </span>tail
 <p>If a CLI result conflicts with a remembered state or a directory listing, trust
 the CLI.</p>
 <h2 id="fleet-launch-and-environments">Fleet Launch And Environments<a class="headerlink" href="#fleet-launch-and-environments" title="Permanent link">&para;</a></h2>
-<p>Launch the fleet through the environment where greatminds is installed:</p>
-<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>daemon<span class="w"> </span>start
-greatminds<span class="w"> </span>launch<span class="w"> </span>--target<span class="w"> </span>tmux
+<p>Run the ACP daemon in the project environment:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>coordd<span class="w"> </span>--project-dir<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">"</span>
 </code></pre></div>
+<p>Alternatively, install the optional user service once, then start it:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>daemon<span class="w"> </span>install<span class="w"> </span>--project-dir<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">"</span>
+greatminds<span class="w"> </span>daemon<span class="w"> </span>start<span class="w"> </span>--project-dir<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">"</span>
+</code></pre></div>
+<p><code>greatminds launch --target tmux</code> opens daemon/operator surfaces; the VS Code
+and Cursor IDE targets generate ACP workspace tasks. Interactive roles use
+<code>greatminds chat</code>, backed by daemon-owned sessions. Configure role bindings in
+<code>coordination/execution.yaml</code> before dispatch.</p>
+<p>Foreground and service entrypoints apply configured environment layers in this
+order: inherited process environment, <code>.greatminds/PROJECT.env</code>, then the selected
+registration's captured environment. A foreground project with one registration
+uses that registration; multiple registrations require <code>coordd --project NAME</code>.
+An unregistered project uses no captured environment. Both entrypoints validate
+file syntax before starting daemon work. Changes take effect on restart, not
+mid-session. The inherited shell and systemd base environments may still differ.</p>
 <p>Use a stable install for long-running fleets: pipx, <code>uv tool</code>, or a normal
 project venv. The editable development venv is for changing and testing
 greatminds itself. Do not launch a long-running fleet with <code>uv run</code>;
@@ -1696,30 +1832,33 @@ environment and leave broken <code>.pth</code> files after the worktree is delet
 <p>When developing greatminds locally, use an isolated development venv:</p>
 <div class="highlight"><pre><span></span><code><span class="nb">unset</span><span class="w"> </span>VIRTUAL_ENV
 uv<span class="w"> </span>venv<span class="w"> </span>.venv
-uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--python<span class="w"> </span>.venv/bin/python<span class="w"> </span>-e<span class="w"> </span><span class="s1">&#39;.[docs]&#39;</span>
+uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--python<span class="w"> </span>.venv/bin/python<span class="w"> </span>-e<span class="w"> </span><span class="s1">'.[docs]'</span>
 .venv/bin/greatminds<span class="w"> </span>--help
 </code></pre></div>
 <p>After upgrading the package used by the fleet, refresh the running processes:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>update
-greatminds<span class="w"> </span>restart<span class="w"> </span>--bootstrap
 greatminds<span class="w"> </span>agent<span class="w"> </span>status
 </code></pre></div>
-<h2 id="daemon-agent-auth-checks">Daemon Agent Auth Checks<a class="headerlink" href="#daemon-agent-auth-checks" title="Permanent link">&para;</a></h2>
-<p>Before treating a driven Claude failure as a task/FSM stall, check the same
-environment that the daemon will use:</p>
-<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>daemon<span class="w"> </span>doctor<span class="w"> </span>--project-dir<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">&quot;</span>
+<h2 id="acp-configuration-and-authentication-checks">ACP configuration and authentication checks<a class="headerlink" href="#acp-configuration-and-authentication-checks" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>daemon<span class="w"> </span>doctor<span class="w"> </span>--project-dir<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">"</span><span class="w"> </span>--json
+greatminds<span class="w"> </span>run<span class="w"> </span>status<span class="w"> </span>--project-dir<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">"</span>
 </code></pre></div>
-<p>If the report says Claude OAuth credentials are expired and have no refresh
-token, repair the Claude login as the same OS user that runs the daemon:</p>
-<div class="highlight"><pre><span></span><code>claude<span class="w"> </span>setup-token
-<span class="c1"># or</span>
-claude<span class="w"> </span>auth<span class="w"> </span>login
-greatminds<span class="w"> </span>daemon<span class="w"> </span>restart
-</code></pre></div>
-<p>Use <code>greatminds daemon doctor</code> again after the restart. A manual interactive
-<code>claude</code> shell can have extra host-auth environment variables; the daemon must
-capture or inherit the same usable credentials before driven Claude turns will
-work reliably.</p>
+<p>Doctor checks the execution configuration, declared environment references and
+executable availability without launching agents. It does not validate provider
+credentials or establish live ACP compatibility. Run status shows durable
+<code>waiting_auth</code>, <code>waiting_input</code>, failure and dispatch reasons.</p>
+<p>Authenticate using the configured harness's supported login method as the OS
+user that runs the daemon. Then restart the installed service to refresh its
+declared environment, or restart the foreground daemon. Resolve the affected
+run explicitly with <code>greatminds run retry RUN_ID</code> when authentication is ready;
+missing authentication does not trigger an unbounded retry loop. Keep credentials
+out of task files, manifests and diagnostic reports.</p>
+<p><code>greatminds wake-check</code> and <code>greatminds wake-check --json</code> inspect the same
+maintenance gates used by the daemon, even when an execution file is absent.
+<code>ready</code> requires terminal dependencies and task readiness; <code>wrong_terminal</code>
+identifies a dependency that ended in another terminal queue. <code>waiting</code>, <code>cycle</code>,
+<code>live_role_hold</code> and <code>gate_failed</code> explain why the daemon cannot resume a task.
+Inspection does not move tasks; the daemon applies only authorized system resumes.</p>
 <h2 id="court-fix">Court Fix<a class="headerlink" href="#court-fix" title="Permanent link">&para;</a></h2>
 <p>A court fix is a small, direct correction to coordination mechanics or docs
 needed to unblock the fleet. Keep it narrow:</p>
@@ -1728,7 +1867,8 @@ needed to unblock the fleet. Keep it narrow:</p>
    <code>greatminds wake-check</code>, or <code>greatminds gate-check</code>.</li>
 <li>Change only the affected canon, CLI, role doc, or project config.</li>
 <li>Run the closest validation command.</li>
-<li>Restart or bootstrap only the roles that need the new behavior.</li>
+<li>Let active runs finish or explicitly cancel them, then restart the daemon
+   when execution configuration or code changes require it.</li>
 <li>Tell <code>ARCHITECT-PLANNER</code> when product work must be replanned.</li>
 </ol>
 <p>Do not use a court fix to skip queue ownership or review gates.</p>
@@ -1742,7 +1882,7 @@ then restart the daemon and agents from it. Avoid <code>uv run</code> during rec
 call the target environment's <code>greatminds</code> binary directly.</p>
 <h2 id="inspect-stand-lease-deploy">Inspect Stand Lease Deploy<a class="headerlink" href="#inspect-stand-lease-deploy" title="Permanent link">&para;</a></h2>
 <p>Stand work is lease-backed. A holder requests a lease with:</p>
-<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>lease<span class="w"> </span>--task<span class="w"> </span>TASK_ID<span class="w"> </span>--worktree<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>greatminds<span class="w"> </span>worktree<span class="w"> </span>path<span class="w"> </span>TASK_ID<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span>--profile<span class="w"> </span>full-deploy
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>lease<span class="w"> </span>--task<span class="w"> </span>TASK_ID<span class="w"> </span>--worktree<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>greatminds<span class="w"> </span>worktree<span class="w"> </span>path<span class="w"> </span>TASK_ID<span class="k">)</span><span class="s2">"</span><span class="w"> </span>--profile<span class="w"> </span>full-deploy
 </code></pre></div>
 <p><code>coordd</code> handles stand-state changes and deploys the active lease profile. If
 the lease stays in <code>preparing</code>, inspect:</p>
@@ -1751,36 +1891,48 @@ greatminds<span class="w"> </span>watchdog
 </code></pre></div>
 <p>If the stand is down after an infrastructure fix, an operator with global
 stand control runs:</p>
-<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>up<span class="w"> </span>--reason<span class="w"> </span><span class="s2">&quot;recovered ...&quot;</span>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>up<span class="w"> </span>--reason<span class="w"> </span><span class="s2">"recovered ..."</span>
 </code></pre></div>
 <p>The holder releases the lease after product probes:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>stand<span class="w"> </span>release<span class="w"> </span>--lease-id<span class="w"> </span>LEASE_ID<span class="w"> </span>--result<span class="w"> </span>pass
 </code></pre></div>
-<h2 id="stuck-driven-turns">Stuck Driven Turns<a class="headerlink" href="#stuck-driven-turns" title="Permanent link">&para;</a></h2>
-<p>Driven roles do not keep a persistent agent process. <code>coordd</code> creates one turn
-per event and holds <code>.greatminds/.locks/driven-{role}.lock</code> for the duration
-of that turn. New lock files contain JSON metadata such as <code>role</code>, <code>driver</code>,
-<code>started_at</code>, <code>coordd_pid</code>, and <code>log_path</code>.</p>
+<h2 id="inspecting-acp-runs">Inspecting ACP Runs<a class="headerlink" href="#inspecting-acp-runs" title="Permanent link">&para;</a></h2>
+<p>The daemon records queue assignments and conversation runs in
+<code>.greatminds/.runtime/state.json</code>, including process identity, protocol outcome,
+timing and pending controls. Conversation sessions may stay open for further
+operator input. A process or a lock alone does not prove useful task progress.</p>
 <p>Use:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>dashboard<span class="w"> </span>--once
-greatminds<span class="w"> </span>watchdog
+greatminds<span class="w"> </span>run<span class="w"> </span>status
+greatminds<span class="w"> </span>run<span class="w"> </span>doctor<span class="w"> </span>--json
 </code></pre></div>
-<p>If the dashboard shows <code>stuck</code> or watchdog reports <code>STUCK DRIVEN TURNS</code>, treat
-the turn as an infrastructure incident, not normal implementation progress.
-Inspect the named <code>log_path</code>, the matching <code>.pending</code> marker, and coordd logs.
-Do not assume a task is being worked just because a driven lock exists.</p>
-<h2 id="driven-retry-backoff">Driven Retry Backoff<a class="headerlink" href="#driven-retry-backoff" title="Permanent link">&para;</a></h2>
-<p>When a driven turn exits with a rate-limit, timeout, or execution error,
-<code>coordd</code> records retry state in
-<code>.greatminds/.locks/driven-{role}.retry.json</code>. The live scheduler uses this
-state to re-drive the role after backoff and restores it after a coordd
-restart. <code>greatminds dashboard --once</code> shows these roles as <code>backoff</code> or
-<code>failed</code>; <code>greatminds watchdog</code> reports them under <code>DRIVEN RETRIES</code>.</p>
-<p><code>backoff</code> means no turn is running because coordd is intentionally waiting for
-the next retry time. <code>failed</code> means bounded hard retries were exhausted and
-auto-retry stopped after escalation. Inspect the retry detail and the latest
-<code>.turns/&lt;role&gt;-*.log</code>; clear the root cause, then trigger a real queue/inbox
-event so the role gets a fresh attempt.</p>
+<p>Inspect the run's outcome and domain receipts before retrying. Uncertain commands,
+deployments and task mutations require their scoped recovery actions. Cancellation
+uses <code>greatminds run cancel RUN_ID</code>; the daemon verifies and cleans tracked process
+groups before releasing the run.</p>
+<h2 id="retries-and-account-admission">Retries and Account Admission<a class="headerlink" href="#retries-and-account-admission" title="Permanent link">&para;</a></h2>
+<p>Startup retries require evidence that no prompt or earlier protocol activity
+started. They have a finite attempt budget and shared account backoff. Post-prompt
+errors do not automatically replay work. <code>greatminds run status</code> reports task and
+account admission separately; an explicit task retry cannot bypass an account hold.</p>
+<p>For adapters with documented application-specific ACP error codes, a manifest may
+configure <code>account_limit_errors</code> (see <a href="../../concepts/codex-profiles/#explicit-account-limit-signals">manifest reference</a>).
+<code>account_rate_limit</code> blocks new claims and subsequent conversation prompts until
+the configured cooldown expires. <code>account_quota_exhausted</code> requires operator
+resolution. Existing in-flight prompts may finish; no provider/model is switched.
+All bindings sharing the account label in this project use the same durable hold.
+Other projects and differently labeled accounts are independent.</p>
+<p>Inspect <code>accounts</code> and <code>account_holds</code> in <code>run status</code>, or use the exact scoped
+action emitted by <code>run doctor</code>. After independently checking account recovery:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>run<span class="w"> </span>account-resume<span class="w"> </span>ACCOUNT<span class="w"> </span>--hold-id<span class="w"> </span>HOLD_ID<span class="w"> </span>--reason<span class="w"> </span><span class="s2">"recovery checked"</span>
+</code></pre></div>
+<p>The hold identity prevents an older action from clearing a newer signal. Repeating
+the same resolution is idempotent. Resume does not replay failed tasks or user
+turns; decide separately whether to retry the task or enqueue a new message.
+Removing a manifest rule or restarting the daemon does not erase a recorded hold.
+Rate-limit expiry opens admission under normal concurrency limits; it does not
+prove the provider is available. Generic errors and message text never create
+provider quota state.</p>
 <h2 id="no-git-deploy-payloads">No-Git Deploy Payloads<a class="headerlink" href="#no-git-deploy-payloads" title="Permanent link">&para;</a></h2>
 <p>A deployed payload without <code>.git</code> is valid only as a validation target. It is
 not a legal source checkout for backend/UI implementation work that requires
@@ -1790,6 +1942,95 @@ root is not a git repository, <code>greatminds task mv</code> must fail before t
 reaches the implementer. Recover by pointing Greatminds at a real source git
 checkout or initializing the intended source project, then rerun the route.
 Do not reintroduce stale <code>.git</code> pointers into deployed payload directories.</p>
+<h2 id="aggregate-local-diagnosis">Aggregate local diagnosis<a class="headerlink" href="#aggregate-local-diagnosis" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>run<span class="w"> </span>doctor<span class="w"> </span>--project-dir<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">"</span>
+greatminds<span class="w"> </span>run<span class="w"> </span>doctor<span class="w"> </span>--project-dir<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">"</span><span class="w"> </span>--json
+</code></pre></div>
+<p>This read-only report combines schema/mirror inspection, ACP prerequisites,
+current run holds, assignment admission, dependency findings and unresolved
+command/result/maintenance/deployment operations. It reuses the runtime services;
+it does not run a harness, inspect provider login by launching a probe, repair
+state or call systemctl. <code>daemon doctor</code> remains the focused prerequisite check.</p>
+<p>JSON version 1 includes <code>checks</code>, <code>findings</code>, <code>summary</code> and <code>status</code>. Each finding
+has a component, stable code, severity, selected evidence and an operator action.
+A failed component does not hide independent results. <code>unavailable</code> means a
+prerequisite prevented that check, not that the component is healthy. The command
+exits 1 when error findings exist; warnings/info alone exit 0. Inspect the summary
+and findings rather than treating exit 0 as proof of a running healthy daemon.</p>
+<p>Authentication waits, semantic dependency holds, retry delays and uncertain
+operation recovery remain separate findings. Use the suggested detailed command
+before authorizing an operation. Repeating diagnosis does not consume model turns
+or alter project files. Reports omit prompt text, command arguments/output and
+raw exception messages; they retain task/run identifiers and diagnostic codes.</p>
+<p>This report covers the named local checks. It is a best-effort observation across
+stores, not an atomic health verdict or live compatibility test. Stale-task, orphan-intent and orphan-worktree scans use the same functions as
+<code>watchdog</code>. Remote provider availability is not implied by a <code>no_findings</code> result.</p>
+<h2 id="local-diagnostic-bundle">Local diagnostic bundle<a class="headerlink" href="#local-diagnostic-bundle" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>run<span class="w"> </span>doctor<span class="w"> </span>--project-dir<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">"</span><span class="w"> </span>--bundle<span class="w"> </span>/tmp/greatminds-diagnostics.json
+</code></pre></div>
+<p>The command writes a private JSON file locally; it performs no upload. Combine
+<code>--json</code> with <code>--bundle</code> to retain the ordinary machine-readable doctor report
+on stdout. Diagnostic errors still produce a bundle when collection is possible,
+and the command keeps doctor's exit status. Use a new destination filename for
+each export: existing files and symlinks are never replaced. The parent directory
+must exist. Publication is atomic and the file has mode <code>0600</code>.</p>
+<p>The versioned bundle contains installed Greatminds/ACP SDK/Python versions,
+configuration fingerprints and binding limits, selected diagnostic findings,
+recent run states/timings/metrics and event headers. Raw configuration, environment
+values, executable arguments, task bodies, prompts, command output, result
+payloads and event bodies are excluded. Task, run, binding and operation identifiers
+become salted pseudonyms consistent within one bundle; each export uses a fresh
+salt. The salt/mapping is not exported. Fingerprints, timestamps and states remain
+useful diagnostic metadata; this is not a guarantee that a project is unidentifiable.</p>
+<p>Defaults retain up to 100 recent runs, 200 recent events and 200 findings, with
+errors prioritized. Summary counts cover the full report. <code>limits</code> and <code>truncated</code>
+make the selected windows explicit; an unreadable runtime has unknown truncation
+values. Total serialized export is limited to 5 MiB. Collection records
+unavailable components rather than copying malformed raw files. Missing metrics
+stay null. Version labels describe installed libraries, not a live harness probe.</p>
+<p>The bundle and doctor inspection are best-effort observations across stores.
+Collecting a bundle does not pause work, authorize retry or resolve uncertain
+side effects. It includes the named diagnostic checks, not a copy of all project
+history or a proof of live provider compatibility.</p>
+<p>Filesystem findings use the effective schema's queue kinds and watchdog thresholds.
+Parking queues preserve task/worktree association; terminal queues do not hide
+orphan candidates unless worktree policy explicitly retains verified/archived
+task worktrees. A finding is a reason to inspect, not permission to delete a
+worktree or intent. Unreadable directories yield an unavailable/failed component
+instead of an empty healthy result. Files that disappear during a concurrent
+transition are skipped; repeated observation can see the new location.</p>
+<h2 id="explicit-recovery-actions">Explicit recovery actions<a class="headerlink" href="#explicit-recovery-actions" title="Permanent link">&para;</a></h2>
+<p>Applicable <code>run doctor</code> findings include <code>recovery_actions</code> with an argv array,
+project environment/cwd, effect, preconditions and required options. The text
+view prints project-scoped command suggestions. These descriptions do not execute
+repairs. A frontend must preserve the project environment and require the stated
+operator input; command services revalidate their preconditions when invoked.
+No action automatically clears run credentials to gain operator authority.</p>
+<ul>
+<li>Uncertain commands: inspect <code>run command-status REQUEST_ID</code>, then use
+  <code>run command-resolve REQUEST_ID --reason EXPLANATION</code> after inspecting effects.
+  Resolution does not rerun a command or create passing command evidence.</li>
+<li>System maintenance: <code>run repair --operation OPERATION_ID</code> requests daemon
+  reconciliation with revision/dependency/gate rechecks. <code>--abandon --reason</code>
+  cancels only an unresolved, uncommitted intent whose source remains a regular
+  file and destination does not exist. It preserves task files.</li>
+<li>Deployment attempts: inspect <code>stand deployment-status</code>; use
+  <code>stand deployment-recover ATTEMPT_ID</code> for tracked process cleanup when needed.
+  <code>stand deployment-resolve ATTEMPT_ID --reason EXPLANATION</code> requires confirmed
+  cleanup and no live tracked group, and records an operator assessment. It does
+  not deploy or mark the stand ready. Exclusive deployment locking still applies.</li>
+</ul>
+<p>Repeating a completed resolution/abandonment with the same explanation returns
+the original receipt without adding another event. A different explanation is
+rejected rather than rewriting evidence. A repeated requested maintenance repair
+returns the existing prepared/applied receipt; if reconciliation fails again,
+a new explicit request can ask the daemon to recheck corrected conditions.</p>
+<p>Mutating recovery controls reject either <code>GREATMINDS_RUN_ID</code> or
+<code>GREATMINDS_RUN_TOKEN</code>: a partial agent credential is not operator context.
+Other role and deployment controls remain in force. For findings without a
+supported bounded action, inspect the relevant evidence instead of deleting
+state or synthesizing a successful receipt. Diagnostic exports omit executable
+recovery descriptors containing local project paths and raw operation IDs.</p>
 
 
 
@@ -1844,7 +2085,7 @@ Do not reintroduce stale <code>.git</code> pointers into deployed payload direct
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

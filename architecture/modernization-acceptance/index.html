@@ -1,0 +1,1962 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="File-based multi-agent coordination for agent fleets and task pipelines.">
+      
+      
+      
+        <link rel="canonical" href="https://veryviolet.github.io/greatminds/architecture/modernization-acceptance/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Modernization acceptance audit - greatminds</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#modernization-acceptance-audit" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="greatminds" class="md-header__button md-logo" aria-label="greatminds" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            greatminds
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Modernization acceptance audit
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/veryviolet/greatminds" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    veryviolet/greatminds
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../concepts/queues/" class="md-tabs__link">
+          
+  
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../cli-reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  CLI Reference
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../operations/runbook/" class="md-tabs__link">
+          
+  
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../recipes/filing-a-bug/" class="md-tabs__link">
+          
+  
+  
+  Recipes
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../changelog/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="greatminds" class="md-nav__button md-logo" aria-label="greatminds" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    greatminds
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/veryviolet/greatminds" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    veryviolet/greatminds
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/first-project/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    First Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/local-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/upgrading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/queues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/roles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/codex-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Manifests and Bindings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/stand-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stand Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/stand-gate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stand Gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/inbox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inbox
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contract-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Contract Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../filesystem-layout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Filesystem Layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transitions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../daemon-and-agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Daemon and Agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lifecycle Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/runbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runbook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Recipes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Recipes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/filing-a-bug/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Filing a Bug
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/planning-a-feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planning a Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/e2e-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E2E Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/cutting-a-release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cutting a Release
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#foundation-and-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Foundation and execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deterministic-orchestration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deterministic orchestration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#product-requirements-and-deliverables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Product requirements and deliverables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acceptance-work-items-in-execution-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Acceptance work items, in execution order
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-milestone-verdicts-2026-09-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current milestone verdicts, 2026-09-07
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="modernization-acceptance-audit">Modernization acceptance audit<a class="headerlink" href="#modernization-acceptance-audit" title="Permanent link">&para;</a></h1>
+<p>Audited against <a href="../modernization-plan/">the approved plan</a>, starting at commit
+<code>7df519a</code>, on 2026-09-07. This is a delivery audit, not a replacement scope.
+The owner confirmed no production deployment or installed fleet migration is
+required. Project task data and actual crash recovery remain required.
+On 2026-09-07 the owner limited current harness support to Codex, Claude and Grok;
+other integrations are deferred. The verdicts below apply to that explicit scope,
+as recorded in the <a href="../evidence/acceptance-scope-2026-09-07.json">scope decision</a>.</p>
+<p>“Confirmed” below means the named implementation and relevant behavior evidence
+were inspected. It does not turn fixture coverage into live harness coverage.
+“Open” identifies an explicit requirement whose current proof is insufficient.</p>
+<h2 id="foundation-and-execution">Foundation and execution<a class="headerlink" href="#foundation-and-execution" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Inspected implementation/evidence</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F1: isolate service tests, credentials and user configuration</td>
+<td>Test isolation fixture; daemon install/environment suites; full offline traversal</td>
+<td>Confirmed for the isolated suite; no real service installation in fixtures</td>
+</tr>
+<tr>
+<td>F2: one effective schema and pinned in-flight contracts</td>
+<td><code>core/schema.py</code>, runtime contract snapshots; <code>test_schema_snapshot.py</code>, <code>test_domain_results.py::test_context_uses_pinned_tables_without_mutating_global_schema</code></td>
+<td>Confirmed: installed/explicit canon is authoritative; mirrors are inspected without silent replacement</td>
+</tr>
+<tr>
+<td>F3: shared filesystem/FSM operations and task preservation</td>
+<td><code>domain/results.py</code>, <code>domain/maintenance.py</code>, workspace/stand services; actual handoff and recovery fixtures</td>
+<td>Confirmed for managed operations; task identity, block provenance and queue gates persist</td>
+</tr>
+<tr>
+<td>F4: project/task revision/binding/run/session/result identities</td>
+<td><code>runtime/store.py</code>, <code>runtime/interactions.py</code>; atomic competing claims, duplicate events/results and stale-revision rejection</td>
+<td>Confirmed; identity and idempotency records survive event-tail pruning</td>
+</tr>
+<tr>
+<td>F5: filesystem store with atomic publication and crash reconciliation</td>
+<td>Store transactions, launch gates, result/maintenance/deployment journals; injected crash stages</td>
+<td>Confirmed; uncertain external commands are held rather than replayed</td>
+</tr>
+<tr>
+<td>A1: independent manifests, roles, model/mode, permission, workspace and scheduling</td>
+<td><code>runtime/config.py</code>; <code>project execution</code>, <code>daemon doctor</code>; capability/auth/model confirmation tests</td>
+<td>Confirmed configuration separation. Version labels describe declared tested installations; doctor does not claim live compatibility</td>
+</tr>
+<tr>
+<td>A1: versioned compatibility deliverable</td>
+<td><a href="../acp-compatibility/">Compatibility campaign</a>, adapter package lock and dated JSON evidence</td>
+<td>Present; remaining live combinations are explicitly open under A4</td>
+</tr>
+<tr>
+<td>A2: common SDK stdio lifecycle and request correlation</td>
+<td><code>runtime/acp_transport.py</code>, ACP SDK 0.11.1; real subprocess negotiation, ordered updates, disconnect, cancellation and cleanup tests</td>
+<td>Confirmed for implemented protocol surface</td>
+</tr>
+<tr>
+<td>A2: permission callbacks, path policy and explicit waiting</td>
+<td><code>runtime/permissions.py</code>, supervisor; pending/answered/denied/expired/stale/crash fixtures and live callback evidence</td>
+<td>Confirmed. Filesystem/terminal callbacks are not advertised; unavailable methods fail explicitly</td>
+</tr>
+<tr>
+<td>A2: normalized protocol diagnostics with bounded raw evidence</td>
+<td>Bounded <code>run.protocol</code> negotiation/tool/error/stop facts, private summary export; real supervisor privacy/saturation/crash fixtures and delayed-update RPC-error regression</td>
+<td>Confirmed G1: managed-path evidence, with no raw payloads or transcripts</td>
+</tr>
+<tr>
+<td>A3: two upstream bridges and a native ACP implementation on one client</td>
+<td>Codex + Claude bridges and native Grok; <a href="../evidence/acp-mixed-pipeline-completed-2026-09-06.json">completed mixed pipeline</a>, lifecycle/permission evidence</td>
+<td>Confirmed tested versions and completed local pipeline; no cross-harness history transfer claimed</td>
+</tr>
+<tr>
+<td>A4: Codex/Claude/Grok distribution, auth, session, worktree, model and cancellation</td>
+<td>Per-stage <a href="../acp-compatibility/">campaign evidence and role matrix</a>; completed mixed pipeline and lifecycle/permission checks on all three</td>
+<td>Confirmed for current scope; other integrations deferred by owner, not marked supported</td>
+</tr>
+<tr>
+<td>A5: daemon-owned interactive prompts, streamed output, permission, reconnect and interrupt</td>
+<td>Conversation FIFO, task-bound claims, shared broker; <code>test_acp_conversations.py</code>, <code>test_chat_tasks.py</code>, <code>test_chat_terminal.py</code></td>
+<td>Confirmed fixture coverage plus public CLI restart/recall/cursor scenarios for planner and live developer on Codex/Claude/Grok/Cline; live coverage remains narrower than all roles/harnesses</td>
+</tr>
+<tr>
+<td>A5: common tmux/VS Code surfaces and removal of native dispatch</td>
+<td><code>runtime/frontends.py</code>, thin <code>cli/coordd.py</code>, extension CLI terminals; launch tests and <a href="../evidence/vscode-extension-host-2026-09-07.json">real extension host</a></td>
+<td>Confirmed managed execution routes through ACP; host smoke does not exercise Quick Picks or live chat</td>
+</tr>
+</tbody>
+</table>
+<h2 id="deterministic-orchestration">Deterministic orchestration<a class="headerlink" href="#deterministic-orchestration" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Inspected implementation/evidence</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>B1: claims, supervision, cancellation, startup/periodic reconciliation, process trees</td>
+<td><code>runtime/daemon.py</code>, <code>supervisor.py</code>, <code>processes.py</code>; exclusive-supervisor, launch-gate, surviving-child and stale-identity fixtures</td>
+<td>Confirmed on the documented Linux host interface</td>
+</tr>
+<tr>
+<td>B1: bounded retries and no-progress policy</td>
+<td><code>retry_policy.py</code>, durable run state; startup/account/no-progress suites</td>
+<td>Confirmed for startup failures and unchanged task turns</td>
+</tr>
+<tr>
+<td>B1: provider/account limits do not cause independent retry storms</td>
+<td>Pinned manifest error-code rules, durable project/account holds, atomic claim admission and subsequent conversation prompt checks</td>
+<td>Confirmed G4 for explicitly configured ACP application codes: bounded cooldown or operator-resolved quota hold. Generic error prose cannot trigger quota state; no built-in live harness code mapping is claimed</td>
+</tr>
+<tr>
+<td>B2: known maintenance, dependency release, impossible dependencies/cycles</td>
+<td>Shared dependency verdicts and journaled SYSTEM maintenance; missing/cyclic/changed/live-role fixtures and installed smoke</td>
+<td>Confirmed; ordinary dependency release invokes zero agents</td>
+</tr>
+<tr>
+<td>B2: dead-holder leases, cleanup, log retention and deduplicated findings</td>
+<td>Lease/deployment recovery, <code>filesystem_health.py</code>, <code>event_retention.py</code>, maintenance finding fingerprints</td>
+<td>Confirmed specified local behavior; evidence/task/conversation records are preserved and external systemd logs use host policy</td>
+</tr>
+<tr>
+<td>B2: maintainer limited to semantic diagnostic work</td>
+<td>Shared schema marks maintainer on demand and forbids polling/recovery loops; public CLI has no journal-to-agent wake dispatcher</td>
+<td>Confirmed instructions and scheduling contract; journal records are preserved while SYSTEM releases dependencies without reviewer/inbox wake effects</td>
+</tr>
+<tr>
+<td>B3: concrete assignment, role/task/gates/results/artifacts and pinned context</td>
+<td><code>context.py</code>, <code>RunStore.contracts</code>, CLI contract inspection and scoped commands</td>
+<td>Confirmed; roles receive their assignment rather than scanning queues</td>
+</tr>
+<tr>
+<td>B3: compatible session resume and changed-contract handling</td>
+<td>Supervisor session selection and conversation acquire/revision checks; load/mismatch/task-change tests</td>
+<td>Confirmed; changed contracts/revisions do not silently consume pending input</td>
+</tr>
+<tr>
+<td>B3: prompt size, useful-work time and turns against baseline</td>
+<td>Input reservations, run stages, queue/accepted-transition waits, preparation/receipt timing; original and installed ACP productive comparisons</td>
+<td>Confirmed G3 measurement scope: bytes are not billed tokens; original native median 4.685 s/5 calls, optimized ACP 8.354 s/3 calls. Native latency regression remains a documented limitation</td>
+</tr>
+<tr>
+<td>B4: typed results, gates, idempotency and SYSTEM provenance</td>
+<td>Result envelopes/service, shared CLI validators; crash-point, duplicate, dynamic-gate and invented-authorship tests</td>
+<td>Confirmed; prompt completion alone cannot verify a task</td>
+</tr>
+<tr>
+<td>B4: dependency and human-input decisions</td>
+<td>Typed blocked/needs_input records, mechanical dependency release; needs-input leaves task unmoved</td>
+<td>Confirmed domain behavior; optional protocol extensions are not inferred from prose</td>
+</tr>
+<tr>
+<td>B5: worktrees, command execution, evidence, stands and explicit deployment authority</td>
+<td>Workspace/command/stand services; real unit commands and merge; profile authorization and evidence freshness tests</td>
+<td>Confirmed local fixtures and local live pipeline. This does not claim a live external deployment campaign</td>
+</tr>
+<tr>
+<td>B5: recovery before retry of uncertain external actions</td>
+<td>Durable intents, cleanup proof, explicit resolution, no-replay tests</td>
+<td>Confirmed bounded local recovery; exactly-once shell execution is not promised</td>
+</tr>
+</tbody>
+</table>
+<h2 id="product-requirements-and-deliverables">Product requirements and deliverables<a class="headerlink" href="#product-requirements-and-deliverables" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Inspected implementation/evidence</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C1: shared operator state, assignment reasons and controls</td>
+<td><code>observation.py</code>, <code>diagnostics.py</code>, run/chat commands, dashboard/frontend tests</td>
+<td>Confirmed state/identity/control surfaces, including G1 managed protocol facts</td>
+</tr>
+<tr>
+<td>C2: minimal local and explicit fuller/UI/docs/deployed rosters with independent review</td>
+<td><code>presets.py</code>, public setup/preset CLI; <a href="../evidence/acp-local-preset-2026-09-07.json">one live Codex task</a> and <a href="../evidence/installed-local-preset-2026-09-07.json">installed wheel</a></td>
+<td>Confirmed representative fresh repository, one harness, three independent role runs, no stand, real checks and merge. The fixture supplies its plan</td>
+</tr>
+<tr>
+<td>C3: explicit initialization/preflight/services/configuration; preserve customizations and hooks</td>
+<td>Bootstrap/service/environment tests; installed idempotent setup and interrupted-operation fixtures</td>
+<td>Confirmed current cutover scope; no fleet migration or rollback deliverable required</td>
+</tr>
+<tr>
+<td>C4: concurrency/time/retry/no-progress/context limits; never switch provider to fit budget</td>
+<td>Binding/project/account limits, input reservations and deadline/cancellation tests</td>
+<td>Confirmed implemented limits and unknown provider values</td>
+</tr>
+<tr>
+<td>C4: optional reliable usage budgets, reported/estimated/billed distinction</td>
+<td>Bounded SDK-decoded observations, explicit currency/cost limits, durable prompt boundaries and cost continuity; real cancellation and loaded-conversation fixtures</td>
+<td>Confirmed G2 for reactive reported session cost. Ambiguous token scope remains unknown and cannot drive an automatic token budget; no billing estimate or hard spending guarantee</td>
+</tr>
+<tr>
+<td>C4: complete timing and measured performance improvement</td>
+<td><a href="../evidence/daemon-idle-2026-09-07.json">Idle benchmark</a>, original baseline, <a href="../evidence/continuous-acp-optimization-2026-09-07.json">continuous ACP optimization</a></td>
+<td>Confirmed bounded measurements: ACP median 10.950→8.354 s after import/parse optimization; original native remains faster. No universal speed guarantee; all three useful role stages remain</td>
+</tr>
+<tr>
+<td>C5: aggregate stable findings, scoped repair, private bundle and no model turn</td>
+<td>Doctor/bundle suites; public doctor → exact emitted command resolution → repeat diagnosis; account hold repair cycle; maintenance/deployment recovery fixtures</td>
+<td>Confirmed G7 concrete fault cycles with unchanged task data, idempotent resolution, no command/agent execution and no implicit retry</td>
+</tr>
+<tr>
+<td>C6: run-bound authority, stale/wrong-role rejection, explicit trust boundary</td>
+<td>Token/revision/role/workspace checks; domain/command/permission tests</td>
+<td>Confirmed cooperative shared-filesystem boundary; no OS isolation claim</td>
+</tr>
+<tr>
+<td>C7: maintainable service boundaries, package examples and release evidence</td>
+<td>Runtime/domain services; source and wheel scenarios; current changelog updated by this audit</td>
+<td>Present and exercised; shared CLI validators, PEP 440 package ordering and current canonical setup declarations are verified</td>
+</tr>
+<tr>
+<td>C7: generated mechanical reference from validated contracts</td>
+<td><a href="../contract-reference/">Generated reference</a>, exact-text <code>--check</code>, role/queue/validator checks, all presets through execution validation</td>
+<td>Confirmed G5: deterministic source fingerprints and drift tests; installed-wheel generation matches on Python 3.11/3.12/3.13; CI/docs/release workflows enforce the check</td>
+</tr>
+<tr>
+<td>C7: real extension-host smoke</td>
+<td><a href="../evidence/vscode-extension-host-2026-09-07.json">VS Code 1.92.2 evidence</a>, isolated launcher, process argv/cleanup assertions</td>
+<td>Confirmed limited host smoke, distinct from mock UI tests</td>
+</tr>
+<tr>
+<td>C8: local operation, evidence, recovery and optional integrations; documented host envelope</td>
+<td>Filesystem runtime, base-wheel fixture, installed docs/README corrected to Linux <code>/proc</code> + pidfd</td>
+<td>Confirmed current host/scope statement; native macOS/Windows daemon support is not claimed</td>
+</tr>
+<tr>
+<td>Next phase: local web workspace</td>
+<td>Agreed plan explicitly places it after modernization</td>
+<td>Deferred as requested; no database migration, distributed scheduler or automatic model selection introduced</td>
+</tr>
+</tbody>
+</table>
+<h2 id="acceptance-work-items-in-execution-order">Acceptance work items, in execution order<a class="headerlink" href="#acceptance-work-items-in-execution-order" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>G1 — managed protocol diagnostics: implemented and verified.</strong> The normal
+   supervisor records bounded negotiation/tool/error/stop facts, with private
+   bundle summaries. Real subprocess fixtures prove secret exclusion, trace
+   saturation with terminal error preserved, durable recovery, atomic failure and
+   ordered draining of updates before an RPC error.</li>
+<li><strong>G2 — reliable usage and budgets: implemented and verified.</strong> Context
+   occupancy, unknown-scope token samples and reported cumulative cost remain
+   distinct. Optional cost limits require an explicit currency. Real subprocess
+   fixtures verify cancellation at the limit, missing/invalid/regressed/currency-
+   changing reports and loaded-session continuity. Durable pending markers retain
+   crash uncertainty; retry cannot reset cost. The pinned schema contradicts
+   itself about token scope, so these samples cannot support a token budget.
+   Cost limits are reactive and allow one bootstrap prompt for a new session;
+   they do not promise a hard spending cap.</li>
+<li><strong>G3 — task timing and comparison: implemented and measured.</strong> Queue wait,
+   preparation, accepted progress and result resolution are recorded separately
+   from first model activity. Real pipeline and crash/retry fixtures exercise them.
+   A <a href="../evidence/productive-pipeline-2026-09-07.json">productive comparison</a> on
+   independently installed modernization checkpoints measured 1145→355 median
+   runtime reads and 17.097→16.567 s wall time with identical task fixtures.
+   The <a href="../evidence/original-pipeline-2026-09-07.json">original continuous-daemon comparison</a>
+   measured native median 4.685 s versus ACP 10.597 s, with five versus three
+   agent calls. A subsequent <a href="../evidence/continuous-acp-optimization-2026-09-07.json">six-run optimization campaign</a>
+   measured ACP median 10.950→8.354 s (23.7% lower) after deferring command-client
+   SDK imports and caching verified schema parsing. Gates and recovery assertions
+   remain intact. This closes the finite measurement/optimization item; native
+   latency remains lower. These fixture timings do not measure inference, billing
+   or model quality, and profiling samples are excluded from comparisons.</li>
+<li><strong>G4 — account admission for explicit quota signals: implemented and verified.</strong>
+   <code>account_limit_errors</code> maps at most 16 nonreserved ACP application codes using
+   the reporting run's pinned manifest. Rate-limit cooldowns are 1..86400 seconds;
+   quota exhaustion requires explicit operator resolution. Shared holds block
+   all new claims and later conversation prompts for the same project/account.
+   Retry, configuration edits and restart do not erase them. Concurrent signals
+   cannot shorten holds; new hold identities invalidate stale resume actions.
+   Real ACP fixtures cover initialization/prompt signals, generic-error rejection,
+   secret exclusion and restart without another launch. No provider prose parsing,
+   credential inference, model switching or implicit live harness mapping exists.
+   An <a href="../evidence/account-admission-2026-09-07.json">independently installed base-wheel fixture</a>
+   confirms restart admission, explicit CLI resume and stale-action rejection.</li>
+<li><strong>G5 — generated contract reference: implemented and verified.</strong>
+   <code>tools/generate_contract_reference.py</code> emits complete role declarations, queue
+   and transition tables, declared SYSTEM operations, run states, normalized record
+   fields/defaults and validated examples of all presets. Unknown references or
+   unregistered requirement validators fail generation. <code>--check</code> detects missing
+   or stale output without rewriting it; source fingerprints include the validators
+   and controllers behind declarations. The reference deliberately distinguishes
+   record fields from the full input-validation grammar and dynamic domain gates.
+   <a href="../evidence/contract-reference-2026-09-07.json">Installed-wheel evidence</a> confirms
+   reproducibility on Python 3.11/3.12/3.13 and real offline pipelines on 3.11/3.12.
+   CI, documentation and release workflows check drift. Two actual CI smoke steps
+   validate the current packaged resources and fresh project setup contract.</li>
+<li><strong>G7 — combined repair acceptance: verified.</strong>
+   <code>test_aggregate_repair_cycle.py</code> invokes public <code>run doctor --json</code>, executes
+   the exact emitted command-resolution argv/environment/cwd, repeats resolution
+   and diagnosis, and checks task bytes, runtime idempotence, absent executor/command
+   effects and absence of implicit retry. The injected missing-completion fault
+   is acknowledged, not converted to passing evidence. The account-limit suite
+   additionally exercises the aggregate doctor → scoped resume → repeat diagnosis
+   cycle and rejection of stale identities and agent credentials.</li>
+<li><strong>G6 — accepted for the selected three harnesses.</strong> Codex, Claude and Grok
+   have a completed mixed domain pipeline, declared role coverage and live
+   session/worktree/lifecycle/permission evidence. Public planner/live-developer
+   conversations passed recall after daemon restart, duplicate delivery and cursor
+   reconnect on all three. Generic role assignment is separately verified by the
+   all-role subprocess fixtures. This does not claim live domain execution of every
+   role/harness combination or optional protocol extension parity.</li>
+</ol>
+<p>The owner deferred Qwen, Kimi, Cline, Gemini, OpenHands and Cursor. Their recorded
+   access/configuration issues and Cline's insufficient Credits remain prerequisites
+   for a later campaign. Cline's two accepted domain roles and lifecycle checks are
+   retained as partial evidence, not a completed three-role pipeline.</p>
+<h2 id="current-milestone-verdicts-2026-09-07">Current milestone verdicts, 2026-09-07<a class="headerlink" href="#current-milestone-verdicts-2026-09-07" title="Permanent link">&para;</a></h2>
+<p>The <a href="../evidence/acceptance-local-audit-2026-09-07.json">post-audit local checks</a> cover
+source commit <code>7017c94</code>: 1543 Python tests passed without skips. Fresh installed
+wheels on Python 3.11/3.12/3.13 passed all 25 public-command help checks, packaged
+resources, repeated setup with preserved configuration/git hook and generated
+reference matching. The installed 3.13 fixture pipeline completed three roles,
+three daemon-owned checks, six independent tests, merge and restart without new
+work. Strict documentation and six directly reported extension fixture cases
+passed. A temporary negative extension test confirmed runner failure propagation.
+These checks do not claim a full Python suite on 3.11/3.12 or new live inference.</p>
+<table>
+<thead>
+<tr>
+<th>Milestone</th>
+<th>Verdict</th>
+<th>Evidence boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>M0 — baseline</td>
+<td>Confirmed</td>
+<td>Isolated local suite and canonical-contract checks</td>
+</tr>
+<tr>
+<td>M1 — execution contract</td>
+<td>Confirmed</td>
+<td>Atomic identities, claims, stale rejection and crash fixtures</td>
+</tr>
+<tr>
+<td>M2 — common ACP path</td>
+<td>Confirmed for tested integrations</td>
+<td>Codex, Claude and native Grok pipeline/lifecycle/permission evidence; Cline lifecycle plus developer/tester completion</td>
+</tr>
+<tr>
+<td>M3 — unattended mechanics</td>
+<td>Confirmed</td>
+<td>SYSTEM dependency release, recovery, bounded admission and zero-agent idle/maintenance checks</td>
+</tr>
+<tr>
+<td>M4 — domain completion</td>
+<td>Confirmed locally</td>
+<td>Typed results, automatic evidence, review gates and recovery; no external deployment claim</td>
+</tr>
+<tr>
+<td>M5 — role and harness coverage</td>
+<td>Confirmed for current scope</td>
+<td>Declared matrix, completed Codex/Claude/Grok mixed pipeline and interactive lifecycle proof; other integrations deferred</td>
+</tr>
+<tr>
+<td>M6 — cutover</td>
+<td>Confirmed</td>
+<td>Common public ACP paths and fresh package/setup checks; no installed-fleet migration required</td>
+</tr>
+<tr>
+<td>M7 — product refinement</td>
+<td>Confirmed within stated limits</td>
+<td>Local preset, reactive budgets, measured optimization and documented Linux/local scope</td>
+</tr>
+</tbody>
+</table>
+<p>The source audit also checked canonical setup declarations, public command
+registration and update ordering. Queue reconciliation belongs to the daemon,
+visual templates are optional presentation, and Python package updates use PEP 440
+for both preview and action. Supporting source changes and their behavioral
+regressions are recorded in the plan.</p>
+<p>Overall modernization is <strong>complete for the owner-approved Codex/Claude/Grok
+scope</strong>. A4/G6/M5 is accepted on the existing mixed and interactive evidence;
+deferring other harnesses does not erase their prerequisites or imply untested
+compatibility. No deployment, all-role Cartesian live campaign or optional vendor
+extension parity is claimed. The local web workspace can now be developed as the
+next phase on top of the completed daemon/domain contract.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

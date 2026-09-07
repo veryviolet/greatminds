@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -29,7 +29,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -561,6 +561,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../getting-started/local-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../getting-started/upgrading/" class="md-nav__link">
         
   
@@ -711,7 +739,7 @@
   <span class="md-ellipsis">
     
   
-    Codex Profiles
+    Agent Manifests and Bindings
   
 
     
@@ -938,6 +966,34 @@
     
   
     Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/contract-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Contract Reference
   
 
     
@@ -1408,6 +1464,91 @@
 <p>All notable changes to <strong>greatminds</strong> are documented here. Format follows
 <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a> loosely; versions
 follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
+<h2 id="300-2026-09-07">3.0.0 — 2026-09-07<a class="headerlink" href="#300-2026-09-07" title="Permanent link">&para;</a></h2>
+<h3 id="upgrade-notes">Upgrade notes<a class="headerlink" href="#upgrade-notes" title="Permanent link">&para;</a></h3>
+<ul>
+<li>This is a major release with an ACP-only execution contract. Configure harness
+  manifests and role bindings in <code>coordination/execution.yaml</code>; vendor-native
+  driven execution is no longer supported. See the upgrading guide and local
+  web workspace documentation. Harness authentication remains host-managed.</li>
+</ul>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<ul>
+<li>All managed background and interactive execution uses the shared ACP client.
+  Harness manifests, role bindings, model/mode choices, permissions and scheduling
+  are independent. Native drivers, TUI keystroke control and vendor setup assets
+  have been removed. Existing project task data is preserved.</li>
+<li>Setup creates the common project contract and queues, preserves customization,
+  and leaves harness authentication and service installation explicit. Ansible
+  dependencies are optional through <code>greatminds[stands]</code>.</li>
+<li>The supported managed host is Linux with <code>/proc</code> and pidfd operations. Service
+  installation, tmux, VS Code and deployed stands are optional integrations.</li>
+<li>
+<p>Command request/status clients defer ACP SDK loading until execution/evidence
+  validation needs it. Result and maintenance controllers reuse parsed schema
+  text while retaining pinned-file verification and isolated document views.</p>
+</li>
+<li>
+<p>Queue dispatch and dependency release are daemon-owned. The journal replay hook
+  that asked agents to scan queues and rerun mechanical checks has been removed;
+  existing journal and inbox data remain intact.</p>
+</li>
+<li>Update preview, upgrade admission and installed-version verification now use
+  PEP 440. Final releases after prereleases and post-releases compare correctly;
+  invalid versions fail before installation, and epoch/major changes require
+  explicit acknowledgement.</li>
+<li>Canonical configuration describes current ACP setup. Unused vendor marketplace
+  and automatic-update settings are removed; visual markers are optional display
+  templates, not instructions for agent housekeeping.</li>
+</ul>
+<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Local web workspace via <code>greatminds web --port PORT</code>: interactive-role tabs,
+  persistent conversations, dashboards, task queues, execution settings and
+  batch-run inspection. The packaged server has no application authentication.</li>
+<li>
+<p>Bounded public ACP activity journals and verified command-output previews.
+  Browser controls share daemon permissions, cancellation and dispatch state.</p>
+</li>
+<li>
+<p>Durable run identities, exclusive claims, launch gates, bounded process cleanup,
+  timeout/cancellation controls, startup/account backoff, no-progress limits and
+  client-input budgets. Prompt completion never substitutes for domain evidence.</p>
+</li>
+<li>Explicit ACP application-error rules for shared project/account cooldowns and
+  quota holds. New claims and subsequent conversation prompts respect the hold;
+  scoped, idempotent operator resume never retries a task or changes credentials.</li>
+<li>Daemon-applied typed results, configured validation commands, workspace cleanup,
+  stand scheduling and deployment receipts. Interrupted non-idempotent commands
+  remain held for reconciliation rather than being replayed automatically.</li>
+<li>Deterministic dependency release, recovery controls, aggregate local diagnosis,
+  scoped recovery suggestions and private diagnostic bundles. Runtime event tails
+  have configurable retention with explicit cursor-gap notifications; task and
+  recovery records remain durable.</li>
+<li>Daemon-owned conversations with queued user messages, permissions, attach,
+  interrupt and close. Terminal and VS Code frontends call the common CLI.</li>
+<li>Explicit local, UI, documentation, deployed and full role presets. The local
+  workflow keeps separate developer, tester and reviewer roles on one manifest.</li>
+<li>Execution-stage observations and a reproducible idle-daemon benchmark. Missing
+  provider usage/cost remains unknown; recorded client bytes are not billed tokens.</li>
+</ul>
+<h3 id="verification">Verification<a class="headerlink" href="#verification" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Offline fixtures cover protocol lifecycle, competing claims, stale submissions,
+  permissions, crash/restart boundaries, deployment uncertainty, bounded retries,
+  input/event limits and dependency release without model turns.</li>
+<li>The compatibility evidence separately records initialization, session creation,
+  real prompts, permission callbacks, restart/load and cancellation. Codex, Claude
+  and Grok completed a mixed-agent local pipeline; Codex also completed the local
+  preset through developer/tester/reviewer and daemon merge.</li>
+<li>Fresh base-wheel environments completed local preset and dependency fixtures
+  without the stands extra. A real VS Code 1.92.2 extension host exercised CLI
+  metadata and terminal-process cleanup with literal paths containing spaces.</li>
+<li>Live compatibility is not established for every listed harness. Cline's current
+  prompt probe requires renewed authentication; the compatibility matrix records
+  authentication/session limitations for the remaining installations. See
+  <code>docs/architecture/acp-compatibility.md</code> and its versioned evidence files.</li>
+</ul>
 <h2 id="278-2026-06-29">2.7.8 — 2026-06-29<a class="headerlink" href="#278-2026-06-29" title="Permanent link">&para;</a></h2>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
@@ -1528,7 +1669,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
   the real daemon/profile failure modes.</li>
 </ul>
 <h2 id="270-2026-06-26">2.7.0 — 2026-06-26<a class="headerlink" href="#270-2026-06-26" title="Permanent link">&para;</a></h2>
-<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Stand deploy failures are now lease-scoped instead of globally downing the
   singleton stand. A non-zero profile run fails the active lease, records
@@ -1584,7 +1725,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
   reported missing LLM settings for the machine.</li>
 </ul>
 <h2 id="250-2026-06-18">2.5.0 — 2026-06-18<a class="headerlink" href="#250-2026-06-18" title="Permanent link">&para;</a></h2>
-<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Added a Node.js VS Code extension test harness that mocks the VS Code API,
   verifies CLI invocation, validates the Agent Tools tree provider, and checks
@@ -1600,7 +1741,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
   <code>GREATMINDS_CURSOR_CPU</code>, and <code>GREATMINDS_CURSOR_SLICE</code>.</li>
 </ul>
 <h2 id="240-2026-06-18">2.4.0 — 2026-06-18<a class="headerlink" href="#240-2026-06-18" title="Permanent link">&para;</a></h2>
-<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
+<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Added a machine-readable agent tool capability registry exposed through
   <code>greatminds agent tools</code> and <code>greatminds agent tools --json</code>.</li>
@@ -1622,7 +1763,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
   project even when invoked from another working directory.</li>
 </ul>
 <h2 id="210-2026-06-15">2.1.0 — 2026-06-15<a class="headerlink" href="#210-2026-06-15" title="Permanent link">&para;</a></h2>
-<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
+<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Added <code>greatminds driven-log</code>, a read-only chronological event stream for
   driven-agent turns. Fresh tmux fleets now include a role-less <code>logs</code> pane
@@ -1704,7 +1845,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
   payload probe, and stand release back to <code>free</code>.</li>
 </ul>
 <h2 id="200-2026-06-13">2.0.0 — 2026-06-13<a class="headerlink" href="#200-2026-06-13" title="Permanent link">&para;</a></h2>
-<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
+<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Clean v2 FSM/autonomy baseline.</strong> Driven roles now expose retry/backoff
   state on disk, restore retry state after coordd restart, fail fast on missing
@@ -1771,7 +1912,7 @@ follow <a href="https://semver.org/">SemVer</a> once 1.0.0 ships.</p>
 </ul>
 <h2 id="167-2026-06-05">1.6.7 — 2026-06-05<a class="headerlink" href="#167-2026-06-05" title="Permanent link">&para;</a></h2>
 <p>Host-agnostic stand deploys + autonomous backlog recovery.</p>
-<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
+<h3 id="changed_3">Changed<a class="headerlink" href="#changed_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>greatminds no longer owns host topology.</strong> <code>execute_yaml_profile</code> hands
   the WHOLE <code>coordination/PROJECT.env</code> (plus lease meta) to ansible as
@@ -2011,7 +2152,7 @@ two runs to converge) when a foreign virtualenv was on PATH.</p>
   session.</li>
 </ul>
 <h2 id="1511-2026-06-04">1.5.11 — 2026-06-04<a class="headerlink" href="#1511-2026-06-04" title="Permanent link">&para;</a></h2>
-<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">&para;</a></h3>
+<h3 id="added_4">Added<a class="headerlink" href="#added_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>greatminds task list &lt;queue&gt; --json</code>.</strong> <code>task list</code> only printed
   filenames; an agent inspecting a queue (a codex PLANNER hit this) has
@@ -2051,7 +2192,7 @@ two runs to converge) when a foreign virtualenv was on PATH.</p>
   a fleet on another branch: put <code>worktrees: { default_branch: &lt;branch&gt; }</code>
   in <code>coord.yaml</code>.</li>
 </ul>
-<h3 id="added_4">Added<a class="headerlink" href="#added_4" title="Permanent link">&para;</a></h3>
+<h3 id="added_5">Added<a class="headerlink" href="#added_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>greatminds migrate</code></strong> + <strong><code>greatminds update</code> now migrates the whole
   project.</strong> Previously <code>update</code> bumped the package but left the project's
@@ -2070,7 +2211,7 @@ two runs to converge) when a foreign virtualenv was on PATH.</p>
 </ul>
 <h2 id="158-2026-06-04">1.5.8 — 2026-06-04<a class="headerlink" href="#158-2026-06-04" title="Permanent link">&para;</a></h2>
 <p>Feature: configurable worktree base/merge branch.</p>
-<h3 id="added_5">Added<a class="headerlink" href="#added_5" title="Permanent link">&para;</a></h3>
+<h3 id="added_6">Added<a class="headerlink" href="#added_6" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>worktrees.default_branch</code></strong> (default <code>main</code>). The per-task worktree
   merge was hardcoded to <code>main</code> — <code>worktree_merge</code> did <code>git checkout
@@ -2086,7 +2227,7 @@ two runs to converge) when a foreign virtualenv was on PATH.</p>
 <h2 id="157-2026-06-04">1.5.7 — 2026-06-04<a class="headerlink" href="#157-2026-06-04" title="Permanent link">&para;</a></h2>
 <p>Canon: insist on full-contract reading, add a no-code stand-verification
 FSM path, and a read-only PROJECT.md surface.</p>
-<h3 id="added_6">Added<a class="headerlink" href="#added_6" title="Permanent link">&para;</a></h3>
+<h3 id="added_7">Added<a class="headerlink" href="#added_7" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>plan.verify_only</code> → <code>feature_plan → feature_test</code>.</strong> A no-code
   stand/playbook task (e.g. "deploy the full stand by profile X",
@@ -2104,7 +2245,7 @@ FSM path, and a read-only PROJECT.md surface.</p>
   agents to read PROJECT.md, but it lives under <code>coordination/</code> and the
   mutations-via-CLI rule left no sanctioned CLI to obtain it.</li>
 </ul>
-<h3 id="changed_3">Changed<a class="headerlink" href="#changed_3" title="Permanent link">&para;</a></h3>
+<h3 id="changed_4">Changed<a class="headerlink" href="#changed_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>bootstrap.md now insists on reading the contract IN FULL.</strong> The old
   wording ("YOUR contract is <code>roles.&lt;ROLE&gt;</code>") let agents — codex
@@ -2154,7 +2295,7 @@ FSM path, and a read-only PROJECT.md surface.</p>
 </ul>
 <h2 id="154-2026-06-04">1.5.4 — 2026-06-04<a class="headerlink" href="#154-2026-06-04" title="Permanent link">&para;</a></h2>
 <p>Feature: a live fleet status dashboard + tmux status-line config on launch.</p>
-<h3 id="added_7">Added<a class="headerlink" href="#added_7" title="Permanent link">&para;</a></h3>
+<h3 id="added_8">Added<a class="headerlink" href="#added_8" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>greatminds dashboard</code></strong> — a read-only, non-scrolling console table
   of the fleet at a glance: per-agent activity (alive/idle/working/
@@ -2240,7 +2381,7 @@ could never be archived.</p>
 <p>Major canon consolidation + a new interactive role. Live-verified on a
 real avatar fleet (driven turns bootstrap from the static prompt, claim,
 implement, advance the FSM).</p>
-<h3 id="added_8">Added<a class="headerlink" href="#added_8" title="Permanent link">&para;</a></h3>
+<h3 id="added_9">Added<a class="headerlink" href="#added_9" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>LIVE-DEVELOPER</strong> — an interactive, USER-paced role for working a
   single task live with the USER on a leased stand. PLANNER routes a
@@ -2253,7 +2394,7 @@ implement, advance the FSM).</p>
   UI-DEVELOPER FAST chat variant; scenario C is now LIVE-DEVELOPER. Ships
   a <code>vite-dev</code> stand-profile example (backend + Vite HMR).</li>
 </ul>
-<h3 id="changed_4">Changed<a class="headerlink" href="#changed_4" title="Permanent link">&para;</a></h3>
+<h3 id="changed_5">Changed<a class="headerlink" href="#changed_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Single static bootstrap.</strong> An agent's whole instruction surface is
   now <code>COORDINATE.md</code> (philosophy) + <code>schema.yaml</code> (machine contract +
@@ -2410,7 +2551,7 @@ coordd .stand watch-up-front + STAND-KEEPER auto-wake, an expired-lease
 reclaim + queue-head auto-promote, the canon TESTER-local-exec ban, the
 EXPLORER stand-only contract restore, and a full reactive-fleet
 documentation refresh.</p>
-<h3 id="added_9">Added<a class="headerlink" href="#added_9" title="Permanent link">&para;</a></h3>
+<h3 id="added_10">Added<a class="headerlink" href="#added_10" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0337 CLI-only coordination access rule reaches the render-role
@@ -2456,7 +2597,7 @@ documentation refresh.</p>
   singleton lock.</p>
 </li>
 </ul>
-<h3 id="changed_5">Changed<a class="headerlink" href="#changed_5" title="Permanent link">&para;</a></h3>
+<h3 id="changed_6">Changed<a class="headerlink" href="#changed_6" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0326 unify <code>greatminds task</code> subcommand id intake (DOD2).</strong>
@@ -2579,7 +2720,7 @@ self-loop watchdog with auto_mode-allowed recovery commands; all
 claude + codex workers are coordd-driven (one turn per event over
 <code>claude -p</code>/<code>--resume</code> or a fresh <code>codex app-server</code> stdio); canon
 prose + public mkdocs site mirror the model.</p>
-<h3 id="added_10">Added<a class="headerlink" href="#added_10" title="Permanent link">&para;</a></h3>
+<h3 id="added_11">Added<a class="headerlink" href="#added_11" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0312 schema role contracts gain per-role lifecycle field (Phase 1a).</strong>
@@ -2678,7 +2819,7 @@ prose + public mkdocs site mirror the model.</p>
   workers run driven; ARCHITECT-REVIEWER stays non-driven for now.</p>
 </li>
 </ul>
-<h3 id="changed_6">Changed<a class="headerlink" href="#changed_6" title="Permanent link">&para;</a></h3>
+<h3 id="changed_7">Changed<a class="headerlink" href="#changed_7" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0325 canon docs for the reactive-fleet lifecycle model (Phase 4).</strong>
   <code>COORDINATE.md</code> §2.1 (new) carries the lifecycle vocabulary + the
@@ -2707,7 +2848,7 @@ worktree-isolation enforcement at the CLI, uniform session-start
 canon-read across role canons, SK heartbeat refresh during long
 ansible runs, daemon install systemd enablement + repair subcommand,
 and the launch/restart wrapper-loop removal.</p>
-<h3 id="added_11">Added<a class="headerlink" href="#added_11" title="Permanent link">&para;</a></h3>
+<h3 id="added_12">Added<a class="headerlink" href="#added_12" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0303 task append-block enforces cwd under per-task worktree.</strong>
@@ -2835,7 +2976,7 @@ upgrade promptly.</p>
 mechanism so fresh-install PLANNER agents pick up the workflow at
 tick start without an operator ping. Closes the role-contract gap
 left after the 0276 stand-profile umbrella shipped.</p>
-<h3 id="added_12">Added<a class="headerlink" href="#added_12" title="Permanent link">&para;</a></h3>
+<h3 id="added_13">Added<a class="headerlink" href="#added_13" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0297 PLANNER role contract gains stand-profile coordination.</strong>
   <code>schema.roles.ARCHITECT-PLANNER</code> now declares
@@ -2851,7 +2992,7 @@ left after the 0276 stand-profile umbrella shipped.</p>
 <h2 id="137-2026-05-27">1.3.7 — 2026-05-27<a class="headerlink" href="#137-2026-05-27" title="Permanent link">&para;</a></h2>
 <p>Closes the 0276 stand-profile umbrella DoD with the MD-cycle live-green
 on real avatar.</p>
-<h3 id="added_13">Added<a class="headerlink" href="#added_13" title="Permanent link">&para;</a></h3>
+<h3 id="added_14">Added<a class="headerlink" href="#added_14" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0295 liveness-prose MD-only canon template (Phase I of 0276).</strong>
   New <code>data/templates/stand-profiles/liveness-prose.md</code> with no YAML
@@ -2868,7 +3009,7 @@ on real avatar.</p>
 plus a chain of canon-playbook robustness fixes empirically proven on
 real avatar deploys, and pushes the schema enum so md-only profiles can
 be leased.</p>
-<h3 id="added_14">Added<a class="headerlink" href="#added_14" title="Permanent link">&para;</a></h3>
+<h3 id="added_15">Added<a class="headerlink" href="#added_15" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0284 end-to-end stand-profile cycle tests + collection-free rsync
@@ -2919,7 +3060,7 @@ be leased.</p>
 workflow from <code>schema.yaml</code> at tick start, and plugs the orphan
 <code>active_lease</code> leak that produced <code>state=down + active_lease={...}</code>
 contradictions across the stand transitions.</p>
-<h3 id="added_15">Added<a class="headerlink" href="#added_15" title="Permanent link">&para;</a></h3>
+<h3 id="added_16">Added<a class="headerlink" href="#added_16" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>0288 schema-driven role contracts for all 13 roles + CLI.</strong>
   <code>schema.roles.&lt;ROLE&gt;</code> now carries <code>responsibilities</code>,
@@ -2964,7 +3105,7 @@ dispatch contract is actually enforced.</p>
 <h2 id="133-2026-05-27">1.3.3 — 2026-05-27<a class="headerlink" href="#133-2026-05-27" title="Permanent link">&para;</a></h2>
 <p>Stand-profile mechanism (0276 umbrella, Phases A-G) plus a deploy-safety
 fix that unblocks Phase H avatar verification.</p>
-<h3 id="added_16">Added<a class="headerlink" href="#added_16" title="Permanent link">&para;</a></h3>
+<h3 id="added_17">Added<a class="headerlink" href="#added_17" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
 <p><strong>0277 stand_profile schema section + canon convention (Phase A).</strong>
@@ -3167,7 +3308,7 @@ files may stay as historical evidence.</p>
   is gone. Pre-1.3.0 tasks without a <code>lease_id</code> on their tests block
   return <code>missing</code>; refile via the lease API to verify.</li>
 </ul>
-<h3 id="added_17">Added<a class="headerlink" href="#added_17" title="Permanent link">&para;</a></h3>
+<h3 id="added_18">Added<a class="headerlink" href="#added_18" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Lease-based stand CLI:</strong></li>
 <li><code>greatminds stand lease --task &lt;id&gt; --worktree &lt;path&gt; --profile
@@ -3285,7 +3426,7 @@ umbrella-console-script migration. No new features.</p>
   library API; the click handlers are thin wrappers calling them,
   matching vfl's <code>create_node()</code> / <code>create_project()</code> pattern.</li>
 </ul>
-<h3 id="added_18">Added<a class="headerlink" href="#added_18" title="Permanent link">&para;</a></h3>
+<h3 id="added_19">Added<a class="headerlink" href="#added_19" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>tests/test_task_field_coercion.py</code> — pytest regression suite
   covering all three 1.1.0 bugs (20 tests, all passing). Tests:
@@ -3318,7 +3459,7 @@ internal artefacts (task files, journal, code) English.</p>
   Russian to English. Pre-1.1.0 versions on PyPI (0.1.0, 0.1.1, 1.0.0)
   shipped Russian-only canon by mistake — yank them in favour of 1.1.0+.</li>
 </ul>
-<h3 id="added_19">Added<a class="headerlink" href="#added_19" title="Permanent link">&para;</a></h3>
+<h3 id="added_20">Added<a class="headerlink" href="#added_20" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>greatminds setup --lang &lt;code&gt;</code> flag — records the agent
   user-facing language in <code>PROJECT.md</code> as <code>&lt;GREATMINDS_LANG&gt;</code>. Any
@@ -3349,7 +3490,7 @@ are consolidated into a single <code>greatminds</code> umbrella with subcommands
 <li><code>coord-init</code>, <code>coord-launch</code>, <code>coord-tmux</code> modules removed; their
   functionality is in <code>greatminds setup</code> and <code>greatminds launch</code>.</li>
 </ul>
-<h3 id="added_20">Added<a class="headerlink" href="#added_20" title="Permanent link">&para;</a></h3>
+<h3 id="added_21">Added<a class="headerlink" href="#added_21" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>greatminds.core.env</code> — adaptive Python-env detector covering 8
   scenarios: pixi, uv, poetry, conda, plain venv, external-venv
@@ -3390,7 +3531,7 @@ permissions enforced.</p>
 </ul>
 <h2 id="010-2026-05-20">0.1.0 — 2026-05-20<a class="headerlink" href="#010-2026-05-20" title="Permanent link">&para;</a></h2>
 <p>First public release.</p>
-<h3 id="added_21">Added<a class="headerlink" href="#added_21" title="Permanent link">&para;</a></h3>
+<h3 id="added_22">Added<a class="headerlink" href="#added_22" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Python package <code>greatminds</code> with 19 console entry-points covering the
   full R8 pipeline:</li>
@@ -3483,7 +3624,7 @@ permissions enforced.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

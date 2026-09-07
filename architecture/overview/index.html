@@ -16,14 +16,14 @@
         <link rel="prev" href="../../cli-reference/">
       
       
-        <link rel="next" href="../filesystem-layout/">
+        <link rel="next" href="../contract-reference/">
       
       
         
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -563,6 +563,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../getting-started/local-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../getting-started/upgrading/" class="md-nav__link">
         
   
@@ -713,7 +741,7 @@
   <span class="md-ellipsis">
     
   
-    Codex Profiles
+    Agent Manifests and Bindings
   
 
     
@@ -997,6 +1025,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#recovery-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recovery boundaries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#contract-sources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1011,6 +1050,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contract-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Contract Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1447,6 +1514,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#recovery-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recovery boundaries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#contract-sources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1478,28 +1556,45 @@
 
 
 <h1 id="architecture-overview">Architecture Overview<a class="headerlink" href="#architecture-overview" title="Permanent link">&para;</a></h1>
-<p>greatminds is built around a filesystem finite state machine:</p>
+<p>Greatminds combines a filesystem task workflow with a durable ACP execution
+runtime. Queue location describes a task's workflow state. The daemon owns agent
+sessions, admits eligible work and invokes shared deterministic domain services.</p>
 <ul>
-<li>State lives in directories.</li>
-<li>A task handoff is a validated file move.</li>
-<li>Blocks inside task files are append-only evidence.</li>
-<li>Role ownership comes from queue location.</li>
-<li>Coordination messages live in per-role inbox directories.</li>
-<li>The daemon only nudges agents; it is not the source of task state.</li>
+<li>The effective schema defines roles, queues, transitions and evidence gates.</li>
+<li><code>coordination/execution.yaml</code> maps role bindings to ACP agent manifests.</li>
+<li><code>.greatminds/</code> holds task queues, workflow journals and runtime state.</li>
+<li><code>.greatminds/.runtime/</code> records run identities, pinned contracts, admission
+  decisions, results, commands and recovery information.</li>
+<li>Agents perform work and submit typed results. Domain services validate the
+  assignment, revision and evidence before applying a transition.</li>
 </ul>
-<p>This makes the project recoverable with normal filesystem inspection. If an
-agent exits mid-transition, intent files and the journal show what it attempted.
-If a daemon is down, the queues still describe the work.</p>
+<p>An ACP prompt ending is an execution outcome. Task verification requires an
+accepted domain result and the schema's evidence gates. The daemon also performs
+mechanical dependency readiness, blocked-task resumption and reconciliation
+without spending an LLM turn on polling.</p>
+<h2 id="recovery-boundaries">Recovery boundaries<a class="headerlink" href="#recovery-boundaries" title="Permanent link">&para;</a></h2>
+<p>Queues remain inspectable while the daemon is down. They do not describe every
+in-flight operation: run records, transition intents, journals, command receipts
+and the deployment ledger provide additional recovery evidence. Interrupted work
+with uncertain side effects requires explicit resolution; restarting the daemon
+does not automatically replay it.</p>
+<p>Use <code>greatminds run status</code>, <code>greatminds run events</code>, <code>greatminds wake-check</code> and
+<code>greatminds watchdog</code> to inspect the combined state. See the
+<a href="../execution-contract/">execution contract</a> for atomicity, idempotency and
+workspace limits, and the <a href="../../operations/runbook/">operations runbook</a> for
+operator actions.</p>
 <h2 id="contract-sources">Contract sources<a class="headerlink" href="#contract-sources" title="Permanent link">&para;</a></h2>
-<ul>
-<li>The packaged schema defines queues, roles, transitions, required fields,
-  stand profile tokens, scenarios, and watchdog thresholds. Setup copies the
-  runtime copy to <code>.greatminds/schema.yaml</code>.</li>
-<li><code>.greatminds/COORDINATE.md</code> explains the invariants behind the schema.</li>
-<li>Role contracts in <code>.greatminds/schema.yaml</code> define what each role may claim,
-  write, and move.</li>
-</ul>
-<p>When schema and prose disagree on mechanics, <code>.greatminds/schema.yaml</code> wins.</p>
+<p>The installed package schema is authoritative. An explicit
+<code>GREATMINDS_CANON_DIR</code> can select an alternate canon. The project file
+<code>.greatminds/schema.yaml</code> is a diagnostic mirror, not a policy override. Setup
+creates a missing mirror and preserves an existing one.</p>
+<p><code>greatminds project schema --json</code> reports the source, version, SHA-256 identity,
+document and mirror status. <code>greatminds project schema --check</code> exits 2 for a
+missing, unreadable or different mirror. Review differences against
+<code>greatminds project schema</code> before replacing the mirror.</p>
+<p>Runs retain pinned schema and execution contracts. Restart the daemon after a
+package/canon update; do not infer that an in-flight run has adopted new policy.
+When schema and prose disagree on mechanics, the effective schema wins.</p>
 
 
 
@@ -1554,7 +1649,7 @@ If a daemon is down, the queues still describe the work.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

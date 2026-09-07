@@ -1,0 +1,3647 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="File-based multi-agent coordination for agent fleets and task pipelines.">
+      
+      
+      
+        <link rel="canonical" href="https://veryviolet.github.io/greatminds/architecture/contract-reference/">
+      
+      
+        <link rel="prev" href="../overview/">
+      
+      
+        <link rel="next" href="../filesystem-layout/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Generated Contract Reference - greatminds</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#generated-contract-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="greatminds" class="md-header__button md-logo" aria-label="greatminds" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            greatminds
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Generated Contract Reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/veryviolet/greatminds" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    veryviolet/greatminds
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../concepts/queues/" class="md-tabs__link">
+          
+  
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../cli-reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  CLI Reference
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../operations/runbook/" class="md-tabs__link">
+          
+  
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../recipes/filing-a-bug/" class="md-tabs__link">
+          
+  
+  
+  Recipes
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../changelog/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="greatminds" class="md-nav__button md-logo" aria-label="greatminds" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    greatminds
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/veryviolet/greatminds" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    veryviolet/greatminds
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/first-project/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    First Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/local-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/upgrading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/queues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/roles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/codex-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Manifests and Bindings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/stand-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stand Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/stand-gate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stand Gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/inbox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inbox
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Contract Reference
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Contract Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#queues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Queues
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Roles
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Roles">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#architect-planner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ARCHITECT-PLANNER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#architect-reviewer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ARCHITECT-REVIEWER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#developer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DEVELOPER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#explorer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EXPLORER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#live-developer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LIVE-DEVELOPER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#maintainer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MAINTAINER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        READER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#technical-writer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TECHNICAL-WRITER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tester" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TESTER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ui-developer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UI-DEVELOPER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#user" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        USER
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-transitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task transitions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#declared-daemon-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Declared daemon operations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-state-transitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run state transitions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#normalized-runtime-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalized runtime fields
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Normalized runtime fields">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#agentmanifest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AgentManifest
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rolebinding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RoleBinding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#commanddefinition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CommandDefinition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#accountlimiterror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AccountLimitError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#standdeploymentpolicy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StandDeploymentPolicy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#executionconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExecutionConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#taskrevision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TaskRevision
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resultenvelope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ResultEnvelope
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validated-preset-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validated preset examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Validated preset examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deployed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deployed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        docs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#full" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        full
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#local" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        local
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ui
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source-fingerprints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source fingerprints
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../filesystem-layout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Filesystem Layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transitions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../daemon-and-agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Daemon and Agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lifecycle Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/runbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runbook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Recipes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Recipes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/filing-a-bug/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Filing a Bug
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/planning-a-feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planning a Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/e2e-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E2E Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipes/cutting-a-release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cutting a Release
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#queues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Queues
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Roles
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Roles">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#architect-planner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ARCHITECT-PLANNER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#architect-reviewer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ARCHITECT-REVIEWER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#developer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DEVELOPER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#explorer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EXPLORER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#live-developer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LIVE-DEVELOPER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#maintainer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MAINTAINER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        READER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#technical-writer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TECHNICAL-WRITER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tester" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TESTER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ui-developer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UI-DEVELOPER
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#user" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        USER
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-transitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task transitions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#declared-daemon-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Declared daemon operations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-state-transitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run state transitions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#normalized-runtime-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalized runtime fields
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Normalized runtime fields">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#agentmanifest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AgentManifest
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rolebinding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RoleBinding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#commanddefinition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CommandDefinition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#accountlimiterror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AccountLimitError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#standdeploymentpolicy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StandDeploymentPolicy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#executionconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExecutionConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#taskrevision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TaskRevision
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resultenvelope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ResultEnvelope
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validated-preset-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validated preset examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Validated preset examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deployed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deployed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        docs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#full" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        full
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#local" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        local
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ui
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source-fingerprints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source fingerprints
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="generated-contract-reference">Generated contract reference<a class="headerlink" href="#generated-contract-reference" title="Permanent link">&para;</a></h1>
+<p>Generated by <code>python tools/generate_contract_reference.py</code>. Do not edit this file by hand.</p>
+<p>Check without writing: <code>python tools/generate_contract_reference.py --check</code>.</p>
+<p>This reference covers declared role/queue/task transitions, normalized runtime record fields,
+run state transitions and validated preset examples. Dynamic task/evidence checks still run
+in the domain services. The field tables are Python record contracts, not a complete YAML
+validation grammar: mapping keys supply IDs, manifests require <code>transport: acp</code>, and the
+<a href="../../concepts/codex-profiles/">manifest guide</a> explains input configuration and constraints.</p>
+<h2 id="queues">Queues<a class="headerlink" href="#queues" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Queue</th>
+<th>Kind</th>
+<th>Owner</th>
+<th>Writers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>.stand</td>
+<td>state</td>
+<td>null</td>
+<td>["TESTER", "ARCHITECT-PLANNER", "MAINTAINER", "LIVE-DEVELOPER", "EXPLORER", "ARCHITECT-REVIEWER"]</td>
+</tr>
+<tr>
+<td>archive</td>
+<td>terminal</td>
+<td>ARCHITECT-PLANNER</td>
+<td>["ARCHITECT-PLANNER", "ARCHITECT-REVIEWER"]</td>
+</tr>
+<tr>
+<td>feature_blocked</td>
+<td>parking</td>
+<td>ARCHITECT-REVIEWER</td>
+<td>["DEVELOPER", "UI-DEVELOPER", "TECHNICAL-WRITER", "TESTER", "READER", "ARCHITECT-REVIEWER", "ARCHITECT-PLANNER"]</td>
+</tr>
+<tr>
+<td>feature_dev</td>
+<td>active</td>
+<td>DEVELOPER</td>
+<td>["DEVELOPER"]</td>
+</tr>
+<tr>
+<td>feature_docs</td>
+<td>active</td>
+<td>TECHNICAL-WRITER</td>
+<td>["TECHNICAL-WRITER"]</td>
+</tr>
+<tr>
+<td>feature_docs_review</td>
+<td>active</td>
+<td>READER</td>
+<td>["TECHNICAL-WRITER", "READER"]</td>
+</tr>
+<tr>
+<td>feature_inbox</td>
+<td>active</td>
+<td>ARCHITECT-PLANNER</td>
+<td>["ARCHITECT-PLANNER", "EXPLORER"]</td>
+</tr>
+<tr>
+<td>feature_live</td>
+<td>active</td>
+<td>LIVE-DEVELOPER</td>
+<td>["LIVE-DEVELOPER", "ARCHITECT-PLANNER"]</td>
+</tr>
+<tr>
+<td>feature_plan</td>
+<td>active</td>
+<td>ARCHITECT-PLANNER</td>
+<td>["ARCHITECT-PLANNER"]</td>
+</tr>
+<tr>
+<td>feature_review</td>
+<td>active</td>
+<td>ARCHITECT-REVIEWER</td>
+<td>["TESTER", "READER", "LIVE-DEVELOPER", "ARCHITECT-REVIEWER"]</td>
+</tr>
+<tr>
+<td>feature_test</td>
+<td>active</td>
+<td>TESTER</td>
+<td>["DEVELOPER", "UI-DEVELOPER", "TESTER"]</td>
+</tr>
+<tr>
+<td>feature_ui_dev</td>
+<td>active</td>
+<td>UI-DEVELOPER</td>
+<td>["UI-DEVELOPER"]</td>
+</tr>
+<tr>
+<td>review_sessions</td>
+<td>active</td>
+<td>EXPLORER</td>
+<td>["ARCHITECT-PLANNER", "EXPLORER"]</td>
+</tr>
+<tr>
+<td>user_feedback</td>
+<td>active</td>
+<td>ARCHITECT-PLANNER</td>
+<td>["USER"]</td>
+</tr>
+<tr>
+<td>verified</td>
+<td>terminal</td>
+<td>ARCHITECT-REVIEWER</td>
+<td>["ARCHITECT-REVIEWER"]</td>
+</tr>
+</tbody>
+</table>
+<h2 id="roles">Roles<a class="headerlink" href="#roles" title="Permanent link">&para;</a></h2>
+<p>Declarations below come directly from the normative schema; tokens are defined in its glossary.</p>
+<h3 id="architect-planner">ARCHITECT-PLANNER<a class="headerlink" href="#architect-planner" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">category</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">product</span>
+<span class="nt">claims_from</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">user_feedback</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_inbox</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_plan</span>
+<span class="nt">event_triggers</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">on_feature_inbox_claim</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">append_triage_block</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mv_to_feature_plan_or_archive</span>
+<span class="w">  </span><span class="nt">on_feature_plan_claim</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write_plan_block</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">set_stand_required</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_to_feature_dev_or_feature_ui_dev_or_feature_docs</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">decompose_scope_release_umbrella_into_subtasks_then_archive_umbrella</span>
+<span class="w">  </span><span class="nt">on_stand_down_yaml_playbook_error</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read_down_reason_from_inbox_info</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file_bugfix_task_for_coordination_stand_profiles_yaml</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">assign_to_developer</span>
+<span class="w">  </span><span class="nt">on_stand_unregistered_profile</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read_registry_error</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file_feature_dev_task_for_stand_profile_registry_entry</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">include_required_profile_name_file_used_for_default_for</span>
+<span class="w">  </span><span class="nt">on_user_feedback_claim</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read_user_feedback_block</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">append_triage_block</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mv_user_feedback_to_feature_inbox_or_archive</span>
+<span class="nt">forbidden_actions</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">implement_code</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run_ansible</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mark_stand_ready</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claim_review_sessions</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">archive_in_lifecycle_work_directly_except_decomposed_release_umbrella</span>
+<span class="nt">intake_discipline</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">propose_then_file</span>
+<span class="nt">lifecycle</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">interactive</span>
+<span class="nt">responsibilities</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">triage_user_feedback</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write_plan_blocks</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_tasks_per_scope</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">chat_partner_for_user</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file_review_sessions</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coordinate_stand_profile_tasks_via_registry_and_canon</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file_profile_registry_task_on_unregistered_profile</span>
+</code></pre></div>
+<h3 id="architect-reviewer">ARCHITECT-REVIEWER<a class="headerlink" href="#architect-reviewer" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">category</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">product</span>
+<span class="nt">claims_from</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_review</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_blocked</span>
+<span class="nt">event_triggers</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">on_feature_blocked_claim</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">inspect_dependency_findings_and_resolve_semantic_blockers</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">archive_when_withdrawn_reason_present</span>
+<span class="w">  </span><span class="nt">on_feature_review_claim</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verify_blocks_chain</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run_gate_check</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">append_review_block_approved_or_changes_requested</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mv_to_verified_on_approved</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mv_back_to_implementer_queue_on_changes_requested</span>
+<span class="w">  </span><span class="nt">on_verified_rollback</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">append_rollback_block_with_reason</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mv_to_archive_or_feature_review</span>
+<span class="nt">forbidden_actions</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">implement_code</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claim_outside_review_queues</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">approve_without_gate_check_pass_when_stand_required</span>
+<span class="nt">lifecycle</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">driven</span>
+<span class="nt">responsibilities</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verify_evidence_chain</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">commit_and_merge</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">resolve_dependency_cycles_and_invalid_declarations</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rollback_verified_tasks</span>
+<span class="nt">stand_profile_selection</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">allowed_used_for</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reviewer_validation</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tester_validation</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">explorer_review</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production_post_deploy_review</span>
+<span class="w">  </span><span class="nt">default_for</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">final_review_when_stand_required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reviewer</span>
+<span class="w">    </span><span class="nt">production_review</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production_review</span>
+<span class="w">  </span><span class="nt">must_select_from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coordination/stand-profiles.yaml</span>
+<span class="w">  </span><span class="nt">required_for</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">final_review_when_stand_required</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production_review</span>
+</code></pre></div>
+<h3 id="developer">DEVELOPER<a class="headerlink" href="#developer" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">category</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">product</span>
+<span class="nt">claims_from</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_dev</span>
+<span class="nt">event_triggers</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">on_feature_dev_claim</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">implement_code_in_worktree</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run_pytest_suite</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">append_implementation_block</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mv_to_feature_test</span>
+<span class="nt">forbidden_actions</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claim_ui_or_docs_or_stand_tasks</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deploy_stand</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run_product_validation_on_stand</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read_or_move_from_feature_plan</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">commit_to_main_directly</span>
+<span class="nt">lifecycle</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">driven</span>
+<span class="nt">responsibilities</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">implement_backend_features</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write_unit_tests</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file_implementation_block_with_files_list</span>
+</code></pre></div>
+<h3 id="explorer">EXPLORER<a class="headerlink" href="#explorer" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">category</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">product</span>
+<span class="nt">claims_from</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">review_sessions</span>
+<span class="nt">event_triggers</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">on_review_sessions_claim</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">acquire_lease_via_stand_lease</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run_scenarios_against_deployed_stand</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file_bugs_as_feature_inbox_tasks</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">append_session_iteration_block</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">release_lease</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mv_to_archive_when_complete</span>
+<span class="nt">forbidden_actions</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">implement_code</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deploy_stand</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claim_outside_review_sessions</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">validate_off_stand_or_local_substitutes</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Run host-destructive or recovery actions (kill, pkill, systemctl, logout, reboot)</span>
+<span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">against the local orchestration host or an unresolved target. Such scenarios require</span>
+<span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">an explicitly authorized disposable stand and verified target identity; otherwise</span>
+<span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">submit a blocker.</span>
+<span class="nt">lifecycle</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">driven</span>
+<span class="nt">responsibilities</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run_review_sessions_on_live_stand</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">operate_on_the_stand_as_real_user_whatever_its_shape</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file_bugs_to_feature_inbox</span>
+<span class="nt">stand_profile_selection</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">allowed_used_for</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">explorer_review</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">full_product_validation</span>
+<span class="w">  </span><span class="nt">default_for</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">review_session</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">explorer</span>
+<span class="w">  </span><span class="nt">must_select_from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coordination/stand-profiles.yaml</span>
+<span class="w">  </span><span class="nt">required_for</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">review_session</span>
+</code></pre></div>
+<h3 id="live-developer">LIVE-DEVELOPER<a class="headerlink" href="#live-developer" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">category</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">product</span>
+<span class="nt">claims_from</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_live</span>
+<span class="nt">event_triggers</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">on_feature_live_claim</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">create_worktree</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">acquire_lease_via_stand_lease</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deploy_to_own_leased_stand_during_session</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">interactive_chat_with_user</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">on_user_ok_append_implementation_block</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">release_lease</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mv_to_feature_review</span>
+<span class="nt">forbidden_actions</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claim_outside_feature_live</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">commit_to_main_directly</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">skip_sprint_review</span>
+<span class="nt">lifecycle</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">interactive</span>
+<span class="nt">responsibilities</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">work_a_single_task_live_with_user_on_leased_stand</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deploy_to_own_leased_stand_during_session</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hand_to_review_as_sprint_on_user_ok</span>
+<span class="nt">stand_profile_selection</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">allowed_used_for</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">live_ui</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ui_iteration</span>
+<span class="w">  </span><span class="nt">default_for</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">feature_live</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">live_developer</span>
+<span class="w">  </span><span class="nt">must_select_from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coordination/stand-profiles.yaml</span>
+<span class="w">  </span><span class="nt">required_for</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_live</span>
+</code></pre></div>
+<h3 id="maintainer">MAINTAINER<a class="headerlink" href="#maintainer" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">category</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">system</span>
+<span class="nt">claims_from</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+<span class="nt">event_triggers</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">on_operator_diagnostic_request</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">inspect_runtime_status_and_operation_evidence</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">diagnose_cause_and_propose_bounded_repair</span>
+<span class="nt">forbidden_actions</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claim_product_queues</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">triage_user_feedback</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write_plan_blocks</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">schedule_polling_or_recovery_loops</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">infer_safe_replay_from_missing_process</span>
+<span class="nt">lifecycle</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">interactive</span>
+<span class="nt">responsibilities</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">diagnose_unknown_infrastructure_failures</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">propose_repairs_with_explicit_preconditions</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">explain_unresolved_runtime_and_deployment_outcomes</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">infra_chat_for_user</span>
+</code></pre></div>
+<h3 id="reader">READER<a class="headerlink" href="#reader" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">category</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">product</span>
+<span class="nt">claims_from</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_docs_review</span>
+<span class="nt">event_triggers</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">on_feature_docs_review_claim</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read_docs_fresh_no_prior_context</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">append_reader_review_block</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mv_to_feature_review_on_pass</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mv_back_to_feature_docs_on_fail_or_partial</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">route_audit_only_to_feature_review_never_feature_docs</span>
+<span class="nt">forbidden_actions</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claim_implementer_queues</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write_code</span>
+<span class="nt">lifecycle</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">driven</span>
+<span class="nt">responsibilities</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">validate_doc_clarity_as_fresh_user</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">append_reader_review_block</span>
+</code></pre></div>
+<h3 id="technical-writer">TECHNICAL-WRITER<a class="headerlink" href="#technical-writer" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">category</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">product</span>
+<span class="nt">claims_from</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_docs</span>
+<span class="nt">event_triggers</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">on_feature_docs_claim</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write_docs_in_worktree</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run_docs_build_if_configured</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">append_implementation_block</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mv_to_feature_docs_review</span>
+<span class="nt">forbidden_actions</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claim_backend_or_ui_tasks</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">commit_to_main_directly</span>
+<span class="nt">lifecycle</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">driven</span>
+<span class="nt">responsibilities</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write_documentation</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file_implementation_block</span>
+</code></pre></div>
+<h3 id="tester">TESTER<a class="headerlink" href="#tester" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">category</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">product</span>
+<span class="nt">claims_from</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_test</span>
+<span class="nt">event_triggers</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">on_feature_test_claim</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">inspect_plan_stand_requirement_and_acceptance</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">request_configured_daemon_checks_and_assess_receipts_for_local_tasks</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">acquire_lease_when_plan_requires_stand</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wait_for_state_ready_when_plan_requires_stand</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">probe_via_ssh_when_plan_requires_stand</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fill_tests_block_with_real_observed_output</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run_gate_check</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">release_lease_with_result_if_held</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">submit_typed_handoff_to_feature_review</span>
+<span class="nt">forbidden_actions</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deploy_stand</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run_ansible_locally</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fill_fake_stand_evidence</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claim_outside_feature_test</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">execute_local_tests_directly_outside_declared_command_service</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace_required_stand_probes_with_local_checks</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">uv_run_or_active_against_fleet_venv</span>
+<span class="nt">lifecycle</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">driven</span>
+<span class="nt">responsibilities</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">independently_assess_implementation_and_test_adequacy</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">request_configured_daemon_checks_for_local_tasks</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">probe_feature_on_deployed_stand_when_plan_requires_it</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fill_real_stand_evidence_when_plan_requires_it</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run_gate_check_before_mv</span>
+<span class="nt">stand_profile_selection</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">allowed_used_for</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tester_validation</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deploy_only</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warmup</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">quick_readiness</span>
+<span class="w">  </span><span class="nt">default_for</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">plan.stand_required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_test</span>
+<span class="w">    </span><span class="nt">plan.verify_only</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verify_only</span>
+<span class="w">  </span><span class="nt">must_select_from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coordination/stand-profiles.yaml</span>
+<span class="w">  </span><span class="nt">required_for</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plan.stand_required</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plan.verify_only</span>
+</code></pre></div>
+<h3 id="ui-developer">UI-DEVELOPER<a class="headerlink" href="#ui-developer" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">category</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">product</span>
+<span class="nt">claims_from</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_ui_dev</span>
+<span class="nt">event_triggers</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">on_feature_ui_dev_claim</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">implement_ui_in_worktree</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run_ui_test_suite</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">append_implementation_block</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mv_to_feature_test</span>
+<span class="nt">forbidden_actions</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claim_backend_or_docs_tasks</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deploy_stand</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">commit_to_main_directly</span>
+<span class="nt">lifecycle</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">driven</span>
+<span class="nt">responsibilities</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">implement_ui_features</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run_ui_tests</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file_implementation_block</span>
+</code></pre></div>
+<h3 id="user">USER<a class="headerlink" href="#user" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">category</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">entry</span>
+<span class="nt">claims_from</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+<span class="nt">event_triggers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span>
+<span class="nt">forbidden_actions</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claim_any_queue</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">implement_code</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write_blocks_directly_to_active_queues</span>
+<span class="nt">lifecycle</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">interactive</span>
+<span class="nt">responsibilities</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file_user_feedback</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">chat_with_planner</span>
+</code></pre></div>
+<h2 id="task-transitions">Task transitions<a class="headerlink" href="#task-transitions" title="Permanent link">&para;</a></h2>
+<p>Dynamic queue/owner selectors remain literal; the task policy resolves them against the current task and queue.</p>
+<table>
+<thead>
+<tr>
+<th>From</th>
+<th>To</th>
+<th>Role</th>
+<th>Required validators</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>user_feedback</td>
+<td>feature_inbox</td>
+<td>ARCHITECT-PLANNER</td>
+<td>["triage_block"]</td>
+</tr>
+<tr>
+<td>user_feedback</td>
+<td>archive</td>
+<td>ARCHITECT-PLANNER</td>
+<td>["triage_block"]</td>
+</tr>
+<tr>
+<td>feature_inbox</td>
+<td>archive</td>
+<td>ARCHITECT-PLANNER</td>
+<td>[]</td>
+</tr>
+<tr>
+<td>feature_plan</td>
+<td>archive</td>
+<td>ARCHITECT-PLANNER</td>
+<td>[]</td>
+</tr>
+<tr>
+<td>review_sessions</td>
+<td>archive</td>
+<td>ARCHITECT-PLANNER</td>
+<td>["review_session_terminal_block"]</td>
+</tr>
+<tr>
+<td>review_sessions</td>
+<td>archive</td>
+<td>EXPLORER</td>
+<td>["review_session_terminal_block"]</td>
+</tr>
+<tr>
+<td>feature_blocked</td>
+<td>archive</td>
+<td>ARCHITECT-REVIEWER</td>
+<td>["feature_blocked_withdrawn_reason"]</td>
+</tr>
+<tr>
+<td>feature_inbox</td>
+<td>feature_plan</td>
+<td>ARCHITECT-PLANNER</td>
+<td>["triage_block"]</td>
+</tr>
+<tr>
+<td>feature_plan</td>
+<td>feature_dev</td>
+<td>ARCHITECT-PLANNER</td>
+<td>["plan_block", "scope_backend"]</td>
+</tr>
+<tr>
+<td>feature_plan</td>
+<td>feature_ui_dev</td>
+<td>ARCHITECT-PLANNER</td>
+<td>["plan_block", "scope_ui"]</td>
+</tr>
+<tr>
+<td>feature_plan</td>
+<td>feature_docs</td>
+<td>ARCHITECT-PLANNER</td>
+<td>["plan_block", "scope_docs"]</td>
+</tr>
+<tr>
+<td>feature_plan</td>
+<td>feature_docs_review</td>
+<td>ARCHITECT-PLANNER</td>
+<td>["plan_block", "scope_docs", "plan.audit_only"]</td>
+</tr>
+<tr>
+<td>feature_plan</td>
+<td>feature_live</td>
+<td>ARCHITECT-PLANNER</td>
+<td>["plan_block", "plan.interactive"]</td>
+</tr>
+<tr>
+<td>feature_plan</td>
+<td>feature_test</td>
+<td>ARCHITECT-PLANNER</td>
+<td>["plan_block", "plan.verify_only"]</td>
+</tr>
+<tr>
+<td>feature_dev</td>
+<td>feature_test</td>
+<td>DEVELOPER</td>
+<td>["implementation_block"]</td>
+</tr>
+<tr>
+<td>feature_ui_dev</td>
+<td>feature_test</td>
+<td>UI-DEVELOPER</td>
+<td>["implementation_block"]</td>
+</tr>
+<tr>
+<td>feature_docs</td>
+<td>feature_docs_review</td>
+<td>TECHNICAL-WRITER</td>
+<td>["implementation_block"]</td>
+</tr>
+<tr>
+<td>feature_live</td>
+<td>feature_review</td>
+<td>LIVE-DEVELOPER</td>
+<td>["implementation_block"]</td>
+</tr>
+<tr>
+<td>feature_test</td>
+<td>feature_review</td>
+<td>TESTER</td>
+<td>["tests_block", "gate_check_pass_if_stand_required"]</td>
+</tr>
+<tr>
+<td>feature_test</td>
+<td>feature_dev</td>
+<td>TESTER</td>
+<td>["tests_block_fail_or_partial", "scope_backend"]</td>
+</tr>
+<tr>
+<td>feature_test</td>
+<td>feature_ui_dev</td>
+<td>TESTER</td>
+<td>["tests_block_fail_or_partial", "scope_ui"]</td>
+</tr>
+<tr>
+<td>feature_docs_review</td>
+<td>feature_review</td>
+<td>READER</td>
+<td>["reader_block_pass"]</td>
+</tr>
+<tr>
+<td>feature_docs_review</td>
+<td>feature_docs</td>
+<td>READER</td>
+<td>["reader_block_fail_or_partial"]</td>
+</tr>
+<tr>
+<td>feature_review</td>
+<td>verified</td>
+<td>ARCHITECT-REVIEWER</td>
+<td>["review_block_approved", "gate_check_pass_if_stand_required"]</td>
+</tr>
+<tr>
+<td>feature_review</td>
+<td>feature_dev</td>
+<td>ARCHITECT-REVIEWER</td>
+<td>["review_block_changes_requested", "scope_backend"]</td>
+</tr>
+<tr>
+<td>feature_review</td>
+<td>feature_ui_dev</td>
+<td>ARCHITECT-REVIEWER</td>
+<td>["review_block_changes_requested", "scope_ui"]</td>
+</tr>
+<tr>
+<td>feature_review</td>
+<td>feature_docs</td>
+<td>ARCHITECT-REVIEWER</td>
+<td>["review_block_changes_requested", "scope_docs"]</td>
+</tr>
+<tr>
+<td>any_active_queue</td>
+<td>feature_blocked</td>
+<td>current_owner</td>
+<td>["blocked_block_with_dependencies_and_resume_to"]</td>
+</tr>
+<tr>
+<td>any_active_queue</td>
+<td>feature_blocked</td>
+<td>ARCHITECT-PLANNER</td>
+<td>["blocked_block_withdrawn_reason_and_resume_to"]</td>
+</tr>
+<tr>
+<td>feature_blocked</td>
+<td>any_resume_to_queue</td>
+<td>ARCHITECT-REVIEWER</td>
+<td>["all_dependencies_exist_per_wake_check"]</td>
+</tr>
+<tr>
+<td>verified</td>
+<td>archive</td>
+<td>ARCHITECT-REVIEWER</td>
+<td>["rollback_block_with_reason"]</td>
+</tr>
+<tr>
+<td>verified</td>
+<td>feature_review</td>
+<td>ARCHITECT-REVIEWER</td>
+<td>["rollback_block_with_reason"]</td>
+</tr>
+</tbody>
+</table>
+<h2 id="declared-daemon-operations">Declared daemon operations<a class="headerlink" href="#declared-daemon-operations" title="Permanent link">&para;</a></h2>
+<p>These operations belong to SYSTEM, not to an agent role.</p>
+<div class="highlight"><pre><span></span><code><span class="nt">resume_dependencies</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">feature_blocked</span>
+<span class="w">  </span><span class="nt">requires</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">terminal_dependencies</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">declared_resume</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">task_readiness</span>
+<span class="w">  </span><span class="nt">to</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">declared_resume_to</span>
+</code></pre></div>
+<h2 id="run-state-transitions">Run state transitions<a class="headerlink" href="#run-state-transitions" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Permitted next states</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>cancelling</td>
+<td>["cancelled", "failed", "interrupted"]</td>
+</tr>
+<tr>
+<td>claimed</td>
+<td>["cancelled", "interrupted", "starting"]</td>
+</tr>
+<tr>
+<td>running</td>
+<td>["cancelling", "completed", "failed", "interrupted", "waiting_auth", "waiting_input"]</td>
+</tr>
+<tr>
+<td>starting</td>
+<td>["cancelling", "failed", "interrupted", "running", "waiting_auth", "waiting_input"]</td>
+</tr>
+<tr>
+<td>waiting_auth</td>
+<td>["cancelling", "failed", "interrupted", "starting"]</td>
+</tr>
+<tr>
+<td>waiting_input</td>
+<td>["cancelling", "failed", "interrupted", "running"]</td>
+</tr>
+</tbody>
+</table>
+<p>Terminal states: <code>cancelled</code>, <code>completed</code>, <code>failed</code>, <code>interrupted</code>.</p>
+<h2 id="normalized-runtime-fields">Normalized runtime fields<a class="headerlink" href="#normalized-runtime-fields" title="Permanent link">&para;</a></h2>
+<p>Required means the Python record has no default. Defaults use JSON notation (tuples become arrays); null and empty collections are distinct.</p>
+<h3 id="agentmanifest">AgentManifest<a class="headerlink" href="#agentmanifest" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Python type</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>str</td>
+<td>required</td>
+</tr>
+<tr>
+<td>argv</td>
+<td>tuple[str, ...]</td>
+<td>required</td>
+</tr>
+<tr>
+<td>adapter_version</td>
+<td>str</td>
+<td>required</td>
+</tr>
+<tr>
+<td>harness_version</td>
+<td>str</td>
+<td>required</td>
+</tr>
+<tr>
+<td>environment</td>
+<td>tuple[tuple[str, str], ...]</td>
+<td>[]</td>
+</tr>
+<tr>
+<td>required_env</td>
+<td>tuple[str, ...]</td>
+<td>[]</td>
+</tr>
+<tr>
+<td>required_capabilities</td>
+<td>tuple[str, ...]</td>
+<td>[]</td>
+</tr>
+<tr>
+<td>optional_capabilities</td>
+<td>tuple[str, ...]</td>
+<td>[]</td>
+</tr>
+<tr>
+<td>auth_method</td>
+<td>str &#124; None</td>
+<td>null</td>
+</tr>
+<tr>
+<td>account_limit_errors</td>
+<td>tuple[AccountLimitError, ...]</td>
+<td>[]</td>
+</tr>
+</tbody>
+</table>
+<h3 id="rolebinding">RoleBinding<a class="headerlink" href="#rolebinding" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Python type</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>str</td>
+<td>required</td>
+</tr>
+<tr>
+<td>role</td>
+<td>str</td>
+<td>required</td>
+</tr>
+<tr>
+<td>agent</td>
+<td>str</td>
+<td>required</td>
+</tr>
+<tr>
+<td>workspace</td>
+<td>str</td>
+<td>"."</td>
+</tr>
+<tr>
+<td>scheduling</td>
+<td>str</td>
+<td>"on-demand"</td>
+</tr>
+<tr>
+<td>permission</td>
+<td>str</td>
+<td>"ask"</td>
+</tr>
+<tr>
+<td>session</td>
+<td>str</td>
+<td>"resume-if-compatible"</td>
+</tr>
+<tr>
+<td>model</td>
+<td>str &#124; None</td>
+<td>null</td>
+</tr>
+<tr>
+<td>mode</td>
+<td>str &#124; None</td>
+<td>null</td>
+</tr>
+<tr>
+<td>account</td>
+<td>str</td>
+<td>"default"</td>
+</tr>
+<tr>
+<td>max_running</td>
+<td>int</td>
+<td>1</td>
+</tr>
+<tr>
+<td>timeout_seconds</td>
+<td>int</td>
+<td>1800</td>
+</tr>
+<tr>
+<td>max_prompt_bytes</td>
+<td>int</td>
+<td>262144</td>
+</tr>
+<tr>
+<td>max_session_input_bytes</td>
+<td>int</td>
+<td>1048576</td>
+</tr>
+<tr>
+<td>max_reported_session_cost</td>
+<td>float &#124; None</td>
+<td>null</td>
+</tr>
+<tr>
+<td>reported_cost_currency</td>
+<td>str &#124; None</td>
+<td>null</td>
+</tr>
+<tr>
+<td>max_no_progress_turns</td>
+<td>int</td>
+<td>1</td>
+</tr>
+<tr>
+<td>max_startup_retries</td>
+<td>int</td>
+<td>2</td>
+</tr>
+<tr>
+<td>retry_initial_seconds</td>
+<td>int</td>
+<td>5</td>
+</tr>
+<tr>
+<td>retry_max_seconds</td>
+<td>int</td>
+<td>60</td>
+</tr>
+</tbody>
+</table>
+<h3 id="commanddefinition">CommandDefinition<a class="headerlink" href="#commanddefinition" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Python type</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>str</td>
+<td>required</td>
+</tr>
+<tr>
+<td>argv</td>
+<td>tuple[str, ...]</td>
+<td>required</td>
+</tr>
+<tr>
+<td>roles</td>
+<td>tuple[str, ...]</td>
+<td>required</td>
+</tr>
+<tr>
+<td>cwd</td>
+<td>str</td>
+<td>"."</td>
+</tr>
+<tr>
+<td>timeout_seconds</td>
+<td>int</td>
+<td>600</td>
+</tr>
+<tr>
+<td>max_output_bytes</td>
+<td>int</td>
+<td>1048576</td>
+</tr>
+<tr>
+<td>environment</td>
+<td>tuple[tuple[str, str], ...]</td>
+<td>[]</td>
+</tr>
+<tr>
+<td>required_env</td>
+<td>tuple[str, ...]</td>
+<td>[]</td>
+</tr>
+<tr>
+<td>environment_revision</td>
+<td>str</td>
+<td>"1"</td>
+</tr>
+<tr>
+<td>purpose</td>
+<td>str</td>
+<td>"validation"</td>
+</tr>
+<tr>
+<td>authorized</td>
+<td>bool</td>
+<td>false</td>
+</tr>
+</tbody>
+</table>
+<h3 id="accountlimiterror">AccountLimitError<a class="headerlink" href="#accountlimiterror" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Python type</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>code</td>
+<td>int</td>
+<td>required</td>
+</tr>
+<tr>
+<td>kind</td>
+<td>str</td>
+<td>required</td>
+</tr>
+<tr>
+<td>cooldown_seconds</td>
+<td>int &#124; None</td>
+<td>null</td>
+</tr>
+</tbody>
+</table>
+<h3 id="standdeploymentpolicy">StandDeploymentPolicy<a class="headerlink" href="#standdeploymentpolicy" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Python type</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>profiles</td>
+<td>tuple[str, ...]</td>
+<td>[]</td>
+</tr>
+<tr>
+<td>authorized</td>
+<td>bool</td>
+<td>false</td>
+</tr>
+<tr>
+<td>timeout_seconds</td>
+<td>int</td>
+<td>1800</td>
+</tr>
+<tr>
+<td>max_output_bytes</td>
+<td>int</td>
+<td>1048576</td>
+</tr>
+<tr>
+<td>environment_revision</td>
+<td>str</td>
+<td>"1"</td>
+</tr>
+</tbody>
+</table>
+<h3 id="executionconfig">ExecutionConfig<a class="headerlink" href="#executionconfig" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Python type</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>agents</td>
+<td>tuple[AgentManifest, ...]</td>
+<td>required</td>
+</tr>
+<tr>
+<td>bindings</td>
+<td>tuple[RoleBinding, ...]</td>
+<td>required</td>
+</tr>
+<tr>
+<td>max_running</td>
+<td>int</td>
+<td>4</td>
+</tr>
+<tr>
+<td>account_limits</td>
+<td>tuple[tuple[str, int], ...]</td>
+<td>[]</td>
+</tr>
+<tr>
+<td>commands</td>
+<td>tuple[CommandDefinition, ...]</td>
+<td>[]</td>
+</tr>
+<tr>
+<td>stand</td>
+<td>StandDeploymentPolicy &#124; None</td>
+<td>null</td>
+</tr>
+<tr>
+<td>account_retry_initial_seconds</td>
+<td>int</td>
+<td>5</td>
+</tr>
+<tr>
+<td>account_retry_max_seconds</td>
+<td>int</td>
+<td>60</td>
+</tr>
+<tr>
+<td>max_runtime_events</td>
+<td>int</td>
+<td>10000</td>
+</tr>
+</tbody>
+</table>
+<h3 id="taskrevision">TaskRevision<a class="headerlink" href="#taskrevision" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Python type</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>task_id</td>
+<td>str</td>
+<td>required</td>
+</tr>
+<tr>
+<td>path</td>
+<td>str</td>
+<td>required</td>
+</tr>
+<tr>
+<td>sha256</td>
+<td>str</td>
+<td>required</td>
+</tr>
+</tbody>
+</table>
+<h3 id="resultenvelope">ResultEnvelope<a class="headerlink" href="#resultenvelope" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Python type</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>result_id</td>
+<td>str</td>
+<td>required</td>
+</tr>
+<tr>
+<td>run_id</td>
+<td>str</td>
+<td>required</td>
+</tr>
+<tr>
+<td>task_id</td>
+<td>str</td>
+<td>required</td>
+</tr>
+<tr>
+<td>task_revision</td>
+<td>str</td>
+<td>required</td>
+</tr>
+<tr>
+<td>schema_sha256</td>
+<td>str</td>
+<td>required</td>
+</tr>
+<tr>
+<td>decision</td>
+<td>str</td>
+<td>required</td>
+</tr>
+<tr>
+<td>payload</td>
+<td>dict</td>
+<td>required</td>
+</tr>
+</tbody>
+</table>
+<h2 id="validated-preset-examples">Validated preset examples<a class="headerlink" href="#validated-preset-examples" title="Permanent link">&para;</a></h2>
+<p>Executable and version values are placeholders. No harness is launched by generation.
+Stand profiles and validation commands need separate project configuration.</p>
+<h3 id="deployed">deployed<a class="headerlink" href="#deployed" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">agents</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">configured-acp</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">adapter_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace-with-tested-version</span>
+<span class="w">    </span><span class="nt">argv</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace-with-installed-acp-executable</span>
+<span class="w">    </span><span class="nt">harness_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace-with-tested-version</span>
+<span class="w">    </span><span class="nt">transport</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">acp</span>
+<span class="nt">bindings</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">developer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DEVELOPER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="w">  </span><span class="nt">explorer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">EXPLORER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="w">  </span><span class="nt">live-developer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LIVE-DEVELOPER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">on-demand</span>
+<span class="w">  </span><span class="nt">planner</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ARCHITECT-PLANNER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">on-demand</span>
+<span class="w">  </span><span class="nt">reviewer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ARCHITECT-REVIEWER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="w">  </span><span class="nt">tester</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TESTER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="w">  </span><span class="nt">ui-developer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">UI-DEVELOPER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+</code></pre></div>
+<h3 id="docs">docs<a class="headerlink" href="#docs" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">agents</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">configured-acp</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">adapter_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace-with-tested-version</span>
+<span class="w">    </span><span class="nt">argv</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace-with-installed-acp-executable</span>
+<span class="w">    </span><span class="nt">harness_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace-with-tested-version</span>
+<span class="w">    </span><span class="nt">transport</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">acp</span>
+<span class="nt">bindings</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">planner</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ARCHITECT-PLANNER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">on-demand</span>
+<span class="w">  </span><span class="nt">reader</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">READER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="w">  </span><span class="nt">reviewer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ARCHITECT-REVIEWER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="w">  </span><span class="nt">writer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TECHNICAL-WRITER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+</code></pre></div>
+<h3 id="full">full<a class="headerlink" href="#full" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">agents</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">configured-acp</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">adapter_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace-with-tested-version</span>
+<span class="w">    </span><span class="nt">argv</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace-with-installed-acp-executable</span>
+<span class="w">    </span><span class="nt">harness_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace-with-tested-version</span>
+<span class="w">    </span><span class="nt">transport</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">acp</span>
+<span class="nt">bindings</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">developer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DEVELOPER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="w">  </span><span class="nt">explorer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">EXPLORER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="w">  </span><span class="nt">live-developer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LIVE-DEVELOPER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">on-demand</span>
+<span class="w">  </span><span class="nt">maintainer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MAINTAINER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">on-demand</span>
+<span class="w">  </span><span class="nt">planner</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ARCHITECT-PLANNER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">on-demand</span>
+<span class="w">  </span><span class="nt">reader</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">READER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="w">  </span><span class="nt">reviewer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ARCHITECT-REVIEWER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="w">  </span><span class="nt">tester</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TESTER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="w">  </span><span class="nt">ui-developer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">UI-DEVELOPER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="w">  </span><span class="nt">writer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TECHNICAL-WRITER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+</code></pre></div>
+<h3 id="local">local<a class="headerlink" href="#local" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">agents</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">configured-acp</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">adapter_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace-with-tested-version</span>
+<span class="w">    </span><span class="nt">argv</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace-with-installed-acp-executable</span>
+<span class="w">    </span><span class="nt">harness_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace-with-tested-version</span>
+<span class="w">    </span><span class="nt">transport</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">acp</span>
+<span class="nt">bindings</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">developer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DEVELOPER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="w">  </span><span class="nt">planner</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ARCHITECT-PLANNER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">on-demand</span>
+<span class="w">  </span><span class="nt">reviewer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ARCHITECT-REVIEWER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="w">  </span><span class="nt">tester</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TESTER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+</code></pre></div>
+<h3 id="ui">ui<a class="headerlink" href="#ui" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">agents</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">configured-acp</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">adapter_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace-with-tested-version</span>
+<span class="w">    </span><span class="nt">argv</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace-with-installed-acp-executable</span>
+<span class="w">    </span><span class="nt">harness_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace-with-tested-version</span>
+<span class="w">    </span><span class="nt">transport</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">acp</span>
+<span class="nt">bindings</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">planner</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ARCHITECT-PLANNER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">on-demand</span>
+<span class="w">  </span><span class="nt">reviewer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ARCHITECT-REVIEWER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="w">  </span><span class="nt">tester</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TESTER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="w">  </span><span class="nt">ui-developer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">agent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configured-acp</span>
+<span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">UI-DEVELOPER</span>
+<span class="w">    </span><span class="nt">scheduling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">queue</span>
+<span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+</code></pre></div>
+<h2 id="source-fingerprints">Source fingerprints<a class="headerlink" href="#source-fingerprints" title="Permanent link">&para;</a></h2>
+<p>The check also detects changes to validators and controllers referenced by these declarations.</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>SHA-256</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>src/greatminds/cli/task.py</td>
+<td>c96e5267236816a503979f1b1f77048fc84abf059c7dce3d3dd73c44086fe0d7</td>
+</tr>
+<tr>
+<td>src/greatminds/data/schema.yaml</td>
+<td>7ff6c38d41376e95889f7abc11c02305caf368f64290db02976232e553d5ae94</td>
+</tr>
+<tr>
+<td>src/greatminds/domain/maintenance.py</td>
+<td>4e61f33e40eaefd8ff286262420a32526b3d158ef04629cbe85b85e879160f29</td>
+</tr>
+<tr>
+<td>src/greatminds/domain/results.py</td>
+<td>3f376fb886e3925be8be60f63b4a352267131c9f3509c29d25291a7c40e1b0f1</td>
+</tr>
+<tr>
+<td>src/greatminds/runtime/account_limits.py</td>
+<td>1c4083f6d345e2cada11cff5938ff2f01d3bcaa0184ba72418500f7d138fe790</td>
+</tr>
+<tr>
+<td>src/greatminds/runtime/config.py</td>
+<td>77102ca79ad4feb4d44460db3f95446147b3e17000b3439cb84eca9813df5d17</td>
+</tr>
+<tr>
+<td>src/greatminds/runtime/presets.py</td>
+<td>89da0ea85d1c2a22105795870d0d54e51b69e214088c7e1ca07eebd33352fd97</td>
+</tr>
+<tr>
+<td>src/greatminds/runtime/store.py</td>
+<td>05b92658202197d88164d49f6e888b8571ec892e3becd250b58ff975a7c6567d</td>
+</tr>
+<tr>
+<td>tools/generate_contract_reference.py</td>
+<td>5018e1629d58c65e917e0701eaf9932df49dad003fe3a7ac58a802a77a96525f</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

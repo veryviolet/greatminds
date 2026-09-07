@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://veryviolet.github.io/greatminds/getting-started/upgrading/">
       
       
-        <link rel="prev" href="../first-project/">
+        <link rel="prev" href="../local-web/">
       
       
         <link rel="next" href="../../concepts/queues/">
@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -565,6 +565,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../local-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -628,10 +656,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#update-notifications" class="md-nav__link">
+  <a href="#moving-to-30" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Update notifications
+        Moving to 3.0
       
     </span>
   </a>
@@ -639,10 +667,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#before-upgrading-a-fleet" class="md-nav__link">
+  <a href="#prepare-active-work" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Before upgrading a fleet
+        Prepare active work
       
     </span>
   </a>
@@ -650,10 +678,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#after-upgrading" class="md-nav__link">
+  <a href="#apply-the-update" class="md-nav__link">
     <span class="md-ellipsis">
       
-        After upgrading
+        Apply the update
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verify-and-resume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify and resume
       
     </span>
   </a>
@@ -798,7 +837,7 @@
   <span class="md-ellipsis">
     
   
-    Codex Profiles
+    Agent Manifests and Bindings
   
 
     
@@ -1025,6 +1064,34 @@
     
   
     Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/contract-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Contract Reference
   
 
     
@@ -1469,10 +1536,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#update-notifications" class="md-nav__link">
+  <a href="#moving-to-30" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Update notifications
+        Moving to 3.0
       
     </span>
   </a>
@@ -1480,10 +1547,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#before-upgrading-a-fleet" class="md-nav__link">
+  <a href="#prepare-active-work" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Before upgrading a fleet
+        Prepare active work
       
     </span>
   </a>
@@ -1491,10 +1558,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#after-upgrading" class="md-nav__link">
+  <a href="#apply-the-update" class="md-nav__link">
     <span class="md-ellipsis">
       
-        After upgrading
+        Apply the update
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verify-and-resume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify and resume
       
     </span>
   </a>
@@ -1522,42 +1600,61 @@
 
 
 <h1 id="upgrading">Upgrading<a class="headerlink" href="#upgrading" title="Permanent link">&para;</a></h1>
-<p>Upgrade the package in the environment that runs your fleet, then restart the
-daemon and agents so long-running processes import the new code. The normal
-fleet path is:</p>
+<p>Run package updates from the project and Python environment used by Greatminds.
+Inspect the available release first:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>update<span class="w"> </span>--check
+</code></pre></div>
+<p>This queries PyPI without changing the package or project. Updates are operator
+initiated; the ACP daemon does not currently send periodic release notifications.</p>
+<h2 id="moving-to-30">Moving to 3.0<a class="headerlink" href="#moving-to-30" title="Permanent link">&para;</a></h2>
+<p>The 3.0 release uses ACP for every managed executor. Define agent manifests and
+role bindings in <code>coordination/execution.yaml</code>, including the installed adapter
+and harness versions. Setup preserves task files and an existing execution
+configuration; it does not choose harnesses or credentials. Verify this contract
+before starting the daemon. Codex, Claude and Grok are the accepted harness scope.</p>
+<p>The packaged <a href="../local-web/">web workspace</a> starts with <code>greatminds web --port 8765</code>.
+It has no application authentication and binds to localhost by default.</p>
+<h2 id="prepare-active-work">Prepare active work<a class="headerlink" href="#prepare-active-work" title="Permanent link">&para;</a></h2>
+<p>Inspect runs and stop new dispatch before changing the daemon's environment:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>run<span class="w"> </span>status
+greatminds<span class="w"> </span>run<span class="w"> </span>pause
+</code></pre></div>
+<p>Pause leaves existing work running. Let it finish or explicitly cancel selected
+runs before restarting. Uncertain command or deployment effects need the
+recovery procedures in the <a href="../../operations/runbook/">operations runbook</a>.
+A daemon restart does not prove those effects safe to repeat.</p>
+<h2 id="apply-the-update">Apply the update<a class="headerlink" href="#apply-the-update" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>update
 </code></pre></div>
-<p>If your project uses a pinned virtual environment, run the upgrade inside that
-environment. If the fleet is launched from tmux, restart the agent processes
-after the package upgrade so their registries, pty sockets, and role prompts
-match the installed version.</p>
-<p><code>greatminds update</code> also refreshes daemon systemd units and runs the equivalent
-of <code>greatminds daemon install</code> when the template unit is missing. Operators do
-not need a separate manual daemon-install step during a normal update.</p>
-<h2 id="update-notifications">Update notifications<a class="headerlink" href="#update-notifications" title="Permanent link">&para;</a></h2>
-<p>When <code>coordd</code> is running, it periodically checks PyPI for a newer greatminds
-release. The interval and target come from the packaged schema under
-<code>auto_update</code>; the default interval is <code>14400</code> seconds, and the default target
-is <code>MAINTAINER</code>.</p>
-<p>The current mode is <code>notify_only</code>. If PyPI has a newer version, <code>coordd</code> sends
-one inbox <code>info</code> message to MAINTAINER with the installed version, latest
-version, release link, and the command to run. It does not upgrade the fleet by
-itself. MAINTAINER chooses the timing and runs <code>greatminds update</code> manually.</p>
-<h2 id="before-upgrading-a-fleet">Before upgrading a fleet<a class="headerlink" href="#before-upgrading-a-fleet" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Check the changelog for CLI or coordination-contract changes.</li>
-<li>Record the currently installed version: <code>greatminds --version</code>.</li>
-<li>Make sure the project has no partially moved tasks or orphaned intents:
-  <code>greatminds watchdog</code>.</li>
-<li>Keep the previous package version available for rollback.</li>
-</ul>
-<h2 id="after-upgrading">After upgrading<a class="headerlink" href="#after-upgrading" title="Permanent link">&para;</a></h2>
-<p>Run:</p>
-<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>--help
-greatminds<span class="w"> </span>daemon<span class="w"> </span>status
+<p>The command selects the detected environment manager, upgrades the package,
+checks the installed version in a fresh Python process, and refreshes project
+bootstrap state. A major version increase requires <code>--major</code>.
+For an explicitly registered service project, use <code>--project PROJECT_NAME</code>.</p>
+<p>Existing installed services have their units refreshed and receive
+<code>systemctl --user try-restart</code>. Inactive services remain inactive. Update skips
+missing service installations; install a service separately when you need one.
+Restart a foreground daemon manually using the updated environment. Harnesses
+and ACP adapters have their own installation and update procedures.</p>
+<p>To repeat only the project and installed-service refresh after managing the
+package yourself:</p>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>update<span class="w"> </span>--post-pip
+</code></pre></div>
+<h2 id="verify-and-resume">Verify and resume<a class="headerlink" href="#verify-and-resume" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>daemon<span class="w"> </span>doctor<span class="w"> </span>--project-dir<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">"</span><span class="w"> </span>--json
+greatminds<span class="w"> </span>project<span class="w"> </span>schema<span class="w"> </span>--check
+greatminds<span class="w"> </span>run<span class="w"> </span>status
 greatminds<span class="w"> </span>watchdog
 </code></pre></div>
-<p>Then smoke one or two low-risk roles before restarting a whole fleet.</p>
+<p>Doctor performs static checks; exercise an actual ACP conversation to verify
+provider authentication and protocol behavior. Resolve reported holds before
+resuming automatic dispatch with <code>greatminds run resume</code>.</p>
+<p>The effective installed schema governs runtime policy. <code>.greatminds/schema.yaml</code>
+is a diagnostic mirror, not a project policy override. Setup creates a missing
+mirror but preserves an existing one. If <code>project schema --check</code> reports drift,
+compare the mirror with <code>greatminds project schema</code>; after reviewing the change,
+replace the mirror with that command's output. Restart the daemon after changing
+the installed package or an explicit <code>GREATMINDS_CANON_DIR</code>. Existing runs retain
+their pinned contracts.</p>
 
 
 
@@ -1612,7 +1709,7 @@ greatminds<span class="w"> </span>watchdog
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

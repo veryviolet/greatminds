@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "date": "2026-09-06",
+  "status": "completed",
+  "scenario": "Continuation of the recorded mixed Codex developer / Claude tester / Grok reviewer clamp pipeline.",
+  "prior_evidence": "acp-mixed-pipeline-2026-09-06.json",
+  "verified": true,
+  "operator_assisted": true,
+  "retry": {
+    "role": "ARCHITECT-REVIEWER",
+    "previous_timeout_seconds": 240,
+    "retry_timeout_seconds": 600,
+    "explicit_operator_retry": true,
+    "permissions": "One-time operator approvals; no persistent permission changes."
+  },
+  "final_commit": "aeacbec5956d41ab9cd097d54dc4c4d0047f5f3e",
+  "main_checkout_tests": {
+    "command": "python -m unittest -v test_clamp",
+    "passed": 6
+  },
+  "changed_files": [
+    "clamp.py"
+  ],
+  "worktree_removed": true,
+  "idle_restart_unchanged": [
+    "runs",
+    "results",
+    "commands"
+  ],
+  "runs": [
+    {
+      "role": "DEVELOPER",
+      "state": "completed"
+    },
+    {
+      "role": "TESTER",
+      "state": "completed"
+    },
+    {
+      "role": "ARCHITECT-REVIEWER",
+      "state": "cancelled"
+    },
+    {
+      "role": "ARCHITECT-REVIEWER",
+      "state": "completed"
+    }
+  ],
+  "result_statuses": [
+    "applied",
+    "applied",
+    "applied"
+  ],
+  "commands": [
+    {
+      "command": "unit-tests",
+      "status": "succeeded",
+      "exit_code": 0,
+      "source_before": {
+        "commit": "d9fa98e18d441cc1c3a31b2a2cc2206b53c5c452",
+        "source_sha256": "a535ed068849a5871d7588003d744326aa308d4f8d104c4c1ba5c88c5b6ac6d2"
+      },
+      "source_after": {
+        "commit": "d9fa98e18d441cc1c3a31b2a2cc2206b53c5c452",
+        "source_sha256": "a535ed068849a5871d7588003d744326aa308d4f8d104c4c1ba5c88c5b6ac6d2"
+      }
+    },
+    {
+      "command": "unit-tests",
+      "status": "succeeded",
+      "exit_code": 0,
+      "source_before": {
+        "commit": "d9fa98e18d441cc1c3a31b2a2cc2206b53c5c452",
+        "source_sha256": "a535ed068849a5871d7588003d744326aa308d4f8d104c4c1ba5c88c5b6ac6d2"
+      },
+      "source_after": {
+        "commit": "d9fa98e18d441cc1c3a31b2a2cc2206b53c5c452",
+        "source_sha256": "a535ed068849a5871d7588003d744326aa308d4f8d104c4c1ba5c88c5b6ac6d2"
+      }
+    },
+    {
+      "command": "unit-tests",
+      "status": "succeeded",
+      "exit_code": 0,
+      "source_before": {
+        "commit": "d9fa98e18d441cc1c3a31b2a2cc2206b53c5c452",
+        "source_sha256": "a535ed068849a5871d7588003d744326aa308d4f8d104c4c1ba5c88c5b6ac6d2"
+      },
+      "source_after": {
+        "commit": "d9fa98e18d441cc1c3a31b2a2cc2206b53c5c452",
+        "source_sha256": "a535ed068849a5871d7588003d744326aa308d4f8d104c4c1ba5c88c5b6ac6d2"
+      }
+    }
+  ],
+  "domain_blocks": [
+    {
+      "kind": "implementation",
+      "provenance": {
+        "run_id": "234d4d5df5554a9cb94368ccd4125d56",
+        "result_id": "234d4d5df5554a9cb94368ccd4125d56-result",
+        "task_revision": "60d3b9da56c887f14cee6b8b536089b98c3ffed565d98bf84b1b3b9154cf330a",
+        "schema_sha256": "eedafb96edcfbf2d86df8d63755a379fbe817cca524f86095319a9cb4cb00446",
+        "applied_by": "SYSTEM"
+      }
+    },
+    {
+      "kind": "tests",
+      "provenance": {
+        "run_id": "950c42ead78e42df8d1fdf1e5f39b187",
+        "result_id": "950c42ead78e42df8d1fdf1e5f39b187-result",
+        "task_revision": "b1e99e642190d94a305637d0d2777247feb565ef9b664a0d1d3861f6921af3ae",
+        "schema_sha256": "eedafb96edcfbf2d86df8d63755a379fbe817cca524f86095319a9cb4cb00446",
+        "applied_by": "SYSTEM",
+        "command_request_id": "6073c809429145cfb2980aaea998f3ce"
+      }
+    },
+    {
+      "kind": "review",
+      "provenance": {
+        "run_id": "753f925ce5624bdf84b62c80a70638ed",
+        "result_id": "753f925ce5624bdf84b62c80a70638ed-result",
+        "task_revision": "5c0a865e25d8f989689190a9bad2f40c60fa60797292513ccca602564207eb27",
+        "schema_sha256": "eedafb96edcfbf2d86df8d63755a379fbe817cca524f86095319a9cb4cb00446",
+        "applied_by": "SYSTEM"
+      }
+    }
+  ],
+  "limits": [
+    "One synthetic local feature, not full role/harness coverage.",
+    "Operator-assisted permissions and one explicit reviewer retry; not unattended execution.",
+    "Timing is not a controlled performance comparison."
+  ]
+}

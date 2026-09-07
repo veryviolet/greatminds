@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -563,6 +563,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../getting-started/local-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../getting-started/upgrading/" class="md-nav__link">
         
   
@@ -713,7 +741,7 @@
   <span class="md-ellipsis">
     
   
-    Codex Profiles
+    Agent Manifests and Bindings
   
 
     
@@ -965,6 +993,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../contract-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generated Contract Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../filesystem-layout/" class="md-nav__link">
         
   
@@ -1109,10 +1165,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#role-lifecycles" class="md-nav__link">
+  <a href="#admission-and-turns" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Role Lifecycles
+        Admission and turns
       
     </span>
   </a>
@@ -1120,21 +1176,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#lifecycle-and-tool-matrix" class="md-nav__link">
+  <a href="#deterministic-supervision" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Lifecycle And Tool Matrix
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#wake-delivery" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Wake Delivery
+        Deterministic supervision
       
     </span>
   </a>
@@ -1469,10 +1514,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#role-lifecycles" class="md-nav__link">
+  <a href="#admission-and-turns" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Role Lifecycles
+        Admission and turns
       
     </span>
   </a>
@@ -1480,21 +1525,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#lifecycle-and-tool-matrix" class="md-nav__link">
+  <a href="#deterministic-supervision" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Lifecycle And Tool Matrix
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#wake-delivery" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Wake Delivery
+        Deterministic supervision
       
     </span>
   </a>
@@ -1522,104 +1556,57 @@
 
 
 <h1 id="lifecycle-model">Lifecycle Model<a class="headerlink" href="#lifecycle-model" title="Permanent link">&para;</a></h1>
-<p>greatminds separates a role's responsibility from the mechanics used to run
-that role. The packaged schema defines the role contract; setup copies the
-runtime copy to <code>.greatminds/schema.yaml</code>. <code>coordination/coord.yaml</code> chooses
-the tool and launch mode for a concrete project.</p>
-<h2 id="role-lifecycles">Role Lifecycles<a class="headerlink" href="#role-lifecycles" title="Permanent link">&para;</a></h2>
+<p>A role defines responsibility and workflow authority. A binding defines how that
+role runs. Configure bindings in <code>coordination/execution.yaml</code>; every binding
+uses the common ACP client regardless of harness.</p>
+<h2 id="admission-and-turns">Admission and turns<a class="headerlink" href="#admission-and-turns" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Lifecycle</th>
-<th>Meaning</th>
-<th>Normal roles</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>interactive</code></td>
-<td>Human-paced chat. The role can ask follow-up questions and stay open for operator steering.</td>
-<td><code>USER</code>, <code>ARCHITECT-PLANNER</code></td>
-</tr>
-<tr>
-<td><code>self-loop</code></td>
-<td>Autonomous health-check loop. The role wakes itself on a timer and may be woken early by <code>coordd</code>.</td>
-<td><code>MAINTAINER</code></td>
-</tr>
-<tr>
-<td><code>driven</code></td>
-<td>One event creates one turn. The pane is idle between turns; <code>coordd</code> starts a fresh invocation when work lands.</td>
-<td>implementers, reviewers, tester, reader, explorer, stand keeper</td>
-</tr>
-</tbody>
-</table>
-<p>The product pipeline uses driven workers so idle roles do not spend tokens
-polling empty queues. The exception is <code>MAINTAINER</code>: it is a non-user-facing
-self-loop watchdog because fleet recovery must still happen when no product
-task is moving.</p>
-<h2 id="lifecycle-and-tool-matrix">Lifecycle And Tool Matrix<a class="headerlink" href="#lifecycle-and-tool-matrix" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Lifecycle</th>
-<th>Tool</th>
-<th>Turn mechanism</th>
+<th>Binding scheduling</th>
+<th>Source of work</th>
 <th>Between turns</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>interactive</code></td>
-<td><code>claude</code>, <code>codex</code>, <code>cursor</code></td>
-<td>User or planner-facing chat input</td>
-<td>Session remains operator-facing</td>
+<td><code>queue</code></td>
+<td>Eligible tasks in the role's queues, subject to admission and evidence gates</td>
+<td>Daemon observes state; no agent polling turn is required</td>
 </tr>
 <tr>
-<td><code>self-loop</code></td>
-<td><code>claude</code></td>
-<td><code>/loop</code> plus <code>ScheduleWakeup</code>, with <code>coordd</code> early wake</td>
-<td>Loop waits for the next health tick</td>
-</tr>
-<tr>
-<td><code>self-loop</code></td>
-<td><code>codex</code> or <code>cursor</code></td>
-<td>Explicit loop plus shell sleep fallback, with <code>coordd</code> interrupt</td>
-<td>Loop waits for the next health tick</td>
-</tr>
-<tr>
-<td><code>driven</code></td>
-<td><code>claude</code></td>
-<td><code>coordd</code> starts one <code>claude -p</code> or resume turn with rendered role bootstrap</td>
-<td>Idle shell pane</td>
-</tr>
-<tr>
-<td><code>driven</code></td>
-<td><code>codex</code></td>
-<td><code>coordd</code> starts one fresh <code>codex app-server</code> stdio turn and persists the thread id</td>
-<td>Idle shell pane</td>
-</tr>
-<tr>
-<td><code>driven</code></td>
-<td><code>cursor</code></td>
-<td><code>coordd</code> starts the configured per-turn command</td>
-<td>Idle shell pane</td>
+<td><code>on-demand</code></td>
+<td>Explicit operator conversation input</td>
+<td>Conversation persists; queued messages are consumed by the daemon</td>
 </tr>
 </tbody>
 </table>
-<p>For driven roles, the rule is one event, one tick, then exit. They do not run
-<code>/loop</code>, schedule their own wakeups, or short-poll queues. Their first action
-is still a CLI call such as <code>greatminds inbox list</code> or
-<code>greatminds task list &lt;queue&gt;</code>, which also refreshes the role heartbeat.</p>
-<h2 id="wake-delivery">Wake Delivery<a class="headerlink" href="#wake-delivery" title="Permanent link">&para;</a></h2>
-<p><code>coordd</code> observes queue files, inbox files, and stand state. It delivers turns
-or wake signals; it does not decide task transitions.</p>
-<p>For non-driven <code>codex</code> and <code>cursor</code> roles, <code>coordd</code> finds the deepest sleeping
-descendant and sends <code>SIGINT</code>. That interrupts the long sleep wrapper so the
-next loop tick starts immediately. For non-driven <code>claude</code> roles, it sends the
-configured tmux input.</p>
-<p>For driven roles, <code>coordd</code> spawns a single turn. A role that has no inbox
-message and no task in its owned queue exits without scheduling another turn;
-the next filesystem event drives it again.</p>
+<p>Interactive conversations have durable IDs and ordered user messages. CLI,
+tmux and IDE frontends attach to daemon-owned conversations. Detaching a
+frontend does not submit a new prompt or cancel the current turn.</p>
+<p>For task execution, the daemon atomically claims a task revision, pins contracts,
+opens or loads a compatible ACP session, applies selected model/mode settings,
+and submits context. ACP permission requests follow the binding policy. An
+operator decision can place the run in <code>waiting_input</code>; authentication problems
+can produce <code>waiting_auth</code>. Cancellation requests receive bounded cleanup.</p>
+<p>Session reuse is governed by the binding's session policy and negotiated agent
+capabilities. Changing harnesses does not transfer their private conversation
+history; the assigned task and pinned contract supply portable context.</p>
+<h2 id="deterministic-supervision">Deterministic supervision<a class="headerlink" href="#deterministic-supervision" title="Permanent link">&para;</a></h2>
+<p>The daemon handles queue observation, dependency readiness, admission limits,
+startup backoff and result reconciliation in code. Role metadata such as
+<code>driven</code> or <code>interactive</code> in the schema does not select a native
+transport, tmux wake sequence or provider-specific timer loop.</p>
+<p>Recognized pre-prompt startup failures can retry within configured budgets.
+Account backoff is shared across bindings with the same configured account.
+Completed background turns without workflow progress are bounded by
+<code>max_no_progress_turns</code>, which defaults to one. Token output and task metadata
+changes do not count as workflow advancement.</p>
+<p>A completed prompt does not verify a task. Typed results pass through the domain
+service; command and deployment effects retain their own evidence and recovery
+requirements. Unknown post-prompt failures are not automatically retried.</p>
+<p>See the <a href="../execution-contract/">execution contract</a> for precise retry eligibility,
+session compatibility, permission and recovery behavior.</p>
 
 
 
@@ -1674,7 +1661,7 @@ the next filesystem event drives it again.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
