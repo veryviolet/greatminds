@@ -75,6 +75,7 @@ def project_schema(project_dir: Path | None, as_json: bool, check: bool) -> None
         click.echo(snapshot.text, nl=False)
     if check and mirror["status"] != "current":
         if not as_json:
-            click.echo("Inspect the difference before refreshing generated files with "
-                       "`greatminds setup`. Runtime policy comes from the schema above.")
+            click.echo("Inspect the difference against `greatminds project schema` before "
+                       "replacing the mirror. Setup preserves existing mirrors. "
+                       "Runtime policy comes from the schema above.")
         raise click.exceptions.Exit(2)

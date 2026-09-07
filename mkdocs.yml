@@ -55,7 +55,7 @@ nav:
   - Concepts:
       - Queues: concepts/queues.md
       - Roles: concepts/roles.md
-      - Codex Profiles: concepts/codex-profiles.md
+      - Agent Manifests and Bindings: concepts/codex-profiles.md
       - Scenarios: concepts/scenarios.md
       - Stand Operations: concepts/stand-operations.md
       - Stand Gate: concepts/stand-gate.md

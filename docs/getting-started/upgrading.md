@@ -1,58 +1,70 @@
 # Upgrading
 
-Upgrade the package in the environment that runs your fleet, then restart the
-daemon and agents so long-running processes import the new code. The normal
-fleet path is:
+Run package updates from the project and Python environment used by Greatminds.
+Inspect the available release first:
+
+```bash
+greatminds update --check
+```
+
+This queries PyPI without changing the package or project. Updates are operator
+initiated; the ACP daemon does not currently send periodic release notifications.
+
+## Prepare active work
+
+Inspect runs and stop new dispatch before changing the daemon's environment:
+
+```bash
+greatminds run status
+greatminds run pause
+```
+
+Pause leaves existing work running. Let it finish or explicitly cancel selected
+runs before restarting. Uncertain command or deployment effects need the
+recovery procedures in the [operations runbook](../operations/runbook.md).
+A daemon restart does not prove those effects safe to repeat.
+
+## Apply the update
 
 ```bash
 greatminds update
 ```
 
-If your project uses a pinned virtual environment, run the upgrade inside that
-environment. If the fleet is launched from tmux, restart the agent processes
-after the package upgrade so their registries, pty sockets, and role prompts
-match the installed version.
+The command selects the detected environment manager, upgrades the package,
+checks the installed version in a fresh Python process, and refreshes project
+bootstrap state. A major version increase requires `--major`.
+For an explicitly registered service project, use `--project PROJECT_NAME`.
 
-`greatminds update` also refreshes daemon systemd units and runs the equivalent
-of `greatminds daemon install` when the template unit is missing. Operators do
-not need a separate manual daemon-install step during a normal update.
+Existing installed services have their units refreshed and receive
+`systemctl --user try-restart`. Inactive services remain inactive. Update skips
+missing service installations; install a service separately when you need one.
+Restart a foreground daemon manually using the updated environment. Harnesses
+and ACP adapters have their own installation and update procedures.
 
-## Update notifications
-
-When `coordd` is running, it periodically checks PyPI for a newer greatminds
-release. The interval and target come from the packaged schema under
-`auto_update`; the default interval is `14400` seconds, and the default target
-is `MAINTAINER`.
-
-The current mode is `notify_only`. If PyPI has a newer version, `coordd` sends
-one inbox `info` message to MAINTAINER with the installed version, latest
-version, release link, and the command to run. It does not upgrade the fleet by
-itself. MAINTAINER chooses the timing and runs `greatminds update` manually.
-
-## Before upgrading a fleet
-
-- Check the changelog for CLI or coordination-contract changes.
-- Record the currently installed version: `greatminds --version`.
-- Make sure the project has no partially moved tasks or orphaned intents:
-  `greatminds watchdog`.
-- Keep the previous package version available for rollback.
-
-## After upgrading
-
-Run:
+To repeat only the project and installed-service refresh after managing the
+package yourself:
 
 ```bash
-greatminds --help
-greatminds daemon status
-greatminds watchdog
-greatminds project schema --check
+greatminds update --post-pip
 ```
 
-Then smoke one or two low-risk roles before restarting a whole fleet.
+## Verify and resume
 
-The installed canon schema governs CLI validation, daemon dispatch, and service
-selection. `.greatminds/schema.yaml` is a generated mirror, not a project policy
-override. If the check reports drift, inspect it against
-`greatminds project schema` before refreshing generated files with
-`greatminds setup`. Restart running processes after updating the installed
-package or an explicit `GREATMINDS_CANON_DIR` so cached contracts agree.
+```bash
+greatminds daemon doctor --project-dir "$PWD" --json
+greatminds project schema --check
+greatminds run status
+greatminds watchdog
+```
+
+Doctor performs static checks; exercise an actual ACP conversation to verify
+provider authentication and protocol behavior. Resolve reported holds before
+resuming automatic dispatch with `greatminds run resume`.
+
+The effective installed schema governs runtime policy. `.greatminds/schema.yaml`
+is a diagnostic mirror, not a project policy override. Setup creates a missing
+mirror but preserves an existing one. If `project schema --check` reports drift,
+compare the mirror with `greatminds project schema`; after reviewing the change,
+replace the mirror with that command's output. Restart the daemon after changing
+the installed package or an explicit `GREATMINDS_CANON_DIR`. Existing runs retain
+their pinned contracts.

@@ -1679,3 +1679,16 @@ Validation: 87 account/startup/no-progress/runtime contract checks passed in
 21.14s, including store reopen after crash recovery and permission resume after
 a newer account failure. No live provider was invoked. This checkpoint does not
 close the remaining modernization milestones listed above.
+
+### ACP installation and update guidance (2026-09-07)
+
+Rewrote installation, upgrading and the former native Codex profile guide around
+ACP manifests/bindings, separate harness authentication, optional stands and
+explicit service installation. Documented installed-service try-restart and
+manual foreground restart; removed the unsupported daemon release-notification
+claim. Corrected project schema's drift hint: setup preserves existing mirrors.
+
+Validation: strict MkDocs build passed in 1.54s. Behavior descriptions were
+checked against bootstrap, update, configuration and project-schema code.
+Remaining concept/architecture pages and packaged native assets still need the
+cutover audit; this checkpoint does not claim that cleanup is complete.

@@ -1,36 +1,55 @@
 # Installation
 
-greatminds is a Python package with one console entry point:
+Greatminds requires Python 3.11 or newer and a POSIX environment. Install it in
+the Python environment that will run the CLI and daemon:
 
 ```bash
-pip install greatminds
+python -m pip install greatminds
 greatminds --help
 ```
 
-For development or documentation work inside a checkout, install the project in
-editable mode:
+An ACP agent or adapter must be installed and authenticated separately. See the
+[compatibility matrix](../architecture/acp-compatibility.md) for tested versions
+and the [first project guide](first-project.md) for configuration and a first
+conversation. Package installation alone does not establish provider access.
+
+## Optional components
+
+- `tmux` for `greatminds launch --target tmux`.
+- A systemd user manager on Linux for `greatminds daemon install` and service
+  control. You can also run `greatminds coordd` in a terminal.
+- The `stands` extra for Ansible-backed YAML stand profiles:
 
 ```bash
-pip install -e .
+python -m pip install 'greatminds[stands]'
 ```
 
-To build this documentation site locally, install the docs extra:
+Local ACP conversations and queue dispatch do not require Ansible. Installing
+this extra does not configure or deploy a stand.
+
+## Development and documentation
+
+Inside a source checkout:
 
 ```bash
-pip install -e '.[docs]'
+python -m pip install -e .
+```
+
+To build the documentation:
+
+```bash
+python -m pip install -e '.[docs]'
 mkdocs build --strict
 ```
 
-## Requirements
+## Project initialization
 
-- Python 3.11 or newer.
-- A POSIX-like environment for the filesystem queue model.
-- `tmux` when using `greatminds launch --target tmux`.
-- `systemctl --user` when using `greatminds daemon` to supervise `coordd`.
+The wheel includes the CLI, ACP runtime, schema and package data. Run
+`greatminds setup` in your project to create runtime queues under `.greatminds/`,
+a schema mirror and an empty `coordination/execution.yaml`. Setup preserves an
+existing execution contract and task data. Configure ACP manifests and role
+bindings in that execution file before dispatching work.
 
-## Package contents
-
-The wheel ships the CLI, coordination schema, role prompts, queue templates,
-Codex profiles, Claude Code plugins, and systemd user unit template. A project
-does not need to vendor the canon files by hand; `greatminds setup` copies the
-current package data into the project.
+Setup does not install harnesses, copy provider credentials, generate native
+Codex profiles or Claude plugins, or install a systemd service. Optional stand
+profiles must be selected and configured explicitly.

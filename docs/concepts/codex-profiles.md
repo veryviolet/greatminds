@@ -1,50 +1,39 @@
-# Codex Profiles
+# Agent manifests and role bindings
 
-Codex roles use generated per-role profile sources instead of Claude plugin
-directories. During `greatminds setup`, greatminds creates one profile source
-directory for each shipped Codex role:
+Configure all harnesses through `coordination/execution.yaml`. An agent manifest
+identifies the ACP executable, arguments, version labels, environment references
+and capability requirements. A role binding selects that manifest and defines
+the role, workspace, scheduling, model, mode and permission policy.
 
-```text
-<project>/
-  .greatminds/
-    .codex-home/
-      developer/
-        config.toml
-      tester/
-        config.toml
-      technical-writer/
-        config.toml
-```
+One agent can serve several roles, and several bindings can use different agents
+for the same role. The daemon uses the same ACP lifecycle for each binding and
+builds context from the assigned task and pinned schema. Role-specific review
+and evidence gates still apply when two roles share a harness.
 
-Each `config.toml` is copied from
-`src/greatminds/data/codex/profiles/<role>.config.toml` and then split for
-Codex profile-v2 loading:
+## Model, mode and permissions
 
-- `.greatminds/.codex-home/<role>/config.toml` contains the role posture,
-  trusted-project entry, and skill registrations.
-- `.greatminds/.codex-home/<role>/<role>.config.toml` contains the role model
-  and execution settings.
+Set model and mode on the binding when needed. The ACP runtime checks support
+and applies those selections to the session. Unsupported selections produce an
+explicit failure; they do not silently choose another model or transport.
 
-These directories are profile sources only. They are not authentication homes
-and must not contain `auth.json`.
+Use `permission: ask` for explicit operator choices. A background turn needing a
+choice enters a waiting state. Harness-side permissions and workspace access
+also matter: ACP orchestration is not an operating-system sandbox.
 
-Codex-backed roles authenticate through the single machine Codex home. By
-default that is `~/.codex`; operators may override it with
-`GREATMINDS_CODEX_HOME`. Greatminds sets `CODEX_HOME` to that machine home so
-Codex reads the one valid login and refreshes tokens in one place.
+## Authentication and environment
 
-Role-specific behavior is preserved without using a per-role auth home:
+Install and authenticate the harness or adapter using its own supported
+procedure. Declare required environment references in the manifest and supply
+the values through the daemon's configured environment. Credentials do not
+belong in task context or execution YAML.
 
-- The role bootstrap/contract is passed as the prompt or app-server
-  `baseInstructions`.
-- The role model is read from the generated profile source and injected with a
-  `-c model="..."` override.
-- Driven Codex turns also inject unattended execution settings with `-c`
-  overrides.
+Greatminds setup does not generate per-role Codex homes, inject native app-server
+instructions, or copy machine authentication. A configured account name groups
+concurrency and startup backoff within this project; it does not select or infer
+a provider identity.
 
-To inspect or customize a project's Codex posture, edit the generated
-`.greatminds/.codex-home/<role>/` files after setup. Do not copy or symlink
-machine auth into those directories. To change the defaults for future
-projects, update the canon templates under
-`src/greatminds/data/codex/profiles/` before running `greatminds setup` in
-those projects.
+See the [first project guide](../getting-started/first-project.md) for a minimal
+manifest, the [execution contract](../architecture/execution-contract.md) for
+configuration and recovery rules, and the
+[compatibility matrix](../architecture/acp-compatibility.md) for the scope of
+actual harness validation.
