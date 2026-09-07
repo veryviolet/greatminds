@@ -1,49 +1,46 @@
 # Lifecycle Model
 
-greatminds separates a role's responsibility from the mechanics used to run
-that role. The packaged schema defines the role contract; setup copies the
-runtime copy to `.greatminds/schema.yaml`. `coordination/coord.yaml` chooses
-the tool and launch mode for a concrete project.
+A role defines responsibility and workflow authority. A binding defines how that
+role runs. Configure bindings in `coordination/execution.yaml`; every binding
+uses the common ACP client regardless of harness.
 
-## Role Lifecycles
+## Admission and turns
 
-| Lifecycle | Meaning | Normal roles |
+| Binding scheduling | Source of work | Between turns |
 | --- | --- | --- |
-| `interactive` | Human-paced chat. The role can ask follow-up questions and stay open for operator steering. | `USER`, `ARCHITECT-PLANNER` |
-| `self-loop` | Autonomous health-check loop. The role wakes itself on a timer and may be woken early by `coordd`. | `MAINTAINER` |
-| `driven` | One event creates one turn. The pane is idle between turns; `coordd` starts a fresh invocation when work lands. | implementers, reviewers, tester, reader, explorer, stand keeper |
+| `queue` | Eligible tasks in the role's queues, subject to admission and evidence gates | Daemon observes state; no agent polling turn is required |
+| `on-demand` | Explicit operator conversation input | Conversation persists; queued messages are consumed by the daemon |
 
-The product pipeline uses driven workers so idle roles do not spend tokens
-polling empty queues. The exception is `MAINTAINER`: it is a non-user-facing
-self-loop watchdog because fleet recovery must still happen when no product
-task is moving.
+Interactive conversations have durable IDs and ordered user messages. CLI,
+tmux and IDE frontends attach to daemon-owned conversations. Detaching a
+frontend does not submit a new prompt or cancel the current turn.
 
-## Lifecycle And Tool Matrix
+For task execution, the daemon atomically claims a task revision, pins contracts,
+opens or loads a compatible ACP session, applies selected model/mode settings,
+and submits context. ACP permission requests follow the binding policy. An
+operator decision can place the run in `waiting_input`; authentication problems
+can produce `waiting_auth`. Cancellation requests receive bounded cleanup.
 
-| Lifecycle | Tool | Turn mechanism | Between turns |
-| --- | --- | --- | --- |
-| `interactive` | `claude`, `codex`, `cursor` | User or planner-facing chat input | Session remains operator-facing |
-| `self-loop` | `claude` | `/loop` plus `ScheduleWakeup`, with `coordd` early wake | Loop waits for the next health tick |
-| `self-loop` | `codex` or `cursor` | Explicit loop plus shell sleep fallback, with `coordd` interrupt | Loop waits for the next health tick |
-| `driven` | `claude` | `coordd` starts one `claude -p` or resume turn with rendered role bootstrap | Idle shell pane |
-| `driven` | `codex` | `coordd` starts one fresh `codex app-server` stdio turn and persists the thread id | Idle shell pane |
-| `driven` | `cursor` | `coordd` starts the configured per-turn command | Idle shell pane |
+Session reuse is governed by the binding's session policy and negotiated agent
+capabilities. Changing harnesses does not transfer their private conversation
+history; the assigned task and pinned contract supply portable context.
 
-For driven roles, the rule is one event, one tick, then exit. They do not run
-`/loop`, schedule their own wakeups, or short-poll queues. Their first action
-is still a CLI call such as `greatminds inbox list` or
-`greatminds task list <queue>`, which also refreshes the role heartbeat.
+## Deterministic supervision
 
-## Wake Delivery
+The daemon handles queue observation, dependency readiness, admission limits,
+startup backoff and result reconciliation in code. Role metadata such as
+`driven`, `interactive` or `self-loop` in the schema does not select a native
+transport, tmux wake sequence or provider-specific timer loop.
 
-`coordd` observes queue files, inbox files, and stand state. It delivers turns
-or wake signals; it does not decide task transitions.
+Recognized pre-prompt startup failures can retry within configured budgets.
+Account backoff is shared across bindings with the same configured account.
+Completed background turns without workflow progress are bounded by
+`max_no_progress_turns`, which defaults to one. Token output and task metadata
+changes do not count as workflow advancement.
 
-For non-driven `codex` and `cursor` roles, `coordd` finds the deepest sleeping
-descendant and sends `SIGINT`. That interrupts the long sleep wrapper so the
-next loop tick starts immediately. For non-driven `claude` roles, it sends the
-configured tmux input.
+A completed prompt does not verify a task. Typed results pass through the domain
+service; command and deployment effects retain their own evidence and recovery
+requirements. Unknown post-prompt failures are not automatically retried.
 
-For driven roles, `coordd` spawns a single turn. A role that has no inbox
-message and no task in its owned queue exits without scheduling another turn;
-the next filesystem event drives it again.
+See the [execution contract](execution-contract.md) for precise retry eligibility,
+session compatibility, permission and recovery behavior.

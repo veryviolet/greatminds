@@ -1,37 +1,48 @@
 # Architecture Overview
 
-greatminds is built around a filesystem finite state machine:
+Greatminds combines a filesystem task workflow with a durable ACP execution
+runtime. Queue location describes a task's workflow state. The daemon owns agent
+sessions, admits eligible work and invokes shared deterministic domain services.
 
-- State lives in directories.
-- A task handoff is a validated file move.
-- Blocks inside task files are append-only evidence.
-- Role ownership comes from queue location.
-- Coordination messages live in per-role inbox directories.
-- The daemon only nudges agents; it is not the source of task state.
+- The effective schema defines roles, queues, transitions and evidence gates.
+- `coordination/execution.yaml` maps role bindings to ACP agent manifests.
+- `.greatminds/` holds task queues, workflow journals and runtime state.
+- `.greatminds/.runtime/` records run identities, pinned contracts, admission
+  decisions, results, commands and recovery information.
+- Agents perform work and submit typed results. Domain services validate the
+  assignment, revision and evidence before applying a transition.
 
-This makes the project recoverable with normal filesystem inspection. If an
-agent exits mid-transition, intent files and the journal show what it attempted.
-If a daemon is down, the queues still describe the work.
+An ACP prompt ending is an execution outcome. Task verification requires an
+accepted domain result and the schema's evidence gates. The daemon also performs
+mechanical dependency readiness, blocked-task resumption and reconciliation
+without spending an LLM turn on polling.
+
+## Recovery boundaries
+
+Queues remain inspectable while the daemon is down. They do not describe every
+in-flight operation: run records, transition intents, journals, command receipts
+and the deployment ledger provide additional recovery evidence. Interrupted work
+with uncertain side effects requires explicit resolution; restarting the daemon
+does not automatically replay it.
+
+Use `greatminds run status`, `greatminds run events`, `greatminds wake-check` and
+`greatminds watchdog` to inspect the combined state. See the
+[execution contract](execution-contract.md) for atomicity, idempotency and
+workspace limits, and the [operations runbook](../operations/runbook.md) for
+operator actions.
 
 ## Contract sources
 
-- The packaged schema defines queues, roles, transitions, required fields,
-  stand profile tokens, scenarios, and watchdog thresholds. Setup copies the
-  runtime copy to `.greatminds/schema.yaml`.
-- `.greatminds/COORDINATE.md` explains the invariants behind the schema.
-- Role contracts in the effective schema define what each role may claim,
-  write, and move. Print that contract with `greatminds project schema`.
+The installed package schema is authoritative. An explicit
+`GREATMINDS_CANON_DIR` can select an alternate canon. The project file
+`.greatminds/schema.yaml` is a diagnostic mirror, not a policy override. Setup
+creates a missing mirror and preserves an existing one.
 
-The installed package schema is authoritative, including when an explicit
-`GREATMINDS_CANON_DIR` selects an alternate canon. The project copy is a generated
-mirror, not a policy override. CLI validation, daemon dispatch, and service
-installation use the installed contract. Restart running processes after a
-package/canon update so cached validation tables use that same contract.
+`greatminds project schema --json` reports the source, version, SHA-256 identity,
+document and mirror status. `greatminds project schema --check` exits 2 for a
+missing, unreadable or different mirror. Review differences against
+`greatminds project schema` before replacing the mirror.
 
-`greatminds project schema --json` reports the source path, schema version,
-SHA-256 content identity, document, and project mirror status.
-`greatminds project schema --check` checks the mirror without changing it and
-exits 2 when it is missing, unreadable, or differs from the effective schema.
-Inspect differences before refreshing generated copies with `greatminds setup`.
-
+Runs retain pinned schema and execution contracts. Restart the daemon after a
+package/canon update; do not infer that an in-flight run has adopted new policy.
 When schema and prose disagree on mechanics, the effective schema wins.

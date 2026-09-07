@@ -6,9 +6,8 @@ state:
 ```text
 coordination/
   PROJECT.md
-  coord.yaml
-  mcp.local.json
-  plugins.local/
+  execution.yaml
+  PROJECT.env
   stand-profiles.yaml
   stand-profiles/
 
@@ -28,7 +27,11 @@ coordination/
   inbox/
   intent/
   journal.ndjson
-  heartbeat.<role>
+  schema.yaml
+  .runtime/
+    state.json
+    contracts/
+    command-output/
 ```
 
 The task file path is meaningful. For example, a product task in
@@ -47,8 +50,14 @@ the worktree.
 - `journal.ndjson`: append-only transition log.
 - `intent/`: short-lived files written before moves and cleared after moves.
 - `inbox/`: role mailboxes.
-- `heartbeat.*`: role liveness files.
+- `.runtime/state.json`: durable run, control, result and command state.
+- `.runtime/contracts/`: frozen content-addressed execution and schema contracts.
+- `.runtime/command-output/`: bounded command output used by execution evidence.
 - `.stand/state.yaml`: singleton stand state, active lease, FIFO queue, and
   recent transition history.
 - `.worktrees/<task-id>/`: in-flight code for a task. Operators inspect
   worktrees directly.
+
+Runtime files can contain private context and operation evidence. Inspect them
+through the CLI where possible; deleting runtime state to clear a hold discards
+recovery information. Setup preserves existing tasks and execution configuration.

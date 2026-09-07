@@ -1692,3 +1692,16 @@ Validation: strict MkDocs build passed in 1.54s. Behavior descriptions were
 checked against bootstrap, update, configuration and project-schema code.
 Remaining concept/architecture pages and packaged native assets still need the
 cutover audit; this checkpoint does not claim that cleanup is complete.
+
+### ACP architecture and role concepts (2026-09-07)
+
+Replaced native lifecycle/PTY wake descriptions with queue and on-demand ACP
+admission, durable conversations, configured session policy and deterministic
+supervision. Architecture now describes the daemon's domain responsibilities,
+pinned contracts and uncertain side-effect recovery. Updated role descriptions
+and filesystem layout to expose execution.yaml and private runtime evidence.
+
+Validation: strict MkDocs build passed in 1.48s. The preceding installation/CLI
+checkpoint also passed 8 project-schema/public-help checks in 0.76s. Packaged
+bootstrap, native profile/template files and tests that assert their old behavior
+remain under audit; none are represented here as current setup output.

@@ -1,34 +1,35 @@
 # Roles
 
-Each role owns a small part of the pipeline. Ownership is defined by queue
-location and encoded in the packaged schema copied to `.greatminds/schema.yaml`.
+Roles divide responsibility across the workflow. Queue ownership and allowed
+transitions come from the effective installed schema. The project schema file
+is a diagnostic mirror.
 
-Product roles:
+| Role | Responsibility |
+| --- | --- |
+| `ARCHITECT-PLANNER` | Intake, triage, planning and routing |
+| `DEVELOPER` | Backend implementation |
+| `UI-DEVELOPER` | UI implementation |
+| `TECHNICAL-WRITER` | Documentation implementation |
+| `TESTER` | Validation and test evidence |
+| `READER` | Documentation review from a fresh reader's perspective |
+| `ARCHITECT-REVIEWER` | Final review and commit policy |
+| `EXPLORER` | Exploratory review and bug filing |
+| `MAINTAINER` | Infrastructure diagnosis and operations that require judgment |
+| `USER` | User-originated input and feedback |
 
-- `ARCHITECT-PLANNER`: intake, triage, planning, and routing. Lifecycle:
-  `interactive`.
-- `DEVELOPER`: backend implementation. Lifecycle: `driven`.
-- `UI-DEVELOPER`: UI implementation or direct UI rapid iteration. Pipeline
-  lifecycle: `driven`.
-- `TECHNICAL-WRITER`: documentation implementation. Lifecycle: `driven`.
-- `TESTER`: validates implemented code and records test evidence. Lifecycle:
-  `driven`.
-- `READER`: reviews documentation as a fresh reader. Lifecycle: `driven`.
-- `ARCHITECT-REVIEWER`: final review, blocked-task wake-up, commit policy.
-  Lifecycle: `driven`.
-- `EXPLORER`: live exploratory review and bug filing. Lifecycle: `driven`.
+Bind a role to an ACP agent in `coordination/execution.yaml`. Harness, model,
+workspace, permissions and scheduling are separate choices. The same harness
+can serve several roles when its capabilities satisfy their bindings; sharing a
+harness does not combine those roles' authority or bypass review gates.
 
-System and entry roles:
+Use `scheduling: queue` to admit eligible workflow tasks automatically and
+`on-demand` for operator-paced work. Mechanical readiness, blocked-task
+resumption, startup backoff and runtime reconciliation belong to daemon code.
+They do not require a self-polling MAINTAINER conversation.
 
-- `USER`: files feedback or chats with planner-facing roles. Lifecycle:
-  `interactive`.
-- `MAINTAINER`: non-user-facing infrastructure and fleet operations.
-  Lifecycle: `self-loop`; USER reaches it through planner-mediated inbox asks
-  rather than direct chat. It handles daemon and agent recovery, venv repair,
-  canon cutover, and escalation of FSM stalls to the planner.
+Inspect runs and holds through `greatminds run status` and `greatminds watchdog`.
+Runtime state and durable outcomes provide execution evidence; a heartbeat or
+stream of tokens alone does not demonstrate task progress.
 
-Every active role has a heartbeat file under `.greatminds/`. Stale heartbeats
-are reported by `greatminds watchdog`.
-
-For lifecycle mechanics across tools, see
-[Lifecycle Model](../architecture/lifecycle.md).
+See [Agent Manifests and Role Bindings](codex-profiles.md) for configuration and
+[Lifecycle Model](../architecture/lifecycle.md) for execution behavior.
