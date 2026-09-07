@@ -109,15 +109,26 @@ class Supervisor:
         metrics = {"context_bytes": 0, "updates": 0, "stop_reason": None, "prompt_started": False, "pre_prompt_activity": False}
         current_turn = None
         accept_output = False
+        observed_stages = set()
+
+        def observe(stage):
+            if stage not in observed_stages:
+                self.store.record_timing(run_id, owner_id=self.id, stage=stage,
+                                         seconds=round(time.monotonic() - started, 6))
+                observed_stages.add(stage)
 
         async def record_spawn(process):
             identity = process_identity(process.pid)
             if identity is None:
                 raise RuntimeError("launch gate exited before identity was recorded")
             self.store.record_process(run_id, owner_id=self.id, identity=identity)
+            observe("process_recorded")
 
         # No raw tool input/output enters the durable metadata snapshot.
         async def event(kind, data):
+            observe("first_protocol_activity")
+            if metrics["prompt_started"]:
+                observe("first_prompt_activity")
             if not metrics["prompt_started"]:
                 metrics["pre_prompt_activity"] = True
             if kind == "session_update":
@@ -180,6 +191,7 @@ class Supervisor:
                 raise RequestError.auth_required()
             run = await prepare_workspace_async(self.store, claim.run, binding, self.schema, self.id)
             claim = Claim(run, claim.token)
+            observe("workspace_ready")
             if conversation is not None and not claim.run.get('conversation_task'):
                 import json
                 from .context import context_document
@@ -190,6 +202,7 @@ class Supervisor:
             elif prompt is None:
                 from .context import compile_context
                 prompt = compile_context(self.store, claim, self.schema)
+            observe("context_ready")
             metrics["context_bytes"] = len(prompt.encode())
             first_prompt = prompt if current_turn is None else prompt + '\nUser message:\n' + current_turn['prompt']
             check_prompt(first_prompt, binding)
@@ -200,6 +213,7 @@ class Supervisor:
                                      environment=env, callbacks=callbacks, on_spawn=record_spawn)
             self._transports[run_id] = transport
             async with transport:
+                observe("protocol_ready")
                 caps = transport.initialized.agent_capabilities
                 capabilities = caps.model_dump(by_alias=True, warnings=False) if caps else {}
                 for name in agent.required_capabilities:
@@ -238,6 +252,7 @@ class Supervisor:
                 self.store._check_revision(TaskRevision(claim.run["task_id"], claim.run["task_path"],
                                                        claim.run["task_revision"]))
                 self._transition(run_id, "running", session_id=session_id)
+                observe("session_ready")
                 if conversation is not None:
                     conversation.set_session(self.id, session_id)
                 prompt_deadline = time.monotonic() + binding.timeout_seconds
@@ -251,6 +266,7 @@ class Supervisor:
 
                 if conversation is None:
                     reserve(prompt)
+                    observe("first_prompt_started")
                     metrics["prompt_started"] = True
                     result = await transport.prompt(prompt, timeout=binding.timeout_seconds)
                 else:
@@ -270,6 +286,7 @@ class Supervisor:
                                                                claim.run['task_revision']))
                         turn_prompt = prompt + '\nUser message:\n' + current_turn['prompt']
                         reserve(turn_prompt)
+                        observe("first_prompt_started")
                         accept_output = True
                         metrics["prompt_started"] = True
                         pending = asyncio.create_task(transport.prompt(
@@ -329,6 +346,7 @@ class Supervisor:
             self._transports.pop(run_id, None)
             self.permissions.close_run(run_id, owner_id=self.id, reason="run_closed", resume_run=True)
             await self.commands.finish_run(run_id)
+        observe("cleanup_complete")
         metrics["elapsed_seconds"] = round(time.monotonic() - started, 6)
         if conversation is not None:
             conversation.dispatch_status(target, reason)

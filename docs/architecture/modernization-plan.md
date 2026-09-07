@@ -1812,3 +1812,30 @@ build passed in 1.47s. All ACP calls used local synthetic agents.
 C4 still requires broader timing/usage observations and representative baseline
 comparison. C5 aggregate diagnosis/local bundles, retention and the remaining
 real compatibility/acceptance campaign are not closed by this budget feature.
+
+### Durable execution-stage observations (2026-09-07)
+
+Added first-occurrence monotonic offsets for workspace/context readiness,
+launch-gate process recording, protocol initialization, configured session,
+first prompt start, first protocol activity, first prompt activity and completed
+cleanup. Each observation is persisted immediately in run.timings and a runtime
+event. Repeated observations preserve the original value; interrupted recovery
+preserves observed stages without inventing later stages or zero durations.
+
+The common run snapshot exposes these fields for all operator frontends.
+Documented exact boundaries: launch gate is not actual harness exec, first
+activity can be loaded history, prompt start is a client boundary, and none of
+these measurements demonstrates useful work, validation or domain approval.
+Missing measurements remain unknown. Queue wait and per-message distributions
+are not claimed by these execution-relative first-occurrence offsets.
+
+Validation: 41 supervisor/input-budget regression checks passed in 26.63s;
+19 timing/ACP-conversation checks passed in 33.60s. Tests include actual local
+ACP stage ordering, prelaunch input rejection, restart preservation, immutable
+first observations and rejected invalid/foreign observations. Strict docs build
+passed in 1.48s. No live provider or external service was invoked.
+
+Remaining C4 work includes representative baseline/pipeline measurements,
+queue/validation timing and reliable provider usage reporting where available.
+Other plan milestones remain open; instrumentation alone is not performance
+acceptance or a claim of end-to-end speedup.

@@ -346,6 +346,23 @@ class RunStore:
             self._event(state, target, run_id, payload)
             return {k: copy.deepcopy(v) for k, v in run.items() if k != "token_sha256"}
 
+    def record_timing(self, run_id: str, *, owner_id: str, stage: str, seconds: float) -> None:
+        """Persist first observed run-stage offsets; absent observations stay unknown."""
+        import math
+        allowed = {"workspace_ready", "context_ready", "process_recorded", "protocol_ready",
+                   "session_ready", "first_prompt_started", "first_protocol_activity",
+                   "first_prompt_activity", "cleanup_complete"}
+        if stage not in allowed or type(seconds) not in (int, float) or not math.isfinite(seconds) or seconds < 0:
+            _error("invalid run timing observation")
+        with self._transaction() as state:
+            run = self._run(state, run_id)
+            if run["owner_id"] != owner_id or run["state"] in TERMINAL:
+                _error("timing observation requires the active run's supervisor", 3)
+            timings = run.setdefault("timings", {})
+            if stage not in timings:
+                timings[stage] = seconds
+                self._event(state, "run_stage_observed", run_id, {"stage": stage, "offset_seconds": seconds})
+
     def reserve_prompt_input(self, run_id: str, *, owner_id: str, request_id: str,
                              size: int, limit: int) -> dict:
         """Reserve known input before sending; uncertain sends retain their debit."""

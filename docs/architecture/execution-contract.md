@@ -867,3 +867,36 @@ are not measured by these byte counters. `context_bytes` describes the compiled
 base context; `input_bytes_reserved` and `session_input_bytes_reserved` describe
 input reservations. Detailed reservation events contain counts and IDs, not raw
 prompt content. Separate provider usage counters remain unknown unless reported.
+
+## Durable run-stage timing
+
+Each run's `timings` records the first observed offset, in seconds from the
+start of that supervisor execution. Offsets use a monotonic clock and are written
+immediately with `run_stage_observed` events. Recovery preserves observed values;
+it does not invent a completion time for a crashed run. Missing stages mean
+unobserved, not zero latency. Values are available in the common run snapshot.
+
+| Stage | Observation boundary |
+| --- | --- |
+| `workspace_ready` | Workspace preparation returned |
+| `context_ready` | Base context was built or supplied |
+| `process_recorded` | Launch-gate process identity was durably recorded |
+| `protocol_ready` | ACP initialize and protocol-version validation returned |
+| `session_ready` | Session creation/loading and model/mode configuration succeeded |
+| `first_prompt_started` | Input reserved; supervisor begins the first prompt call |
+| `first_protocol_activity` | First delivered update, permission or extension event |
+| `first_prompt_activity` | First such event after a prompt call began |
+| `cleanup_complete` | Transport, permission and command cleanup returned |
+
+Subtract observed boundary offsets to inspect preparation and startup costs.
+`outcome.elapsed_seconds` covers the execution including cleanup. These offsets
+do not include time in the queue before a claim or measure provider inference
+in isolation. The launch gate can precede actual harness exec. Prompt-start time
+is a client boundary, not proof the provider received the request.
+
+A loaded session may emit history before a new prompt, so protocol activity and
+prompt activity are distinct observations. Neither means useful task progress,
+first user-visible text, adequate validation or an approved domain result.
+For a multi-message interactive run these are first-occurrence observations,
+not a per-message latency distribution. Unknown token/cost data remains outside
+this timing contract.
