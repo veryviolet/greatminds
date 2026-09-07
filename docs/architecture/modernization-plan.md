@@ -1980,3 +1980,8 @@ Validation: 86 preset, runtime-contract, role-contract and public-documentation
 checks passed in 5.74s; both original and local-preset integration pipelines passed
 in 25.76s. Strict documentation build passed in 1.47s; diff whitespace check passed.
 C2 live-provider first-task acceptance and comparative handoff overhead remain open.
+
+Full regression checkpoint after shared filesystem health, scoped recovery and
+execution presets: 1429 passed, 1 skipped in 328.45s. No live provider was invoked.
+Implementation checkpoint: 309a60e. Continue with the outstanding acceptance
+items above; this checkpoint does not mark the entire modernization complete.
