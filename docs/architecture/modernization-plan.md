@@ -2213,3 +2213,46 @@ secret metadata; 86 supervisor/conversation/config/bundle regression checks pass
 in 22.79s. Ownership and failed atomic publication were tested. G2 remains open
 for explicit budget semantics, session continuity, reset/currency handling and
 actual enforcement acceptance. This checkpoint is progress, not plan completion.
+
+### G2 — reactive reported session cost limits (2026-09-07)
+
+Added optional binding max_reported_session_cost and reported_cost_currency,
+validated together with finite positive limits. The daemon tracks reported
+cumulative cost for the same agent manifest, workspace and ACP session ID.
+Prompt boundaries are durable before sending. A pending turn after interruption,
+unknown loaded history, invalid report, decreasing counter or changed currency
+cannot be interpreted as a fresh zero balance. Continuity failures persist across
+loaded runs. Disabled budgets retain the evidence without introducing a gate.
+
+At or above the configured threshold the supervisor cancels the active prompt
+through the common ACP lifecycle and records reported_usage_budget with structured
+reason/amount/limit/currency. A new session can make one bootstrap prompt to
+obtain its first report; missing cost on completion holds further budgeted work.
+This is explicitly a reactive reported-cost guard, not a hard spending guarantee,
+estimate or billing statement. No silent provider/model/session change occurs.
+Previously accepted domain results remain independent. Prompt-token scope remains
+unknown because of the verified upstream schema contradiction; unsupported token
+semantics are not used to invent a token budget.
+
+Real process fixtures prove under-limit completion, exact threshold, cancellation
+of an otherwise waiting prompt, missing/invalid/reset/currency-changing reports,
+and a loaded two-turn conversation stopping at cumulative cost .4 with limit .3.
+Restart does not replay it. Store tests cover ownership, pinned limits, atomic
+failure before a send, sticky continuity, unknown history and disabled budgets.
+The first regression group passed 72 tests in 23.14s; the expanded cross-feature
+group passed 125 in 23.11s; 55 budget/supervisor/bundle tests passed in 14.04s;
+77 budget/timing/contract/docs tests passed in 8.01s. Strict docs passed in 1.62s.
+One attempted test command used a nonexistent timing filename and collected no
+tests; the corrected run used test_run_timings.py and passed. The acceptance
+matrix closes G2 for the explicitly supported reported-cost semantics; G3/G4/
+G5/G7/G6 remain open. The previous goal turn was progress: persisted usage samples
+and the upstream ambiguity evidence were committed as 1013a3f.
+
+The complete offline regression traversal passed: **1489 passed, 1 skipped in
+347.92s**, recorded in /tmp/greatminds-cost-budget-full-suite.txt. This includes
+the shared daemon, interactive sessions, pipeline, recovery and documentation
+tests; no live provider was invoked for this checkpoint. Next is G3: first-observed
+queue waits, result validation/application timing and accepted domain progress,
+plus an equivalent productive workload comparison. Existing startup/activity
+metrics cannot establish those intervals, and file timestamps are not treated as
+authoritative queue-entry times.

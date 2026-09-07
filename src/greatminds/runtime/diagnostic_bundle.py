@@ -24,12 +24,13 @@ CODES = set(ACTIONS) | {'inspection_failed', 'mirror_not_current', 'agent_prereq
                       'process_identity_unconfirmed', 'operation_needs_recovery', 'dependency_hold',
                       'deployment_unresolved', 'orphan_intent', 'stale_task', 'orphan_worktree', 'transport_failure', 'configuration_error', 'timeout',
                       'turn_ended', 'authentication_required', 'permission_required', 'operator_cancelled',
-                      'supervisor_restart', 'protocol_error', 'no_progress_backoff'}
+                      'supervisor_restart', 'protocol_error', 'no_progress_backoff', 'reported_usage_budget'}
 EVENTS = STATES | {'run_claimed', 'claimed', 'run_stage_observed', 'prompt_input_reserved',
                    'run_recovered', 'process_recorded', 'workspace_ready', 'workspace_preparing',
                    'result_received', 'result_applied', 'result_rejected', 'control_requested',
                    'control_completed', 'control_processing', 'dispatch_paused', 'dispatch_resumed',
-                   'events_pruned', 'event_retention_configured', 'protocol_observed', 'protocol_trace_truncated'}
+                   'events_pruned', 'event_retention_configured', 'protocol_observed', 'protocol_trace_truncated',
+                   'usage_observed', 'usage_session_prepared', 'usage_prompt_begin', 'usage_prompt_finish'}
 
 
 def number(value):

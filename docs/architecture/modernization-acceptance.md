@@ -54,7 +54,7 @@ were inspected. It does not turn fixture coverage into live harness coverage.
 | C2: minimal local and explicit fuller/UI/docs/deployed rosters with independent review | `presets.py`, public setup/preset CLI; [one live Codex task](evidence/acp-local-preset-2026-09-07.json) and [installed wheel](evidence/installed-local-preset-2026-09-07.json) | Confirmed representative fresh repository, one harness, three independent role runs, no stand, real checks and merge. The fixture supplies its plan |
 | C3: explicit initialization/preflight/services/configuration; preserve customizations and hooks | Bootstrap/service/environment tests; installed idempotent setup and interrupted-operation fixtures | Confirmed current cutover scope; no fleet migration or rollback deliverable required |
 | C4: concurrency/time/retry/no-progress/context limits; never switch provider to fit budget | Binding/project/account limits, input reservations and deadline/cancellation tests | Confirmed implemented limits and unknown provider values |
-| C4: optional reliable usage budgets, reported/estimated/billed distinction | Supervisor retains bounded, allowlisted SDK-decoded context/cost and prompt-token observations; real subprocess privacy/context-compaction coverage | **Open G2:** token scope is contradictory in the pinned schema; add explicitly supported budget behavior and continuity checks; byte limits cannot stand in for token/cost limits |
+| C4: optional reliable usage budgets, reported/estimated/billed distinction | Bounded SDK-decoded observations, explicit currency/cost limits, durable prompt boundaries and cost continuity; real cancellation and loaded-conversation fixtures | Confirmed G2 for reactive reported session cost. Ambiguous token scope remains unknown and cannot drive an automatic token budget; no billing estimate or hard spending guarantee |
 | C4: complete timing and measured performance improvement | [Idle before/after benchmark](evidence/daemon-idle-2026-09-07.json), stage observations, real pipeline durations | Idle read reduction confirmed. Productive timing/comparison remains G3; no role stage was eliminated |
 | C5: aggregate stable findings, scoped repair, private bundle and no model turn | Doctor/bundle suites; command resolution from foreign cwd; maintenance/deployment idempotency and injected crashes | Components confirmed. **Open G7:** combine aggregate diagnosis → emitted action → repair → repeat diagnosis on a concrete fault fixture |
 | C6: run-bound authority, stale/wrong-role rejection, explicit trust boundary | Token/revision/role/workspace checks; domain/command/permission tests | Confirmed cooperative shared-filesystem boundary; no OS isolation claim |
@@ -70,15 +70,16 @@ were inspected. It does not turn fixture coverage into live harness coverage.
    supervisor records bounded negotiation/tool/error/stop facts, with private
    bundle summaries. Real subprocess fixtures prove secret exclusion, trace
    saturation with terminal error preserved, durable recovery, atomic failure and
-   ordered draining of updates before an RPC error. Six items below remain open.
-2. **G2 — reliable usage and budgets.** Use the pinned SDK's documented counter
-   meanings. Distinguish context occupancy, cumulative token usage and reported
-   cost. Missing/invalid/reset/currency-changing observations must not become zero
-   consumption or invented billing. Budget behavior needs actual callback tests.
-   Initial observation persistence is implemented. The SDK schema contradicts
-   itself about whether prompt tokens are per-turn or cumulative; the latest
-   sample therefore has unknown scope and is never summed. Budget enforcement,
-   cross-run continuity and reset/currency handling remain open.
+   ordered draining of updates before an RPC error.
+2. **G2 — reliable usage and budgets: implemented and verified.** Context
+   occupancy, unknown-scope token samples and reported cumulative cost remain
+   distinct. Optional cost limits require an explicit currency. Real subprocess
+   fixtures verify cancellation at the limit, missing/invalid/regressed/currency-
+   changing reports and loaded-session continuity. Durable pending markers retain
+   crash uncertainty; retry cannot reset cost. The pinned schema contradicts
+   itself about token scope, so these samples cannot support a token budget.
+   Cost limits are reactive and allow one bootstrap prompt for a new session;
+   they do not promise a hard spending cap. Five items below remain open.
 3. **G3 — task timing and comparison.** Add the missing observable queue/validation/
    accepted-progress intervals, keeping unknowable times unknown. Compare an
    equivalent workload before/after; existing mixed-model durations are not a

@@ -210,9 +210,58 @@ class RunStore:
                 _error('usage observation requires the active supervisor', 3)
             usage = run.setdefault('usage', {'version': 1, 'source': 'acp_sdk_decoded'})
             usage[kind] = {'at': self.clock(), 'data': normalized}
+            if kind == 'session' and 'cost_accounting' in usage:
+                from .usage_budget import observe
+                observe(usage['cost_accounting'], normalized['cost'])
             # Latest samples are bounded. Missing reports replace previous samples
             # explicitly; old values must not appear current after another turn.
             self._event(state, 'usage_observed', run_id, {'kind': kind, **normalized})
+
+    def prepare_usage_session(self, run_id: str, *, owner_id: str, loaded: bool) -> None:
+        from .usage_budget import initial, observe
+        with self._transaction() as state:
+            run = self._run(state, run_id)
+            if run['owner_id'] != owner_id or run['state'] != 'running' or not run.get('session_id'):
+                _error('usage accounting requires the running session supervisor', 3)
+            usage = run.setdefault('usage', {'version': 1, 'source': 'acp_sdk_decoded'})
+            if 'cost_accounting' in usage:
+                return
+            history = [other for other in state['runs'].values() if other['id'] != run_id and
+                       all(other.get(key) == run[key] for key in ('agent_sha256', 'workspace', 'session_id'))]
+            previous = max(history, key=lambda other: other['sequence']) if history else None
+            prior = previous.get('usage', {}).get('cost_accounting') if previous else None
+            ledger = initial(prior, unknown_history=(loaded or bool(history)) and prior is None)
+            if 'session' in usage:
+                observe(ledger, usage['session']['data']['cost'])
+            usage['cost_accounting'] = ledger
+            self._event(state, 'usage_session_prepared', run_id, {})
+
+    def usage_prompt_boundary(self, run_id: str, *, owner_id: str, binding: RoleBinding,
+                              phase: str) -> dict | None:
+        from .usage_budget import verdict
+        if phase not in {'admit', 'begin', 'finish', 'observe'}:
+            _error('invalid usage prompt phase')
+        with self._transaction() as state:
+            run = self._run(state, run_id)
+            if (run['owner_id'] != owner_id or run['state'] in TERMINAL or
+                    (phase != 'observe' and run['state'] not in {'running', 'waiting_input'})):
+                _error('usage budget requires the active session supervisor', 3)
+            if run['binding_sha256'] != binding.sha256:
+                _error('usage budget binding changed', 3)
+            ledger = run['usage']['cost_accounting']
+            result = verdict(ledger, binding, phase='begin' if phase == 'admit' else phase)
+            if phase == 'begin' and result is None:
+                if ledger['pending']:
+                    _error('usage prompt is already pending', 3)
+                ledger['pending'], ledger['fresh'] = True, False
+            elif phase == 'finish':
+                if not ledger['pending']:
+                    _error('usage prompt is not pending', 3)
+                ledger['pending'] = False
+                ledger['completed_prompts'] += 1
+            if phase in {'begin', 'finish'}:
+                self._event(state, 'usage_prompt_' + phase, run_id, {'held': result is not None})
+            return result
 
     def configure_event_retention(self, max_events: int) -> None:
         if type(max_events) is not int or not 100 <= max_events <= 1000000:

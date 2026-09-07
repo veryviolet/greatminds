@@ -38,7 +38,7 @@ for line in sys.stdin:
     method = message.get("method")
     request_id = message.get("id")
     if method == "initialize":
-        capabilities = {"loadSession": scenario == "resume"}
+        capabilities = {"loadSession": scenario in {"resume", "usage-resume"}}
         if scenario.startswith("protocol-evidence"):
             capabilities.update(promptCapabilities={"image": True, "_meta": {"secret": "SECRET_META"}},
                                 _meta={"credential": os.environ.get("GREATMINDS_RUN_TOKEN", "SECRET_TOKEN")})
@@ -79,13 +79,26 @@ for line in sys.stdin:
                     "sessionId": "test-session", "update": {"sessionUpdate": "agent_message_chunk",
                     "content": {"type": "text", "text": "started"}}}})
             continue
-        elif scenario == "usage-observations":
-            for used, amount in [(80, .2), (20, .3)]:
+        elif scenario in {"usage-observations", "usage-budget-hang", "usage-resume",
+                          "usage-regress", "usage-currency", "usage-invalid"}:
+            previous_cost = float(Path('reported-cost').read_text()) if Path('reported-cost').exists() else 0
+            costs = [(80, .2), (20, .3)]
+            if scenario == 'usage-regress':
+                costs[-1] = (20, .1)
+            if scenario == 'usage-invalid':
+                costs[-1] = (20, -1)
+            if scenario == 'usage-resume':
+                costs = [(20, round(previous_cost + .2, 2))]
+                Path('reported-cost').write_text(str(costs[-1][1]))
+            for used, amount in costs:
                 send({"method": "session/update", "params": {
                     "sessionId": "test-session", "update": {
                         "sessionUpdate": "usage_update", "used": used, "size": 100,
-                        "cost": {"amount": amount, "currency": "USD", "_meta": {"secret": "SECRET_COST"}},
+                        "cost": {"amount": amount, "currency": 'EUR' if scenario == 'usage-currency' and used == 20 else 'USD',
+                                 "_meta": {"secret": "SECRET_COST"}},
                         "_meta": {"secret": "SECRET_CONTEXT"}}}})
+            if scenario == 'usage-budget-hang':
+                continue
             result(pending, {"stopReason": "end_turn", "usage": {
                 "totalTokens": 150, "inputTokens": 100, "outputTokens": 50,
                 "cachedReadTokens": 70, "_meta": {"secret": "SECRET_TOKENS"}}})
@@ -200,6 +213,8 @@ for line in sys.stdin:
             "content": {"type": "text", "text": json.dumps(outcome)}}}})
         result(pending, {"stopReason": "end_turn"})
     elif method == "session/cancel" and scenario != "hang":
+        if scenario == 'usage-budget-hang':
+            Path('usage-cancelled').write_text('cancelled')
         result(pending, {"stopReason": "cancelled"})
 
 if scenario == "orphan":

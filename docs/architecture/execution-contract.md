@@ -843,16 +843,36 @@ cost sample, and the latest prompt response's token sample, each timestamped.
 Context `used`/`size` describes occupancy, which may decrease after compaction.
 Optional cost describes reported cumulative session cost and its currency; it is
 not a billing statement. Missing and invalid reports are explicit statuses, not
-zero. Raw metadata is discarded. This bounded record is an observation surface,
-not budget enforcement; a timestamped sample does not establish current or
-cross-run completeness.
+zero. Raw metadata is discarded. A timestamped sample alone does not establish
+current or cross-run completeness; cost continuity has a separate durable record.
 
 The pinned SDK schema describes prompt token usage both as per-turn and cumulative.
 The [upstream ambiguity report](https://github.com/agentclientprotocol/agent-client-protocol/issues/1860)
 documents the conflict. Token samples therefore have `scope: unknown`; the daemon
 neither sums successive samples nor adds potentially overlapping token categories.
 These are SDK-decoded values, not a claim that wire values escaped SDK coercion.
-Reported usage budgets and continuity validation remain acceptance work in G2.
+
+Bindings may configure both `max_reported_session_cost` (a positive finite number)
+and `reported_cost_currency` (three uppercase letters, for example `USD`). The
+limit applies to reported cumulative cost for the same agent manifest, workspace
+and ACP session ID, including loaded sessions. No currency conversion, price
+estimate, billing claim or automatic provider/model switch is performed.
+
+This is a reactive limit: cost at or above the threshold cancels an active prompt
+through ACP and holds the run with reason `reported_usage_budget`. A new session
+may make one bootstrap prompt before a cost report is available; that prompt can
+already exceed the limit. A completed prompt must have a fresh cost report for
+budgeted work to continue. Without one the run is held as `cost_unavailable`.
+This is not a hard spending guarantee or a pre-purchase affordability check.
+
+The cost accounting record marks a prompt pending before ACP sends it. A crash or
+uncertain cancellation preserves that uncertainty across session loading. Unknown
+prior history, invalid cost, counter regression or currency changes cannot reset
+the budget: the affected session remains held. Reported cost and expected currency
+must match. An operator may explicitly choose a new session or revise budget
+configuration; retry alone does not erase the ledger. Disabled cost budgets do
+not introduce an execution gate, but observations and uncertainty are retained.
+These controls do not remove previously accepted domain results.
 
 ## Bounded client input
 

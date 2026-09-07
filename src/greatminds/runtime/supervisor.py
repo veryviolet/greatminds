@@ -21,6 +21,7 @@ from .workspaces import prepare_workspace_async
 from .commands import CommandService
 from .permissions import PermissionService
 from .input_budget import InputBudgetExceeded, check_prompt
+from .usage_budget import UsageBudgetHeld
 
 
 class Supervisor:
@@ -113,6 +114,9 @@ class Supervisor:
         observed_stages = set()
         protocol_phase = "preflight"
         accept_tool_evidence = True
+        usage_ready = False
+        budget_stop = asyncio.Event()
+        budget_violation = None
 
         def protocol(kind, **data):
             return self.store.record_protocol(run_id, owner_id=self.id, kind=kind,
@@ -133,7 +137,7 @@ class Supervisor:
 
         # No raw tool input/output enters the durable metadata snapshot.
         async def event(kind, data):
-            nonlocal accept_tool_evidence
+            nonlocal accept_tool_evidence, budget_violation
             observe("first_protocol_activity")
             if metrics["prompt_started"]:
                 observe("first_prompt_activity")
@@ -144,6 +148,12 @@ class Supervisor:
                 update = data.get("update", {})
                 if update.get("sessionUpdate") == "usage_update":
                     self.store.record_usage(run_id, owner_id=self.id, kind="session", data=update)
+                    if usage_ready and binding.max_reported_session_cost is not None:
+                        violation = self.store.usage_prompt_boundary(run_id, owner_id=self.id,
+                                                                    binding=binding, phase='observe')
+                        if violation is not None:
+                            budget_violation = violation
+                            budget_stop.set()
                 if accept_tool_evidence and update.get("sessionUpdate") in {"tool_call", "tool_call_update"}:
                     accept_tool_evidence = protocol("tool", update=update)
                 metrics["last_activity_at"] = self.store.clock()
@@ -273,26 +283,58 @@ class Supervisor:
                 self.store._check_revision(TaskRevision(claim.run["task_id"], claim.run["task_path"],
                                                        claim.run["task_revision"]))
                 self._transition(run_id, "running", session_id=session_id)
+                self.store.prepare_usage_session(run_id, owner_id=self.id,
+                                                loaded=metrics['session_strategy'] == 'loaded')
+                usage_ready = True
                 observe("session_ready")
                 if conversation is not None:
                     conversation.set_session(self.id, session_id)
                 prompt_deadline = time.monotonic() + binding.timeout_seconds
                 def reserve(text):
                     size = check_prompt(text, binding)
+                    violation = self.store.usage_prompt_boundary(run_id, owner_id=self.id,
+                                                                binding=binding, phase='admit')
+                    if violation is not None:
+                        raise UsageBudgetHeld(violation)
                     reservation = self.store.reserve_prompt_input(
                         run_id, owner_id=self.id, request_id=uuid.uuid4().hex,
                         size=size, limit=binding.max_session_input_bytes)
                     metrics["session_input_bytes_reserved"] = reservation["used_bytes"]
                     metrics["input_bytes_reserved"] = metrics.get("input_bytes_reserved", 0) + size
+                    violation = self.store.usage_prompt_boundary(run_id, owner_id=self.id,
+                                                                binding=binding, phase='begin')
+                    if violation is not None:
+                        raise UsageBudgetHeld(violation)
+
+                async def prompt_with_budget(text):
+                    pending_prompt = asyncio.create_task(transport.prompt(text, timeout=binding.timeout_seconds))
+                    stopped = asyncio.create_task(budget_stop.wait())
+                    try:
+                        await asyncio.wait({pending_prompt, stopped}, return_when=asyncio.FIRST_COMPLETED)
+                        if budget_stop.is_set():
+                            pending_prompt.cancel()
+                            await asyncio.gather(pending_prompt, return_exceptions=True)
+                            raise UsageBudgetHeld(budget_violation)
+                        response = await pending_prompt
+                        self.store.record_usage(run_id, owner_id=self.id, kind='tokens',
+                            data=response.usage.model_dump(by_alias=True, exclude_none=True) if response.usage else None)
+                        violation = self.store.usage_prompt_boundary(run_id, owner_id=self.id,
+                                                                    binding=binding, phase='finish')
+                        if violation is not None:
+                            raise UsageBudgetHeld(violation)
+                        return response
+                    finally:
+                        for pending_task in (pending_prompt, stopped):
+                            if not pending_task.done():
+                                pending_task.cancel()
+                        await asyncio.gather(pending_prompt, stopped, return_exceptions=True)
 
                 if conversation is None:
                     reserve(prompt)
                     observe("first_prompt_started")
                     metrics["prompt_started"] = True
                     protocol_phase = "prompt"
-                    result = await transport.prompt(prompt, timeout=binding.timeout_seconds)
-                    self.store.record_usage(run_id, owner_id=self.id, kind="tokens",
-                        data=result.usage.model_dump(by_alias=True, exclude_none=True) if result.usage else None)
+                    result = await prompt_with_budget(prompt)
                 else:
                     while True:
                         if current_turn is None and claim.run.get('conversation_task') and any(
@@ -314,8 +356,7 @@ class Supervisor:
                         accept_output = True
                         metrics["prompt_started"] = True
                         protocol_phase = "prompt"
-                        pending = asyncio.create_task(transport.prompt(
-                            turn_prompt, timeout=binding.timeout_seconds))
+                        pending = asyncio.create_task(prompt_with_budget(turn_prompt))
                         try:
                             while not pending.done():
                                 await asyncio.wait({pending}, timeout=.1)
@@ -323,8 +364,6 @@ class Supervisor:
                                 if turn['cancel_requested'] and not pending.done():
                                     pending.cancel()
                             result = await pending
-                            self.store.record_usage(run_id, owner_id=self.id, kind="tokens",
-                                data=result.usage.model_dump(by_alias=True, exclude_none=True) if result.usage else None)
                         finally:
                             if not pending.done():
                                 pending.cancel()
@@ -346,6 +385,9 @@ class Supervisor:
                     target, reason = "completed", "turn_ended"
                 else:
                     target, reason = "failed", f"agent_stop_{result.stop_reason}"
+        except UsageBudgetHeld as exc:
+            target, reason = 'failed', 'reported_usage_budget'
+            metrics['usage_budget'] = exc.details
         except InputBudgetExceeded as exc:
             target, reason = "failed", "input_budget_exceeded"
             metrics["input_budget"] = exc.details

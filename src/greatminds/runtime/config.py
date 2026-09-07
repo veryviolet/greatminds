@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -101,6 +102,8 @@ class RoleBinding:
     timeout_seconds: int = 1800
     max_prompt_bytes: int = 262144
     max_session_input_bytes: int = 1048576
+    max_reported_session_cost: float | None = None
+    reported_cost_currency: str | None = None
     max_no_progress_turns: int = 1
     max_startup_retries: int = 2
     retry_initial_seconds: int = 5
@@ -210,6 +213,16 @@ def parse_execution_config(document: Any, *, roles: set[str]) -> ExecutionConfig
         if type(retries) is not int or not 0 <= retries <= 20:
             _fail("max_startup_retries must be an integer between 0 and 20")
         no_progress = _positive(item.get("max_no_progress_turns", 1), "max_no_progress_turns")
+        cost_limit = item.get('max_reported_session_cost')
+        cost_currency = item.get('reported_cost_currency')
+        if cost_limit is not None and (type(cost_limit) not in (int, float) or
+                not 0 < cost_limit <= 1e100 or not math.isfinite(cost_limit)):
+            _fail('max_reported_session_cost must be a positive finite number at most 1e100')
+        if (cost_limit is None) != (cost_currency is None):
+            _fail('max_reported_session_cost and reported_cost_currency must be configured together')
+        if cost_currency is not None and (not isinstance(cost_currency, str) or
+                                          not re.fullmatch('[A-Z]{3}', cost_currency)):
+            _fail('reported_cost_currency must be a three-letter uppercase currency code')
         if no_progress > 20:
             _fail("max_no_progress_turns must not exceed 20")
         bindings.append(RoleBinding(
@@ -225,6 +238,7 @@ def parse_execution_config(document: Any, *, roles: set[str]) -> ExecutionConfig
             timeout_seconds=_positive(item.get("timeout_seconds", 1800), "timeout_seconds"),
             max_prompt_bytes=_positive(item.get("max_prompt_bytes", 262144), "max_prompt_bytes"),
             max_session_input_bytes=_positive(item.get("max_session_input_bytes", 1048576), "max_session_input_bytes"),
+            max_reported_session_cost=cost_limit, reported_cost_currency=cost_currency,
             max_startup_retries=retries, max_no_progress_turns=no_progress,
             retry_initial_seconds=_positive(item.get("retry_initial_seconds", 5), "retry_initial_seconds"),
             retry_max_seconds=_positive(item.get("retry_max_seconds", 60), "retry_max_seconds")))
