@@ -24,6 +24,13 @@ follow [SemVer](https://semver.org/) once 1.0.0 ships.
 - Queue dispatch and dependency release are daemon-owned. The journal replay hook
   that asked agents to scan queues and rerun mechanical checks has been removed;
   existing journal and inbox data remain intact.
+- Update preview, upgrade admission and installed-version verification now use
+  PEP 440. Final releases after prereleases and post-releases compare correctly;
+  invalid versions fail before installation, and epoch/major changes require
+  explicit acknowledgement.
+- Canonical configuration describes current ACP setup. Unused vendor marketplace
+  and automatic-update settings are removed; visual markers are optional display
+  templates, not instructions for agent housekeeping.
 
 ### Added
 

@@ -2590,3 +2590,23 @@ operator inbox text and journal history remain byte-preserved; the second pass i
 idempotent. The public CLI no longer exposes the wake dispatcher. All 48 targeted
 maintenance/daemon/public-interface tests passed. The initial full audit run had
 already collected before this removal and cannot serve as final post-change proof.
+
+### Acceptance audit — current schema and package version semantics (2026-09-07)
+
+The canonical schema retained unused vendor marketplace setup data, an unconsumed
+auto_update block and comments requiring agent-authored visual markers, despite
+the current setup and COORDINATE contract. Removed the unused setup/update data and
+vendor permission-loop commentary; kept visual templates explicitly optional for
+operator presentation. Corrected the stand notification comment to the actual
+stand-down owner. Role declarations and task gates are unchanged. Regenerated the
+contract reference so its source fingerprint matches the canonical schema.
+
+The package updater still used a separate loose version tuple despite its packaging
+dependency. A direct evaluation of the previous pure helpers reproduced two wrong
+verdicts: 2.6.0.post1 was treated as already current against 2.6.0, and promotion from
+2.6.0rc1 to 2.6.0 incorrectly required --major. Preview and actual upgrade admission
+now share packaging.version.Version ordering. Epoch/major increases keep explicit
+acknowledgement, malformed versions stop before installation, and post-install
+verification accepts equivalent normalized versions while rejecting absent/invalid
+results. Behavioral tests cover preview/action agreement and verification without
+performing real package updates. All 58 update/schema/reference tests passed.

@@ -1,11 +1,4 @@
-"""Tests for task 0193: agent-uttered visual markers.
-
-Agent ends each successful CLI-action reply with one markdown line
-per ``schema.visual_events``. Schema carries the emoji + template;
-``command_START.yaml`` common: carries the irreducible-minimum prose
-instruction telling agents WHEN to emit (the rule cannot be encoded
-machine-readably because the agent's behavior is prompt-driven).
-"""
+"""Optional visual templates and operator-facing presentation contract."""
 from __future__ import annotations
 
 import re

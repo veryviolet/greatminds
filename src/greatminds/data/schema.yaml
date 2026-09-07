@@ -1153,47 +1153,9 @@ worktrees:
   conflict_handback_to: feature_dev        # where REVIEWER hands back on conflict
   required_for_task_kinds: [feature, bugfix, ops]
 
-# USER-curated marketplace plugin lists for `greatminds setup`.
-# Verified 2026-05-25 against anthropics/claude-plugins-official.
-# Codex side deferred — operator hasn't curated yet, empty list per
-# role logs deferral and continues.
-plugins:
-  claude_marketplace:
-    ARCHITECT-PLANNER:  [sourcegraph, sentry, huggingface-skills]
-    ARCHITECT-REVIEWER: [sourcegraph, sentry]
-    DEVELOPER:          [postman]
-    UI-DEVELOPER:       [playwright, chrome-devtools-mcp, postman]
-    TESTER:             [playwright, sentry, postman, codspeed]
-    READER:             []
-    MAINTAINER:         []
-  codex_marketplace:
-    TECHNICAL-WRITER: []
-    EXPLORER:         []
-
-# Agent-uttered visual markers.
-#
-# After each successful greatminds task mv / append-block / inbox
-# send, the agent ends its turn-reply with one markdown line per
-# the schema-defined template. Unicode colored emoji + markdown
-# bold + inline code = TUI (claude / codex / tmux) renders this
-# natively — no ANSI escapes (which most TUIs strip). Operator
-# scrolling through any agent pane scans by the emoji color and
-# spots major lifecycle events without parsing tool-output blocks.
-#
-# Detection rules (which event for which CLI verb):
-#   - task mv → implementer queue from non-claim queue       → claimed
-#   - task mv → feature_test / feature_docs_review from
-#     an implementer queue                                   → finished
-#   - task mv → verified                                     → accepted
-#   - task append-block tests --field test_result=fail|partial
-#     OR review --field outcome=changes_requested
-#     OR mv back to implementer queue from review queue      → rejected
-#   - inbox send                                             → message_sent
-#
-# Templates use Python str.format placeholders. Available context:
-# {emoji}, {task_id}, {from_queue}, {to_queue}, {from_role},
-# {to_role}, {kind}, {task_ref}, {reason}. Agents pick the right
-# placeholders for each event.
+# Optional display templates for operator summaries. Frontends render durable
+# runtime/domain events; agents do not have to repeat mechanical state as a
+# final-line marker. These templates are presentation, never transition evidence.
 visual_events:
   claimed:
     emoji: "🔵"
@@ -1210,30 +1172,6 @@ visual_events:
   message_sent:
     emoji: "🟣"
     template: "{emoji} **SENT** {kind} → {to_role} {task_ref}"
-
-# Claude Code auto-mode permissions for claude-host roles.
-#
-# /loop REVIEWER (and any other claude-host role that needs to run
-# destructive git ops) cannot do `git commit/tag/push/merge` without
-# an explicit allow rule — Claude Code's auto-mode classifier blocks
-# destructive Bash by default, and a /loop session has no operator to
-# answer an AskUserQuestion prompt. `greatminds setup` writes/extends
-# `<project>/.claude/settings.local.json` with these rules per the
-# structured-config-first directive. Operator may extend per-project
-# by editing settings.local.json directly; setup merges via union,
-# never overwriting existing operator entries.
-# coordd periodic PyPI version check. Every
-# `check_interval_seconds`, coordd compares the installed greatminds
-# version against PyPI's latest; if newer, it sends ONE info-message
-# to `notify_target`. Notify-only — MAINTAINER decides when to
-# actually run `greatminds update`. coordd tracks the last-notified
-# version in process memory so a still-un-acted-upon newer release
-# doesn't spam every poll.
-auto_update:
-  check_interval_seconds: 14400   # 4h
-  notify_target: MAINTAINER
-  mode: notify_only               # future: auto_execute
-  source: pypi                    # future: git_tag
 
 # Gate `greatminds report-upstream` to MAINTAINER only. Other
 # roles file bug-suspects via `greatminds inbox send MAINTAINER
@@ -1309,9 +1247,9 @@ stand_profile:
   # that prepare the stand for the real probe).
   deploy_prerequisites_only_flag: deploy_prerequisites_only
 
-# Stand lifecycle notification policy. coordd files inbox-info
-# automatically on these events so PLANNER (or another role) does not need to
-# poll state.yaml. Keep the map small — only events PLANNER must react to.
+# Stand lifecycle notification policy. The stand down operation records
+# inbox-info for the configured semantic owner. State inspection and scheduling
+# stay in deterministic services; agents do not poll state.yaml.
 stand_keeper:
   notifications:
     on_down: ARCHITECT-PLANNER

@@ -15,6 +15,7 @@ import urllib.request
 from pathlib import Path
 
 import click
+from packaging.version import InvalidVersion, Version
 
 from greatminds import __version__
 from greatminds.cli._colors import err, info, ok, warn
@@ -28,16 +29,22 @@ PYPI_JSON_URL = "https://pypi.org/pypi/greatminds/json"
 # ---------------------------------------------------------------------------
 
 
-def _parse_semver(v: str) -> tuple[int, int, int]:
-    """Loose semver parse: take leading int.int.int, ignore pre-release suffix."""
-    parts = v.split("-", 1)[0].split("+", 1)[0].split(".")
+def _package_versions(current: str, latest: str) -> tuple[Version, Version]:
+    """Use Python package ordering for both preview and the actual upgrade."""
     try:
-        nums = [int(p) for p in parts[:3]]
-    except ValueError:
-        return (0, 0, 0)
-    while len(nums) < 3:
-        nums.append(0)
-    return tuple(nums[:3])  # type: ignore[return-value]
+        return Version(current), Version(latest)
+    except InvalidVersion:
+        err("cannot compare package versions: installed or PyPI version is invalid")
+        raise click.exceptions.Exit(2)
+
+
+def _installed_matches(actual: str | None, expected: Version) -> bool:
+    if actual is None:
+        return False
+    try:
+        return Version(actual) == expected
+    except InvalidVersion:
+        return False
 
 
 def _fetch_latest_pypi_version() -> str:
@@ -63,10 +70,8 @@ def _fetch_latest_pypi_version() -> str:
     return version
 
 
-def _is_major_bump(current: str, latest: str) -> bool:
-    c_major = _parse_semver(current)[0]
-    l_major = _parse_semver(latest)[0]
-    return l_major > c_major
+def _is_major_bump(current: Version, latest: Version) -> bool:
+    return (latest.epoch, latest.major) > (current.epoch, current.major)
 
 
 # ---------------------------------------------------------------------------
@@ -146,14 +151,14 @@ def _step_pip_upgrade(major: bool) -> bool:
     latest = _fetch_latest_pypi_version()
     info(f"==> latest on PyPI: {latest}")
 
-    if _parse_semver(latest) <= _parse_semver(current):
+    current_version, latest_version = _package_versions(current, latest)
+    if latest_version <= current_version:
         ok("already up to date (package); will still reconcile config")
         return False
 
-    if _is_major_bump(current, latest) and not major:
+    if _is_major_bump(current_version, latest_version) and not major:
         err(
-            f"major upgrade {current.split('.')[0]}.x → "
-            f"{latest.split('.')[0]}.0 may require config migration; "
+            f"major upgrade {current} → {latest} may require config migration; "
             "re-run with --major to acknowledge."
         )
         raise click.exceptions.Exit(2)
@@ -193,12 +198,12 @@ def _step_pip_upgrade(major: bool) -> bool:
     # in a fresh subprocess; for uv, force one reinstall pass if it
     # lagged, then fail loudly rather than silently needing a 2nd run.
     got = _installed_version_fresh()
-    if got != latest and setup.env_type == "uv":
+    if not _installed_matches(got, latest_version) and setup.env_type == "uv":
         warn(f"    installed still {got} after sync — forcing reinstall")
         subprocess.run(["uv", "sync", "--reinstall-package", "greatminds"],
                        capture_output=True, text=True)
         got = _installed_version_fresh()
-    if got != latest:
+    if not _installed_matches(got, latest_version):
         err(f"upgrade did not take effect: installed={got!r}, expected "
             f"{latest!r}. Re-run, or check for a process holding the venv "
             f"(a running daemon) or a foreign activated virtualenv "
@@ -274,10 +279,11 @@ def update(post_pip: bool, check: bool, dry_run: bool, major: bool,
         latest = _fetch_latest_pypi_version()
         info(f"==> current: greatminds {current}")
         info(f"==> latest on PyPI: {latest}")
-        if _parse_semver(latest) <= _parse_semver(current):
+        current_version, latest_version = _package_versions(current, latest)
+        if latest_version <= current_version:
             ok("already up to date")
             return
-        if _is_major_bump(current, latest) and not major:
+        if _is_major_bump(current_version, latest_version) and not major:
             warn(f"would refuse: major bump {current} → {latest} "
                  "(re-run with --major to acknowledge).")
             return

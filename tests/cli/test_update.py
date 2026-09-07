@@ -221,18 +221,52 @@ def test_check_pypi_unreachable_clean_error(monkeypatch):
     assert "could not reach PyPI" in result.output
 
 
-# ---------------------------------------------------------------------------
-# _parse_semver corner cases (internal helper)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("v,expected", [
-    ("1.2.3", (1, 2, 3)),
-    ("1.2.3-rc1", (1, 2, 3)),
-    ("1.2.3+build.5", (1, 2, 3)),
-    ("2.0", (2, 0, 0)),
-    ("9", (9, 0, 0)),
-    ("garbage", (0, 0, 0)),
+@pytest.mark.parametrize('current,latest,verdict', [
+    ('2.6.0rc1', '2.6.0', 'upgrade'),
+    ('2.6.0', '2.6.0.post1', 'upgrade'),
+    ('2.6.dev1', '2.6a1', 'upgrade'),
+    ('2.6.0.post1', '2.6.0', 'current'),
+    ('2.6+local', '2.6.0', 'current'),
+    ('2.6', '2.6.0', 'current'),
+    ('2.6', '1!2.6', 'major'),
+    ('2.6', 'invalid', 'invalid'),
+    ('invalid', '2.6', 'invalid'),
 ])
-def test_parse_semver(v, expected):
-    assert upd._parse_semver(v) == expected
+def test_preview_and_upgrade_share_python_package_ordering(
+        tmp_path, monkeypatch, fake_pypi, fake_subprocess, current, latest, verdict):
+    from greatminds.core import env
+    import click
+    monkeypatch.setattr(upd, '__version__', current)
+    fake_pypi['latest'] = latest
+    monkeypatch.setattr(env, 'detect', lambda *a, **kw: SimpleNamespace(env_type='venv', project_dir=tmp_path, source='fixture'))
+    monkeypatch.setattr(upd, '_installed_version_fresh', lambda: latest)
+    preview = _invoke(['--check'])
+    assert preview.exit_code == (2 if verdict == 'invalid' else 0)
+    text = {'upgrade': 'would upgrade', 'current': 'already up to date',
+            'major': 'would refuse: major bump', 'invalid': 'cannot compare package versions'}[verdict]
+    assert text in preview.output
+    assert fake_subprocess == []  # Preview and malformed versions cannot change installation.
+    if verdict in {'major', 'invalid'}:
+        with pytest.raises(click.exceptions.Exit) as error:
+            upd._step_pip_upgrade(major=False)
+        assert error.value.exit_code == 2 and fake_subprocess == []
+    else:
+        assert upd._step_pip_upgrade(major=False) == (verdict == 'upgrade')
+        assert bool(fake_subprocess) == (verdict == 'upgrade')
+
+
+@pytest.mark.parametrize('actual,success', [('2.7', True), ('2.7.0', True), (None, False), ('invalid', False)])
+def test_installed_version_verification_accepts_only_equivalent_package_versions(
+        tmp_path, monkeypatch, fake_pypi, fake_subprocess, actual, success):
+    from greatminds.core import env
+    import click
+    monkeypatch.setattr(upd, '__version__', '2.6.0')
+    fake_pypi['latest'] = '2.7.0'
+    monkeypatch.setattr(env, 'detect', lambda *a, **kw: SimpleNamespace(env_type='venv', project_dir=tmp_path, source='fixture'))
+    monkeypatch.setattr(upd, '_installed_version_fresh', lambda: actual)
+    if success:
+        assert upd._step_pip_upgrade(major=False)
+    else:
+        with pytest.raises(click.exceptions.Exit) as error:
+            upd._step_pip_upgrade(major=False)
+        assert error.value.exit_code == 1
