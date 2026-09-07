@@ -210,14 +210,20 @@ class AcpTransport:
             await asyncio.wait_for(self.connection.set_session_mode(
                 session_id=session_id, mode_id=mode), self.request_timeout)
         if model:
-            option = next((item for item in session.config_options or []
-                           if item.category == "model" and item.type == "select"), None)
-            if option is None:
+            options = [item for item in session.config_options or []
+                       if item.category == "model" and item.type == "select"]
+            if not options:
                 raise ValueError("agent does not advertise model selection")
-            choices = [choice for item in option.options
-                       for choice in (item.options if hasattr(item, "options") else [item])]
-            if model not in {choice.value for choice in choices}:
+            # Category is not a unique selector ID. A server may put provider
+            # and model selectors in the same category; never pick by order.
+            matching = [option for option in options if model in {
+                choice.value for item in option.options
+                for choice in (item.options if hasattr(item, "options") else [item])}]
+            if not matching:
                 raise ValueError("configured model is not advertised")
+            if len(matching) != 1:
+                raise ValueError("configured model matches multiple advertised selectors")
+            option = matching[0]
             selected = await asyncio.wait_for(self.connection.set_config_option(
                 config_id=option.id, session_id=session_id, value=model), self.request_timeout)
             if not any(item.id == option.id and item.current_value == model

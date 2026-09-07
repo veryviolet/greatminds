@@ -28,9 +28,14 @@ def result(request_id, payload):
 
 
 def model_options(value):
-    return [{"id": "model", "name": "Model", "category": "model", "type": "select",
+    options = [{"id": "model", "name": "Model", "category": "model", "type": "select",
              "currentValue": value, "options": [{"value": "default", "name": "Default"},
                                                  {"value": "chosen", "name": "Chosen"}]}]
+    if scenario in {'model-multiple', 'model-ambiguous'}:
+        options.insert(0, {"id": "provider", "name": "Provider", "category": "model", "type": "select",
+            "currentValue": "provider", "options": [{"value": "provider", "name": "Provider"}] +
+            ([{"value": "chosen", "name": "Ambiguous"}] if scenario == 'model-ambiguous' else [])})
+    return options
 
 
 for line in sys.stdin:
@@ -63,6 +68,7 @@ for line in sys.stdin:
             payload["configOptions"] = model_options("default")
         result(request_id, payload)
     elif method == "session/set_config_option":
+        Path('selected-config-id.log').write_text(message['params']['configId'])
         value = "default" if scenario == "model-ignore" else message["params"]["value"]
         result(request_id, {"configOptions": model_options(value)})
     elif method == "session/load":

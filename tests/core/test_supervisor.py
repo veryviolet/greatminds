@@ -282,7 +282,8 @@ def test_required_capability_fails_before_prompt(tmp_path):
     asyncio.run(check())
 
 
-@pytest.mark.parametrize("scenario,expected", [("model", "completed"), ("model-ignore", "failed")])
+@pytest.mark.parametrize("scenario,expected", [("model", "completed"), ("model-ignore", "failed"),
+                                              ("model-multiple", "completed"), ("model-ambiguous", "failed")])
 def test_model_choice_requires_confirmation_from_agent(tmp_path, scenario, expected):
     store, schema, config, task = setup(tmp_path, scenario)
     config = replace(config, bindings=(replace(config.bindings[0], model="chosen"),))
@@ -291,6 +292,10 @@ def test_model_choice_requires_confirmation_from_agent(tmp_path, scenario, expec
             claim = service.claim(task, config.bindings[0])
             result = await service.execute(claim, binding=config.bindings[0], prompt="work")
             assert result["state"] == expected, result
+            if scenario == 'model-multiple':
+                assert (tmp_path / 'selected-config-id.log').read_text() == 'model'
+            if scenario == 'model-ambiguous':
+                assert not (tmp_path / 'selected-config-id.log').exists()
             if expected == "failed":
                 assert result["reason"] == "configuration_error"
                 assert result["outcome"]["updates"] == 0
