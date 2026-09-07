@@ -59,6 +59,14 @@ and Cursor IDE targets generate ACP workspace tasks. Interactive roles use
 `greatminds chat`, backed by daemon-owned sessions. Configure role bindings in
 `coordination/execution.yaml` before dispatch.
 
+Foreground and service entrypoints apply configured environment layers in this
+order: inherited process environment, `.greatminds/PROJECT.env`, then the selected
+registration's captured environment. A foreground project with one registration
+uses that registration; multiple registrations require `coordd --project NAME`.
+An unregistered project uses no captured environment. Both entrypoints validate
+file syntax before starting daemon work. Changes take effect on restart, not
+mid-session. The inherited shell and systemd base environments may still differ.
+
 Use a stable install for long-running fleets: pipx, `uv tool`, or a normal
 project venv. The editable development venv is for changing and testing
 greatminds itself. Do not launch a long-running fleet with `uv run`;

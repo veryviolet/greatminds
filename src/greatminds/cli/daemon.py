@@ -279,16 +279,34 @@ def _parse_env_file(path: Path) -> dict[str, str]:
     return read_environment(path)
 
 
-def _daemon_candidate_env(name: str, project_dir: Path) -> dict[str, str]:
-    """Environment a daemon-started driven subprocess should see.
+def _daemon_candidate_env(name: str | None, project_dir: Path) -> dict[str, str]:
+    """Environment a daemon-started subprocess should see.
 
     Mirrors the systemd drop-in order: current process env, then
     .greatminds/PROJECT.env, then the private captured agent env.
     """
     env = dict(os.environ)
     env.update(_parse_env_file(project_env_file(project_dir)))
-    env.update(_parse_env_file(_agent_env_file(name)))
+    if name is not None:
+        env.update(_parse_env_file(_agent_env_file(name)))
     return env
+
+
+def execution_environment(project_dir: Path, project_name: str | None = None) -> dict[str, str]:
+    """Resolve project-specific captured values without registering or writing."""
+    registry = load_registry()
+    root = project_dir.resolve()
+    if project_name is not None:
+        if project_name not in registry:
+            raise click.ClickException(f"no project registered as {project_name!r}")
+        if Path(registry[project_name]).resolve() != root:
+            raise click.ClickException("project name is registered to a different directory")
+    else:
+        names = sorted(name for name, path in registry.items() if Path(path).resolve() == root)
+        if len(names) > 1:
+            raise click.ClickException("project has multiple registered names; pass --project explicitly")
+        project_name = names[0] if names else None
+    return _daemon_candidate_env(project_name, root)
 
 
 def install_project_dropin(name: str, project_dir: Path) -> bool:

@@ -1,4 +1,5 @@
 """CLI entrypoint for the common ACP execution daemon."""
+import os
 from pathlib import Path
 import click
 from greatminds.core.paths import find_project_dir
@@ -22,7 +23,17 @@ def coordd(project_dir: Path | None, project_name: str | None,
                                    use_env=project_dir is None)
     import asyncio
     from greatminds.runtime.daemon import serve
-    asyncio.run(serve(project_dir, interval=interval_sec, once=once))
+    from greatminds.cli.daemon import execution_environment
+    environment = execution_environment(project_dir, project_name)
+    # Establish the process environment before starting daemon threads. Stand
+    # and workspace subprocesses use it too, not only ACP/command services.
+    original = dict(os.environ)
+    try:
+        os.environ.update(environment)
+        asyncio.run(serve(project_dir, interval=interval_sec, once=once, environment=environment))
+    finally:
+        os.environ.clear()
+        os.environ.update(original)
 
 
 if __name__ == "__main__":

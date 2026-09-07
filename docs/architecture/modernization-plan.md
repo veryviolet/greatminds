@@ -1487,3 +1487,29 @@ inherits its process environment while the installed service obtains PROJECT.env
 through systemd. Explicit parity of foreground/service environment layering
 remains to be completed. B1/M3 supervision policies and other outstanding
 milestone requirements also remain open.
+
+### Foreground/service configured environment parity (2026-09-07)
+
+Closed the environment layering gap noted in the preceding checkpoint. coordd
+now resolves current-process, PROJECT.env and selected-registration captured
+values before entering serve. It establishes that environment before creating
+threads and passes the same mapping to the ACP supervisor/command services;
+stand/workspace subprocesses inherit the configured process values too. The
+entrypoint restores the caller's environment on return or error. No registration
+or credential capture is performed by foreground startup.
+
+A unique registration for the exact project root is selected automatically;
+multiple aliases require --project. Explicit names must exist and match the
+resolved project directory even when both CLI options are provided. Unregistered
+projects (including directories with spaces) use no captured file. Invalid files
+or ambiguous/mismatched identity fail before serve. The inherited shell and
+systemd base environments can still differ; the guarantee is the same explicit
+configuration layering, not identical unrelated host variables.
+
+Validation: **101 startup/default-ACP/service tests passed**. An additional
+**26 startup/ACP-daemon tests passed**, including actual subprocess inheritance
+of multiline values in unregistered, automatically registered and explicitly
+registered cases. Failure restoration and no-launch invalid input checks passed.
+The operations runbook documents precedence and restart semantics. No live
+systemd service or provider was started. Remaining B1/M3 supervision policy,
+legacy asset cleanup and full milestone acceptance work stays open.
