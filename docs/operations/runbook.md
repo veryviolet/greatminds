@@ -217,3 +217,34 @@ root is not a git repository, `greatminds task mv` must fail before the task
 reaches the implementer. Recover by pointing Greatminds at a real source git
 checkout or initializing the intended source project, then rerun the route.
 Do not reintroduce stale `.git` pointers into deployed payload directories.
+
+## Aggregate local diagnosis
+
+```bash
+greatminds run doctor --project-dir "$PWD"
+greatminds run doctor --project-dir "$PWD" --json
+```
+
+This read-only report combines schema/mirror inspection, ACP prerequisites,
+current run holds, assignment admission, dependency findings and unresolved
+command/result/maintenance/deployment operations. It reuses the runtime services;
+it does not run a harness, inspect provider login by launching a probe, repair
+state or call systemctl. `daemon doctor` remains the focused prerequisite check.
+
+JSON version 1 includes `checks`, `findings`, `summary` and `status`. Each finding
+has a component, stable code, severity, selected evidence and an operator action.
+A failed component does not hide independent results. `unavailable` means a
+prerequisite prevented that check, not that the component is healthy. The command
+exits 1 when error findings exist; warnings/info alone exit 0. Inspect the summary
+and findings rather than treating exit 0 as proof of a running healthy daemon.
+
+Authentication waits, semantic dependency holds, retry delays and uncertain
+operation recovery remain separate findings. Use the suggested detailed command
+before authorizing an operation. Repeating diagnosis does not consume model turns
+or alter project files. Reports omit prompt text, command arguments/output and
+raw exception messages; they retain task/run identifiers and diagnostic codes.
+
+This report covers the named local checks. It is a best-effort observation across
+stores, not an atomic health verdict or live compatibility test. Watchdog-specific
+stale-task/intent/worktree scans and remote provider availability are not implied
+by a `no_findings` result.

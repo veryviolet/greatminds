@@ -544,25 +544,8 @@ def doctor_cmd(project: str | None, project_dir: Path | None,
     _, config = configuration(pd)
     name = _resolve_project_name(project, pd)
     env = _daemon_candidate_env(name, pd)
-    checks = []
-    for agent in config.agents:
-        effective = dict(env)
-        effective.update({dest: env[ref] for dest, ref in agent.environment if ref in env})
-        executable = agent.argv[0]
-        # Relative executables/PATH entries depend on each binding's workspace.
-        # Do not resolve them against the operator's unrelated current directory.
-        if os.path.isabs(executable):
-            available = Path(executable).is_file() and os.access(executable, os.X_OK)
-        elif "/" in executable:
-            available = False
-        else:
-            path = os.pathsep.join(part for part in effective.get("PATH", os.defpath).split(os.pathsep)
-                                   if os.path.isabs(part))
-            available = shutil.which(executable, path=path) is not None
-        missing = [key for key in agent.required_env if not env.get(key)]
-        checks.append({"agent": agent.id, "executable_available": available,
-                       "missing_required_env": missing,
-                       "ready": available and not missing})
+    from greatminds.runtime.diagnostics import agent_prerequisites
+    checks = agent_prerequisites(config, env)
     result = {"project": str(pd), "transport": "acp", "verification": "static",
               "environment": "current process plus project and captured environment files",
               "agents": checks, "ready": all(row["ready"] for row in checks)}

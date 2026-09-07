@@ -28,6 +28,26 @@ def status(project_dir):
     click.echo(json.dumps(snapshot(project), ensure_ascii=False, indent=2))
 
 
+@run.command("doctor")
+@click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path))
+@click.option("--json", "as_json", is_flag=True)
+def doctor(project_dir, as_json):
+    """Aggregate local configuration, run, dependency and recovery findings."""
+    from greatminds.runtime.diagnostics import diagnose
+    from greatminds.cli.chat import terminal_text
+    project = project_dir.resolve() if project_dir else find_project_dir()
+    report = diagnose(project)
+    if as_json:
+        click.echo(json.dumps(report, ensure_ascii=True, sort_keys=True))
+    else:
+        for item in report["findings"]:
+            click.echo(terminal_text(f"{item['severity']}: {item['component']}/{item['code']} "
+                                    f"{item['evidence']} — {item['action']}"))
+        click.echo(f"Local inspection: {report['status']}; provider login and ACP compatibility were not probed.")
+    if report["summary"]["error"]:
+        raise click.exceptions.Exit(1)
+
+
 @run.command("events")
 @click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path))
 @click.option("--after", type=click.IntRange(min=0), default=0, help="Exclusive event sequence cursor.")

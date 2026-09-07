@@ -1839,3 +1839,30 @@ Remaining C4 work includes representative baseline/pipeline measurements,
 queue/validation timing and reliable provider usage reporting where available.
 Other plan milestones remain open; instrumentation alone is not performance
 acceptance or a claim of end-to-end speedup.
+
+### Aggregate local diagnostic findings (2026-09-07)
+
+Added greatminds run doctor (text/JSON) with versioned component checks,
+findings, severity, selected evidence, suggested actions and summary counts.
+Reuses effective configuration, shared static agent prerequisites, ACP operator
+rows, assignment admission, dependency maintenance and deployment ledger reads.
+Extracted agent_prerequisites so daemon doctor uses the same check implementation.
+
+Independent components continue after inspection failures. Errors expose class
+names instead of raw exception messages; reports exclude prompt bodies, command
+argv/output and raw result envelopes. Authentication, dependency, backoff and
+uncertain-operation holds remain distinct. Diagnosis does not write runtime
+state, launch agents or execute repairs. Documented exit/status semantics and
+scope: no-findings is not a live-provider or atomic daemon-health verdict.
+
+Validation: 6 prerequisite/operator regression checks passed in 1.22s;
+9 initial aggregate/public-help checks passed in 1.56s; final 12 aggregate,
+prerequisite and operator checks passed in 1.55s. Cases cover read-only repeatable
+inspection, secret exclusion, malformed operation collections, broken config
+without hiding deployment faults, and distinct auth/dependency holds. Strict
+MkDocs build passed in 1.48s.
+
+C5 remains open: add the local diagnostic bundle, integrate watchdog-specific
+stale intent/task/worktree findings, and consolidate bounded recovery actions.
+The aggregate is implemented as a domain report usable by the future web UI;
+no additional frontend state machine or live-provider probe was added.
