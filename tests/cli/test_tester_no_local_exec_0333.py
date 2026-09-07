@@ -27,7 +27,7 @@ def _schema() -> dict:
 
 def test_tester_forbids_local_tests_and_uv_run() -> None:
     forb = set(_schema()["roles"]["TESTER"].get("forbidden_actions") or [])
-    assert "run_local_tests" in forb, (
+    assert "execute_local_tests_directly_outside_declared_command_service" in forb, (
         "0333: TESTER must forbid local test runs")
     assert "uv_run_or_active_against_fleet_venv" in forb, (
         "0333: TESTER must forbid uv run/--active against the fleet venv")

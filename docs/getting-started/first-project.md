@@ -32,13 +32,39 @@ agents:
     argv: [/absolute/path/to/your-acp-agent]
     adapter_version: your-tested-adapter-version
     harness_version: your-tested-harness-version
-bindings:
-  planner:
-    agent: local-agent
-    role: ARCHITECT-PLANNER
-    scheduling: on-demand
-    permission: ask
+bindings: {}
 ```
+
+Select a roster before starting the daemon:
+
+```bash
+greatminds project presets
+greatminds project preset local --agent local-agent
+greatminds project preset local --agent local-agent --apply
+```
+
+The first preset command previews the complete contract without writing it.
+`--apply` atomically fills empty bindings; repeating the same selection is safe.
+Existing custom bindings are never replaced. Edit them explicitly if changing an
+established roster, then restart the daemon to load the changed contract.
+
+| Preset | Roles |
+| --- | --- |
+| `local` | Planner, developer, tester, reviewer |
+| `ui` | Planner, UI developer, tester, reviewer |
+| `docs` | Planner, technical writer, reader, reviewer |
+| `deployed` | Planner, code/UI developers, tester, reviewer, live developer, explorer |
+| `full` | All ten roles, including maintainer |
+
+Planner, live developer and maintainer are on demand. Queue workers start only
+when eligible work exists. All generated bindings use `permission: ask` and the
+named manifest. Presets preserve commands and other execution settings; they do
+not install harnesses or provision stands. Configure validation commands for your
+project and optional stand policy separately. Local tasks explicitly declare
+`plan.stand_required: false`; TESTER requests daemon commands and independently
+assesses the implementation and evidence. Tasks requiring a stand retain their
+actual deployed validation gates. The schema and transition rules are unchanged
+by preset selection.
 
 One manifest can serve multiple role bindings. Roles, model selection,
 permissions, workspace, scheduling and account limits are configured separately.

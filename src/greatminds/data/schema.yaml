@@ -35,7 +35,7 @@ glossary:
     UI-DEVELOPER: "UI implementation. Claims from feature_ui_dev/ (placed there by ARCHITECT-PLANNER routing scope:ui tasks), writes the implementation block, hands off to feature_test/."
     LIVE-DEVELOPER: "Interactive, USER-paced developer for a single task on a leased stand (scenario C and ad-hoc live work). Claims from feature_live/, holds a stand lease and deploys to it during the session, chats live with the USER, and on USER approval hands to feature_review/ as a sprint task (REVIEWER no-regression review, no TESTER)."
     TECHNICAL-WRITER: "Documentation implementation. Claims from feature_docs/ (placed there by ARCHITECT-PLANNER routing scope:docs tasks); hands off to feature_docs_review/."
-    TESTER: "Validates implemented features on a deployed stand. Acquires the stand by lease, probes once it is ready, and runs greatminds gate-check before mv to feature_review/."
+    TESTER: "Independently evaluates implementation and declared command evidence. When plan.stand_required is true, validates on the deployed stand with lease-backed evidence and gate-check. Local tasks use configured daemon commands; prompt completion alone is not passing evidence."
     READER: "Reads docs as a fresh user; validates clarity and accuracy; routes the result out of feature_docs_review/."
     EXPLORER: "Uses the live system on the stand as a real user (scenario B), whatever the stand's shape. Files bugs as kind:bugfix tasks in feature_inbox/."
     USER: "Writes user_feedback/ or initiates an ARCHITECT-PLANNER chat. Never creates implementation tasks directly."
@@ -383,30 +383,32 @@ roles:
     lifecycle: driven
     claims_from: [feature_test]
     responsibilities:
-      - probe_feature_on_deployed_stand
-      - fill_real_stand_evidence
+      - independently_assess_implementation_and_test_adequacy
+      - request_configured_daemon_checks_for_local_tasks
+      - probe_feature_on_deployed_stand_when_plan_requires_it
+      - fill_real_stand_evidence_when_plan_requires_it
       - run_gate_check_before_mv
     forbidden_actions:
       - deploy_stand
       - run_ansible_locally
       - fill_fake_stand_evidence
       - claim_outside_feature_test
-      # TESTER's only execution surface is SSH probes against the
-      # DEPLOYED stand — never a local test run. `uv run`/`uv run
-      # --active` from a worktree syncs it into the active fleet environment,
-      # dangling its editable .pth on worktree prune →
-      # fleet-wide ModuleNotFoundError. Evidence is stand-probe only.
-      - run_local_tests
+      # Validation commands execute in the daemon's declared command service.
+      # Stand-required work still needs actual deployed behavioral evidence.
+      - execute_local_tests_directly_outside_declared_command_service
+      - replace_required_stand_probes_with_local_checks
       - uv_run_or_active_against_fleet_venv
     event_triggers:
       on_feature_test_claim:
-        - acquire_lease_via_stand_lease
-        - wait_for_state_ready
-        - probe_via_ssh_using_project_env_host
+        - inspect_plan_stand_requirement_and_acceptance
+        - request_configured_daemon_checks_and_assess_receipts_for_local_tasks
+        - acquire_lease_when_plan_requires_stand
+        - wait_for_state_ready_when_plan_requires_stand
+        - probe_via_ssh_when_plan_requires_stand
         - fill_tests_block_with_real_observed_output
         - run_gate_check
-        - release_lease_with_result
-        - mv_to_feature_review
+        - release_lease_with_result_if_held
+        - submit_typed_handoff_to_feature_review
     stand_profile_selection:
       required_for:
         - plan.stand_required

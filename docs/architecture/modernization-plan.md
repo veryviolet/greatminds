@@ -1956,3 +1956,27 @@ exports and descriptions backed by existing deterministic recovery services.
 Full milestone acceptance still requires auditing their combined coverage;
 remaining C2 presets, C4 comparative performance/resource work and real harness
 compatibility requirements are not satisfied by these diagnostic controls.
+
+### Explicit role presets and local TESTER contract (2026-09-07)
+
+Added project presets and preview/apply commands for local, UI, documentation,
+deployed and full role rosters over an existing named ACP manifest. Applying a
+preset fills empty bindings atomically under the setup lock; identical repetition
+preserves bytes, and conflicting existing bindings are rejected. Agent manifests,
+configured commands and schema transition/evidence gates remain unchanged. All
+preset permissions are ask; interactive roles remain on demand. The first-project
+guide now starts with a manifest and a selected roster. Agent context includes the
+configured roles from the run's frozen execution contract.
+
+TESTER instructions now distinguish local tasks requesting declared daemon
+commands from stand-required tasks with lease, readiness and actual SSH evidence.
+No validation gate was relaxed. A single synthetic ACP executable completed the
+local preset's developer/tester/reviewer pipeline with three real command receipts,
+typed results, daemon merge and restart without replay; its on-demand planner did
+not consume a background run. This starts from a prepared task and does not claim
+fresh-install live-provider onboarding acceptance.
+
+Validation: 86 preset, runtime-contract, role-contract and public-documentation
+checks passed in 5.74s; both original and local-preset integration pipelines passed
+in 25.76s. Strict documentation build passed in 1.47s; diff whitespace check passed.
+C2 live-provider first-task acceptance and comparative handoff overhead remain open.

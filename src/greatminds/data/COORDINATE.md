@@ -429,10 +429,12 @@ Implementers (DEVELOPER / UI-DEVELOPER / TECHNICAL-WRITER)
 `cd "$(greatminds worktree path <task-id>)"` before **editing** — the
 CLI resolves the path from schema policy.
 
-TESTER does **not** edit or execute in the worktree. TESTER's only
-execution surface is SSH probes against the **deployed stand** (after
-the deploy playbook rsyncs the worktree to the stand); evidence comes from the
-stand, not a local run.
+TESTER does **not** edit or execute in the worktree. For a local task with
+`plan.stand_required: false`, TESTER requests configured validation commands
+through the daemon and independently assesses their receipts and adequacy.
+When the plan requires a stand, TESTER acquires its lease, waits for readiness,
+and records actual SSH probes against the **deployed stand**. Local command
+receipts cannot replace required stand evidence.
 
 `uv run` / `uv run --active` is **forbidden for every role anywhere in
 the repo**: `--active` syncs the cwd project into the *active* venv —

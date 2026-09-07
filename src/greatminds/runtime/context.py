@@ -15,6 +15,7 @@ from .store import Claim, RunStore, TaskRevision
 def context_document(store: RunStore, claim: Claim, schema: SchemaSnapshot) -> dict:
     cli_argv = [sys.executable, "-I", "-m", "greatminds.cli.main"]
     run = claim.run
+    configured_roles = sorted({binding['role'] for binding in store.contracts(run['id'])['execution']['bindings']})
     task = TaskRevision(run["task_id"], run["task_path"], run["task_revision"])
     store._check_revision(task)
     if run.get('conversation_id') and not run.get('conversation_task'):
@@ -25,7 +26,7 @@ def context_document(store: RunStore, claim: Claim, schema: SchemaSnapshot) -> d
                 'forbidden_actions': role.get('forbidden_actions', []),
                 'configured_commands': [item for item in store.contracts(run['id'])['execution'].get('commands', [])
                                         if run['role'] in item['roles']],
-                'task': None, 'allowed_transitions': [], 'result_format': None}
+                'configured_roles': configured_roles, 'task': None, 'allowed_transitions': [], 'result_format': None}
     try:
         document = yaml.safe_load((store.runtime / task.path).read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:
@@ -41,6 +42,7 @@ def context_document(store: RunStore, claim: Claim, schema: SchemaSnapshot) -> d
     context = {
         "run_id": run["id"], "task_id": task.task_id, "task_revision": task.sha256,
         "schema_sha256": schema.sha256, "role": run["role"], "workspace": run["workspace"],
+        "configured_roles": configured_roles,
         "cli_argv": cli_argv,
         "responsibilities": role.get("responsibilities", []),
         "forbidden_actions": role.get("forbidden_actions", []),

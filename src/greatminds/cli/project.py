@@ -1,12 +1,4 @@
-"""``greatminds project`` — read-only view of ``coordination/PROJECT.md``.
-
-Closes a protocol gap: the contract requires every agent to read
-``coordination/PROJECT.md`` each tick, but ``PROJECT.md`` lives under
-``coordination/`` and the "mutations via the CLI only" rule (plus
-cwd ambiguity) left agents with no sanctioned CLI surface to obtain it.
-This command prints it, resolving the coordination dir regardless of
-cwd. Strictly read-only — no mutation, no FSM side effects.
-"""
+"""Project documentation, effective contracts and explicit execution presets."""
 from __future__ import annotations
 
 import json
@@ -21,7 +13,7 @@ from greatminds.runtime.config import load_execution_config
 
 
 @click.group(name="project",
-             help="read-only project documentation and effective contract.")
+             help="project documentation, effective contracts and execution presets.")
 def project() -> None:
     pass
 
@@ -79,3 +71,20 @@ def project_schema(project_dir: Path | None, as_json: bool, check: bool) -> None
                        "replacing the mirror. Setup preserves existing mirrors. "
                        "Runtime policy comes from the schema above.")
         raise click.exceptions.Exit(2)
+
+
+@project.command(name="presets", help="list available ACP role rosters without changing the project.")
+def project_presets():
+    from greatminds.runtime.presets import catalog
+    click.echo(json.dumps({"version": 1, "presets": catalog()}, indent=2))
+
+
+@project.command(name="preset", help="preview or explicitly apply a role roster to an existing ACP manifest.")
+@click.argument("name", type=click.Choice(["local", "ui", "docs", "deployed", "full"]))
+@click.option("--agent", required=True, help="Existing agent manifest ID to use for the selected roles.")
+@click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path))
+@click.option("--apply", is_flag=True, help="Atomically write the previewed bindings; preserve existing custom bindings.")
+def project_preset(name, agent, project_dir, apply):
+    from greatminds.runtime.presets import configure_preset
+    root = project_dir.resolve() if project_dir else find_project_dir()
+    click.echo(json.dumps(configure_preset(root, name, agent, apply=apply), indent=2))

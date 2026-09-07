@@ -48,6 +48,7 @@ def test_assigned_context_pins_cli_without_path_or_workspace_module_lookup(runti
     (runtime.parent / "greatminds.py").write_text("raise RuntimeError('workspace module must not run')\n")
     prompt = compile_context(RunStore(runtime), claim, schema)
     context = json.loads(prompt.split("\n\n", 1)[1])
+    assert context["configured_roles"] == ["DEVELOPER"]
     assert context["cli_argv"] == [sys.executable, "-I", "-m", "greatminds.cli.main"]
     result = subprocess.run([*context["cli_argv"], "--version"], cwd=runtime.parent,
                             capture_output=True, text=True, timeout=10)

@@ -113,7 +113,7 @@ def test_tester_contract_pins_lease_probe_chain() -> None:
     assert "wait_for_state_ready" in joined or "wait_for_state" in joined
     assert "probe_via_ssh" in joined
     assert "release_lease" in joined or "release_lease_with_result" in joined
-    assert "mv_to_feature_review" in joined
+    assert "submit_typed_handoff_to_feature_review" in joined
 
 
 def test_tester_forbidden_includes_fake_evidence() -> None:
