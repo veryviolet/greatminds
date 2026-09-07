@@ -2188,3 +2188,28 @@ the error-order fix; 56 protocol/budget/account/startup/timing checks passed in
 matrix now closes G1; six explicit items remain, starting with reliable usage
 observations and budgets (G2). The previous goal turn was progress: the acceptance
 audit and concrete host/release-documentation fixes were committed.
+
+### G2 — initial usage observations and discovered schema ambiguity (2026-09-07)
+
+Recovered the clean b4b5116 checkpoint after another reported client crash.
+Inspected ACP SDK 0.11.1, generated schema-v1.16.0: PromptResponse.usage says
+per-turn while Usage fields say cumulative session. Upstream issue 1860 documents
+the same contradiction and divergent implementations. We cannot safely infer a
+session total by either summing or replacing these samples. No provider-specific
+guess or automatic model change was introduced.
+
+The managed supervisor now retains the latest allowlisted SDK-decoded session
+context/cost observation and each prompt's latest token observation, with time,
+source and explicit scope. Context occupancy may decrease. Prompt-token scope is
+unknown; categories and observations are never summed. Missing reports replace
+the previous token sample explicitly; missing, invalid and reported-zero values
+remain distinct. Arbitrary metadata and invalid currency text are excluded.
+These are reported observations, not billing, estimates or budget enforcement.
+SDK coercion precedes this layer; the record does not claim raw-wire validation.
+
+Validation: 35 usage/protocol/input-budget checks passed in 6.05s, including a
+real subprocess with compaction, reported cost, overlapping cache counts and
+secret metadata; 86 supervisor/conversation/config/bundle regression checks passed
+in 22.79s. Ownership and failed atomic publication were tested. G2 remains open
+for explicit budget semantics, session continuity, reset/currency handling and
+actual enforcement acceptance. This checkpoint is progress, not plan completion.

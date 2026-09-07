@@ -142,6 +142,8 @@ class Supervisor:
             if kind == "session_update":
                 metrics["updates"] += 1
                 update = data.get("update", {})
+                if update.get("sessionUpdate") == "usage_update":
+                    self.store.record_usage(run_id, owner_id=self.id, kind="session", data=update)
                 if accept_tool_evidence and update.get("sessionUpdate") in {"tool_call", "tool_call_update"}:
                     accept_tool_evidence = protocol("tool", update=update)
                 metrics["last_activity_at"] = self.store.clock()
@@ -289,6 +291,8 @@ class Supervisor:
                     metrics["prompt_started"] = True
                     protocol_phase = "prompt"
                     result = await transport.prompt(prompt, timeout=binding.timeout_seconds)
+                    self.store.record_usage(run_id, owner_id=self.id, kind="tokens",
+                        data=result.usage.model_dump(by_alias=True, exclude_none=True) if result.usage else None)
                 else:
                     while True:
                         if current_turn is None and claim.run.get('conversation_task') and any(
@@ -319,6 +323,8 @@ class Supervisor:
                                 if turn['cancel_requested'] and not pending.done():
                                     pending.cancel()
                             result = await pending
+                            self.store.record_usage(run_id, owner_id=self.id, kind="tokens",
+                                data=result.usage.model_dump(by_alias=True, exclude_none=True) if result.usage else None)
                         finally:
                             if not pending.done():
                                 pending.cancel()

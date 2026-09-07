@@ -201,6 +201,19 @@ class RunStore:
             self._event(state, 'protocol_observed', run_id, {'kind': kind, **normalized})
         return True
 
+    def record_usage(self, run_id: str, *, owner_id: str, kind: str, data) -> None:
+        from .usage_observations import normalize
+        normalized = normalize(kind, data)
+        with self._transaction() as state:
+            run = self._run(state, run_id)
+            if run['owner_id'] != owner_id or run['state'] in TERMINAL:
+                _error('usage observation requires the active supervisor', 3)
+            usage = run.setdefault('usage', {'version': 1, 'source': 'acp_sdk_decoded'})
+            usage[kind] = {'at': self.clock(), 'data': normalized}
+            # Latest samples are bounded. Missing reports replace previous samples
+            # explicitly; old values must not appear current after another turn.
+            self._event(state, 'usage_observed', run_id, {'kind': kind, **normalized})
+
     def configure_event_retention(self, max_events: int) -> None:
         if type(max_events) is not int or not 100 <= max_events <= 1000000:
             _error("max_runtime_events must be between 100 and 1000000")

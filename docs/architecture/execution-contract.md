@@ -836,6 +836,24 @@ within an exhausted queue stage must explicitly retry it or perform an authorize
 workflow transition. This is a workflow-progress budget, not an estimate of code
 quality or a detector of meaningful text changes.
 
+## Reported usage observations
+
+Run metadata `usage` retains the latest SDK-decoded `usage_update` context and
+cost sample, and the latest prompt response's token sample, each timestamped.
+Context `used`/`size` describes occupancy, which may decrease after compaction.
+Optional cost describes reported cumulative session cost and its currency; it is
+not a billing statement. Missing and invalid reports are explicit statuses, not
+zero. Raw metadata is discarded. This bounded record is an observation surface,
+not budget enforcement; a timestamped sample does not establish current or
+cross-run completeness.
+
+The pinned SDK schema describes prompt token usage both as per-turn and cumulative.
+The [upstream ambiguity report](https://github.com/agentclientprotocol/agent-client-protocol/issues/1860)
+documents the conflict. Token samples therefore have `scope: unknown`; the daemon
+neither sums successive samples nor adds potentially overlapping token categories.
+These are SDK-decoded values, not a claim that wire values escaped SDK coercion.
+Reported usage budgets and continuity validation remain acceptance work in G2.
+
 ## Bounded client input
 
 Each binding accepts positive integer `max_prompt_bytes` (default 262144) and

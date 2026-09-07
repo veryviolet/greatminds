@@ -79,6 +79,16 @@ for line in sys.stdin:
                     "sessionId": "test-session", "update": {"sessionUpdate": "agent_message_chunk",
                     "content": {"type": "text", "text": "started"}}}})
             continue
+        elif scenario == "usage-observations":
+            for used, amount in [(80, .2), (20, .3)]:
+                send({"method": "session/update", "params": {
+                    "sessionId": "test-session", "update": {
+                        "sessionUpdate": "usage_update", "used": used, "size": 100,
+                        "cost": {"amount": amount, "currency": "USD", "_meta": {"secret": "SECRET_COST"}},
+                        "_meta": {"secret": "SECRET_CONTEXT"}}}})
+            result(pending, {"stopReason": "end_turn", "usage": {
+                "totalTokens": 150, "inputTokens": 100, "outputTokens": 50,
+                "cachedReadTokens": 70, "_meta": {"secret": "SECRET_TOKENS"}}})
         elif scenario.startswith("protocol-evidence"):
             for index in range(40):
                 identifier = f"SECRET_TOOL_ID-{index}"
