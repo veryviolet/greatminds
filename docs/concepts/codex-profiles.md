@@ -37,3 +37,34 @@ manifest, the [execution contract](../architecture/execution-contract.md) for
 configuration and recovery rules, and the
 [compatibility matrix](../architecture/acp-compatibility.md) for the scope of
 actual harness validation.
+
+## Explicit account limit signals
+
+An optional manifest `account_limit_errors` array maps documented, exact ACP
+application error codes to shared admission holds. It is empty by default. For
+example, **only if your adapter documents these example codes**:
+
+```yaml
+account_limit_errors:
+  - code: 42901
+    kind: rate_limit
+    cooldown_seconds: 60
+  - code: 42902
+    kind: quota_exhausted
+```
+
+Up to 16 unique signed 32-bit codes are accepted outside the reserved JSON-RPC
+range (-32768 through -32000; [JSON-RPC error specification](https://www.jsonrpc.org/specification#error_object)). Authentication, internal, invalid-request and other
+reserved errors cannot be reclassified. A rate-limit cooldown is an integer from
+1 to 86400 seconds; a quota hold has no automatic expiry. These codes are not
+standard ACP quota codes and are not HTTP statuses extracted from error text.
+[ACP error handling](https://agentclientprotocol.com/protocol/v1/overview#error-handling)
+uses the JSON-RPC error envelope; this mapping is explicit adapter configuration.
+
+The reporting run's pinned manifest determines meaning. Holds affect all bindings
+with the same `account` label in this project, including subsequent prompts in
+open conversations. They survive restart and configuration edits. Other projects
+and account labels are independent. Set consistent account labels yourself; the
+daemon does not inspect credentials to infer account ownership. Read the
+[recovery procedure](../operations/runbook.md#retries-and-account-admission) before
+resolving a hold. No built-in harness mapping or provider availability is implied.

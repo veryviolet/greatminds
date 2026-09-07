@@ -172,39 +172,55 @@ The holder releases the lease after product probes:
 greatminds stand release --lease-id LEASE_ID --result pass
 ```
 
-## Stuck Driven Turns
+## Inspecting ACP Runs
 
-Driven roles do not keep a persistent agent process. `coordd` creates one turn
-per event and holds `.greatminds/.locks/driven-{role}.lock` for the duration
-of that turn. New lock files contain JSON metadata such as `role`, `driver`,
-`started_at`, `coordd_pid`, and `log_path`.
+The daemon records queue assignments and conversation runs in
+`.greatminds/.runtime/state.json`, including process identity, protocol outcome,
+timing and pending controls. Conversation sessions may stay open for further
+operator input. A process or a lock alone does not prove useful task progress.
 
 Use:
 
 ```bash
 greatminds dashboard --once
-greatminds watchdog
+greatminds run status
+greatminds run doctor --json
 ```
 
-If the dashboard shows `stuck` or watchdog reports `STUCK DRIVEN TURNS`, treat
-the turn as an infrastructure incident, not normal implementation progress.
-Inspect the named `log_path`, the matching `.pending` marker, and coordd logs.
-Do not assume a task is being worked just because a driven lock exists.
+Inspect the run's outcome and domain receipts before retrying. Uncertain commands,
+deployments and task mutations require their scoped recovery actions. Cancellation
+uses `greatminds run cancel RUN_ID`; the daemon verifies and cleans tracked process
+groups before releasing the run.
 
-## Driven Retry Backoff
+## Retries and Account Admission
 
-When a driven turn exits with a rate-limit, timeout, or execution error,
-`coordd` records retry state in
-`.greatminds/.locks/driven-{role}.retry.json`. The live scheduler uses this
-state to re-drive the role after backoff and restores it after a coordd
-restart. `greatminds dashboard --once` shows these roles as `backoff` or
-`failed`; `greatminds watchdog` reports them under `DRIVEN RETRIES`.
+Startup retries require evidence that no prompt or earlier protocol activity
+started. They have a finite attempt budget and shared account backoff. Post-prompt
+errors do not automatically replay work. `greatminds run status` reports task and
+account admission separately; an explicit task retry cannot bypass an account hold.
 
-`backoff` means no turn is running because coordd is intentionally waiting for
-the next retry time. `failed` means bounded hard retries were exhausted and
-auto-retry stopped after escalation. Inspect the retry detail and the latest
-`.turns/<role>-*.log`; clear the root cause, then trigger a real queue/inbox
-event so the role gets a fresh attempt.
+For adapters with documented application-specific ACP error codes, a manifest may
+configure `account_limit_errors` (see [manifest reference](../concepts/codex-profiles.md#explicit-account-limit-signals)).
+`account_rate_limit` blocks new claims and subsequent conversation prompts until
+the configured cooldown expires. `account_quota_exhausted` requires operator
+resolution. Existing in-flight prompts may finish; no provider/model is switched.
+All bindings sharing the account label in this project use the same durable hold.
+Other projects and differently labeled accounts are independent.
+
+Inspect `accounts` and `account_holds` in `run status`, or use the exact scoped
+action emitted by `run doctor`. After independently checking account recovery:
+
+```bash
+greatminds run account-resume ACCOUNT --hold-id HOLD_ID --reason "recovery checked"
+```
+
+The hold identity prevents an older action from clearing a newer signal. Repeating
+the same resolution is idempotent. Resume does not replay failed tasks or user
+turns; decide separately whether to retry the task or enqueue a new message.
+Removing a manifest rule or restarting the daemon does not erase a recorded hold.
+Rate-limit expiry opens admission under normal concurrency limits; it does not
+prove the provider is available. Generic errors and message text never create
+provider quota state.
 
 ## No-Git Deploy Payloads
 

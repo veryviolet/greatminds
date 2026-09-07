@@ -26,6 +26,9 @@ follow [SemVer](https://semver.org/) once 1.0.0 ships.
 - Durable run identities, exclusive claims, launch gates, bounded process cleanup,
   timeout/cancellation controls, startup/account backoff, no-progress limits and
   client-input budgets. Prompt completion never substitutes for domain evidence.
+- Explicit ACP application-error rules for shared project/account cooldowns and
+  quota holds. New claims and subsequent conversation prompts respect the hold;
+  scoped, idempotent operator resume never retries a task or changes credentials.
 - Daemon-applied typed results, configured validation commands, workspace cleanup,
   stand scheduling and deployment receipts. Interrupted non-idempotent commands
   remain held for reconciliation rather than being replayed automatically.

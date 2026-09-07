@@ -34,7 +34,7 @@ were inspected. It does not turn fixture coverage into live harness coverage.
 | --- | --- | --- |
 | B1: claims, supervision, cancellation, startup/periodic reconciliation, process trees | `runtime/daemon.py`, `supervisor.py`, `processes.py`; exclusive-supervisor, launch-gate, surviving-child and stale-identity fixtures | Confirmed on the documented Linux host interface |
 | B1: bounded retries and no-progress policy | `retry_policy.py`, durable run state; startup/account/no-progress suites | Confirmed for startup failures and unchanged task turns |
-| B1: provider/account limits do not cause independent retry storms | Shared startup backoff exists; post-prompt failures are held | **Open G4:** no explicit shared provider-quota/rate-limit admission control from reliable signals; startup backoff alone is not the whole requirement |
+| B1: provider/account limits do not cause independent retry storms | Pinned manifest error-code rules, durable project/account holds, atomic claim admission and subsequent conversation prompt checks | Confirmed G4 for explicitly configured ACP application codes: bounded cooldown or operator-resolved quota hold. Generic error prose cannot trigger quota state; no built-in live harness code mapping is claimed |
 | B2: known maintenance, dependency release, impossible dependencies/cycles | Shared dependency verdicts and journaled SYSTEM maintenance; missing/cyclic/changed/live-role fixtures and installed smoke | Confirmed; ordinary dependency release invokes zero agents |
 | B2: dead-holder leases, cleanup, log retention and deduplicated findings | Lease/deployment recovery, `filesystem_health.py`, `event_retention.py`, maintenance finding fingerprints | Confirmed specified local behavior; evidence/task/conversation records are preserved and external systemd logs use host policy |
 | B2: maintainer limited to semantic diagnostic work | Shared schema marks maintainer on demand and forbids polling/recovery loops | Confirmed instructions and scheduling contract |
@@ -56,7 +56,7 @@ were inspected. It does not turn fixture coverage into live harness coverage.
 | C4: concurrency/time/retry/no-progress/context limits; never switch provider to fit budget | Binding/project/account limits, input reservations and deadline/cancellation tests | Confirmed implemented limits and unknown provider values |
 | C4: optional reliable usage budgets, reported/estimated/billed distinction | Bounded SDK-decoded observations, explicit currency/cost limits, durable prompt boundaries and cost continuity; real cancellation and loaded-conversation fixtures | Confirmed G2 for reactive reported session cost. Ambiguous token scope remains unknown and cannot drive an automatic token budget; no billing estimate or hard spending guarantee |
 | C4: complete timing and measured performance improvement | [Idle benchmark](evidence/daemon-idle-2026-09-07.json), original baseline, [continuous ACP optimization](evidence/continuous-acp-optimization-2026-09-07.json) | Confirmed bounded measurements: ACP median 10.950→8.354 s after import/parse optimization; original native remains faster. No universal speed guarantee; all three useful role stages remain |
-| C5: aggregate stable findings, scoped repair, private bundle and no model turn | Doctor/bundle suites; command resolution from foreign cwd; maintenance/deployment idempotency and injected crashes | Components confirmed. **Open G7:** combine aggregate diagnosis → emitted action → repair → repeat diagnosis on a concrete fault fixture |
+| C5: aggregate stable findings, scoped repair, private bundle and no model turn | Doctor/bundle suites; public doctor → exact emitted command resolution → repeat diagnosis; account hold repair cycle; maintenance/deployment recovery fixtures | Confirmed G7 concrete fault cycles with unchanged task data, idempotent resolution, no command/agent execution and no implicit retry |
 | C6: run-bound authority, stale/wrong-role rejection, explicit trust boundary | Token/revision/role/workspace checks; domain/command/permission tests | Confirmed cooperative shared-filesystem boundary; no OS isolation claim |
 | C7: maintainable service boundaries, package examples and release evidence | Runtime/domain services; source and wheel scenarios; current changelog updated by this audit | Present and exercised; existing CLI validators remain shared during incremental extraction |
 | C7: generated mechanical reference from validated contracts | JSON `project schema`/`project execution` and generated assigned context exist | **Open G5:** no reproducible checked-in mechanical reference generator was found; add and verify the reference artifact |
@@ -79,7 +79,7 @@ were inspected. It does not turn fixture coverage into live harness coverage.
    crash uncertainty; retry cannot reset cost. The pinned schema contradicts
    itself about token scope, so these samples cannot support a token budget.
    Cost limits are reactive and allow one bootstrap prompt for a new session;
-   they do not promise a hard spending cap. Four items below remain open.
+   they do not promise a hard spending cap. G5 and G6 below remain open.
 3. **G3 — task timing and comparison: implemented and measured.** Add the missing observable queue/validation/
    accepted-progress intervals, keeping unknowable times unknown. Compare an
    equivalent workload before/after; existing mixed-model durations are not a
@@ -106,15 +106,28 @@ were inspected. It does not turn fixture coverage into live harness coverage.
    This closes the finite measurement/optimization item; the native latency
    regression remains an explicit limitation. Neither fixture measures inference,
    billed tokens or model quality. Profiling samples are excluded from benchmarks.
-4. **G4 — account admission for explicit quota signals.** Extend shared admission
-   only from unambiguous configured/protocol signals, with bounded recovery and
-   operator controls. Do not infer credentials, silently switch providers or parse
-   vendor prose as authoritative domain state.
+4. **G4 — account admission for explicit quota signals: implemented and verified.**
+   `account_limit_errors` maps at most 16 nonreserved ACP application codes using
+   the reporting run's pinned manifest. Rate-limit cooldowns are 1..86400 seconds;
+   quota exhaustion requires explicit operator resolution. Shared holds block
+   all new claims and later conversation prompts for the same project/account.
+   Retry, configuration edits and restart do not erase them. Concurrent signals
+   cannot shorten holds; new hold identities invalidate stale resume actions.
+   Real ACP fixtures cover initialization/prompt signals, generic-error rejection,
+   secret exclusion and restart without another launch. No provider prose parsing,
+   credential inference, model switching or implicit live harness mapping exists.
+   An [independently installed base-wheel fixture](evidence/account-admission-2026-09-07.json)
+   confirms restart admission, explicit CLI resume and stale-action rejection.
 5. **G5 — generated contract reference.** Produce mechanical role/transition/runtime
    reference from the validated contract and verify it cannot silently drift.
-6. **G7 — combined repair acceptance.** Exercise the exact action emitted by doctor
-   against injected durable faults, then verify repeated repair/diagnosis and zero
-   model calls. Component-level tests do not substitute for this last connection.
+6. **G7 — combined repair acceptance: verified.**
+   `test_aggregate_repair_cycle.py` invokes public `run doctor --json`, executes
+   the exact emitted command-resolution argv/environment/cwd, repeats resolution
+   and diagnosis, and checks task bytes, runtime idempotence, absent executor/command
+   effects and absence of implicit retry. The injected missing-completion fault
+   is acknowledged, not converted to passing evidence. The account-limit suite
+   additionally exercises the aggregate doctor → scoped resume → repeat diagnosis
+   cycle and rejection of stale identities and agent credentials.
 7. **G6 — remaining live coverage.** Revalidate configured authentication before
    classifying an external blocker, then complete session/worktree/model/cancel
    scenarios and a declared role-by-harness evidence table. Current Cline evidence

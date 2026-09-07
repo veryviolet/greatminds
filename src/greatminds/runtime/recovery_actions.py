@@ -3,14 +3,18 @@
 
 def recovery_actions(component, code, evidence, *, project):
     operation = evidence.get('operation_id')
-    if not operation:
-        return []
     def action(name, argv, effect, preconditions, required_options=()):
         return {'id': name, 'argv': ['greatminds', *argv], 'effect': effect,
                 'preconditions': preconditions, 'required_options': list(required_options),
                 'automatic': False, 'cwd': str(project),
                 'environment': {'GREATMINDS_PROJECT_DIR': str(project)}}
     operator = ['operator context without run credentials']
+    if component == 'accounts' and code in {'account_rate_limit', 'account_quota_exhausted'}:
+        return [action('resume_account', ['run', 'account-resume', evidence['account'],
+                       '--hold-id', evidence['hold_id']], 'resolve_account_admission_hold',
+                       operator + ['operator has verified account recovery', 'hold identity is still current'], ['--reason'])]
+    if not operation:
+        return []
     if component == 'commands' and code == 'operation_needs_recovery':
         return [
             action('inspect_command', ['run', 'command-status', operation], 'read_only', []),

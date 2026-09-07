@@ -103,6 +103,14 @@ def diagnose(project, *, environment=None):
     store = RunStore(runtime)
     state = inspect('runtime', store.snapshot)
     if state is not None:
+        from .account_limits import admission
+        def account_verdicts():
+            return [admission(state, account, store.clock()) for account in sorted(state.get('account_holds', {}))]
+        for verdict in inspect('accounts', account_verdicts) or []:
+            if verdict['reason'] != 'ready':
+                finding('accounts', verdict['reason'], 'warning',
+                        'Wait for the configured cooldown or inspect quota recovery and resume this exact hold.',
+                        **{key: value for key, value in verdict.items() if key != 'reason'})
         if state['paused']:
             finding('runtime', 'dispatch_paused', 'info', ACTIONS['dispatch_paused'])
         # Current active runs or latest terminal run per binding, as in operator views.

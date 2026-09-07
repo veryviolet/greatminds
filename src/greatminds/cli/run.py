@@ -126,6 +126,19 @@ def retry(run_id):
     click.echo(json.dumps(control))
 
 
+@run.command("account-resume")
+@click.argument("account")
+@click.option("--hold-id", required=True)
+@click.option("--reason", required=True)
+def account_resume(account, hold_id, reason):
+    """Resolve the inspected account hold; do not retry any task or change identity."""
+    from greatminds.runtime.account_limits import AccountLimits
+    if os.environ.get('GREATMINDS_RUN_ID') or os.environ.get('GREATMINDS_RUN_TOKEN'):
+        raise GreatMindsError('account resume requires the operator', exit_code=3)
+    limits = AccountLimits(RunStore(project_runtime_dir(find_project_dir())))
+    click.echo(json.dumps(limits.resume(account, hold_id=hold_id, reason=reason), indent=2, sort_keys=True))
+
+
 @run.command("command")
 @click.argument("command_id")
 @click.option("--request-id")

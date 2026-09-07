@@ -38,6 +38,9 @@ for line in sys.stdin:
     method = message.get("method")
     request_id = message.get("id")
     if method == "initialize":
+        if scenario == 'account-init-error':
+            send({'id': request_id, 'error': {'code': 42902, 'message': 'SECRET-init-error'}})
+            continue
         capabilities = {"loadSession": scenario in {"resume", "usage-resume"}}
         if scenario.startswith("protocol-evidence"):
             capabilities.update(promptCapabilities={"image": True, "_meta": {"secret": "SECRET_META"}},
@@ -71,6 +74,13 @@ for line in sys.stdin:
         result(request_id, {})
     elif method == "session/prompt":
         pending = request_id
+        if scenario in {'account-rate-error', 'account-quota-error', 'account-generic-error'}:
+            code = {'account-rate-error': 42901, 'account-quota-error': 42902,
+                    'account-generic-error': -32603}[scenario]
+            send({'id': request_id, 'error': {'code': code,
+                  'message': 'quota exhausted rate limit SECRET-provider-error',
+                  'data': {'token': 'SECRET-error-data'}}})
+            continue
         if scenario == "disconnect":
             sys.exit(0)
         elif scenario in {"hang", "orphan", "cancel", "cancel-output"}:

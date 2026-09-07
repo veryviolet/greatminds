@@ -9,6 +9,7 @@ import uuid
 from pathlib import Path
 
 from acp import RequestError
+from .account_limits import AccountLimitHeld, AccountLimits, admission as account_admission
 
 from greatminds.core.errors import GreatMindsError
 from greatminds.core.schema import SchemaSnapshot
@@ -291,6 +292,9 @@ class Supervisor:
                     conversation.set_session(self.id, session_id)
                 prompt_deadline = time.monotonic() + binding.timeout_seconds
                 def reserve(text):
+                    limited = account_admission(self.store.snapshot(), binding.account, self.store.clock())
+                    if limited['reason'] != 'ready':
+                        raise AccountLimitHeld(limited)
                     size = check_prompt(text, binding)
                     violation = self.store.usage_prompt_boundary(run_id, owner_id=self.id,
                                                                 binding=binding, phase='admit')
@@ -385,6 +389,9 @@ class Supervisor:
                     target, reason = "completed", "turn_ended"
                 else:
                     target, reason = "failed", f"agent_stop_{result.stop_reason}"
+        except AccountLimitHeld as exc:
+            target, reason = 'failed', exc.details['reason']
+            metrics['account_admission'] = exc.details
         except UsageBudgetHeld as exc:
             target, reason = 'failed', 'reported_usage_budget'
             metrics['usage_budget'] = exc.details
@@ -396,6 +403,10 @@ class Supervisor:
             target = "waiting_auth" if exc.code == -32000 else "failed"
             reason = "authentication_required" if exc.code == -32000 else "protocol_error"
             metrics["error_code"] = exc.code
+            limited = AccountLimits(self.store).record(run_id, owner_id=self.id, rpc_code=exc.code)
+            if limited is not None:
+                target, reason = 'failed', 'account_' + limited['kind']
+                metrics['account_limit'] = limited
         except asyncio.CancelledError:
             self._transition(run_id, "cancelling", reason="operator_cancelled")
             target, reason = "cancelled", "operator_cancelled"

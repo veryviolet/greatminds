@@ -88,6 +88,10 @@ def account_backoff(snapshot, account, config, now):
     A durable configured-session marker proves startup recovery. No token stream or successful
     prompt is treated as domain progress by this narrow connectivity controller.
     """
+    from .account_limits import admission
+    limited = admission(snapshot, account, now)
+    if limited['reason'] != 'ready':
+        return limited
     observations = []
     for run in snapshot['runs'].values():
         if run['account'] != account:

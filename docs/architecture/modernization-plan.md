@@ -2400,3 +2400,64 @@ live coverage remain open. Overall modernization is not complete.
 Initial schema/command/result/maintenance/productive regression: 76 passed in 24.98s.
 Expanded pinned-contract/timing/real-pipeline/documentation regression: 67 passed
 in 25.31s. This includes corrupted contract rejection after initial reads.
+
+### G4 — shared admission for explicit account limits (2026-09-07)
+
+Added optional manifest account_limit_errors with up to 16 unique signed 32-bit
+application codes outside the reserved JSON-RPC range. The pinned manifest of the
+reporting run maps an exact ACP RequestError code to rate_limit (configured integer
+cooldown 1..86400 seconds) or quota_exhausted (operator resolution). Rules default
+to empty. No vendor prose, HTTP status buried in text, credentials, or arbitrary
+error.data determines account state. The official ACP overview and JSON-RPC error
+specification were checked; the example positive codes are fixture-only, not a
+claimed standard or tested mapping for any real harness.
+
+The account controller records a hold before run cleanup, independently of terminal
+run outcome and event retention. Atomic claims and subsequent prompts in open
+conversations enforce the same project/account verdict. Startup connectivity backoff
+remains independent. In-flight prompts may finish; elapsed cooldown admits work
+under existing concurrency limits, not an automatic replay of a failed prompt.
+Quota holds persist until an operator resolves the exact current hold identity.
+Concurrent signals cannot shorten a cooldown or replace a quota hold with a timeout.
+Each new signal changes the hold identity; old resume actions fail. Identical repeat
+signals and operator resolutions are durable no-ops. Configuration changes, retry
+authorization and daemon restart cannot clear the hold. Other projects/accounts
+are independent; account labels are explicit configuration, not inferred identity.
+
+run status exposes account admission, and aggregate doctor emits scoped account-resume
+argv/cwd/environment with required explanation. RUN_ID or RUN_TOKEN alone forbids
+operator resolution. Real ACP subprocess fixtures cover custom errors during
+initialize and prompt, generic internal errors with misleading quota prose, secret
+exclusion and restart without another executor. A two-turn conversation fixture
+proves the second prompt is not reserved/sent after another run reports a quota hold.
+Clocked tests cover cooldown expiry, pinned rules, explicit retry, separate accounts,
+concurrent signals, stale operator actions and repeat idempotence. G4 is verified
+for these explicit signals; no live provider quota campaign or default mapping is
+claimed. Two stale native-driven runbook sections were replaced with current ACP
+run/control/account recovery instructions.
+
+Validation: 98 account/backoff/retry/cost/conversation tests passed in 73.16s;
+84 account/diagnostic/bundle/contract/idle/real-pipeline tests passed in 37.52s.
+Eight public documentation checks passed in 0.67s; strict documentation build passed
+in 1.60s. Full regression passed 1531 tests with one skip in 357.28s. The public
+repair cycle below was added after that collection and passed separately.
+An independently installed offline base wheel (ten packages, no stands extra)
+also received the quota signal, refused a second task after restart, admitted that
+task after explicit CLI resume, and rejected the old resume identity after the
+second signal. Evidence: evidence/account-admission-2026-09-07.json. Both fixture
+runs failed explicitly on quota; no commands, task results or provider calls ran.
+
+### G7 — aggregate diagnosis and literal public repair action (2026-09-07)
+
+Added test_aggregate_repair_cycle.py with an injected durable missing-completion
+command fault. It runs public doctor in an isolated subprocess, selects the actual
+emitted action and executes its literal argv with emitted project environment/cwd.
+It repeats both resolution and diagnosis, asserting identical persisted state after
+the first resolution, unchanged task bytes, no command/executor effects, no generated
+passing result and no automatic task retry. The original run remains interrupted;
+acknowledging uncertainty does not claim successful execution. This scenario passed
+in 4.00s. The account-limit suite covers a second aggregate scoped-repair cycle.
+G7's missing connection is now exercised rather than inferred from component tests.
+G5 generated reference and G6 remaining live coverage remain open; the overall plan
+is still active. The previous goal turn was progress: original baseline evidence
+and measured ACP import/schema optimization were committed as f7b3237 and 5434074.
