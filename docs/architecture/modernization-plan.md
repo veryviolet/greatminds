@@ -1758,3 +1758,29 @@ requirements are unchanged.
 
 Validation result: 128 passed in 56.72s. Tests used synthetic local ACP agents;
 no real provider or service was invoked.
+
+### ACP coordination reference and full cutover regression (2026-09-07)
+
+Reworked packaged COORDINATE.md around daemon-owned claims, typed results,
+deterministic dependency resumption and durable operation recovery. Removed
+static bootstrap, native driver/plugin loading, mandatory queue/inbox polling,
+agent-authored journals/intents and final-line marker requirements. Corrected
+claims that no central daemon exists or journals can be reconstructed from the
+current queue snapshot. Display templates remain optional presentation.
+
+Preserved stand verification rules, profile registry conventions, independent
+review and the narrow section 9.1 self-blocker carve-out. Documented deployment
+freshness and explicit runtime authorization. Removed a prose-only MAINTAINER
+commit exception that contradicted schema git_permissions. No task data or
+workflow transition table changed in this checkpoint.
+
+Validation: the complete suite after native asset/wake removal and reference
+cleanup passed with 1375 passed, 1 skipped in 299.35s. Strict documentation build
+passed in 1.42s. Retired two tests requiring agents to manufacture final-line
+markers; schema display-template checks and substantive domain gates remain.
+
+Next concrete C4 gap confirmed in code: supervisor records context_bytes but
+has no configured maximum input/context size. Implement explicit bounded
+admission for oversized context without silent truncation or model switching;
+include interactive input and persisted-session limits in the design. Remaining
+compatibility, diagnostics, retention and full milestone acceptance stay open.

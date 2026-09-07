@@ -1,109 +1,58 @@
 # Multi-agent coordination protocol
 
-This document is the contract for a file-based finite state machine that
-coordinates Claude agents on a product. Mechanics (queue names, transitions,
-required front-matter fields, watchdog thresholds) are defined in the
-machine-readable schema printed by `greatminds project schema`. This document is the prose version: it
-explains the philosophy and the invariants that hold the system together.
+Greatminds coordinates task workflows through a durable daemon and one ACP
+client. This reference explains ownership and evidence rules. The effective
+schema defines mechanical transitions; `coordination/execution.yaml` defines
+agent manifests, role bindings, commands and execution policy.
 
-References below to `.greatminds/schema.yaml` refer to the generated mirror of
-the installed contract. Read `greatminds project schema` for the effective
-contract; `greatminds project schema --check` detects a stale or missing mirror.
-Project copies do not override CLI or daemon policy. An explicit
-`GREATMINDS_CANON_DIR` selects the canon used by both.
+`greatminds project schema` prints the effective installed schema.
+`.greatminds/schema.yaml` is a diagnostic mirror; setup preserves an existing
+mirror. An explicit `GREATMINDS_CANON_DIR` selects an alternate canon.
 
-When the effective schema and this prose disagree,
-the effective schema is authoritative
-for mechanics, and the prose is authoritative for the spirit of the
-invariants. Fix whichever is wrong, do not paper over the conflict.
+The daemon compiles assigned context from the task and pinned contracts.
+Agents do not reread the whole schema or scan all queues before every turn.
+Use `greatminds run contract --schema` for additional run-pinned rules. Project
+background can live in operator-maintained `coordination/PROJECT.md`.
 
-Project-specific values live in the installed `coordination/PROJECT.md`
-(canon refers to them as `${...}` variables). Each agent's system prompt is
-the single static `.greatminds/bootstrap.md`; it reads the installed canon
-(`greatminds project schema` + `.greatminds/COORDINATE.md`) plus
-`coordination/PROJECT.md` at the start of every tick.
-
-Every installed agent reads `.greatminds/COORDINATE.md`,
-the output of `greatminds project schema`, its own role contract, and
-`coordination/PROJECT.md` before acting.
-
----
+When prose and schema disagree, resolve the conflict against actual validators
+and the effective contract; do not infer permission to bypass a gate.
 
 ## 1. Philosophy
 
-- **State lives in the filesystem.** A task's directory is its state. A
-  handoff is `mv <queue>/X <next-queue>/X`. There is no daemon, no database,
-  no broker.
-- **Append-only inside files.** Every block (plan, implementation, tests,
-  review, blocked, etc.) is appended. Earlier blocks are never edited.
-  Iterations create new blocks with the same name.
-- **Ownership is location.** Inline flags such as `ready_for_review: true`
-  are evidence, not handoff. Only the physical move transfers ownership.
-- **Coordd drives turns, not decisions.** `coordd` observes filesystem
-  events and starts the next role turn when work lands. It does not own
-  task state, choose transitions, or override role ownership.
-- **Read-only observability.** Tools such as `greatminds watchdog`,
-  `greatminds wake-check`, `greatminds gate-check`, `greatminds agent status`,
-  and `greatminds journal` only read; they never move files. They produce
-  reports for the appropriate role to act on.
-
----
+- **Queue location describes workflow state.** A validated transition transfers
+  ownership; inline flags and final agent prose do not.
+- **Evidence is append-only.** Iterations add new blocks rather than rewriting
+  earlier decisions. Runtime services generate author and timestamp fields.
+- **The daemon performs mechanical work.** It claims revisions, manages ACP
+  sessions, evaluates admission, runs configured commands and reconciles results.
+  Agents provide reasoning, implementation and substantive review.
+- **Typed results drive transitions.** An agent submits a decision through
+  `greatminds run submit`. The domain service validates identity, revision,
+  allowed transition and evidence before changing queues.
+- **Observability uses durable state.** `run status`, `run events`, `wake-check`
+  and `watchdog` explain execution and domain state without relying on a TUI.
 
 ## 2. Roles
 
-See `.greatminds/schema.yaml` `roles:` for the full roster and per-role description.
+The effective schema defines responsibilities, forbidden actions and queue
+ownership. Sharing a harness across roles does not combine their authority.
 
-### 2.1 Reactive fleet lifecycle
+### 2.1 ACP lifecycle
 
-Every role declares `.greatminds/schema.yaml > roles.<ROLE>.lifecycle`. That field
-describes how the role receives work; it is orthogonal to task scenario
-mode (`A`, `B`, `C`) and to the product queue it owns.
+Every managed role uses the same ACP session lifecycle. Binding scheduling is
+`queue` for eligible background tasks or `on-demand` for operator input.
+Harness, role, model, workspace and permission policy are separate choices.
+Tmux and IDE frontends display daemon-owned conversations and observations.
 
-Lifecycle values:
+The daemon handles startup backoff, configured no-progress budgets, concurrency,
+permission waits, cancellation and restart reconciliation. It does not ask an
+agent to poll, emit artificial heartbeats or schedule another loop. The OS
+supervisor can restart the daemon itself. MAINTAINER remains available for
+operator-requested diagnosis of unknown failures and repair planning.
 
-- `interactive` — human-paced chat. The role is user-facing and acts
-  when the operator speaks to it. `ARCHITECT-PLANNER` is the normal
-  interactive product role: it discusses scope with USER, then files or
-  plans work after explicit approval.
-- `self-loop` — autonomous watchdog loop. The role wakes itself on a
-  timer and may also be woken early by coordd. `MAINTAINER` uses this
-  model so fleet recovery does not depend on a user being present.
-- `driven` — no persistent agent loop. The tmux pane is idle between
-  turns. `coordd` observes an inbox, queue, or stand-state event and
-  runs one role turn, then the role exits. Driven roles do one tick per
-  invocation; they do not self-pace with `/loop`, long sleeps, or
-  `ScheduleWakeup`.
-
-The launch path is selected by lifecycle plus tool:
-
-| Lifecycle | Tool | Turn mechanism | Between turns |
-|---|---|---|---|
-| `interactive` | `claude` | operator chat / USER prompt | live chat session |
-| `self-loop` | `claude` | `/loop` plus `ScheduleWakeup` timer, with coordd early wake | loop waits for next tick |
-| `self-loop` | `codex` or `cursor` | explicit loop plus Bash sleep fallback, with coordd interrupt | loop waits for next tick |
-| `driven` | `claude` | coordd spawns one `claude -p` / resume turn with the rendered role bootstrap | idle bash pane |
-| `driven` | `codex` | coordd drives one fresh `codex app-server` stdio turn and persists the app-server thread id | idle bash pane |
-| `driven` | `bash` | direct command run by the owning automation | process exits |
-
-Driven dispatch is intentionally gated by both `.greatminds/schema.yaml` lifecycle
-and the installed `coord.yaml` window mode. When both say `driven`, coordd uses
-the driven turn path. Otherwise the role keeps its configured launch behavior
-until the operator updates the fleet config.
-
-`MAINTAINER` is non-user-facing in this model. USER asks about fleet
-health, restarts, schema changes, or upgrades go to `ARCHITECT-PLANNER`
-first; PLANNER forwards an inbox ask to MAINTAINER when infrastructure
-action is needed. The recovery chain is:
-
-```text
-systemd user unit -> coordd -> MAINTAINER self-loop -> worker restart / coordd restart / PLANNER escalation
-```
-
-`coordd` and systemd keep the observation and process layers alive;
-MAINTAINER decides only safe fleet-recovery actions and escalates
-product/FSM decisions back to PLANNER.
-
----
+An ACP turn ending is not task verification. Session reuse requires compatible
+contracts and agent support; switching harnesses does not transfer their private
+conversation history. Durable tasks provide portable work context.
 
 ## 3. Scenarios
 
@@ -115,7 +64,7 @@ See `.greatminds/schema.yaml` `scenarios:` for A/B/C definitions.
 
 Editable project configuration lives under `coordination/` in the project
 root. Runtime/system state lives under `.greatminds/`: queues, inboxes, locks,
-events, the journal, heartbeats, and stand state. Product source and normal
+events, pinned run contracts, journals and stand state. Product source and normal
 project files stay in the root.
 
 ### Queues
@@ -128,7 +77,7 @@ Categories:
 - **Active queues** (`feature_inbox`, `feature_plan`, `feature_dev`, etc.):
   work is in flight; the owning role processes them.
 - **Parking** (`feature_blocked`): waiting on explicit dependencies; not
-  active work; wake-up by `ARCHITECT-REVIEWER`.
+  active work; the daemon evaluates mechanical resumption gates.
 - **Terminal** (`verified`, `archive`, `*_verified`, `*_archive`): end
   states for normal flow. Product `verified` can still be rolled back by
   `ARCHITECT-REVIEWER` with an explicit `rollback` block when post-verify
@@ -152,15 +101,17 @@ review_sessions/<id>.md  (lives until the session concludes, then archive/)
 ### Other runtime artifacts
 
 - `.greatminds/journal.ndjson` — append-only journal of transitions. One
-  NDJSON line per move with fields `t, actor, task, from, to, reason,
-  intent_id`. Gitignored. Optional for observability; not load-bearing.
+  NDJSON records provide transition and recovery evidence. Preserve this
+  journal: queue snapshots cannot reconstruct its past decisions.
 - `.greatminds/intent/<task>-<role>-<uuid>.json` — created BEFORE every
   `mv`, cleared AFTER successful `mv`. Detects crashed transitions. See
   §6.
 - `.greatminds/inbox/{role}/` — mailbox for cross-role messages without
   moving tasks. Each message is a small markdown file with front-matter
   `to_role, from_role, task_ref, question, answered_at`. The recipient
-  role reads its inbox at the start of every tick.
+  role inspects messages relevant to assigned work or an operator request.
+- `.greatminds/.runtime/` — durable run, result, command and control records,
+  frozen contracts and bounded command output. These are recovery evidence.
 
 ---
 
@@ -179,86 +130,44 @@ append blocks to it, do not edit it, and do not move it.
 - If a task is blocked only by explicit named dependencies, the current
   owner must not leave it in an active queue indefinitely. Park it in
   `feature_blocked/` with a `blocked` block (see §7). Wake-up is
-  `ARCHITECT-REVIEWER`'s job.
+  performed by the daemon when dependency and role gates allow it.
 
 ---
 
-## 6. Journal and intent (new)
+## 6. Journal and intent
 
-These artifacts make crashed transitions visible and provide a global
-order of events. Both are write-only by the role doing the move; readers
-(humans, watchdog) only inspect.
+Shared domain services write intents, apply validated transitions and append
+journal records. Agents never hand-author intent, journal or runtime files.
+Runtime result and maintenance records link work to durable identities so
+reconciliation can recognize a committed transition after interruption.
 
-### Intent files
+`.greatminds/journal.ndjson` and `.greatminds/intent/` preserve workflow evidence.
+`.greatminds/.runtime/` holds run and operation state. Existing queues alone do
+not reveal every unfinished operation. Do not delete these files to clear a
+hold; inspect the operation and use its supported recovery action.
 
-Before any `mv`, the moving role creates an intent file:
+A command may have external effects even if its process is gone. Uncertain
+command/deployment outcomes require explicit resolution before another attempt.
+The runtime does not promise exactly-once shell execution.
 
-```text
-.greatminds/intent/{task}-{role}-{uuid}.json
-```
+## 7. Dependency blocking and resumption
 
-with contents:
+If assigned work needs another artifact, submit a typed `blocked` decision with
+explicit dependencies and `resume_to`. The service validates and records the
+blocked state; the agent does not move the file itself.
 
-```json
-{
-  "actor": "<role>",
-  "task": "<task-id>",
-  "from": "<queue>",
-  "to":   "<queue>",
-  "started_at": "<ISO>",
-  "expected_finish_within_seconds": 30
-}
-```
+The shared dependency service checks syntax, missing targets, terminal-state
+requirements, impossible dependencies and cycles. `greatminds wake-check`
+reports readiness and holds. The daemon rechecks task and live-role gates before
+performing a journaled system resume. Mere file existence is insufficient.
 
-After the `mv` succeeds, the role removes its own intent. If the role
-crashes mid-move, the intent file is left behind. `greatminds watchdog` reports
-intent files older than 5 minutes as orphaned, and the appropriate role
-investigates.
+Malformed or semantic blockers need a role decision; deterministic readiness
+does not invent a replacement dependency or approve a task. The source blocked
+record and system action retain provenance.
 
-### Journal (`journal.ndjson`)
-
-After every successful `mv`, the role appends one NDJSON line to
-`.greatminds/journal.ndjson`:
-
-```json
-{"t":"<ISO>","actor":"<role>","task":"<id>","from":"<q1>","to":"<q2>","reason":"<short>","intent_id":"<uuid>"}
-```
-
-The journal is derived state: you can reconstruct it by replaying the
-filesystem if it is lost. Useful for `greatminds watchdog`, post-mortems, and a
-global linear order of transitions.
-
----
-
-## 7. Dependency blocking and wake-up
-
-If a task cannot make progress because it explicitly depends on another
-named artifact (a verified task, a tests-block stand evidence record), the current
-owner must:
-
-1. Append a `blocked` block (see
-   the feature-blocked task template):
-   - `dependencies: ["<queue>/<task-id>.md", ...]` — strict format,
-   - `resume_to: <queue>` — where the task should go when unblocked.
-2. `mv <current-queue>/X feature_blocked/X`.
-
-`ARCHITECT-REVIEWER` runs `greatminds wake-check` at the start of every tick. The
-script:
-- validates dependency syntax,
-- checks if each dependency file exists,
-- reports tasks where ALL dependencies exist as "ready to wake",
-- flags malformed dependencies and orphan blocked-tasks.
-
-For each ready-to-wake task, `ARCHITECT-REVIEWER` appends a wake-up note and
-moves the task to `resume_to`.
-
-User-requested cancellation is a separate path: `ARCHITECT-PLANNER` runs
-`greatminds task withdraw <task-id> --reason "<why>"`. Internally this appends
-a withdrawn-class `blocked` block and moves the task to `feature_blocked/`.
-`ARCHITECT-REVIEWER` is still the only role that can move that parked task to
-`archive/`.
-
----
+User-requested cancellation is a separate path: `ARCHITECT-PLANNER` can use
+`greatminds task withdraw <task-id> --reason "<why>"`. The withdrawn task is
+parked in `feature_blocked/`; archival still requires the schema's reviewer path.
 
 ## 8. Stand gate (`greatminds gate-check`)
 
@@ -273,6 +182,7 @@ The script:
 - verifies the tested commit matches the task's implementation `base_commit`
   (prefix match either direction),
 - verifies `worktree_fingerprint` when both the task and evidence carry one,
+- requires fresh deployment evidence for the referenced lease and task,
 - prints `pass | fail | missing | n/a` (one word).
 
 TESTER records the result in the `tests` block as:
@@ -292,8 +202,10 @@ wrong-commit evidence, mismatched worktree fingerprints, or
 
 When a lease enters preparing, coordd reads `lease.profile`, resolves that
 profile through `coordination/stand-profiles.yaml`, loads the referenced
-Ansible YAML file from `coordination/stand-profiles/`, and executes it as part
-of the deploy.
+Ansible YAML file from `coordination/stand-profiles/`, and executes it through
+the configured authorized deployment policy. The deployment ledger records
+intent and outcome; changed inputs invalidate readiness evidence. An uncertain
+outcome needs explicit recovery before replay.
 
 Ownership and usage:
 
@@ -327,8 +239,10 @@ Convention:
   must verify the deployment pipeline itself after only the host prerequisites
   are prepared.
 
-Schema source-of-truth: `schema.stand_profile`. The runtime loader and
-validator read profiles from there.
+Schema source-of-truth for profile conventions: `schema.stand_profile`.
+Project files provide the selected playbook; `coordination/execution.yaml`
+authorizes runtime deployment policy. Setup does not silently select a packaged
+playbook. YAML execution requires the optional `greatminds[stands]` dependency.
 
 ### 8.2 Stand-only verification tasks (`plan.verify_only`)
 
@@ -380,17 +294,16 @@ So: deploy/readiness = coordd, behavioural verification = TESTER
 For ANY task with `plan.stand_required: true`, "tested" / "verified"
 means a **reproducible behavioral verification on the live stand**,
 NOT just pytest green. Pytest with mocks is necessary but NOT
-sufficient: mocks encode the author's mental model of how live tmux /
-pty / systemd / agent tools behave, and cannot detect failures the
+sufficient: mocks encode the author's mental model of how live ACP /
+process / systemd / agent tools behave, and cannot detect failures the
 author did not anticipate.
 
 TESTER's `tests` block on a `stand_required: true` task MUST include
 `stand_evidence` with three fields:
 
 1. **Reproduction steps** — exact commands to trigger the original
-   failure mode on the live stand (e.g. for an agent-stall bug:
-   `ssh violet@<host> 'tmux send-keys -t toy:dev "" && sleep 60 &&
-   check agent heartbeat'`).
+   failure mode on the live stand, including target identity, ACP input,
+   expected runtime state and the observation command.
 2. **Observed-without-fix** — output of step 1 BEFORE the fix
    (recorded from a separate lease probe, from the bug report, or from a
    pre-fix wheel build).
@@ -470,73 +383,43 @@ prompted the change (asked, escalated, or PLANNER acted proactively).
 
 ---
 
-## 10. Inbox mailbox (new)
+## 10. Inbox mailbox
 
-`.greatminds/inbox/{role}/` is a per-role mailbox for cross-role messages
-that do NOT need a task move. Use it for:
+`.greatminds/inbox/{role}/` stores cross-role messages. Use `greatminds inbox`
+to list, inspect, send and acknowledge messages. Do not edit or delete mailbox
+files directly. Messages can clarify assigned work, but do not substitute for
+validated task results or grant a role additional authority.
 
-- a question from DEVELOPER to ARCHITECT-PLANNER mid-implementation,
-- coordination signals from coordd ("stand is back up"),
-- EXPLORER asking ARCHITECT-PLANNER to refresh `stand_target`.
-
-Each message is a markdown file with front-matter:
-
-```yaml
----
-to_role: ARCHITECT-PLANNER
-from_role: DEVELOPER
-task_ref: <task-id or null>
-asked_at: <ISO>
-answered_at: null | <ISO>
----
-```
-
-followed by the question body. The recipient reads its inbox at the start
-of every tick, replies (either by editing the file to add an answer block
-and notifying via `from_role`'s inbox, or by acting), and deletes handled
-messages.
-
-Inbox is intentionally informal. It is not a substitute for task moves; it
-is a way to ask a question without escalating to handback.
-
----
+A mailbox is distinct from a daemon-owned conversation: `greatminds chat`
+provides ordered operator messages, streamed ACP responses, permission choices,
+reconnect and cancellation. Detaching a frontend does not replay its last prompt.
 
 ## 11. Watchdog (`greatminds watchdog`)
 
-`greatminds watchdog` reports:
+The watchdog reports orphan intents, stale tasks, worktree findings and ACP
+execution observations. It does not restart native agents or infer success from
+PID registry entries. Use `greatminds run status` for admission holds, pending
+operations and account retry state; use `greatminds run events` for run events.
 
-- orphaned intent files (older than `intent_orphan_seconds`),
-- registry entries whose `pid` is no longer alive,
-- tasks idle in active queues beyond the per-queue threshold,
-- tasks idle in review queues beyond the per-queue threshold,
-- orphan worktrees (no matching active task).
+Watchdog inspection does not move tasks. Routine maintenance and recovery are
+daemon controllers with explicit preconditions, not mandatory reviewer turns.
 
-Heartbeat is **not** a watchdog concern (see §12).
+## 12. Progress and supervision
 
-The watchdog never moves files. `ARCHITECT-REVIEWER` is expected to run it
-each tick and follow up on findings.
+Process liveness, protocol activity and workflow progress are separate signals.
+A token stream or heartbeat file does not advance a task. The daemon tracks
+completed turns without progress and enforces `max_no_progress_turns` (default
+one). Task metadata changes do not reset that budget.
 
----
+Recognized pre-prompt startup failures can retry with bounded backoff. Shared
+account delay covers bindings and conversations using that configured account.
+Configured-session readiness is timestamped once; permission resume and crash
+recovery do not create a new connectivity success. Unknown post-prompt failures
+require explicit retry authority, subject to other unresolved-operation gates.
 
-## 12. Heartbeats
-
-A heartbeat is **not** a periodic-liveness signal. It is an
-**in-flight-turn hang detector**, owned by `coordd`:
-
-```
-.greatminds/heartbeat.<role>
-```
-
-While `coordd` holds a driven role's run-lock — i.e. a turn is in flight —
-the turn's subprocess is expected to advance that role's heartbeat. If the
-run-lock has been held *and* the heartbeat has not advanced for longer than
-`schema.heartbeat.hang_threshold_seconds`, the turn is considered hung.
-`coordd` does **not** kill it; it escalates once to `MAINTAINER` (an inbox
-ask), and `MAINTAINER` decides what to do. A turn that completes normally
-releases the lock, so a cold heartbeat with no held lock is simply an idle
-role between turns — not a hang.
-
----
+Use `run pause` to stop new dispatch, `run resume` to restore it, and
+`run cancel RUN_ID` to request bounded cancellation. Pause lets active work
+finish. Permission and authentication waits remain visible operator states.
 
 ## 12.5 Per-task worktrees
 
@@ -577,8 +460,8 @@ Lifecycle:
   the task needs another amendment/review cycle.
 - `greatminds task mv ... archive` removes the task worktree.
 
-There is no file-lock model: operators look in `.worktrees/` for in-flight
-code instead of looking for lock files. The deploy playbook rsyncs the worktree
+Worktrees separate task code, while runtime transactions use locks and durable
+claims. A worktree is not an OS sandbox or evidence of exclusive host access. The deploy playbook rsyncs the worktree
 (not the main project tree) when the active stand lease names the task and
 worktree. Policy lives in `.greatminds/schema.yaml > worktrees:`.
 
@@ -587,12 +470,8 @@ worktree. Policy lives in `.greatminds/schema.yaml > worktrees:`.
 Default:
 
 - `ARCHITECT-REVIEWER` is the only product-work committer.
-- `MAINTAINER` commits **canon and infrastructure** changes only
-  (.greatminds/schema.yaml, role docs, CLI source, plugin skills, MCP config,
-  templates) — explicitly distinct from product-pipeline work, which
-  flows through `ARCHITECT-REVIEWER`. MAINTAINER never commits
-  product-task artifacts (plan / implementation / tests / reader /
-  review blocks); the FSM owns those via per-role queues.
+- MAINTAINER does not receive additional commit authority from its diagnostic
+  role. Apply the effective `git_permissions` and explicit project policy.
 - Implementers, TESTER, READER, USER, and EXPLORER do not
   commit.
 
@@ -608,119 +487,42 @@ No `git add .`; the committer stages exact paths only.
 
 ---
 
-## 14. Non-goals
+## 14. Boundaries
 
-- No second bug-fix loop (bugs are `plan_kind: bugfix` product tasks).
-- No `active_loop`.
-- No REVIEW/FIX/UI_FIX roles; use the role set defined in `schema.yaml`.
-- No central daemon, broker, or database.
-- No automatic conflict resolution.
-- No hidden state outside the task files, `stand.status`, and the journal.
-- No POSIX-permission enforcement of the stand gate or queue ownership.
+- Agent execution has one ACP transport; unsupported harness combinations fail
+  explicitly rather than selecting a native driver.
+- Filesystem state is retained; no database migration is required for this model.
+- Conflicts and uncertain side effects are not automatically declared resolved.
+- Workspace and role contracts are cooperative boundaries; they do not replace
+  OS isolation or provider-side permissions.
 
----
+## 15. Setup and assigned context
 
-## 15. Bootstrap
+`greatminds setup` creates runtime directories and an empty execution manifest,
+preserving existing project data. Install and authenticate the chosen ACP
+harness separately, configure bindings and run `greatminds daemon doctor`.
+Start a foreground daemon with `greatminds coordd`, or explicitly install an
+optional systemd user service. Setup does not install native profiles or plugins.
 
-Every agent's system prompt is the single static `.greatminds/bootstrap.md`
-(seeded from canon by `greatminds setup`). It is role-independent: the agent
-learns its role from `$GREATMINDS_ROLE` and reads its own contract from
-`.greatminds/schema.yaml > roles.<GREATMINDS_ROLE>`, plus
-`.greatminds/COORDINATE.md` and
-`coordination/PROJECT.md`. coordd injects it as the system prompt for driven
-turns; `greatminds start-agent` uses it for paned roles. The role list is
-`.greatminds/schema.yaml > roles`.
+The context builder supplies the assigned revision, role obligations, applicable
+transitions, command definitions and result format. Use the CLI argv provided in
+that context; `run contract --schema` reads the run-pinned schema. Do not obtain
+a different role or bypass revision checks by editing environment variables.
 
-To check the canon for unknown tokens or missing catalog entries:
-
-```bash
-<PROJECT_ROOT>/greatminds lint-tokens
-```
-
-To audit the live coordination filesystem:
+Operator inspection commands include:
 
 ```bash
-<PROJECT_ROOT>/greatminds watchdog
-<PROJECT_ROOT>/greatminds wake-check
-<PROJECT_ROOT>/greatminds gate-check <task-id>
-<PROJECT_ROOT>/greatminds agent status [ROLE]
-<PROJECT_ROOT>/greatminds journal tail
+greatminds run status
+greatminds run events
+greatminds watchdog
+greatminds wake-check
+greatminds project schema --check
 ```
 
 ## 16. Visual event markers
 
-After a coordination action — `greatminds task mv`,
-`greatminds task append-block`, or `greatminds inbox send` — emit the
-matching one-line visual marker as the **LAST line** of your reply, so
-an operator scrolling a pane sees state changes at a glance. The marker templates
-(and their emoji) live in `schema.visual_events` — use them as the
-source of truth; do not inline or invent emoji here, or prose and
-schema drift. The marker comes AFTER any follow-up text, on its own
-final line.
-
-## Canon skill plugins
-
-Procedural detail (recipes, gotchas, examples) lives in **Claude Code
-Skills** under `src/greatminds/data/plugins/`. Each role-X plugin is
-loaded only for the matching `GREATMINDS_ROLE`; the shared
-`coordination-protocol` plugin is loaded by every role.
-
-| Plugin | Audience | Highlights |
-|---|---|---|
-| `coordination-protocol` | all roles | fsm-mechanics, plan-block-protocol, impl-block-craft, iteration-and-blocking, stand-protocol, inbox-and-escalation |
-| `role-architect-planner` | ARCHITECT-PLANNER | adr-template, trade-off-framework, task-decomposition |
-| `role-tester` | TESTER | probe-craft, api-and-db-probes, ui-visual-verification |
-| `role-reader` | READER | fresh-user-perspective, reality-vs-docs-audit, reader-review-block-craft, audit-path-vs-post-write-path |
-| `role-architect-reviewer` | ARCHITECT-REVIEWER | evidence-chain-verification, architectural-review, review-block-craft, commit-and-push-protocol, wake-and-unblock |
-| `role-explorer` | EXPLORER | exploratory-probing, bug-as-mini-task, re-verify-loop |
-| `role-maintainer` | MAINTAINER | agent-lifecycle-and-diagnostics, canon-sync-and-cutover, maintainer-vs-planner-routing, infra-surface-separation |
-
-This document stays as the **philosophy / invariants / queue map** for
-the protocol. Skill files carry the procedural detail and are
-auto-invoked by Claude based on context.
-
-### Per-tool loading mechanism
-
-Skill loading is tool-specific. The same role's procedural knowledge
-reaches the agent via different mechanisms depending on which tool the
-role is launched on:
-
-- **Claude Code** — `greatminds start-agent <ROLE> claude` passes
-  `--plugin-dir <canon>/plugins/coordination-protocol` and
-  `--plugin-dir <canon>/plugins/role-<role>` (plus the project
-  override under `coordination/plugins.local/project-overrides/`).
-  Skill content is auto-invoked by Claude based on description-keyword
-  match in the agent's working context.
-- **Codex** — codex CLI has no `--plugin-dir` equivalent. The
-  equivalent path is generated per-role profile source material:
-  `greatminds setup` creates `.greatminds/.codex-home/<role>/`
-  from `<canon>/codex/profiles/*.config.toml`. The generated
-  `config.toml` carries `developer_instructions` and skill registrations;
-  `<role>.config.toml` carries model / approval / sandbox settings.
-  These directories are config sources only, not auth homes.
-  `greatminds start-agent <ROLE> codex` and driven Codex turns set
-  `CODEX_HOME` to the single machine Codex home (`GREATMINDS_CODEX_HOME`,
-  an inherited non-per-role `CODEX_HOME`, or `~/.codex`) so Codex reads one
-  valid `auth.json`. Role-specific model/settings are injected with `-c`
-  overrides, and the role contract rides in the bootstrap prompt or
-  app-server `baseInstructions`. The profile body summarizes the role
-  contract — it's not a full SKILL-format auto-invoke, but it brings the
-  role-specific procedural posture into every codex session.
-- **Cursor** — currently no per-role plugin/profile mechanism is
-  wired; cursor roles get the bootstrap prompt only (which already
-  contains the full role brief rendered from `<role>.md`). Driven cursor
-  roles run through the one-shot `cursor-agent` headless subprocess adapter.
-- **Cline** — currently no per-role plugin/profile mechanism is wired;
-  Cline roles get the bootstrap prompt. Driven Cline roles run through
-  `cline --json --auto-approve true` as a one-shot subprocess.
-- **Gemini CLI** — currently no per-role plugin/profile mechanism is wired;
-  Gemini roles get the bootstrap prompt. Driven Gemini roles run through
-  `gemini --yolo -p` as a one-shot subprocess.
-- **OpenHands CLI** — currently no per-role plugin/profile mechanism is wired;
-  OpenHands roles get the bootstrap prompt. Driven OpenHands roles run through
-  `openhands --headless --json -t` as a one-shot subprocess and require the
-  machine's OpenHands/LiteLLM configuration to be valid for the daemon user.
-
-See also: `plugins/README.md` for plugin layout; `mcp/canon.json`
-for canon-wide MCP server set; `greatminds start-agent` for how plugins
-/ profiles are wired per-launch.
+`schema.visual_events` retains display templates for operator summaries.
+Structured runtime and domain events are authoritative; an agent's final-line
+marker is optional presentation and cannot prove that a transition committed.
+Frontends should render recorded actions instead of requiring an LLM to repeat
+mechanical state as a specially formatted message.

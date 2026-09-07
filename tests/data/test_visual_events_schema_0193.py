@@ -116,9 +116,8 @@ def test_templates_use_markdown_bold_verb() -> None:
 
 # ---------- COORDINATE.md §16: WHEN-to-emit prose ----------
 #
-# The agent-facing WHEN-to-emit convention moved from command_START's
-# common block to COORDINATE.md §16 (the system prompt is now the static
-# bootstrap.md). The marker TEMPLATES stay in schema.visual_events.
+# Optional display templates remain in schema.visual_events. Runtime events
+# provide authoritative actions; agents need no final-line marker protocol.
 
 
 def _marker_para() -> str:
@@ -142,21 +141,3 @@ def test_prose_references_schema_not_inlined_templates() -> None:
     for emoji in ("🔵", "🟢", "🟩", "🔴", "🟣"):
         assert emoji not in para, (
             f"prose paragraph leaks emoji {emoji!r} — must live in schema")
-
-
-def test_prose_lists_three_trigger_verbs() -> None:
-    """The WHEN-to-emit instruction names the three CLI verbs a marker
-    follows (task mv, task append-block, inbox send)."""
-    para = _marker_para()
-    for verb in ("greatminds task mv", "greatminds task append-block",
-                 "greatminds inbox send"):
-        assert verb in para, f"prose paragraph missing trigger verb {verb!r}"
-
-
-def test_prose_says_marker_is_last_line() -> None:
-    """The marker is the LAST line of the reply (operators scrolling a
-    pane should find it without hunting through follow-up text)."""
-    para = _marker_para()
-    assert "LAST line" in para or "last sentence" in para or \
-        "AFTER any follow-up" in para, (
-        "prose must state the marker is the LAST line of the reply")
