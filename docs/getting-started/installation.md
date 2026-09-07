@@ -6,7 +6,18 @@ cleanup use these Linux interfaces. Native macOS and Windows daemon execution
 are not supported; a Linux environment must satisfy the same requirements.
 Harness compatibility is tracked separately from host support.
 
-Install Greatminds in the Python environment that will run the CLI and daemon:
+For a uv-managed project, use a separate tool environment. This also supports
+working on projects whose Python version is below 3.11:
+
+```bash
+uv tool install --python 3.13 greatminds
+greatminds --help
+```
+
+If the executable is not on PATH, run `uv tool update-shell` and open a new
+terminal. Greatminds does not need to be a project dependency.
+
+Alternatively, install Greatminds in a dedicated Python 3.11+ environment:
 
 ```bash
 python -m pip install greatminds

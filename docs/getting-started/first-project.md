@@ -1,17 +1,31 @@
 # First local project
 
-Install Greatminds in a Python 3.11+ environment. Start in the repository you want
-to work on:
+For a uv-managed project, install Greatminds as an isolated tool with its own
+Python. Your project's Python version and dependencies stay separate:
 
 ```bash
-python -m pip install greatminds
+uv tool install --python 3.13 greatminds
+cd /path/to/your/project
 greatminds setup
+greatminds web --port 8765 --no-daemon
 ```
+
+Open `http://127.0.0.1:8765`. If `greatminds` is not on your shell's PATH, run
+`uv tool update-shell` and open a new terminal. You can also run each command
+without a persistent tool installation using `uvx --python 3.13 greatminds`,
+for example `uvx --python 3.13 greatminds setup`.
+
+This works when the project itself requires Python 3.8: Greatminds runs on 3.13.
+Do not add Greatminds to the project's dependencies. See the
+[uv/Python 3.8 walkthrough](uv-project.md) for project checks and browser setup.
 
 Setup creates an empty `coordination/execution.yaml` and runtime queues under
 `.greatminds/`. Repeating it preserves your configuration and task data. Harness
 installation, provider login and optional service installation are separate steps.
 Setup does not install vendor plugins, rewrite git hooks or widen permissions.
+
+For the browser workflow, continue with the [step-by-step setup](uv-project.md#4-configure-the-first-conversation).
+The remaining sections describe the CLI workflow.
 
 ## Configure one ACP harness
 
