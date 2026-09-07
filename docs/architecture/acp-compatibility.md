@@ -329,7 +329,8 @@ cancelled stop response, public CLI cancellation, or optional extension parity.
 ## Declared role coverage, 2026-09-07
 
 This table records live evidence, not restrictions on manifest role assignment.
-**D** = completed domain role with accepted typed result; **P** = only a synthetic
+**D** = completed domain role with accepted typed result; **C** = synthetic live
+conversation through the public CLI, including restart and recall; **P** = only a synthetic
 DEVELOPER-bound permission test; **U** = no live domain-role proof; **B** = broader
 live campaign cannot proceed past the auth/configuration issue above. USER is a
 human role and SYSTEM actions are deterministic daemon work, so neither is a
@@ -337,11 +338,11 @@ harness assignment. Generic lifecycle tests do not fill domain-role cells.
 
 | Role | Codex | Claude | Grok | Qwen | Kimi | Cline | OpenHands | Gemini | Cursor |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| ARCHITECT-PLANNER | U | U | U | B | B | B | B | B | B |
+| ARCHITECT-PLANNER | C | C | C | B | B | B | B | B | B |
 | ARCHITECT-REVIEWER | D | U | D | B | B | B | B | B | B |
 | DEVELOPER | D | P | P | B | B | B | B | B | B |
 | UI-DEVELOPER | U | U | U | B | B | B | B | B | B |
-| LIVE-DEVELOPER | U | U | U | B | B | B | B | B | B |
+| LIVE-DEVELOPER | C | C | C | B | B | B | B | B | B |
 | TECHNICAL-WRITER | U | U | U | B | B | B | B | B | B |
 | TESTER | D | D | U | B | B | B | B | B | B |
 | READER | U | U | U | B | B | B | B | B | B |
@@ -359,3 +360,26 @@ two FIFO user turns share one daemon-owned ACP session, preserve streamed events
 create no domain result and do not relaunch after an idle restart. All ten cases
 passed on the subprocess fixture. This confirms the common role-independent
 conversation mechanism, not live domain coverage; the matrix above is unchanged.
+
+## Public conversation restart and reconnect, 2026-09-07
+
+[Live evidence](evidence/acp-public-conversations-2026-09-07.json) records six
+scenarios: ARCHITECT-PLANNER and LIVE-DEVELOPER on each tested Codex, Claude and
+Grok installation. The reproducible tool is `tools/acp_conversation_probe.py`: pass
+`--config` with a manifest file and `--agent` with its name. It creates a disposable
+project and uses public `chat create`, `chat send`, `chat attach --after` and
+separate `coordd --once` processes. It uses model usage and denies permissions.
+
+Every first reply matched a random token. The next daemon process loaded the same
+ACP session and recalled that token, which the second prompt did not contain.
+Duplicate delivery of the second request ID created no extra turn. Cursor reads
+left the conversation journal unchanged and excluded the first turn's events.
+Both runs completed, their process groups exited, and an idle restart preserved
+runs, results and commands. No domain result was created.
+
+The subprocess fixture verifies this orchestration and rejects a peer without
+loadSession. Live evidence is specific to synthetic conversations: it does not
+prove domain plan generation, live code editing, mid-turn crash recovery, streaming
+terminal detach, Quick Picks or vendor extensions. C cells therefore remain
+distinct from D cells. G6's other installations still need their recorded access
+or configuration issues resolved before full live scenarios can run.

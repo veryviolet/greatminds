@@ -1,0 +1,190 @@
+{
+  "version": 1,
+  "date": "2026-09-07",
+  "client_source_commit": "e4c6ef5",
+  "sdk_version": "0.11.1",
+  "probe_sha256": "77e3fdfe3622727c98a416fbcc1bfff7e3dad663770d4dcbf1d977746c07672b",
+  "scope": "Public CLI create/send/attach and fresh coordd processes for planner and live developer conversations",
+  "inference": true,
+  "installations": {
+    "codex": {
+      "adapter": "1.10.0",
+      "cli": "0.153.4"
+    },
+    "claude": {
+      "adapter": "0.75.1",
+      "sdk": "0.3.257"
+    },
+    "grok": {
+      "native": "1.0.13",
+      "auto_update": false,
+      "permission_mode": "default",
+      "leader": false
+    }
+  },
+  "binding_permission": "deny",
+  "harnesses": [
+    {
+      "harness": "codex",
+      "scenarios": [
+        {
+          "role": "ARCHITECT-PLANNER",
+          "run_states": [
+            "completed",
+            "completed"
+          ],
+          "first_reply_exact": true,
+          "resumed_reply_exact": true,
+          "same_session": true,
+          "session_strategies": [
+            "new_context",
+            "loaded"
+          ],
+          "attach_read_only": true,
+          "cursor_excludes_previous_turn": true,
+          "exactly_two_turns": true,
+          "turns_completed": true,
+          "process_groups_exited": true,
+          "no_domain_results": true,
+          "idle_restart_no_work": true,
+          "passed": true
+        },
+        {
+          "role": "LIVE-DEVELOPER",
+          "run_states": [
+            "completed",
+            "completed"
+          ],
+          "first_reply_exact": true,
+          "resumed_reply_exact": true,
+          "same_session": true,
+          "session_strategies": [
+            "new_context",
+            "loaded"
+          ],
+          "attach_read_only": true,
+          "cursor_excludes_previous_turn": true,
+          "exactly_two_turns": true,
+          "turns_completed": true,
+          "process_groups_exited": true,
+          "no_domain_results": true,
+          "idle_restart_no_work": true,
+          "passed": true
+        }
+      ],
+      "raw_report_sha256": "dd8cdbb2c5f430c1c2639b01d65ac542e10656f0adb62fbeec40bf1dec799f35"
+    },
+    {
+      "harness": "claude",
+      "scenarios": [
+        {
+          "role": "ARCHITECT-PLANNER",
+          "run_states": [
+            "completed",
+            "completed"
+          ],
+          "first_reply_exact": true,
+          "resumed_reply_exact": true,
+          "same_session": true,
+          "session_strategies": [
+            "new_context",
+            "loaded"
+          ],
+          "attach_read_only": true,
+          "cursor_excludes_previous_turn": true,
+          "exactly_two_turns": true,
+          "turns_completed": true,
+          "process_groups_exited": true,
+          "no_domain_results": true,
+          "idle_restart_no_work": true,
+          "passed": true
+        },
+        {
+          "role": "LIVE-DEVELOPER",
+          "run_states": [
+            "completed",
+            "completed"
+          ],
+          "first_reply_exact": true,
+          "resumed_reply_exact": true,
+          "same_session": true,
+          "session_strategies": [
+            "new_context",
+            "loaded"
+          ],
+          "attach_read_only": true,
+          "cursor_excludes_previous_turn": true,
+          "exactly_two_turns": true,
+          "turns_completed": true,
+          "process_groups_exited": true,
+          "no_domain_results": true,
+          "idle_restart_no_work": true,
+          "passed": true
+        }
+      ],
+      "raw_report_sha256": "5962ef21b20a2999bd365b6cd798735aaf7c98b30e582f284087391759c429eb"
+    },
+    {
+      "harness": "grok",
+      "scenarios": [
+        {
+          "role": "ARCHITECT-PLANNER",
+          "run_states": [
+            "completed",
+            "completed"
+          ],
+          "first_reply_exact": true,
+          "resumed_reply_exact": true,
+          "same_session": true,
+          "session_strategies": [
+            "new_context",
+            "loaded"
+          ],
+          "attach_read_only": true,
+          "cursor_excludes_previous_turn": true,
+          "exactly_two_turns": true,
+          "turns_completed": true,
+          "process_groups_exited": true,
+          "no_domain_results": true,
+          "idle_restart_no_work": true,
+          "passed": true
+        },
+        {
+          "role": "LIVE-DEVELOPER",
+          "run_states": [
+            "completed",
+            "completed"
+          ],
+          "first_reply_exact": true,
+          "resumed_reply_exact": true,
+          "same_session": true,
+          "session_strategies": [
+            "new_context",
+            "loaded"
+          ],
+          "attach_read_only": true,
+          "cursor_excludes_previous_turn": true,
+          "exactly_two_turns": true,
+          "turns_completed": true,
+          "process_groups_exited": true,
+          "no_domain_results": true,
+          "idle_restart_no_work": true,
+          "passed": true
+        }
+      ],
+      "raw_report_sha256": "616870c70b87527658b2a848e3aec748fea63ec4fb330ae9146356b369576d88"
+    }
+  ],
+  "fixture_validation": {
+    "resumable_server": "passed; 21.13 seconds",
+    "server_without_load_session": "correctly rejected; 19.40 seconds"
+  },
+  "limitations": [
+    "Synthetic text conversations do not constitute domain planning or live code-editing task completion.",
+    "Each scenario restarts both daemon and harness after the first completed turn. It is not a mid-turn daemon crash or streaming terminal detach test.",
+    "The second prompt omits the random token. The common conversation context contains role/identity information, not past user prompts.",
+    "Attach is a finite public cursor read. Interactive talk, Quick Picks and optional vendor extensions are not exercised here.",
+    "Harness/provider defaults are used; no account, model, provider or global settings are changed.",
+    "Fixture replies simulate the protocol and validate probe rejection without loadSession; only live random-token results establish recall in these tested installations."
+  ]
+}

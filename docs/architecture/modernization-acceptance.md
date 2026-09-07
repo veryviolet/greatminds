@@ -25,7 +25,7 @@ were inspected. It does not turn fixture coverage into live harness coverage.
 | A2: normalized protocol diagnostics with bounded raw evidence | Bounded `run.protocol` negotiation/tool/error/stop facts, private summary export; real supervisor privacy/saturation/crash fixtures and delayed-update RPC-error regression | Confirmed G1: managed-path evidence, with no raw payloads or transcripts |
 | A3: two upstream bridges and a native ACP implementation on one client | Codex + Claude bridges and native Grok; [completed mixed pipeline](evidence/acp-mixed-pipeline-completed-2026-09-06.json), lifecycle/permission evidence | Confirmed tested versions and completed local pipeline; no cross-harness history transfer claimed |
 | A4: Qwen/Kimi/Grok/Cline/Gemini/OpenHands/Cursor distribution, auth, session, worktree, model and cancellation | Per-stage [campaign evidence and role matrix](acp-compatibility.md); fresh explicit auth attempts and pending-permission cancellation on three harnesses | **Open G6:** only initialized/session-created status for several installations; authentication and complete scenarios remain necessary |
-| A5: daemon-owned interactive prompts, streamed output, permission, reconnect and interrupt | Conversation FIFO, task-bound claims, shared broker; `test_acp_conversations.py`, `test_chat_tasks.py`, `test_chat_terminal.py` | Confirmed fixture coverage; live coverage remains explicitly narrower than all roles/harnesses |
+| A5: daemon-owned interactive prompts, streamed output, permission, reconnect and interrupt | Conversation FIFO, task-bound claims, shared broker; `test_acp_conversations.py`, `test_chat_tasks.py`, `test_chat_terminal.py` | Confirmed fixture coverage plus public CLI restart/recall/cursor scenarios for planner and live developer on Codex/Claude/Grok; live coverage remains narrower than all roles/harnesses |
 | A5: common tmux/VS Code surfaces and removal of native dispatch | `runtime/frontends.py`, thin `cli/coordd.py`, extension CLI terminals; launch tests and [real extension host](evidence/vscode-extension-host-2026-09-07.json) | Confirmed managed execution routes through ACP; host smoke does not exercise Quick Picks or live chat |
 
 ## Deterministic orchestration
@@ -144,8 +144,10 @@ were inspected. It does not turn fixture coverage into live harness coverage.
    authentication checks distinguish missing Qwen configuration, Kimi/Cline login,
    OpenHands agent configuration, discontinued Gemini individual access and an
    inconclusive Cursor ACP timeout despite cached native login. Cancellation while
-   permission is pending passed on Claude/Codex/Grok. These checks do not establish
-   the remaining domain-role or harness scenarios.
+   permission is pending passed on Claude/Codex/Grok. Public CLI planner/live-developer
+   conversations also passed session recall after daemon restart, duplicate delivery
+   and cursor reconnect on all three. These checks do not establish the remaining
+   domain-role or harness scenarios.
 
 After these items, rerun the complete suite and relevant package/host checks,
 inspect every row again, and record the resulting milestone verdicts. Current

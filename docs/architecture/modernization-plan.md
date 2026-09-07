@@ -2541,3 +2541,25 @@ No runtime fix was needed. The full suite had already collected before the six
 additional conversation role parameters; all ten parameters passed separately.
 The full suite was not repeated after the wording-only fix. Exact scope is retained
 in evidence/recovery-regression-2026-09-07.json. Overall acceptance remains open at G6.
+
+### G6 — live public conversation lifecycle (2026-09-07)
+
+Added tools/acp_conversation_probe.py and subprocess acceptance for a resumable peer
+and a peer without loadSession. The latter is correctly rejected rather than counted
+as a successful fresh session. The public tool exercises create/send/attach and
+separate coordd processes in disposable projects, with a random recall token and no
+permission grants. It also sends an exact duplicate request ID and reattaches using
+the prior cursor, then verifies an idle restart creates no work.
+
+All six live scenarios passed: ARCHITECT-PLANNER and LIVE-DEVELOPER on Codex adapter
+1.10.0 / CLI 0.153.4, Claude adapter 0.75.1 / SDK 0.3.257, and native Grok 1.0.13.
+They loaded the original session after restart, returned the original random token,
+kept exactly two turns, excluded previous-turn events at the cursor and cleaned up
+all model process groups. The shared context was inspected: it contains role and
+identity metadata, not prior user messages. Sanitized assertions and fingerprints
+are in evidence/acp-public-conversations-2026-09-07.json. The role matrix now uses C
+for this live conversation proof, retaining D exclusively for domain completion.
+
+This advances A5/M5 without asserting unsupported domain work or other installations.
+No model/provider/account configuration was changed. G6's recorded external access
+and configuration issues remain; overall goal completion is still unproven.
