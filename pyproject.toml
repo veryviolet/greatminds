@@ -59,7 +59,7 @@ greatminds = "greatminds.cli.main:cli"
 packages = ["src/greatminds"]
 
 [tool.hatch.build.targets.wheel.force-include]
-# Package data (plugins, mcp configs, codex profiles, templates, role docs, schema)
+# Package data (schema, coordination reference, stand and task templates)
 # lives under src/greatminds/data/ and is shipped with the wheel verbatim.
 
 [tool.hatch.build.targets.sdist]

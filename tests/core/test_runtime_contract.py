@@ -381,3 +381,15 @@ def test_invalid_binding_fails_before_launch(field, value):
     document["bindings"]["developer"][field] = value
     with pytest.raises(GreatMindsError):
         parse_execution_config(document, roles={"DEVELOPER"})
+
+
+def test_assigned_context_keeps_runtime_mutations_and_scheduling_in_daemon(runtime):
+    from greatminds.runtime.context import compile_context
+    claim = claim_at(runtime)
+    schema, _ = contract()
+    prompt = compile_context(RunStore(runtime), claim, schema)
+    assert "Do not edit task-store files directly" in prompt
+    assert "do not move queues yourself" in prompt
+    assert "Do not scan other queues, send heartbeat messages, sleep, or rearm an agent loop" in prompt
+    assert "run submit --json" in prompt
+    assert "run contract --schema" in prompt

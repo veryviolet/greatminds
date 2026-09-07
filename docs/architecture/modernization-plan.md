@@ -1705,3 +1705,33 @@ Validation: strict MkDocs build passed in 1.48s. The preceding installation/CLI
 checkpoint also passed 8 project-schema/public-help checks in 0.76s. Packaged
 bootstrap, native profile/template files and tests that assert their old behavior
 remain under audit; none are represented here as current setup output.
+
+### Full regression checkpoint before native asset removal (2026-09-07)
+
+The full suite after durable account recovery completed with 1411 passed,
+1 skipped in 297.41s. Subsequent changes through the architecture-doc checkpoint
+are documentation and a schema-drift hint; the hint's CLI checks passed separately.
+This is a regression checkpoint, not completion of the modernization plan.
+
+### Remove unused native package assets (2026-09-07)
+
+Removed static native bootstrap/coord.yaml templates, Codex per-role profiles,
+Claude plugin manifests and default native MCP configuration from package data.
+Removed unused project-bootstrap/doc path helpers. Setup already uses only ACP;
+these files had no execution consumer and contradicted generated run context.
+Retired assertions about native panes/profiles; retained role/FSM checks and
+added actual ACP-context coverage for CLI mutations and daemon-owned scheduling.
+
+Preserved Explorer's destructive-target boundary in the shared role schema:
+local orchestration or unresolved targets are forbidden; destructive scenarios
+require an explicitly authorized disposable stand and verified target identity,
+otherwise a blocker. A real claimed-run context test verifies delivery across
+harnesses. This is a contract boundary, not a claim of OS shell isolation.
+
+Validation: 83 affected context/setup/role/data checks passed in 6.41s. Built and
+installed a fresh wheel into /tmp/greatminds-acp-clean-installed offline (10 base
+packages). Inspected wheel members to confirm native assets are absent. Installed
+smoke passed: idempotent setup, one deterministic dependency resume, zero agent
+runs and no duplicate replay; base installation has no Ansible dependency.
+Remaining schema prose/event-trigger cleanup, supervision improvements and full
+milestone acceptance remain open.

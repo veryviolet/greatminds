@@ -1,10 +1,5 @@
-"""Package data namespace.
+"""Package data namespace for schema, coordination reference and templates.
 
-This is a regular Python package (not a namespace package) so that
-``importlib.resources.files('greatminds.data')`` resolves to the directory
-containing ``plugins/``, ``mcp/``, ``codex/profiles/``, ``templates/``,
-``schema.yaml``, ``COORDINATE.md`` and the static ``bootstrap.md``.
-
-Modules under ``data/`` (if any) should remain importable, but the primary
-content here is non-Python data files shipped verbatim with the wheel.
+A regular package lets importlib.resources locate data in installed wheels.
+Project setup and agent context generation use the ACP runtime modules.
 """

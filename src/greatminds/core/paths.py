@@ -164,18 +164,8 @@ def project_schema_path(project_dir: Path) -> Path:
     return project_runtime_dir(project_dir) / "schema.yaml"
 
 
-def project_bootstrap_path(project_dir: Path) -> Path:
-    return project_runtime_dir(project_dir) / "bootstrap.md"
-
-
-def project_coordinate_doc_path(project_dir: Path) -> Path:
-    return project_runtime_dir(project_dir) / "COORDINATE.md"
-
-
 def find_canon_dir() -> Path:
-    """Locate the canon data directory (``schema.yaml``, ``bootstrap.md``,
-    ``COORDINATE.md``, ``plugins/``, ``mcp/``, ``codex/profiles/``,
-    ``templates/``).
+    """Locate the packaged schema, coordination reference and templates.
 
     Resolution order:
       1. ``$GREATMINDS_CANON_DIR`` — explicit override (sandbox runs, dev clones).

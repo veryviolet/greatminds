@@ -462,6 +462,11 @@ roles:
       - deploy_stand
       - claim_outside_review_sessions
       - validate_off_stand_or_local_substitutes
+      - >-
+        Run host-destructive or recovery actions (kill, pkill, systemctl,
+        logout, reboot) against the local orchestration host or an unresolved
+        target. Such scenarios require an explicitly authorized disposable
+        stand and verified target identity; otherwise submit a blocker.
     event_triggers:
       on_review_sessions_claim:
         - acquire_lease_via_stand_lease

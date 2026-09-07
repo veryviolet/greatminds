@@ -33,19 +33,3 @@ def test_schema_declares_runtime_access_cli_only() -> None:
     assert "greatminds inbox" in surfaces
     assert "greatminds task" in surfaces
     assert "greatminds stand status" in surfaces
-
-
-# ---------- the rule reaches the agent-facing surface (bootstrap.md) ----------
-
-
-def test_static_bootstrap_carries_cli_only_rule() -> None:
-    """The single static system prompt every agent receives must state
-    the CLI-only runtime-access rule (the agent also reads
-    schema.runtime_access itself)."""
-    text = (find_canon_dir() / "bootstrap.md").read_text(encoding="utf-8").lower()
-    # 1.5.7 reworded this to scope the rule to MUTATIONS (reading docs like
-    # PROJECT.md is explicitly allowed) — match case-insensitively so the
-    # clarified phrasing ("through the `greatminds` CLI ONLY") still passes.
-    assert "greatminds` cli only" in text or "greatminds cli only" in text, (
-        "bootstrap.md must state runtime FSM-state access is CLI-only")
-    assert ".greatminds/" in text

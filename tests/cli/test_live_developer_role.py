@@ -3,9 +3,7 @@
 LIVE-DEVELOPER is USER-paced: it claims from feature_live, leases a
 stand and deploys to it during the session, works live with the USER,
 and on USER approval hands to feature_review as a sprint task (REVIEWER
-no-regression review, outcome approved_sprint; TESTER skipped). It
-replaces the old UI-DEVELOPER FAST chat variant. Its pane is `staged`
-(launch pre-types the start command; the USER starts the session).
+no-regression review, outcome approved_sprint; TESTER skipped). Its ACP binding can use on-demand scheduling for operator input.
 """
 from __future__ import annotations
 
@@ -21,12 +19,6 @@ from greatminds.core.paths import find_canon_dir
 def _schema() -> dict:
     return yaml.safe_load(
         (find_canon_dir() / "schema.yaml").read_text(encoding="utf-8")
-    ) or {}
-
-
-def _coord_template() -> dict:
-    return yaml.safe_load(
-        (find_canon_dir() / "coord.yaml.template").read_text(encoding="utf-8")
     ) or {}
 
 
@@ -111,27 +103,6 @@ def test_vite_dev_profile_preset_ships() -> None:
     text = p.read_text(encoding="utf-8")
     assert "npm run dev" in text  # HMR dev server
     assert "vite_port" in text
-
-
-# ---------- coord.yaml template: staged pane ----------
-
-
-def test_coord_template_has_staged_live_pane() -> None:
-    win = next((w for w in (_coord_template().get("windows") or [])
-                if isinstance(w, dict) and w.get("role") == "LIVE-DEVELOPER"),
-               None)
-    assert win is not None, "coord template missing LIVE-DEVELOPER window"
-    assert win["mode"] == "staged"
-    assert win["tool"] == "claude"
-
-
-# ---------- launch: staged pane pre-types but does NOT submit ----------
-
-
-def _env_setup():
-    return launch_mod.gm_env.EnvSetup(env_type=None, activation="", source="(test)")
-
-
 
 
 # ---------- validators ----------

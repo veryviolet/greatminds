@@ -9,6 +9,7 @@ is a diagnostic mirror.
 | `ARCHITECT-PLANNER` | Intake, triage, planning and routing |
 | `DEVELOPER` | Backend implementation |
 | `UI-DEVELOPER` | UI implementation |
+| `LIVE-DEVELOPER` | User-paced implementation and live stand iteration |
 | `TECHNICAL-WRITER` | Documentation implementation |
 | `TESTER` | Validation and test evidence |
 | `READER` | Documentation review from a fresh reader's perspective |
