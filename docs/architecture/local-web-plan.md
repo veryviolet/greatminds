@@ -60,4 +60,4 @@ tests passed** (included in the focused run). The HTTP tests need loopback socke
 access. The remaining suite ran in its normal process namespace: running the
 entire suite outside that namespace initially produced three migration-safety
 failures from unreadable host `/proc` entries; all three passed in the normal
-isolated regression. No tests were skipped or removed to hide those failures.
+isolated regression. Every test ran in the appropriate environment.
