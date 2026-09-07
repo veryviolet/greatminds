@@ -1,151 +1,26 @@
-#!/usr/bin/env python3
-"""Report blocked tasks ready to wake, malformed deps, and deadlock cycles.
+"""Inspect dependency and task-readiness gates used by the daemon.
 
-Usage:
-    greatminds wake-check [--project-dir <dir>] [--canon-dir <dir>] [--quiet]
-
-Scans <project-dir>/.greatminds/feature_blocked/*.{yaml,md}. For each:
-  - parses the latest `blocked` block;
-  - validates dependency entries match `<queue>/<id>.{yaml,md}`;
-  - checks each referenced file actually exists;
-  - flags tasks whose ALL deps exist AND none of those deps is itself
-    in a wait state (active blocked queue) → READY TO WAKE.
-
-Also detects:
-  - malformed deps (wrong format or unknown queue);
-  - deadlock cycles (A blocked on B, B blocked on A, etc — DFS over
-    the feature_blocked dependency graph);
-  - tasks with no blocked block (orphans).
-
-For ACP execution contracts the daemon resumes ready work automatically.
-This command exposes the same dependency/system-operation findings read-only.
-Legacy projects retain their informational report until configuration migration.
-
-Exit code:
-  0 always (informational).
+Reports ready tasks, missing or impossible dependencies, cycles, live-role holds
+and pending operations through the shared maintenance service. Inspection never
+moves tasks or starts agents. The daemon applies authorized system resumes.
 """
 from __future__ import annotations
 
-import re
 import json
 from pathlib import Path
 
 import click
-import yaml
 
-from greatminds.core.paths import find_canon_dir, find_runtime_dir
-from greatminds.cli._colors import info, ok, warn
-
-# accept either yaml or md task files in dependency entries during the
-# R8 transition period
-DEP_RE = re.compile(r"^(?P<queue>[a-z_]+)/(?P<id>[0-9]{1,4}-[a-z0-9-]+)\.(?P<ext>yaml|md)$")
-
-
-def load_schema_queues(canon_dir: Path) -> set[str]:
-    schema_path = canon_dir / "schema.yaml"
-    if not schema_path.exists():
-        return set()
-    try:
-        data = yaml.safe_load(schema_path.read_text(encoding="utf-8"))
-    except yaml.YAMLError:
-        return set()
-    return set((data.get("queues") or {}).keys())
+from greatminds.cli._colors import info
+from greatminds.cli.chat import terminal_text
+from greatminds.core.errors import GreatMindsError
+from greatminds.core.paths import find_project_dir, project_runtime_dir
+from greatminds.core.schema import load_schema_snapshot
+from greatminds.domain.maintenance import MaintenanceService
+from greatminds.runtime.store import RunStore
 
 
-def load_task(path: Path) -> tuple[dict, list[dict]]:
-    """Return (header_dict, list_of_legacy_blocks_for_md)."""
-    if path.suffix == ".yaml":
-        try:
-            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-        except yaml.YAMLError:
-            return {}, []
-        if not isinstance(data, dict):
-            return {}, []
-        return data, []
-    text = path.read_text(encoding="utf-8")
-    parts = re.split(r"^---\s*$", text, flags=re.MULTILINE)
-    header: dict = {}
-    blocks: list[dict] = []
-    for chunk in parts:
-        chunk = chunk.strip()
-        if not chunk:
-            continue
-        try:
-            data = yaml.safe_load(chunk)
-        except yaml.YAMLError:
-            continue
-        if not isinstance(data, dict):
-            continue
-        if not header and "id" in data:
-            header = data
-        else:
-            blocks.append(data)
-    return header, blocks
-
-
-def latest_blocked(data: dict, legacy_blocks: list[dict]) -> dict | None:
-    yaml_blocks = data.get("blocks") or []
-    if isinstance(yaml_blocks, list) and yaml_blocks:
-        latest = None
-        for b in yaml_blocks:
-            if isinstance(b, dict) and b.get("kind") == "blocked":
-                latest = b
-        if latest:
-            return latest
-    latest_legacy = None
-    for b in legacy_blocks:
-        for key in ("blocked_block", "blocked"):
-            if key in b and isinstance(b[key], dict):
-                latest_legacy = b[key]
-    return latest_legacy
-
-
-def dep_path_under_coord(coord: Path, dep: str) -> Path | None:
-    m = DEP_RE.match(dep)
-    if m is None:
-        return None
-    p = coord / m.group("queue") / f"{m.group('id')}.{m.group('ext')}"
-    if p.is_file():
-        return p
-    alt_ext = "yaml" if m.group("ext") == "md" else "md"
-    p2 = coord / m.group("queue") / f"{m.group('id')}.{alt_ext}"
-    if p2.is_file():
-        return p2
-    return None
-
-
-def find_dep_in_queues(coord: Path, dep_id: str,
-                       queues: "set[str] | list[str]") -> list[str]:
-    """Queue dir names (among ``queues``) that actually contain a task file
-    ``<dep_id>.{yaml,md}``. Used to locate a dependency's target task when
-    it is NOT at the queue the dependency path expects — so wake-check can
-    tell a permanently-dead dependency (target sitting in a terminal queue
-    it can never leave) from one that is merely not-created-yet."""
-    found: list[str] = []
-    for q in sorted(queues):
-        qd = coord / q
-        if not qd.is_dir():
-            continue
-        if (qd / f"{dep_id}.yaml").is_file() or (qd / f"{dep_id}.md").is_file():
-            found.append(q)
-    return found
-
-
-def all_blocked_files(coord: Path) -> list[Path]:
-    out: list[Path] = []
-    d = coord / "feature_blocked"
-    if not d.is_dir():
-        return out
-    for f in sorted(d.iterdir()):
-        if f.suffix in (".yaml", ".md") and not f.name.startswith("_TEMPLATE"):
-            out.append(f)
-    return out
-
-
-@click.command(
-    short_help="report blocked-tasks ready to wake, cycles, malformed deps",
-    help=__doc__,
-)
+@click.command(short_help="report dependency, cycle and task-readiness findings", help=__doc__)
 @click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
               default=None, help="project root containing .greatminds/ (default: cwd)")
 @click.option("--canon-dir", type=click.Path(exists=True, file_okay=False, path_type=Path),
@@ -153,270 +28,20 @@ def all_blocked_files(coord: Path) -> list[Path]:
 @click.option("--quiet", is_flag=True, help="suppress no-findings output")
 @click.option("--json", "as_json", is_flag=True, help="versioned dependency/controller findings")
 def wake_check(project_dir: Path | None, canon_dir: Path | None, quiet: bool, as_json: bool = False) -> None:
-    project_dir = project_dir or Path.cwd()
-    canon_dir = canon_dir or find_canon_dir()
-
-    if (project_dir.name == ".greatminds"
-            and (project_dir / "feature_blocked").is_dir()):
-        coord = project_dir
+    project = find_project_dir(project_dir, strict=False, use_env=project_dir is None)
+    runtime = project_runtime_dir(project)
+    if not runtime.is_dir():
+        raise click.ClickException(f"runtime directory not found: {runtime}")
+    try:
+        report = MaintenanceService(RunStore(runtime), load_schema_snapshot(canon_dir)).inspect()
+    except GreatMindsError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if as_json:
+        click.echo(json.dumps(report, ensure_ascii=True, indent=2))
     else:
-        coord = find_runtime_dir(project_dir, strict=False)
-    if as_json or (coord.parent / "coordination" / "execution.yaml").is_file():
-        from greatminds.core.schema import load_schema_snapshot
-        from greatminds.domain.maintenance import MaintenanceService
-        from greatminds.runtime.store import RunStore
-        report = MaintenanceService(RunStore(coord), load_schema_snapshot(canon_dir)).inspect()
-        if as_json:
-            click.echo(json.dumps(report, ensure_ascii=False, indent=2))
-        else:
-            for item in report["tasks"].values():
-                click.echo(f"{item['task_id']}: {item['status']} → {item['resume_to']}")
-                for reason in item["reasons"]:
-                    click.echo("  " + json.dumps(reason, ensure_ascii=False))
-            if not report["tasks"] and not quiet:
-                info("no blocked tasks")
-        return
-    if not (coord / "feature_blocked").is_dir():
-        if not quiet:
-            info(f"no feature_blocked/ at {coord}")
-        return
-
-    schema_queues = load_schema_queues(canon_dir)
-    blocked_files = all_blocked_files(coord)
-    blocked_id_set = {f.stem for f in blocked_files}
-
-    graph: dict[str, list[str]] = {}
-    task_deps: dict[str, list[str]] = {}
-    blocked_meta: dict[str, dict] = {}
-    malformed: list[tuple[str, str, str]] = []
-    no_block: list[str] = []
-
-    for f in blocked_files:
-        tid = f.stem
-        header, legacy = load_task(f)
-        latest = latest_blocked(header, legacy)
-        if latest is None:
-            no_block.append(tid)
-            continue
-        deps_raw = latest.get("dependencies") or []
-        if not isinstance(deps_raw, list):
-            malformed.append((tid, str(deps_raw), "dependencies must be a list"))
-            continue
-        deps: list[str] = []
-        edges: list[str] = []
-        for d in deps_raw:
-            if not isinstance(d, str):
-                malformed.append((tid, str(d), "dep entry must be string"))
-                continue
-            m = DEP_RE.match(d)
-            if m is None:
-                malformed.append((tid, d, "bad format (expected <queue>/<id>.{yaml,md})"))
-                continue
-            if schema_queues and m.group("queue") not in schema_queues:
-                malformed.append((tid, d, f"unknown queue {m.group('queue')!r}"))
-                continue
-            deps.append(d)
-            dep_id = m.group("id")
-            if dep_id in blocked_id_set:
-                edges.append(dep_id)
-        task_deps[tid] = deps
-        blocked_meta[tid] = {
-            "resume_to": latest.get("resume_to") or "",
-            "header": header,
-            "blocked": latest,
-        }
-        graph[tid] = edges
-
-    # DFS cycle detection over the blocked-subgraph
-    cycles: list[list[str]] = []
-    color: dict[str, int] = {n: 0 for n in graph}  # 0 white 1 gray 2 black
-
-    def dfs(start: str) -> None:
-        path: list[str] = []
-        stack: list[tuple[str, int]] = [(start, 0)]
-        color[start] = 1
-        path.append(start)
-        while stack:
-            node, i = stack[-1]
-            neighbors = graph.get(node, [])
-            if i < len(neighbors):
-                nxt = neighbors[i]
-                stack[-1] = (node, i + 1)
-                c = color.get(nxt, 0)
-                if c == 1 and nxt in path:
-                    idx = path.index(nxt)
-                    cycles.append(path[idx:] + [nxt])
-                elif c == 0:
-                    color[nxt] = 1
-                    path.append(nxt)
-                    stack.append((nxt, 0))
-            else:
-                color[node] = 2
-                stack.pop()
-                if path and path[-1] == node:
-                    path.pop()
-
-    for n in list(graph.keys()):
-        if color[n] == 0:
-            dfs(n)
-
-    in_cycle = {n for cyc in cycles for n in cyc}
-    # A dep counts as "done" only if it sits in a terminal queue.
-    # Anything in an active queue (incl. feature_blocked itself) means
-    # work is not finished, so the blocked task is NOT yet ready.
-    terminal_queues = set()
-    schema_path = canon_dir / "schema.yaml"
-    if schema_path.is_file():
-        try:
-            schema_data = yaml.safe_load(schema_path.read_text(encoding="utf-8")) or {}
-        except yaml.YAMLError:
-            schema_data = {}
-        for q, meta in (schema_data.get("queues") or {}).items():
-            if isinstance(meta, dict) and meta.get("kind") == "terminal":
-                terminal_queues.add(q)
-    if not terminal_queues:
-        terminal_queues = {"verified", "archive"}
-
-    # Queues to search when a dependency target is not at its expected path
-    # (so a dead dep — target stuck in a different terminal queue — is told
-    # apart from a not-yet-created one). Prefer the schema's queue set; fall
-    # back to whatever queue-like dirs exist under coord/.
-    search_queues: set[str] = set(schema_queues) or {
-        p.name for p in coord.iterdir() if p.is_dir()
-    }
-
-    ready: list[tuple[str, str]] = []
-    not_ready: list[tuple[str, list[str]]] = []
-    # Permanently-unsatisfiable deps: target task sits in a TERMINAL queue
-    # other than the one the dependency path expects, so it can never reach
-    # the expected queue (issue #15). (tid, [human descriptions]).
-    dead: list[tuple[str, list[str]]] = []
-    for tid, deps in task_deps.items():
-        if tid in in_cycle:
-            continue
-        unresolved: list[str] = []
-        dead_for_task: list[str] = []
-        for d in deps:
-            p = dep_path_under_coord(coord, d)
-            if p is None:
-                m = DEP_RE.match(d)  # deps here already matched DEP_RE
-                dep_id = m.group("id")
-                exp_q = m.group("queue")
-                terminal_locs = [
-                    q for q in find_dep_in_queues(coord, dep_id, search_queues)
-                    if q in terminal_queues and q != exp_q
-                ]
-                if terminal_locs:
-                    dead_for_task.append(
-                        f"{d} (target in terminal {terminal_locs[0]}/, "
-                        f"can never reach {exp_q}/)")
-                else:
-                    unresolved.append(f"{d} (missing)")
-                continue
-            parent = p.parent.name
-            if parent not in terminal_queues:
-                unresolved.append(f"{d} (in {parent}, not terminal)")
-        # A dead dep makes the task permanently blocked regardless of any
-        # other unresolved dep — surface it loudly, not as plain "missing".
-        if dead_for_task:
-            dead.append((tid, dead_for_task))
-        elif unresolved:
-            not_ready.append((tid, unresolved))
-        else:
-            ready.append((tid, blocked_meta[tid]["resume_to"]))
-
-    # 0388: a task whose deps are all satisfied is normally READY TO WAKE,
-    # but if it declares `requires_live_roles` and a required runtime role
-    # is wedged (alive-but-stuck at a codex auth / login-timeout / trust
-    # prompt — 0387), resuming it would just rediscover the same wedge.
-    # Hold those out of READY and surface them loudly so REVIEWER does not
-    # unblock them (the resume validator enforces the same gate at mv).
-    # Conservative + fail-open: tasks without the field, and any inspection
-    # error, leave readiness unchanged.
-    # 0389: the required roles are evaluated against the task's declared
-    # `requires_live_roles_context` (a remote stand's coordination project)
-    # when present, else locally — so a healthy LOCAL role can't falsely
-    # mark a remote-targeted campaign READY, and a declared-but-unreachable
-    # target holds conservatively instead of reading READY.
-    held: list[tuple[str, str]] = []
-    if ready:
-        try:
-            from greatminds.cli.agent import (
-                held_live_roles, describe_live_role_hold,
-            )
-            still_ready: list[tuple[str, str]] = []
-            for tid, resume_to in ready:
-                meta = blocked_meta.get(tid, {})
-                hold = held_live_roles(
-                    coord, meta.get("header") or {}, meta.get("blocked"))
-                if hold.held:
-                    held.append((tid, describe_live_role_hold(hold)))
-                else:
-                    still_ready.append((tid, resume_to))
-            ready = still_ready
-        except Exception:
-            pass  # fail-open: never hide a ready task on an inspection error
-
-    findings = 0
-    if ready:
-        findings += len(ready)
-        ok(f"READY TO WAKE ({len(ready)}):")
-        for tid, resume_to in ready:
-            ok(f"  {tid} → {resume_to}")
-        click.echo()
-    elif not quiet:
-        info("ready to wake: 0")
-
-    if held:
-        findings += len(held)
-        warn(f"HELD — deps satisfied but required live role(s) "
-             f"unavailable ({len(held)}):")
-        for tid, reason in held:
-            warn(f"  {tid}: {reason}")
-        click.echo()
-
-    if not_ready and not quiet:
-        info(f"BLOCKED (not yet ready) ({len(not_ready)}):")
-        for tid, deps in not_ready:
-            info(f"  {tid}: {', '.join(deps)}")
-        click.echo()
-
-    if dead:
-        findings += len(dead)
-        warn(f"DEAD DEPENDENCIES — permanently unsatisfiable ({len(dead)}):")
-        for tid, descs in dead:
-            warn(f"  {tid}: {', '.join(descs)}")
-        click.echo()
-
-    if cycles:
-        findings += len(cycles)
-        warn(f"DEADLOCK CYCLES ({len(cycles)}):")
-        seen: set[tuple[str, ...]] = set()
-        for cyc in cycles:
-            key = tuple(sorted(set(cyc)))
-            if key in seen:
-                continue
-            seen.add(key)
-            warn(f"  cycle: {' → '.join(cyc)}")
-        click.echo()
-
-    if malformed:
-        findings += len(malformed)
-        warn(f"MALFORMED DEPENDENCIES ({len(malformed)}):")
-        for tid, dep, why in malformed:
-            warn(f"  {tid}: {dep!r} — {why}")
-        click.echo()
-
-    if no_block:
-        findings += len(no_block)
-        warn(f"BLOCKED WITHOUT blocked BLOCK ({len(no_block)}):")
-        for tid in no_block:
-            warn(f"  {tid}")
-        click.echo()
-
-    if findings == 0 and not quiet:
-        info("(no actionable findings)")
-
-
-if __name__ == "__main__":
-    wake_check()
+        for item in report["tasks"].values():
+            click.echo(terminal_text(f"{item['task_id']}: {item['status']} → {item['resume_to']}"))
+            for reason in item["reasons"]:
+                click.echo("  " + json.dumps(reason, ensure_ascii=True))
+        if not report["tasks"] and not quiet:
+            info("no blocked tasks")

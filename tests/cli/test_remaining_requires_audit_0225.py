@@ -23,6 +23,7 @@ allowlist so future audits classify them correctly.
 from __future__ import annotations
 
 import pytest
+import yaml
 
 from greatminds.cli import task as task_mod
 
@@ -108,39 +109,24 @@ def test_all_dependencies_exist_rejects_missing_blocked_block(
     assert msg is not None
 
 
-def test_all_dependencies_exist_rejects_when_dep_missing(
-    monkeypatch, tmp_path,
-) -> None:
-    """Dependency file doesn't exist at named path → reject with
-    named missing files."""
-    coord = tmp_path / "coord"
-    coord.mkdir()
-    monkeypatch.setattr(task_mod, "find_coord_dir", lambda: coord)
-    data = {"blocks": [{
-        "kind": "blocked",
-        "dependencies": ["verified/0099-some-task.yaml"],
-    }]}
-    msg = task_mod._check_all_dependencies_exist(
-        data, "feature_blocked", "feature_dev",
-    )
-    assert msg is not None
-    assert "0099-some-task.yaml" in msg
-
-
-def test_all_dependencies_exist_accepts_when_all_present(
-    monkeypatch, tmp_path,
-) -> None:
-    coord = tmp_path / "coord"
+@pytest.mark.parametrize("present", [False, True])
+def test_all_dependencies_exist_checks_persisted_dependency_identity(monkeypatch, tmp_path, present):
+    coord = tmp_path / ".greatminds"
     (coord / "verified").mkdir(parents=True)
-    (coord / "verified" / "0099-task.yaml").write_text("x", encoding="utf-8")
+    (coord / "feature_blocked").mkdir()
     monkeypatch.setattr(task_mod, "find_coord_dir", lambda: coord)
-    data = {"blocks": [{
-        "kind": "blocked",
+    data = {"id": "0001-waiter", "blocks": [{
+        "kind": "blocked", "resume_to": "feature_dev",
         "dependencies": ["verified/0099-task.yaml"],
     }]}
-    assert task_mod._check_all_dependencies_exist(
-        data, "feature_blocked", "feature_dev",
-    ) is None
+    (coord / "feature_blocked/0001-waiter.yaml").write_text(yaml.safe_dump(data))
+    if present:
+        (coord / "verified/0099-task.yaml").write_text("id: 0099-task\n")
+    msg = task_mod._check_all_dependencies_exist(data, "feature_blocked", "feature_dev")
+    if present:
+        assert msg is None
+    else:
+        assert "0099-task.yaml" in msg and "missing" in msg
 
 
 # 0247 (1.3.0): _check_evidence_for_if_related_product_task removed

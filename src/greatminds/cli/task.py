@@ -1350,79 +1350,17 @@ def _check_review_block_changes_requested(data: dict[str, Any],
 def _check_all_dependencies_exist(data: dict[str, Any],
                                     from_q: str,
                                     to_q: str) -> str | None:
-    """0225: feature_blocked → any_resume_to_queue requires that all
-    declared dependencies actually exist at the named paths. Pre-
-    0225 noop'd at mv (the same check happened via `greatminds wake-
-    check` but only if REVIEWER ran it; not enforced inline).
+    """Require the shared dependency/live-role verdict and declared destination."""
+    from greatminds.domain.dependencies import inspect_dependencies
 
-    Resolves dependency strings from the latest blocked block and
-    checks each against ``coord/<path>``. Missing dep → reject."""
     coord = _domain_runtime()
-    if _domain_context.get() is not None or (coord.parent / "coordination" / "execution.yaml").is_file():
-        from greatminds.domain.dependencies import inspect_dependencies
-        context = _domain_context.get()
-        report = inspect_dependencies(coord, schema(), environment=context.get("environment") if context else None)
-        finding = report["tasks"].get(data.get("id"))
-        if not finding or finding["status"] != "ready":
-            return "dependencies are not ready: " + str(finding["reasons"] if finding else "task not found")
-        if finding["resume_to"] != to_q:
-            return "resume must use the latest blocked.resume_to destination"
-        return None
-    blocks = data.get("blocks") or []
-    blockeds = [b for b in blocks
-                if isinstance(b, dict) and b.get("kind") == "blocked"]
-    if not blockeds:
-        return (
-            "all_dependencies_exist_per_wake_check: feature_blocked "
-            "→ any_resume_to_queue requires a blocked block listing "
-            "the dependencies that satisfied the wake."
-        )
-    deps = blockeds[-1].get("dependencies") or []
-    if not isinstance(deps, list):
-        return (
-            "all_dependencies_exist_per_wake_check: latest blocked "
-            "block has non-list dependencies field"
-        )
-    coord = _domain_runtime()
-    missing: list[str] = []
-    for d in deps:
-        if not isinstance(d, str):
-            continue
-        if not (coord / d).exists():
-            missing.append(d)
-    if missing:
-        return (
-            f"all_dependencies_exist_per_wake_check: {len(missing)} "
-            f"dependency(s) still missing: "
-            f"{', '.join(missing[:3])}"
-            + (" …" if len(missing) > 3 else "")
-            + ". Run `greatminds wake-check` for the full picture."
-        )
-    # 0388/0389: deps satisfied, but if the task's objective declares
-    # `requires_live_roles`, a resume against a wedged runtime role (alive
-    # pid stuck at a codex auth / login-timeout / trust prompt per 0387)
-    # would just rediscover the same wedge. 0389: those roles are evaluated
-    # in the task's declared `requires_live_roles_context` (a remote stand's
-    # coordination project) when present, else locally — so a healthy LOCAL
-    # role can't unblock a remote-targeted campaign, and a declared-but-
-    # unreachable target holds conservatively. Opt-in + fail-open: tasks
-    # without the field are unaffected, and any inspection error never
-    # blocks the mv.
-    try:
-        from greatminds.cli.agent import (
-            held_live_roles, describe_live_role_hold,
-        )
-        hold = held_live_roles(coord, data, blockeds[-1])
-        if hold.held:
-            return (
-                "all_dependencies_exist_per_wake_check: "
-                + describe_live_role_hold(hold)
-                + " Run `greatminds wake-check` for the full picture."
-            )
-    except GreatMindsError:
-        raise
-    except Exception:
-        pass  # fail-open: never wedge the FSM on an inspection hiccup
+    context = _domain_context.get()
+    report = inspect_dependencies(coord, schema(), environment=context.get("environment") if context else None)
+    finding = report["tasks"].get(data.get("id"))
+    if not finding or finding["status"] != "ready":
+        return "dependencies are not ready: " + str(finding["reasons"] if finding else "task not found")
+    if finding["resume_to"] != to_q:
+        return "resume must use the latest blocked.resume_to destination"
     return None
 
 

@@ -41,12 +41,23 @@ the CLI.
 
 ## Fleet Launch And Environments
 
-Launch the fleet through the environment where greatminds is installed:
+Run the ACP daemon in the project environment:
 
 ```bash
-greatminds daemon start
-greatminds launch --target tmux
+greatminds coordd --project-dir "$PWD"
 ```
+
+Alternatively, install the optional user service once, then start it:
+
+```bash
+greatminds daemon install --project-dir "$PWD"
+greatminds daemon start --project-dir "$PWD"
+```
+
+`greatminds launch --target tmux` opens daemon/operator surfaces; the VS Code
+and Cursor IDE targets generate ACP workspace tasks. Interactive roles use
+`greatminds chat`, backed by daemon-owned sessions. Configure role bindings in
+`coordination/execution.yaml` before dispatch.
 
 Use a stable install for long-running fleets: pipx, `uv tool`, or a normal
 project venv. The editable development venv is for changing and testing
@@ -67,33 +78,34 @@ After upgrading the package used by the fleet, refresh the running processes:
 
 ```bash
 greatminds update
-greatminds restart --bootstrap
 greatminds agent status
 ```
 
-## Daemon Agent Auth Checks
-
-Before treating a driven Claude failure as a task/FSM stall, check the same
-environment that the daemon will use:
+## ACP configuration and authentication checks
 
 ```bash
-greatminds daemon doctor --project-dir "$PWD"
+greatminds daemon doctor --project-dir "$PWD" --json
+greatminds run status --project-dir "$PWD"
 ```
 
-If the report says Claude OAuth credentials are expired and have no refresh
-token, repair the Claude login as the same OS user that runs the daemon:
+Doctor checks the execution configuration, declared environment references and
+executable availability without launching agents. It does not validate provider
+credentials or establish live ACP compatibility. Run status shows durable
+`waiting_auth`, `waiting_input`, failure and dispatch reasons.
 
-```bash
-claude setup-token
-# or
-claude auth login
-greatminds daemon restart
-```
+Authenticate using the configured harness's supported login method as the OS
+user that runs the daemon. Then restart the installed service to refresh its
+declared environment, or restart the foreground daemon. Resolve the affected
+run explicitly with `greatminds run retry RUN_ID` when authentication is ready;
+missing authentication does not trigger an unbounded retry loop. Keep credentials
+out of task files, manifests and diagnostic reports.
 
-Use `greatminds daemon doctor` again after the restart. A manual interactive
-`claude` shell can have extra host-auth environment variables; the daemon must
-capture or inherit the same usable credentials before driven Claude turns will
-work reliably.
+`greatminds wake-check` and `greatminds wake-check --json` inspect the same
+maintenance gates used by the daemon, even when an execution file is absent.
+`ready` requires terminal dependencies and task readiness; `wrong_terminal`
+identifies a dependency that ended in another terminal queue. `waiting`, `cycle`,
+`live_role_hold` and `gate_failed` explain why the daemon cannot resume a task.
+Inspection does not move tasks; the daemon applies only authorized system resumes.
 
 ## Court Fix
 
@@ -104,7 +116,8 @@ needed to unblock the fleet. Keep it narrow:
    `greatminds wake-check`, or `greatminds gate-check`.
 2. Change only the affected canon, CLI, role doc, or project config.
 3. Run the closest validation command.
-4. Restart or bootstrap only the roles that need the new behavior.
+4. Let active runs finish or explicitly cancel them, then restart the daemon
+   when execution configuration or code changes require it.
 5. Tell `ARCHITECT-PLANNER` when product work must be replanned.
 
 Do not use a court fix to skip queue ownership or review gates.

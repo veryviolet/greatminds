@@ -1399,3 +1399,41 @@ Next: unify wake-check with MaintenanceService and port its dead-dependency
 regressions; continue native asset/setup cleanup, then finish the outstanding
 B1/M3 retry/backoff/no-progress/account/retention policies and the remaining
 milestone acceptance requirements. The full modernization goal is still open.
+
+### One dependency verdict for daemon and CLI (2026-09-07)
+
+Removed wake-check's parallel legacy parser, graph scan, readiness algorithm and
+configuration-based branch. Text and JSON now present MaintenanceService
+findings, using the same selected schema and explicit project resolution.
+Removed the matching native fallback from the task transition validator;
+terminal dependency identity, live-role holds and declared resume_to apply
+regardless of execution.yaml presence. This also removes fail-open handling of
+live-role inspection errors from that fallback. Markdown data is preserved and
+reported as requiring conversion by the shared service, never silently resumed.
+
+Ported dead-dependency regressions to valid persisted task fixtures and shared
+structured findings: wrong terminal vs missing vs active vs satisfied, cascading
+root cause, cycles, readiness failure without execution.yaml, read-only operation
+and explicit project selection. Existing maintenance crash recovery and live-role
+checks remain. Targeted validation: **88 tests passed**.
+
+Built the wheel offline and installed it with dependencies into a separate venv.
+The new `tests/smoke/installed_dependency_resume.py`, executed by that installed
+Python, proves repeated setup preserves configuration, CLI reports readiness,
+coordd --once applies exactly one SYSTEM resume, and a second daemon start does
+not duplicate its journal record. The fixture has **zero agent runs**. Module
+origin was verified under the installed venv, not the editable source tree.
+Example project: /tmp/greatminds-dependency-wheel-project-8ri8h885. Run the script
+with any isolated wheel-installed Python; it creates its own temporary fixture.
+Updated the operations runbook to current ACP launch, auth diagnostics and
+maintenance commands, removing the deleted restart --bootstrap instruction.
+
+Full-suite rerun is recorded below when complete. Remaining work still includes
+native assets/setup helpers, deterministic supervision policies, optional stand
+dependencies, performance/budget measurements and the full milestone acceptance
+audit. This installed-wheel fixture is not live-harness compatibility evidence.
+
+Full validation after the dependency cutover: **1379 passed, 1 skipped in
+282.59 seconds** (`/tmp/greatminds-dependency-full-suite.txt`). No collection
+errors or failing tests. The standalone installed-wheel smoke is additional
+validation, outside pytest collection.

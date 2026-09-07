@@ -1,125 +1,111 @@
-"""GitHub issue #15: wake-check must flag a blocked dependency that can
-never resolve because the target task sits in a TERMINAL queue other than
-the one the dependency path expects (e.g. dep wants ``verified/<id>`` but
-the task is in ``archive/``). Previously such a dep was reported as plain
-"missing" — indistinguishable from a not-yet-created task — so the blocked
-task sat forever with no actionable signal.
-"""
-from __future__ import annotations
+"""Impossible dependencies stay actionable in the shared CLI/daemon report."""
+import json
 
-from pathlib import Path
-
+import pytest
 import yaml
 from click.testing import CliRunner
 
-from greatminds.cli import wake_check as wc
-from greatminds.cli.wake_check import wake_check, find_dep_in_queues
+from greatminds.cli.wake_check import wake_check
+from greatminds.core.schema import load_schema_snapshot
+from greatminds.domain.maintenance import MaintenanceService
+from greatminds.runtime.bootstrap import bootstrap
+from greatminds.runtime.store import RunStore
 
 
-def _make(tmp_path: Path) -> tuple[Path, Path]:
-    """Minimal project (coordination/) + canon (schema.yaml) with verified
-    and archive marked terminal."""
-    project = tmp_path / "proj"
-    coord = project / "coordination"
-    for q in ("feature_blocked", "verified", "archive", "feature_dev"):
-        (coord / q).mkdir(parents=True)
-    canon = tmp_path / "canon"
-    canon.mkdir()
-    (canon / "schema.yaml").write_text(yaml.safe_dump({
-        "queues": {
-            "feature_blocked": {"kind": "active"},
-            "feature_dev": {"kind": "active"},
-            "verified": {"kind": "terminal"},
-            "archive": {"kind": "terminal"},
-        }
-    }), encoding="utf-8")
-    return project, canon
+def make(tmp_path):
+    project = tmp_path / 'project'
+    project.mkdir()
+    bootstrap(project)
+    return project, project / '.greatminds'
 
 
-def _blocked(coord: Path, tid: str, deps: list[str], resume_to="feature_dev"):
-    (coord / "feature_blocked" / f"{tid}.yaml").write_text(yaml.safe_dump({
-        "id": tid, "queue": "feature_blocked",
-        "blocks": [{"kind": "blocked", "dependencies": deps,
-                    "resume_to": resume_to}],
-    }), encoding="utf-8")
+def write(runtime, queue, task_id, deps=None, ready=True):
+    blocks = []
+    if deps is not None:
+        blocks = [
+            {'kind': 'plan', 'by': 'ARCHITECT-PLANNER', 'at': '2026-09-06T10:00:00Z',
+             'base_commit': 'fixture', 'assignee_role': 'DEVELOPER', 'stand_required': False,
+             'plan_kind': 'full', 'mode': 'A', 'ready_for_implementation': ready},
+            {'kind': 'blocked', 'by': 'DEVELOPER', 'at': '2026-09-06T10:00:00Z',
+             'reason': 'waiting for prerequisite', 'dependencies': deps, 'resume_to': 'feature_dev'}]
+    path = runtime / queue / f'{task_id}.yaml'
+    path.write_text(yaml.safe_dump({'id': task_id, 'title': 'Dependency fixture',
+        'stream': 'product', 'kind': 'research', 'scope': 'backend', 'reporter': 'USER',
+        'opened_at': '2026-09-06T10:00:00Z', 'priority': 'normal', 'blocks': blocks}))
+    return path
 
 
-def _run(project: Path, canon: Path):
-    return CliRunner().invoke(
-        wake_check,
-        ["--project-dir", str(project), "--canon-dir", str(canon)],
-    )
+def report(project):
+    result = CliRunner().invoke(wake_check, ['--project-dir', str(project), '--json'])
+    assert result.exit_code == 0, result.output
+    actual = json.loads(result.output)
+    service = MaintenanceService(RunStore(project / '.greatminds'), load_schema_snapshot())
+    assert actual == service.inspect()
+    text = CliRunner().invoke(wake_check, ['--project-dir', str(project)])
+    assert text.exit_code == 0, text.output
+    for task in actual['tasks'].values():
+        assert f"{task['task_id']}: {task['status']}" in text.output
+    return actual
 
 
-def test_find_dep_in_queues_locates_target(tmp_path):
-    project, _ = _make(tmp_path)
-    coord = project / "coordination"
-    (coord / "archive" / "0123-foo.yaml").write_text("id: x\n")
-    assert find_dep_in_queues(
-        coord, "0123-foo",
-        {"verified", "archive", "feature_dev"}) == ["archive"]
+@pytest.mark.parametrize('location,status,reason', [
+    ('archive', 'wrong_terminal', 'wrong_terminal'),
+    ('verified', 'ready', None),
+    (None, 'waiting', 'missing'),
+    ('feature_dev', 'waiting', 'waiting'),
+])
+def test_dependency_location_has_same_meaning_for_cli_and_daemon(tmp_path, location, status, reason):
+    project, runtime = make(tmp_path)
+    if location:
+        write(runtime, location, '0123-foo')
+    source = write(runtime, 'feature_blocked', '0200-waiter', ['verified/0123-foo.yaml'])
+    before = {p.relative_to(runtime): p.read_bytes() for p in runtime.rglob('*') if p.is_file()}
+    item = report(project)['tasks'][source.stem]
+    assert item['status'] == status
+    assert [r['code'] for r in item['reasons']] == ([reason] if reason else [])
+    assert {p.relative_to(runtime): p.read_bytes() for p in runtime.rglob('*') if p.is_file()} == before
 
 
-def test_dead_dep_target_in_other_terminal_queue(tmp_path):
-    """Dep wants verified/0123 but 0123 is in archive (terminal) → DEAD,
-    not 'ready' and not plain 'missing'."""
-    project, canon = _make(tmp_path)
-    coord = project / "coordination"
-    (coord / "archive" / "0123-foo.yaml").write_text("id: x\n")
-    _blocked(coord, "0200-waiter", ["verified/0123-foo.yaml"])
-
-    res = _run(project, canon)
-    assert res.exit_code == 0
-    assert "DEAD DEPENDENCIES" in res.output
-    assert "0200-waiter" in res.output
-    assert "archive" in res.output
-    # must NOT be misreported as ready to wake
-    assert "READY TO WAKE" not in res.output
+def test_cascading_dependency_surfaces_dead_root(tmp_path):
+    project, runtime = make(tmp_path)
+    write(runtime, 'archive', '0123-foo')
+    write(runtime, 'feature_blocked', '0300-b', ['verified/0123-foo.yaml'])
+    write(runtime, 'feature_blocked', '0301-a', ['feature_blocked/0300-b.yaml'])
+    tasks = report(project)['tasks']
+    assert tasks['0300-b']['status'] == 'wrong_terminal'
+    assert tasks['0300-b']['reasons'][0]['actual_queues'] == ['archive']
+    assert tasks['0301-a']['status'] == 'waiting'
+    assert tasks['0301-a']['reasons'][0]['code'] == 'active_dependency'
 
 
-def test_satisfied_dep_in_expected_queue_is_ready(tmp_path):
-    """Control: dep wants verified/0123 and 0123 IS in verified → ready,
-    no dead finding."""
-    project, canon = _make(tmp_path)
-    coord = project / "coordination"
-    (coord / "verified" / "0123-foo.yaml").write_text("id: x\n")
-    _blocked(coord, "0200-waiter", ["verified/0123-foo.yaml"])
-
-    res = _run(project, canon)
-    assert "DEAD DEPENDENCIES" not in res.output
-    assert "READY TO WAKE" in res.output and "0200-waiter" in res.output
+def test_satisfied_dependencies_do_not_bypass_readiness_without_execution_file(tmp_path):
+    project, runtime = make(tmp_path)
+    (project / 'coordination/execution.yaml').unlink()
+    write(runtime, 'verified', '0123-foo')
+    write(runtime, 'feature_blocked', '0200-waiter', ['verified/0123-foo.yaml'], ready=False)
+    assert report(project)['tasks']['0200-waiter']['status'] == 'gate_failed'
 
 
-def test_truly_missing_dep_is_not_dead(tmp_path):
-    """Control: target task exists nowhere → still plain 'missing' (may be
-    created later), NOT a dead-dependency finding."""
-    project, canon = _make(tmp_path)
-    coord = project / "coordination"
-    _blocked(coord, "0200-waiter", ["verified/0999-ghost.yaml"])
-
-    res = _run(project, canon)
-    assert "DEAD DEPENDENCIES" not in res.output
-    assert "missing" in res.output
+def test_cycle_diagnostics_share_the_daemon_graph(tmp_path):
+    project, runtime = make(tmp_path)
+    write(runtime, 'feature_blocked', '0300-b', ['verified/0301-a.yaml'])
+    write(runtime, 'feature_blocked', '0301-a', ['verified/0300-b.yaml'])
+    result = report(project)
+    assert result['cycles'] == [['0300-b', '0301-a']]
+    assert {task['status'] for task in result['tasks'].values()} == {'cycle'}
 
 
-def test_cascading_blocked_dep_surfaces_dead_root(tmp_path):
-    """Cascade: A blocked on B (in feature_blocked, active → A not ready),
-    B blocked on a dead dep (target in archive). wake-check must flag B as
-    dead so fixing B unblocks A."""
-    project, canon = _make(tmp_path)
-    coord = project / "coordination"
-    (coord / "archive" / "0123-foo.yaml").write_text("id: x\n")
-    _blocked(coord, "0300-b", ["verified/0123-foo.yaml"])
-    _blocked(coord, "0301-a", ["feature_blocked/0300-b.yaml"])
+def test_explicit_project_ignores_environment_override(tmp_path, monkeypatch):
+    project, runtime = make(tmp_path)
+    write(runtime, 'feature_blocked', '0200-waiter', ['verified/0999-missing.yaml'])
+    other = tmp_path / 'other'
+    other.mkdir()
+    bootstrap(other)
+    monkeypatch.setenv('GREATMINDS_PROJECT_DIR', str(other))
+    assert '0200-waiter' in report(project)['tasks']
 
-    res = _run(project, canon)
-    assert "DEAD DEPENDENCIES" in res.output
-    # the dead-dependency finding names the root (B), not the cascaded
-    # waiter (A) — A is merely waiting on B which sits in an active queue.
-    dead_section = res.output.split("DEAD DEPENDENCIES", 1)[1].split(
-        "BLOCKED", 1)[0]
-    assert "0300-b" in dead_section
-    assert "0301-a" not in dead_section
-    # A is reported as blocked/not-ready (waiting on B), never woken
-    assert "0301-a" in res.output
-    assert "READY TO WAKE" not in res.output
+
+def test_missing_project_does_not_report_empty_success(tmp_path):
+    result = CliRunner().invoke(wake_check, ['--project-dir', str(tmp_path), '--json'])
+    assert result.exit_code != 0
+    assert 'runtime directory not found' in result.output
