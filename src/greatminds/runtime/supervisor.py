@@ -27,7 +27,7 @@ from .usage_budget import UsageBudgetHeld
 
 class Supervisor:
     def __init__(self, *, project: Path, store: RunStore, config: ExecutionConfig,
-                 schema: SchemaSnapshot, environment: dict[str, str] | None = None):
+                 schema: SchemaSnapshot, environment: dict[str, str] | None = None, on_acquired=None):
         self.project = project.resolve()
         self.store = store
         self.config = config
@@ -37,6 +37,7 @@ class Supervisor:
         self.permissions = PermissionService(store)
         self.id = uuid.uuid4().hex
         self._lease = None
+        self._on_acquired = on_acquired
         self._execution_barrier = None
         self._transports: dict[str, AcpTransport] = {}
 
@@ -48,6 +49,8 @@ class Supervisor:
                                 label="ACP supervisor", timeout=0)
         try:
             self._lease.__enter__()
+            if self._on_acquired is not None:
+                self._on_acquired()
             self.store.configure_event_retention(self.config.max_runtime_events)
             await self.recover()
             return self

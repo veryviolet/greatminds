@@ -4,6 +4,21 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 3.1.0 — 2026-09-07
+
+### Changed
+
+- CLI and web share independent background daemon control without requiring
+  systemd. Closing the web server or launching terminal leaves the daemon running.
+- `daemon start/stop/restart/status` operate on the canonical project directory.
+  Startup waits for readiness; status includes verified process identity and
+  heartbeat. Detached logs rotate independently of the starting client.
+- `coordd` starts in the background by default; use `--foreground` for terminal
+  debugging. `--once` remains a foreground single pass. Update process-owning
+  scripts and existing systemd units to use `--foreground`.
+- Optional systemd controls require `--systemd`. Re-run `daemon install` to refresh
+  an existing unit before using that optional manager.
+
 ## 3.0.0 — 2026-09-07
 
 ### Upgrade notes

@@ -42,4 +42,4 @@ def test_inline_fallback_uses_restart_always(monkeypatch) -> None:
     body = daemon_mod._template_unit_body()
     assert "Restart=always" in body
     assert "Restart=on-failure" not in body
-    assert "coordd --project %i" in body
+    assert "coordd --foreground --project %i" in body

@@ -43,7 +43,4 @@ def web(project_dir, host, port, daemon):
         pass
     finally:
         server.server_close()
-        try:
-            service.stop_daemon()
-        finally:
-            signal.signal(signal.SIGTERM, previous_term)
+        signal.signal(signal.SIGTERM, previous_term)

@@ -101,7 +101,7 @@ the execution manifest and task files.
 
 ## Start the daemon and a conversation
 
-In one terminal:
+Start the independent background daemon:
 
 ```bash
 greatminds coordd --project-dir "$PWD"
@@ -130,12 +130,11 @@ greatminds launch --target tmux
 greatminds launch --target vscode
 ```
 
-On Linux, you can use an optional systemd user service instead of the foreground
-daemon:
+On Linux, you can use an optional systemd user service for automatic restart and login startup:
 
 ```bash
 greatminds daemon install --name my-project --project-dir "$PWD"
-greatminds daemon start --project my-project
+greatminds daemon start --systemd --project my-project
 ```
 
 Use a single daemon owner for the project. See the

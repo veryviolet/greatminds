@@ -1,12 +1,8 @@
 """Project-scoped browser operations; the daemon remains the execution owner."""
-import fcntl
 import hashlib
 import json
 import os
 from pathlib import Path
-import subprocess
-import sys
-import threading
 
 import yaml
 
@@ -29,61 +25,22 @@ class WebService:
         self.runtime = project_runtime_dir(self.project)
         self.store = RunStore(self.runtime)
         self.config_path = self.project / 'coordination/execution.yaml'
-        self.child = None
-        self.child_config = None
-        self.child_lock = threading.RLock()
-        self.daemon_output = ''
 
     def config(self):
         schema = load_schema_snapshot()
         return schema, load_execution_config(self.config_path, roles=set(schema.document['roles']))
 
     def daemon_status(self):
-        locked = False
-        path = self.store.directory / 'supervisor.lock'
-        if path.exists():
-            with path.open('rb') as stream:
-                try:
-                    fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    fcntl.flock(stream, fcntl.LOCK_UN)
-                except BlockingIOError:
-                    locked = True
-        owned = self.child is not None and self.child.poll() is None
-        revision = hashlib.sha256(self.config_path.read_bytes()).hexdigest() if self.config_path.exists() else None
-        return {'running': locked, 'owned': owned, 'starting': owned and not locked,
-                'exit_code': self.child.poll() if self.child else None,
-                'restart_required': bool(owned and self.child_config != revision)}
+        from greatminds.runtime.background import status
+        return status(self.project)
 
     def start_daemon(self):
-        with self.child_lock:
-            self.config()
-            if self.daemon_status()['running'] or (self.child and self.child.poll() is None):
-                return self.daemon_status()
-            self.daemon_output = ''
-            self.child_config = hashlib.sha256(self.config_path.read_bytes()).hexdigest()
-            self.child = subprocess.Popen([sys.executable, '-I', '-m', 'greatminds.cli.main',
-                'coordd', '--project-dir', str(self.project)], cwd=self.project,
-                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                start_new_session=True)
-            child = self.child
-            def drain():
-                try:
-                    while chunk := child.stdout.read(1024):
-                        self.daemon_output = (self.daemon_output + chunk.decode('utf-8', 'replace'))[-8192:]
-                finally:
-                    child.stdout.close()
-            threading.Thread(target=drain, daemon=True).start()
-            return self.daemon_status()
+        from greatminds.runtime.background import control
+        return control(self.project, 'start')
 
     def stop_daemon(self):
-        with self.child_lock:
-            if self.child and self.child.poll() is None:
-                self.child.terminate()
-                try:
-                    self.child.wait(timeout=15)
-                except subprocess.TimeoutExpired:
-                    raise GreatMindsError('Daemon is still finishing work; inspect its status before retrying.', exit_code=4)
-            return self.daemon_status()
+        from greatminds.runtime.background import control
+        return control(self.project, 'stop')
 
     def settings(self):
         raw = self.config_path.read_bytes() if self.config_path.exists() else b'version: 1\nagents: {}\nbindings: {}\n'

@@ -8,7 +8,7 @@ Type=simple
 # install` to the absolute path of the running greatminds binary (resolved
 # via shutil.which). This makes per-project venv installs (`uv add
 # greatminds`) work without requiring a global ~/.local/bin/greatminds.
-ExecStart=__GREATMINDS_BIN__ coordd --project %i
+ExecStart=__GREATMINDS_BIN__ coordd --foreground --project %i
 # Restart after unexpected exits; an explicit systemctl stop is respected.
 Restart=always
 RestartSec=2

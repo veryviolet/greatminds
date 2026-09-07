@@ -44,9 +44,9 @@ def test_tmux_launch_only_starts_coordd_and_operator_shell_without_keystrokes(tm
     monkeypatch.setattr('greatminds.runtime.frontends.subprocess.run',run)
     result=launch(root,target='tmux')
     assert result['status']=='created'
-    assert [c[1] for c in calls]==['has-session','new-session','new-window']
-    command=shlex.split(calls[1][-1])
-    assert command[-3:]==['coordd','--project-dir',str(root)]
+    assert [c[1] for c in calls if c[0]=='tmux']==['has-session','new-session','new-window']
+    command=calls[1]
+    assert command[-4:]==['daemon','start','--project-dir',str(root)]
     assert not any('start-agent' in str(c) or 'send-keys' in str(c) for c in calls)
     calls.clear()
     monkeypatch.setattr('greatminds.runtime.frontends.subprocess.run',lambda argv,**kw:CompletedProcess(argv,0,'',''))

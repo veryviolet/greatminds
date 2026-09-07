@@ -1,24 +1,8 @@
-"""greatminds daemon — per-project coordination daemon supervision.
+"""Manage independent per-project background daemons.
 
-Wraps ``systemctl --user`` to manage instances of the
-``greatminds-daemon@<project>.service`` template unit. Each greatminds
-project on the host gets ONE daemon instance keyed by its
-registered project name (or the project directory name by default),
-so multiple projects on the same user can run their daemons
-concurrently without colliding on a global unit name.
-
-Subcommands::
-
-    greatminds daemon install [--name NAME] [--project-dir DIR]
-    greatminds daemon start    [--project NAME] [--project-dir DIR]
-    greatminds daemon stop     [--project NAME] [--project-dir DIR]
-    greatminds daemon restart  [--project NAME] [--project-dir DIR]
-    greatminds daemon status   [--project NAME] [--project-dir DIR]
-    greatminds daemon list
-
-``install`` is idempotent: it writes the template unit if missing and
-adds the ``{name → project_dir}`` entry to the per-user registry at
-``~/.config/greatminds/projects.json``.
+start/stop/restart/status use the same project lifecycle as the web interface.
+No installation or systemd is required. Optional `install` and `--systemd`
+commands integrate with a user service manager for login startup and restart.
 """
 from __future__ import annotations
 
@@ -188,7 +172,7 @@ def _template_unit_body() -> str:
             "\n"
             "[Service]\n"
             "Type=simple\n"
-            f"ExecStart={exec_cmd} coordd --project %i\n"
+            f"ExecStart={exec_cmd} coordd --foreground --project %i\n"
             # 0346: always (not on-failure) — coordd exits 0 on SIGTERM, so
             # on-failure left a killed coordd dead. always resurrects it
             # after an external kill/crash; a commanded `systemctl stop` is
@@ -451,7 +435,7 @@ def install_cmd(name: str | None, project_dir: Path | None) -> None:
     _checked_systemctl("enable", instance)
     ok(f"{instance} enabled for the user manager's default target")
 
-    info(f"next: `greatminds daemon start --project {resolved}`")
+    info(f"next: `greatminds daemon start --systemd --project {resolved}`")
 
 
 @daemon.command("repair",
@@ -484,9 +468,27 @@ def _project_options(fn):
     return fn
 
 
+def _background_verb(action, project, project_dir):
+    from greatminds.core.paths import find_project_dir
+    from greatminds.runtime.background import control
+    if project:
+        root = lookup_project_dir(project)
+        if root is None:
+            raise click.ClickException('Unknown project name; use --project-dir instead.')
+        if project_dir is not None and root.resolve() != project_dir.resolve():
+            raise click.ClickException('Project name and directory do not match.')
+    else:
+        root = project_dir or find_project_dir()
+    click.echo(json.dumps(control(root, action, project_name=project), indent=2))
+
+
 @daemon.command("start", short_help="start the daemon for a project")
 @_project_options
-def start_cmd(project: str | None, project_dir: Path | None) -> None:
+@click.option('--systemd', is_flag=True, help='Use the optional installed systemd user service.')
+def start_cmd(project: str | None, project_dir: Path | None, systemd: bool = False) -> None:
+    if not systemd:
+        _background_verb('start', project, project_dir)
+        return
     name = _resolve_project_name(project, project_dir)
     pd = _registered_service_project(name, project_dir)
     if capture_agent_env(name, pd):
@@ -496,7 +498,11 @@ def start_cmd(project: str | None, project_dir: Path | None) -> None:
 
 @daemon.command("stop", short_help="stop the daemon for a project")
 @_project_options
-def stop_cmd(project: str | None, project_dir: Path | None) -> None:
+@click.option('--systemd', is_flag=True, help='Use the optional installed systemd user service.')
+def stop_cmd(project: str | None, project_dir: Path | None, systemd: bool = False) -> None:
+    if not systemd:
+        _background_verb('stop', project, project_dir)
+        return
     _run_verb("stop", _resolve_project_name(project, project_dir))
 
 
@@ -515,7 +521,11 @@ def _refresh_units_before_restart(name: str,
 
 @daemon.command("restart", short_help="restart the daemon for a project")
 @_project_options
-def restart_cmd(project: str | None, project_dir: Path | None) -> None:
+@click.option('--systemd', is_flag=True, help='Use the optional installed systemd user service.')
+def restart_cmd(project: str | None, project_dir: Path | None, systemd: bool = False) -> None:
+    if not systemd:
+        _background_verb('restart', project, project_dir)
+        return
     name = _resolve_project_name(project, project_dir)
     # Refresh service configuration before asking the manager to restart.
     if _refresh_units_before_restart(name, project_dir):
@@ -563,7 +573,11 @@ def doctor_cmd(project: str | None, project_dir: Path | None,
 
 @daemon.command("status", short_help="show daemon status for a project")
 @_project_options
-def status_cmd(project: str | None, project_dir: Path | None) -> None:
+@click.option('--systemd', is_flag=True, help='Inspect the optional installed systemd user service.')
+def status_cmd(project: str | None, project_dir: Path | None, systemd: bool = False) -> None:
+    if not systemd:
+        _background_verb('status', project, project_dir)
+        return
     # systemctl status exits 3 for inactive — informational, not an error.
     _run_verb("status",
               _resolve_project_name(project, project_dir),
@@ -571,13 +585,15 @@ def status_cmd(project: str | None, project_dir: Path | None) -> None:
 
 
 @daemon.command("list", short_help="list all registered projects + active state")
-def list_cmd() -> None:
+@click.option('--systemd', is_flag=True, help='Inspect optional installed user services.')
+def list_cmd(systemd: bool = False) -> None:
     reg = load_registry()
     if not reg:
         info("(no projects registered — run `greatminds daemon install`)")
         return
     for name in sorted(reg):
         pdir = reg[name]
-        cp = _systemctl("is-active", _instance_unit(name))
-        state = (cp.stdout or "").strip() or "unknown"
+        from greatminds.runtime.background import status
+        state = ((_systemctl("is-active", _instance_unit(name)).stdout or "").strip()
+                 if systemd else status(Path(pdir))["state"])
         click.echo(f"  {name:<24}  {state:<10}  {pdir}")

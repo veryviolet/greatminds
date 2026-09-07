@@ -73,11 +73,15 @@ def launch(project, *, target, venv=None, recreate=False):
             raise GreatMindsError('tmux operation failed; inspect session '+session, exit_code=2) from exc
     if tmux('has-session','-t',session).returncode == 0:
         return {'target':target,'session':session,'status':'existing'}
-    result = tmux('new-session','-d','-s',session,'-n','coordd','-c',str(project),
-                  shlex.join(cli+['coordd','--project-dir',str(project)]))
+    started = subprocess.run(cli+['daemon','start','--project-dir',str(project)],
+                             capture_output=True, text=True, timeout=40)
+    if started.returncode:
+        raise GreatMindsError('cannot start daemon; inspect daemon status and logs', exit_code=4)
+    result = tmux('new-session','-d','-s',session,'-n','operator','-c',str(project))
     if result.returncode:
         raise GreatMindsError('cannot create ACP tmux session', exit_code=2)
-    result = tmux('new-window','-t',session,'-n','operator','-c',str(project))
+    result = tmux('new-window','-t',session,'-n','status','-c',str(project),
+                  shlex.join(cli+['daemon','status','--project-dir',str(project)]))
     if result.returncode:
         raise GreatMindsError('daemon session created but operator window failed; inspect tmux session '+session,exit_code=2)
     return {'target':target,'session':session,'status':'created',

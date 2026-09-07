@@ -33,7 +33,9 @@ conversation. Package installation alone does not establish provider access.
 
 - `tmux` for `greatminds launch --target tmux`.
 - A systemd user manager on Linux for `greatminds daemon install` and service
-  control. You can also run `greatminds coordd` in a terminal.
+  integration using explicit `--systemd` controls. Normal daemon and web commands
+  do not require a service manager. `greatminds coordd --foreground` is available
+  for terminal debugging.
 - The `stands` extra for Ansible-backed YAML stand profiles:
 
 ```bash

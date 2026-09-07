@@ -59,7 +59,7 @@ def test_local_assets_and_read_only_state_do_not_launch(http, service):
     before = service.store.snapshot()
     assert http('/api/state')[0] == 200
     assert service.store.snapshot() == before
-    assert service.child is None
+    assert not service.daemon_status()['running']
     assert http('/../../pyproject.toml')[0] == 404
 
 
@@ -85,7 +85,7 @@ def test_settings_validate_and_reject_stale_writes(http, service):
     assert http('/api/settings', {'document': document, 'revision': original['revision']})[0] == 200
     assert http('/api/settings', {'text': original['text'], 'revision': original['revision']})[0] == 409
     assert service.settings()['document']['max_running'] == 2
-    assert service.child is None
+    assert not service.daemon_status()['running']
 
 
 def test_invalid_yaml_can_be_read_and_repaired(http, service):
@@ -102,9 +102,9 @@ def test_conversation_http_idempotency_and_actual_daemon(service, http):
     assert http(f'/api/conversations/{conv}/send', message)[0] == 200
     assert http(f'/api/conversations/{conv}/send', {**message, 'message': 'different'})[0] == 409
     assert len(service.conversation(conv)['turns']) == 1
-    assert service.child is None
-    service.start_daemon(); child = service.child
-    service.start_daemon(); assert service.child is child
+    assert not service.daemon_status()['running']
+    child = service.start_daemon()['process']
+    assert service.start_daemon()['process'] == child
     deadline = time.monotonic() + 20
     while service.conversation(conv)['turns']['first']['status'] not in {'completed', 'failed'}:
         assert time.monotonic() < deadline
@@ -113,7 +113,7 @@ def test_conversation_http_idempotency_and_actual_daemon(service, http):
     page = json.loads(http(f'/api/conversations/{conv}/events')[2])
     assert ''.join(e['text'] for e in page['events'] if e['kind'] == 'text') == 'hello'
     assert json.loads(http(f'/api/conversations/{conv}/events?after={page["cursor"]}')[2])['events'] == []
-    service.stop_daemon(); assert child.poll() is not None
+    service.stop_daemon()
     assert service.daemon_status()['running'] is False
 
 

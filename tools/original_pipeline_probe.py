@@ -59,7 +59,7 @@ def run(python, timeout):
     started = time.perf_counter()
     print(json.dumps({'project': str(root)}), flush=True)
     with log.open('w') as output:
-        process = subprocess.Popen([str(python), '-I', '-m', 'greatminds.cli.main', 'coordd',
+        process = subprocess.Popen([str(python), '-I', '-m', 'greatminds.cli.main', 'coordd', '--foreground',
             '--project-dir', str(root), '--interval-sec', '.2', '--verbose'], cwd=root,
             env=environment, stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
         try:
@@ -92,7 +92,7 @@ def run(python, timeout):
     before_invocations = (root / '.greatminds/benchmark-invocations.jsonl').read_bytes()
     restart_log = root / '.greatminds/benchmark-restart.log'
     with restart_log.open('w') as output:
-        restarted = subprocess.Popen([str(python), '-I', '-m', 'greatminds.cli.main', 'coordd',
+        restarted = subprocess.Popen([str(python), '-I', '-m', 'greatminds.cli.main', 'coordd', '--foreground',
             '--project-dir', str(root), '--interval-sec', '.2', '--verbose'], cwd=root,
             env=environment, stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
         try:

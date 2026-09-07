@@ -13,9 +13,10 @@ prints its URL.
 
 By default the command attaches to the project's running daemon, or starts one
 if an execution configuration exists. `--no-daemon` opens the UI without starting
-execution; its toolbar can start the daemon later. Exiting the web command stops
-only the daemon it started. A daemon launched elsewhere remains running and is
-shown as connected; manage that process from its original terminal.
+execution; its toolbar can start the daemon later. Closing a browser tab or
+stopping the web server never stops the daemon. Any web instance or CLI can
+inspect and explicitly stop the same project daemon. No systemd installation is
+required. See [daemon lifecycle](../operations/daemon-lifecycle.md).
 
 There is **no application authentication**: no login, cookies, or access tokens.
 The default bind address is `127.0.0.1`. Set `--host 0.0.0.0` to listen on other
@@ -36,7 +37,7 @@ to its local port. Browser writes require the same origin; this is not a login.
   tool activity, command output previews, results, and protocol metadata. Cancel
   active runs or request a retry through the same controls as the CLI. A retry
   remains subject to daemon admission and workflow rules.
-- **Toolbar:** start/stop the owned daemon, pause/resume new runs, and edit settings.
+- **Toolbar:** start/stop the project daemon, pause/resume new runs, and edit settings.
   Pausing dispatch does not interrupt existing runs or their open conversations.
   Use the turn/run interruption controls to stop work already in progress.
 

@@ -69,7 +69,7 @@ An existing explicit contract can be supplied during initialization:
 greatminds setup --project-dir /path/to/project --execution-config /path/to/execution.yaml
 ```
 
-Start the daemon in one terminal:
+Start the independent background daemon (the command returns when ready):
 
 ```bash
 greatminds coordd
@@ -79,7 +79,7 @@ On Linux with a systemd user manager, service installation is optional:
 
 ```bash
 greatminds daemon install --name my-project
-greatminds daemon start --project my-project
+greatminds daemon start --systemd --project my-project
 ```
 
 The registry associates the service name with the project directory. Without an

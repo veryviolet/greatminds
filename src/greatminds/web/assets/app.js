@@ -31,7 +31,7 @@ function renderChrome(){
  $('role-nav').innerHTML=interactive().map(b=>`<button class="nav role-button ${state.binding===b.id&&state.view==='chat'?'active':''}" data-binding="${esc(b.id)}"><span>${initials(b.role)}</span>${esc(roleName(b.role))}</button>`).join('') || '<p class="subtitle">Добавьте интерактивные роли в настройках.</p>';
  $('tabs').innerHTML=`<button class="tab ${state.view==='overview'?'active':''}" role="tab" aria-selected="${state.view==='overview'}" data-view="overview">▦ Обзор</button>`+interactive().map(b=>`<button class="tab ${state.binding===b.id&&state.view==='chat'?'active':''}" role="tab" aria-selected="${state.binding===b.id&&state.view==='chat'}" data-binding="${esc(b.id)}">${esc(roleName(b.role))}<small>${esc(b.agent)}</small></button>`).join('');
  $('pause-button').textContent=d.paused?'▷ Продолжить':'Ⅱ Пауза';$('pause-button').disabled=Boolean(d.configuration_error);
- const ds=d.daemon;const db=$('daemon-button');db.textContent=ds.running?(ds.owned?'■ Остановить демон':'● Демон подключён'):(ds.starting?'Запускается…':'▷ Запустить демон');db.disabled=(ds.running&&!ds.owned)||ds.starting||Boolean(d.configuration_error);
+ const ds=d.daemon;const db=$('daemon-button');db.textContent=ds.running?'■ Остановить демон':(ds.starting?'Запускается…':'▷ Запустить демон');db.disabled=(ds.running&&!ds.managed)||(!ds.running&&Boolean(d.configuration_error));
  $('connection-dot').classList.toggle('online',ds.running);$('connection-text').textContent=ds.running?'Демон подключён':'Интерфейс подключён · демон остановлен';
  let notice=d.configuration_error?`Настройте исполнителей: ${d.configuration_error}`:ds.exit_code&& !ds.running?`Демон завершился с кодом ${ds.exit_code}. Проверьте конфигурацию и доступность исполнителей.`:ds.restart_required?'Настройки сохранены. Остановите и запустите демон, чтобы применить их.':!ds.running?'Демон остановлен. Сообщения останутся в очереди до его запуска.':d.paused?'Новые запуски на паузе. Уже открытые сессии продолжают работать.':'';
  $('notice').textContent=notice;$('notice').classList.toggle('hidden',!notice);
@@ -150,7 +150,7 @@ document.addEventListener('click',async event=>{
   if(t.dataset.task){const d=await api('/api/tasks/'+t.dataset.task);$('detail-title').textContent=d.id;$('detail-body').innerHTML=`<p>${esc(queues[d.queue]||d.queue)}</p><pre>${esc(d.text)}</pre>`;$('detail-dialog').showModal();return;}
   if(t.id==='settings-button'){await openSettings();return;}
   if(t.id==='pause-button'){await api('/api/dispatch',{paused:!state.data.paused});await refresh();return;}
-  if(t.id==='daemon-button'){t.disabled=true;await api('/api/daemon/'+(state.data.daemon.owned?'stop':'start'),{});await refresh();return;}
+  if(t.id==='daemon-button'){t.disabled=true;await api('/api/daemon/'+(state.data.daemon.running?'stop':'start'),{});await refresh();return;}
   if(t.dataset.permission){t.disabled=true;await api('/api/permissions/'+t.dataset.permission,{option_id:t.dataset.option});await refresh();return;}
   if(t.dataset.control){t.disabled=true;await api('/api/runs/'+t.dataset.id+'/'+t.dataset.control,{});await refresh();return;}
   if(t.dataset.action==='new-chat'){state.conversation=(await api('/api/conversations',{binding_id:state.binding})).id;await refresh();return;}

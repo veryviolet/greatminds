@@ -132,7 +132,7 @@ def test_install_uses_directory_without_coord_yaml(_isolate_paths, fake_systemct
 def test_start_with_explicit_project_calls_systemctl(_isolate_paths,
                                                       fake_systemctl, tmp_path):
     _configured(tmp_path, "foo")
-    result = _invoke(["start", "--project", "foo"])
+    result = _invoke(['start', '--systemd', "--project", "foo"])
     assert result.exit_code == 0
     starts = [c for c in fake_systemctl.calls
               if c[:3] == ["systemctl", "--user", "start"]]
@@ -149,7 +149,7 @@ def test_start_ignores_native_coord_yaml_session(_isolate_paths,
         yaml.safe_dump({"session": "from-yaml", "windows": []}),
         encoding="utf-8")
     daemon_mod.register_project("proj", project_dir)
-    result = _invoke(["start", "--project-dir", str(project_dir)])
+    result = _invoke(['start', '--systemd', "--project-dir", str(project_dir)])
     assert result.exit_code == 0
     starts = [c for c in fake_systemctl.calls
               if c[:3] == ["systemctl", "--user", "start"]]
@@ -158,7 +158,7 @@ def test_start_ignores_native_coord_yaml_session(_isolate_paths,
 
 def test_restart_invokes_systemctl_restart(_isolate_paths, fake_systemctl, tmp_path):
     _configured(tmp_path, "alpha")
-    result = _invoke(["restart", "--project", "alpha"])
+    result = _invoke(['restart', '--systemd', "--project", "alpha"])
     assert result.exit_code == 0
     assert any(
         c[:3] == ["systemctl", "--user", "restart"]
@@ -186,7 +186,7 @@ def test_list_prints_each_registered_project(_isolate_paths, fake_systemctl,
          "greatminds-daemon@beta.service"),
         rc=3, stdout="inactive\n",
     )
-    result = _invoke(["list"])
+    result = _invoke(["list", "--systemd"])
     assert result.exit_code == 0
     assert "alpha" in result.output
     assert "beta" in result.output
@@ -195,7 +195,7 @@ def test_list_prints_each_registered_project(_isolate_paths, fake_systemctl,
 
 
 def test_list_when_empty_registry(_isolate_paths, fake_systemctl):
-    result = _invoke(["list"])
+    result = _invoke(["list", "--systemd"])
     assert result.exit_code == 0
     assert "no projects registered" in result.output
 
@@ -249,7 +249,7 @@ def test_install_template_unit_uses_resolved_greatminds_path(_isolate_paths,
 
     body = (daemon_mod.SYSTEMD_USER_DIR / daemon_mod.TEMPLATE_UNIT_NAME).read_text(encoding="utf-8")
     assert "__GREATMINDS_BIN__" not in body, "placeholder must be substituted"
-    assert f"ExecStart={fake_path} coordd --project %i" in body
+    assert f"ExecStart={fake_path} coordd --foreground --project %i" in body
     assert "%h/.local/bin/greatminds" not in body, \
         "stale hardcoded path must be gone"
 
@@ -264,7 +264,7 @@ def test_install_template_unit_falls_back_to_python_module(_isolate_paths,
     daemon_mod.install_template_unit()
 
     body = (daemon_mod.SYSTEMD_USER_DIR / daemon_mod.TEMPLATE_UNIT_NAME).read_text(encoding="utf-8")
-    assert f"ExecStart={fake_py} -m greatminds.cli.main coordd --project %i" in body
+    assert f"ExecStart={fake_py} -m greatminds.cli.main coordd --foreground --project %i" in body
 
 
 def test_install_template_unit_overwrites_stale_path(_isolate_paths, monkeypatch):
@@ -309,7 +309,7 @@ def test_install_manages_only_common_daemon_even_with_old_vendor_config(fake_sys
     ]
     units = list(daemon_mod.SYSTEMD_USER_DIR.glob('*.service'))
     assert [p.name for p in units] == ['greatminds-daemon@.service']
-    assert ' coordd --project %i' in units[0].read_text()
+    assert ' coordd --foreground --project %i' in units[0].read_text()
     assert 'migrate' not in daemon_mod.daemon.commands
     assert not hasattr(daemon_mod, 'install_appserver_unit')
 
@@ -372,7 +372,7 @@ def test_fresh_acp_setup_installs_and_starts_by_registered_identity(tmp_path, fa
     nested = project/'src'
     nested.mkdir()
     monkeypatch.chdir(nested)
-    started = _invoke(['start'])
+    started = _invoke(['start', '--systemd'])
     assert started.exit_code == 0, started.output
     assert fake_systemctl.calls[-1] == ['systemctl', '--user', 'start', 'greatminds-daemon@shared-acp.service']
     assert daemon_mod.lookup_project_dir('shared-acp') == project
@@ -398,7 +398,7 @@ def test_restart_does_not_run_after_failed_reload(fake_systemctl, tmp_path):
     _configured(tmp_path, "reload-test")
     fake_systemctl.set(('systemctl', '--user', 'daemon-reload'), rc=1)
     for _ in range(2):
-        result = _invoke(['restart', '--project', 'reload-test'])
+        result = _invoke(['restart', '--systemd', '--project', 'reload-test'])
         assert result.exit_code != 0
     assert not any('restart' in call for call in fake_systemctl.calls)
 
@@ -411,7 +411,7 @@ def test_systemctl_errors_are_bounded_and_actionable(monkeypatch, failure):
             raise subprocess.TimeoutExpired(argv, 30)
         raise FileNotFoundError('systemctl unavailable')
     monkeypatch.setattr(daemon_mod.subprocess, 'run', fail)
-    result = _invoke(['status', '--project', 'test'])
+    result = _invoke(['status', '--systemd', '--project', 'test'])
     assert result.exit_code != 0
     assert ('inspect service state' if failure == 'timeout' else 'cannot run systemctl') in result.output
 

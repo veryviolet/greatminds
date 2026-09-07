@@ -26,7 +26,7 @@ def test_bad_configuration_fails_before_service_or_file_mutations(tmp_path, monk
     calls = []
     monkeypatch.setattr(daemon, '_systemctl', lambda *args: calls.append(args))
     name_flag = '--name' if command in ('install', 'repair') else '--project'
-    result = CliRunner().invoke(daemon.daemon, [command, name_flag, 'fixture', '--project-dir', str(project)])
+    result = CliRunner().invoke(daemon.daemon, [command, name_flag, 'fixture', '--project-dir', str(project)] + (['--systemd'] if command in {'start', 'restart'} else []))
     assert result.exit_code != 0, result.output
     assert 'invalid secret' not in result.output
     assert calls == []
@@ -40,7 +40,7 @@ def test_service_activation_requires_registration(tmp_path, monkeypatch, command
     calls = []
     monkeypatch.setattr(daemon, '_systemctl', lambda *args: calls.append(args))
     flag = '--name' if command == 'repair' else '--project'
-    result = CliRunner().invoke(daemon.daemon, [command, flag, 'fixture', '--project-dir', str(tmp_path)])
+    result = CliRunner().invoke(daemon.daemon, [command, flag, 'fixture', '--project-dir', str(tmp_path)] + (['--systemd'] if command in {'start', 'restart'} else []))
     assert result.exit_code != 0
     assert 'not registered' in result.output
     assert not calls and not daemon.SYSTEMD_USER_DIR.exists()
@@ -51,6 +51,6 @@ def test_broken_project_can_still_be_stopped(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(daemon, '_systemctl', lambda *args:
         calls.append(args) or subprocess.CompletedProcess(args, 0, '', ''))
-    result = CliRunner().invoke(daemon.daemon, ['stop', '--project', 'fixture'])
+    result = CliRunner().invoke(daemon.daemon, ['stop', '--systemd', '--project', 'fixture'])
     assert result.exit_code == 0, result.output
     assert calls == [('stop', 'greatminds-daemon@fixture.service')]

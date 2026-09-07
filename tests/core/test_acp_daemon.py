@@ -108,7 +108,7 @@ def test_sigkill_during_command_holds_uncertain_execution_and_cleans_process(tmp
 
     marker = tmp_path / ".greatminds" / "command-started"
     root = command_project(tmp_path, f"from pathlib import Path; import time; Path({str(marker)!r}).write_text('started'); time.sleep(60)")
-    child = subprocess.Popen([sys.executable, "-m", "greatminds.cli.main", "coordd", "--project-dir", str(root)],
+    child = subprocess.Popen([sys.executable, "-m", "greatminds.cli.main", "coordd", "--foreground", "--project-dir", str(root)],
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
     command_process = None
     try:
@@ -258,7 +258,7 @@ def test_sigkill_recovery_cleans_orphan_without_replaying_task(tmp_path):
     document["bindings"]["implementation"]["timeout_seconds"] = 60
     source.write_text(yaml.safe_dump(document))
     store = RunStore(root / ".greatminds")
-    daemon = subprocess.Popen([sys.executable, "-m", "greatminds.cli.main", "coordd",
+    daemon = subprocess.Popen([sys.executable, "-m", "greatminds.cli.main", "coordd", "--foreground",
                                "--project-dir", str(root), "--interval-sec", "0.2"],
                               cwd=root, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     identity = None
@@ -295,7 +295,7 @@ def test_restart_cancels_permission_without_replaying_operator_decision(tmp_path
     source.write_text(yaml.safe_dump(document))
     store = RunStore(root / ".greatminds")
     permissions = PermissionService(store)
-    daemon = subprocess.Popen([sys.executable, "-m", "greatminds.cli.main", "coordd",
+    daemon = subprocess.Popen([sys.executable, "-m", "greatminds.cli.main", "coordd", "--foreground",
                                "--project-dir", str(root), "--interval-sec", "0.2"],
                               cwd=root, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     identity = None
@@ -334,7 +334,7 @@ def test_restart_cancels_permission_without_replaying_operator_decision(tmp_path
 def test_operator_cancel_reaches_running_acp_daemon(tmp_path):
     root = project(tmp_path, scenario="hang")
     store = RunStore(root / ".greatminds")
-    daemon = subprocess.Popen([sys.executable, "-m", "greatminds.cli.main", "coordd",
+    daemon = subprocess.Popen([sys.executable, "-m", "greatminds.cli.main", "coordd", "--foreground",
                                "--project-dir", str(root), "--interval-sec", "0.2"],
                               cwd=root, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     try:

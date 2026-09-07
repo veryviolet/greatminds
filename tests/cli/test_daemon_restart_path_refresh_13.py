@@ -66,7 +66,7 @@ def test_refresh_rewrites_stale_unit_lacking_path(monkeypatch, tmp_path) -> None
     dest.write_text(
         "[Unit]\nDescription=greatminds coordination daemon for project %i\n"
         "After=default.target\n\n[Service]\nType=simple\n"
-        "ExecStart=/old/bin/greatminds coordd --project %i\n"
+        "ExecStart=/old/bin/greatminds coordd --foreground --project %i\n"
         "Restart=always\nRestartSec=2\n\n[Install]\n"
         "WantedBy=default.target\n",
         encoding="utf-8",

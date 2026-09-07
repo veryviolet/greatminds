@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import signal
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -19,6 +20,7 @@ from .stand_scheduler import StandScheduler
 from .store import RunStore, TERMINAL, TaskRevision
 from .supervisor import Supervisor
 from .processes import terminate_group
+from .background import presence, publish_presence
 from .retry_policy import retry_admission, account_backoff
 
 
@@ -99,6 +101,10 @@ def assignments(store, config, schema, *, snapshot=None):
 
 async def serve(project: Path, *, interval: float = 1, once: bool = False,
                 environment: dict | None = None):
+    try:
+        revision = hashlib.sha256((project / 'coordination/execution.yaml').read_bytes()).hexdigest()
+    except OSError as exc:
+        raise GreatMindsError('cannot load execution config', exit_code=2) from exc
     schema = load_schema_snapshot()
     config = load_execution_config(project / "coordination" / "execution.yaml",
                                    roles=set(schema.document["roles"]))
@@ -113,7 +119,8 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                 loop.add_signal_handler(signum, stop.set)
                 installed_signals.append(signum)
         async with Supervisor(project=project, store=store, schema=schema,
-                              config=config, environment=environment) as supervisor:
+                              config=config, environment=environment,
+                              on_acquired=lambda: publish_presence(project, revision, 'starting')) as supervisor, presence(project, revision=revision):
             active: dict[str, asyncio.Task] = {}
             results = ResultService(store, environment=supervisor.environment)
             maintenance = MaintenanceService(store, schema, environment=supervisor.environment)

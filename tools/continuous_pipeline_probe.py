@@ -24,7 +24,7 @@ def main():
     print(json.dumps({'project': str(root)}), flush=True)
     started = time.perf_counter()
     with log.open('w') as output:
-        process = subprocess.Popen([sys.executable, '-I', '-m', 'greatminds.cli.main', 'coordd',
+        process = subprocess.Popen([sys.executable, '-I', '-m', 'greatminds.cli.main', 'coordd', '--foreground',
             '--project-dir', str(root), '--interval-sec', '.2'], cwd=root,
             env={'PATH': '/usr/bin:/bin', 'PYTHONUNBUFFERED': '1'}, stdout=output,
             stderr=subprocess.STDOUT, start_new_session=True)

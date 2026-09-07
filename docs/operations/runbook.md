@@ -41,17 +41,21 @@ the CLI.
 
 ## Fleet Launch And Environments
 
-Run the ACP daemon in the project environment:
+Start the independent ACP daemon from the project directory:
 
 ```bash
 greatminds coordd --project-dir "$PWD"
 ```
 
-Alternatively, install the optional user service once, then start it:
+The command returns after startup; closing the terminal does not stop the daemon.
+Use `greatminds daemon status`, `stop`, or `restart` in the project. For logs,
+read `.greatminds/.runtime/daemon.log`. See [daemon lifecycle](daemon-lifecycle.md).
+
+Alternatively, install the optional systemd user service once, then start it:
 
 ```bash
 greatminds daemon install --project-dir "$PWD"
-greatminds daemon start --project-dir "$PWD"
+greatminds daemon start --systemd --project-dir "$PWD"
 ```
 
 `greatminds launch --target tmux` opens daemon/operator surfaces; the VS Code

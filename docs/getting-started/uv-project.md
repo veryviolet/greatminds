@@ -154,7 +154,9 @@ greatminds web --port 8765
 
 This opens the saved configuration and starts or attaches to the project's daemon.
 Select an existing conversation in its role tab to continue. Keep the terminal
-running. Ctrl+C stops the web server and a daemon it owns; project history remains.
+running while using the browser. Ctrl+C stops only the web server; the daemon
+and its agent work continue. To stop execution explicitly, use the web toolbar
+or `greatminds daemon stop` from the project. Project history remains.
 
 If the port is occupied, use another one, such as `--port 8766`, and open the
 printed URL. Each project has its own server, port and runtime state.

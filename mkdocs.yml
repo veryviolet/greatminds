@@ -72,6 +72,7 @@ nav:
       - Lifecycle Model: architecture/lifecycle.md
   - Operations:
       - Runbook: operations/runbook.md
+      - Daemon Lifecycle: operations/daemon-lifecycle.md
   - Recipes:
       - Filing a Bug: recipes/filing-a-bug.md
       - Planning a Feature: recipes/planning-a-feature.md
