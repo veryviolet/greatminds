@@ -274,18 +274,9 @@ def capture_agent_env(name: str, project_dir: Path | None = None) -> bool:
 
 
 def _parse_env_file(path: Path) -> dict[str, str]:
-    """Read systemd EnvironmentFile values without evaluating shell syntax."""
-    from greatminds.core.service_environment import decode_environment
-    try:
-        text = path.read_bytes().decode("utf-8")
-    except FileNotFoundError:
-        return {}
-    except (OSError, UnicodeError) as exc:
-        raise click.ClickException("cannot read environment file") from exc
-    try:
-        return decode_environment(text)
-    except ValueError as exc:
-        raise click.ClickException("invalid environment file syntax") from exc
+    """Read shared literal EnvironmentFile values without shell evaluation."""
+    from greatminds.core.service_environment import read_environment
+    return read_environment(path)
 
 
 def _daemon_candidate_env(name: str, project_dir: Path) -> dict[str, str]:

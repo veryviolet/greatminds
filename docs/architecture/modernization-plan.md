@@ -1464,3 +1464,26 @@ installation installed **17 packages**, including ansible-core 2.17.14. All
 **18 package/profile tests passed**, including real ansible-playbook syntax check
 with synthetic local inventory and Ansible temporary state under /tmp. No remote
 connection or deployment was performed. uv lock --check --offline passed.
+
+### Shared literal environment inputs for stand execution (2026-09-07)
+
+Found a remaining deterministic inconsistency: stand_executor parsed PROJECT.env
+line by line, stripped quote characters and silently returned empty configuration
+on read errors, whereas daemon preflight used EnvironmentFile semantics. Extracted
+read_environment into core.service_environment and routed both readers through
+it. Stand extra-vars and subsequent deployment evidence now see the same literal
+multiline, quote, backslash and metacharacter values. Missing files remain
+optional; malformed syntax, invalid UTF-8, unreadable files and broken symlinks
+fail with sanitized errors before command execution. No shell evaluation occurs.
+
+Validation: **54 environment/stand evidence/ledger/executor tests passed**;
+**139 daemon/deployment/prerequisite tests passed** in the broader related run.
+New end-to-end argv fixture inspects the temporary extra-vars JSON before its
+cleanup and verifies exact synthetic values. Invalid-input cases forbid any
+subprocess launch. No real deployment or provider call was performed.
+
+This aligns file parsing, not every environment source: foreground coordd still
+inherits its process environment while the installed service obtains PROJECT.env
+through systemd. Explicit parity of foreground/service environment layering
+remains to be completed. B1/M3 supervision policies and other outstanding
+milestone requirements also remain open.

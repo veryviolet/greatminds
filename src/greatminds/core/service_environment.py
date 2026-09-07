@@ -4,6 +4,9 @@ See systemd.exec(5), EnvironmentFile. Malformed quoting is rejected rather than
 silently turning an incomplete credential into a different value.
 """
 import re
+from pathlib import Path
+
+from .errors import GreatMindsError
 
 _NAME = re.compile(r'[A-Za-z_][A-Za-z0-9_]*\Z')
 _SPACE = ' \t\r'
@@ -78,6 +81,25 @@ def decode_environment(text: str) -> dict[str, str]:
         if _NAME.fullmatch(name):
             result[name] = ''.join(value)
     return result
+
+
+def read_environment(path: Path) -> dict[str, str]:
+    """Read an optional EnvironmentFile; invalid or unreadable files fail closed.
+
+    Errors never include file contents, which may contain credentials.
+    """
+    try:
+        text = path.read_bytes().decode("utf-8")
+    except FileNotFoundError as exc:
+        if path.is_symlink():
+            raise GreatMindsError("cannot read environment file", exit_code=2) from exc
+        return {}
+    except (OSError, UnicodeError) as exc:
+        raise GreatMindsError("cannot read environment file", exit_code=2) from exc
+    try:
+        return decode_environment(text)
+    except ValueError as exc:
+        raise GreatMindsError("invalid environment file syntax", exit_code=2) from exc
 
 
 def unit_word(value: str) -> str:

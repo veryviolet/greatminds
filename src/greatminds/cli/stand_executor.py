@@ -36,34 +36,13 @@ PREREQ_TAG = "prerequisite"
 
 
 def read_project_env(coord: Path | None) -> dict[str, str]:
-    """Parse ``.greatminds/PROJECT.env`` (``KEY=value`` lines) into a dict.
+    """Read the same literal EnvironmentFile values used by the daemon.
 
-    PROJECT.env is the SINGLE per-fleet config source, visible to everyone:
-    injected into the daemon + every driven agent's process environment
-    (systemd ``EnvironmentFile=``), sourced into interactive agent shells,
-    and handed to ansible as ``--extra-vars`` here so a profile reads any
-    fleet variable as ``{{ KEY }}``. greatminds owns no host topology — the
-    profile author targets hosts natively (``add_host`` from these vars, or
-    a static inventory shipped alongside)."""
-    if coord is None:
-        return {}
-    f = coord / "PROJECT.env"
-    if not f.is_file():
-        return {}
-    out: dict[str, str] = {}
-    try:
-        for raw in f.read_text(encoding="utf-8").splitlines():
-            line = raw.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, val = line.partition("=")
-            key = key.strip()
-            val = val.strip().strip('"').strip("'")
-            if key:
-                out[key] = val
-    except OSError:
-        return {}
-    return out
+    Values become Ansible extra-vars without shell evaluation. Invalid files
+    stop deployment rather than silently omitting or truncating configuration.
+    """
+    from greatminds.core.service_environment import read_environment
+    return read_environment(coord / "PROJECT.env") if coord is not None else {}
 
 
 # ---------------------------------------------------------------------------
