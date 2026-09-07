@@ -7,6 +7,9 @@ Task files and evidence remain on the filesystem; there is no database service.
 
 ## Quickstart
 
+The managed daemon runs on Linux with Python 3.11+, `/proc` and pidfd support.
+See the [host requirements](docs/getting-started/installation.md).
+
 ```bash
 pip install greatminds  # or install in your preferred Python environment
 mkdir -p /tmp/greatminds-demo

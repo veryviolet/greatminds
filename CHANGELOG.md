@@ -6,39 +6,53 @@ follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
 ## Unreleased
 
+### Changed
+
+- All managed background and interactive execution uses the shared ACP client.
+  Harness manifests, role bindings, model/mode choices, permissions and scheduling
+  are independent. Native drivers, TUI keystroke control and vendor setup assets
+  have been removed. Existing project task data is preserved.
+- Setup creates the common project contract and queues, preserves customization,
+  and leaves harness authentication and service installation explicit. Ansible
+  dependencies are optional through `greatminds[stands]`.
+- The supported managed host is Linux with `/proc` and pidfd operations. Service
+  installation, tmux, VS Code and deployed stands are optional integrations.
+
 ### Added
 
-- ACP execution manifests and independent role bindings, inspected read-only
-  with `greatminds project execution`. The new runtime store provides durable
-  claims, pinned contracts, concurrency limits, and authenticated result receipts.
-  Projects with `coordination/execution.yaml` now dispatch through the common
-  ACP supervisor. Full cutover remains in progress.
-- ACP run state and assignment reasons via `greatminds run status`, pause/resume,
-  cancellation, explicit retry, and credential-bound CLI result submission.
-- Durable launch gates, process identity checks, bounded restart cleanup, and
-  suppression of repeated turns for unchanged tasks in ACP projects.
-- Daemon application of typed decisions through shared task gates, with pinned
-  validation context, system/decision provenance, artifact hashes, journaled
-  recovery, and explicit holds for uncertain operations.
-- `greatminds project schema` prints the effective installed contract.
-  `--json` includes its source, version, SHA-256 identity, and project-copy
-  status; `--check` detects missing, unreadable, or different generated copies
-  without rewriting them.
+- Durable run identities, exclusive claims, launch gates, bounded process cleanup,
+  timeout/cancellation controls, startup/account backoff, no-progress limits and
+  client-input budgets. Prompt completion never substitutes for domain evidence.
+- Daemon-applied typed results, configured validation commands, workspace cleanup,
+  stand scheduling and deployment receipts. Interrupted non-idempotent commands
+  remain held for reconciliation rather than being replayed automatically.
+- Deterministic dependency release, recovery controls, aggregate local diagnosis,
+  scoped recovery suggestions and private diagnostic bundles. Runtime event tails
+  have configurable retention with explicit cursor-gap notifications; task and
+  recovery records remain durable.
+- Daemon-owned conversations with queued user messages, permissions, attach,
+  interrupt and close. Terminal and VS Code frontends call the common CLI.
+- Explicit local, UI, documentation, deployed and full role presets. The local
+  workflow keeps separate developer, tester and reviewer roles on one manifest.
+- Execution-stage observations and a reproducible idle-daemon benchmark. Missing
+  provider usage/cost remains unknown; recorded client bytes are not billed tokens.
 
-### Fixed
+### Verification
 
-- Block fields cannot override the caller's authorship or domain provenance.
-- Short task IDs and full IDs share a canonical task lock, including during
-  recovery of partially applied domain results.
-- Task locks retain a stable inode so queued waiters and new callers cannot
-  acquire different locks for the same task.
-- Daemon service selection now uses the same canon schema as task validation
-  and driven dispatch instead of trusting a potentially stale project copy.
-  Codex service selection also requires the configured window mode to be driven.
-- Agent bootstrap reads the effective schema through the CLI. Explicit canon
-  overrides apply consistently; project copies remain generated mirrors.
-- Daemon tests isolate user configuration paths and inherited auth environment,
-  so install helpers can be tested without writing the operator's systemd files.
+- Offline fixtures cover protocol lifecycle, competing claims, stale submissions,
+  permissions, crash/restart boundaries, deployment uncertainty, bounded retries,
+  input/event limits and dependency release without model turns.
+- The compatibility evidence separately records initialization, session creation,
+  real prompts, permission callbacks, restart/load and cancellation. Codex, Claude
+  and Grok completed a mixed-agent local pipeline; Codex also completed the local
+  preset through developer/tester/reviewer and daemon merge.
+- Fresh base-wheel environments completed local preset and dependency fixtures
+  without the stands extra. A real VS Code 1.92.2 extension host exercised CLI
+  metadata and terminal-process cleanup with literal paths containing spaces.
+- Live compatibility is not established for every listed harness. Cline's current
+  prompt probe requires renewed authentication; the compatibility matrix records
+  authentication/session limitations for the remaining installations. See
+  `docs/architecture/acp-compatibility.md` and its versioned evidence files.
 
 ## 2.6.0 — 2026-06-18
 

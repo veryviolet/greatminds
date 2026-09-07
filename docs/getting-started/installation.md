@@ -1,7 +1,12 @@
 # Installation
 
-Greatminds requires Python 3.11 or newer and a POSIX environment. Install it in
-the Python environment that will run the CLI and daemon:
+The managed daemon requires Python 3.11 or newer on Linux, with a readable
+`/proc` filesystem and working pidfd operations. Process identity and restart
+cleanup use these Linux interfaces. Native macOS and Windows daemon execution
+are not supported; a Linux environment must satisfy the same requirements.
+Harness compatibility is tracked separately from host support.
+
+Install Greatminds in the Python environment that will run the CLI and daemon:
 
 ```bash
 python -m pip install greatminds

@@ -2,6 +2,7 @@
 
 Date: 2026-09-06. Status: implementation in progress; see Progress below.
 Baseline and evidence: [initial audit](rehabilitation-audit-2026-09-06.md).
+Current requirement-by-requirement status: [acceptance audit](modernization-acceptance.md).
 
 Scope clarification from the owner (2026-09-06): there are no legacy installations
 and no production deployment. A live-fleet migration, dual transport compatibility,
@@ -2127,3 +2128,31 @@ docs passed in 1.51s. The late-added follow-gap test was not part of that alread
 collected full run; it passed in the separate 15-case cursor/retention campaign.
 No runtime failure was reported by the full traversal. This records the actual
 verification scopes rather than claiming a second complete full-suite run.
+
+### Requirement-by-requirement acceptance audit (2026-09-07)
+
+Created modernization-acceptance.md against every foundation/track requirement,
+named milestone and acceptance deliverable. Inspected current dispatch, transport,
+context, observation, recovery and process code; relevant concrete fixture cases;
+installed/live/host JSON evidence; and public setup/release documentation. The
+matrix distinguishes implemented behavior from remaining proof, and does not turn
+initialization-only harness records into support claims.
+
+Seven explicit gaps remain: bounded managed protocol diagnostics (G1), reliable
+usage/cost observations and supported budgets (G2), complete useful task timing and
+productive comparison (G3), shared admission from explicit provider quota signals
+(G4), generated mechanical reference (G5), remaining live harness coverage (G6),
+and a combined aggregate-doctor-to-repair acceptance scenario (G7). The audit gives
+each its evidence, scope and next verification. Whole-plan completion remains
+unproven; no new database, distributed scheduler or web scope was introduced.
+
+Corrected two confirmed publication gaps: installation/README now specify the
+actual Linux /proc/pidfd host envelope rather than generic POSIX, and Unreleased
+notes describe the current ACP/deterministic implementation with separate offline,
+installed-wheel, live-provider and extension-host verification limits. Package
+version and released history were not changed; nothing was published.
+
+Validation: all eight documentation/reference checks passed in 1.44s and strict
+docs in 1.50s; diff whitespace check passed. The previous goal turn was progress:
+atomic event retention and its regression evidence were committed. Next work is
+G1 in the normal supervisor path, followed by the finite open list in the audit.
