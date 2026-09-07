@@ -1369,3 +1369,33 @@ Validation after porting: 49 ACP-daemon/live-role/default setup checks passed;
 yet been rerun after these final fixture updates, so a green full-suite result
 remains unproven. Next: rerun the complete suite, investigate any real failures,
 then continue removing obsolete runtime fallback paths and shipped native assets.
+
+### Recovered full-suite result and ACP watchdog cutover (2026-09-07)
+
+Recovered from another interrupted desktop session at dcee1a7. The prior suite-7
+log ended without a summary, so it is not a successful validation record. A new
+complete baseline run finished: **1366 passed, 1 skipped in 278.89 seconds**
+(`/tmp/greatminds-modernization-suite-8.txt`). It collected the baseline before
+this watchdog edit; the changed watchdog has separate targeted evidence below.
+
+Removed watchdog's native PID registry, driven-lock and mirrored retry-file
+inspection. It now observes ACP binding/run state and process identity through
+the common observation service. Removed the prompt obligation to run watchdog
+at every reviewer tick. Inspection uses the shared schema snapshot, respects an
+explicit project despite an environment override, and detects stale YAML tasks
+as well as Markdown data. Worktree inspection uses the selected schema/project
+policy, reports the actual base path, and does not report an unavailable check
+as healthy. Invalid schemas fail visibly instead of silently becoming empty.
+
+Validation: **31 watchdog/worktree tests passed**. ACP fixtures cover idle,
+running, authentication/input waits, failed/interrupted runs, and reused PID
+identity; inspection leaves runtime file contents unchanged. Tests also cover
+YAML/Markdown staleness, template exclusion, explicit project selection,
+corrupt configuration/schema and unavailable worktree inspection. Native retry
+file tests were replaced with ACP observations, not claimed as retry-policy
+parity. No live agents or services were launched.
+
+Next: unify wake-check with MaintenanceService and port its dead-dependency
+regressions; continue native asset/setup cleanup, then finish the outstanding
+B1/M3 retry/backoff/no-progress/account/retention policies and the remaining
+milestone acceptance requirements. The full modernization goal is still open.
