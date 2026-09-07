@@ -245,9 +245,8 @@ or alter project files. Reports omit prompt text, command arguments/output and
 raw exception messages; they retain task/run identifiers and diagnostic codes.
 
 This report covers the named local checks. It is a best-effort observation across
-stores, not an atomic health verdict or live compatibility test. Watchdog-specific
-stale-task/intent/worktree scans and remote provider availability are not implied
-by a `no_findings` result.
+stores, not an atomic health verdict or live compatibility test. Stale-task, orphan-intent and orphan-worktree scans use the same functions as
+`watchdog`. Remote provider availability is not implied by a `no_findings` result.
 
 ## Local diagnostic bundle
 
@@ -282,3 +281,11 @@ The bundle and doctor inspection are best-effort observations across stores.
 Collecting a bundle does not pause work, authorize retry or resolve uncertain
 side effects. It includes the named diagnostic checks, not a copy of all project
 history or a proof of live provider compatibility.
+
+Filesystem findings use the effective schema's queue kinds and watchdog thresholds.
+Parking queues preserve task/worktree association; terminal queues do not hide
+orphan candidates unless worktree policy explicitly retains verified/archived
+task worktrees. A finding is a reason to inspect, not permission to delete a
+worktree or intent. Unreadable directories yield an unavailable/failed component
+instead of an empty healthy result. Files that disappear during a concurrent
+transition are skipped; repeated observation can see the new location.

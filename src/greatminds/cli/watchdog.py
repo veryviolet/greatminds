@@ -25,13 +25,10 @@ from greatminds.core.errors import GreatMindsError
 from greatminds.cli._colors import err, info, ok, warn
 
 
-DEFAULT_THRESHOLDS = {
-    "intent_orphan_seconds": 300,
-    "task_stale_in_active_queue_seconds": 86400,
-    "task_stale_in_review_queue_seconds": 43200,
-}
-
-REVIEW_QUEUES = {"feature_review", "feature_docs_review"}
+from greatminds.domain.filesystem_health import (
+    REVIEW_QUEUES, thresholds as health_thresholds, orphan_intents, stale_tasks as inspect_stale_tasks,
+    orphan_worktrees as inspect_orphan_worktrees,
+)
 
 
 def fmt_age(seconds: float) -> str:
@@ -64,28 +61,28 @@ def watchdog(project_dir: Path | None, canon_dir: Path | None, quiet: bool) -> N
         schema = load_schema_snapshot(canon_dir).document
     except GreatMindsError as exc:
         raise click.ClickException(str(exc)) from exc
-    thresholds = {**DEFAULT_THRESHOLDS, **(schema.get("watchdog") or {})}
-    queues = schema.get("queues") or {}
+    thresholds = health_thresholds(schema)
 
     now = time.time()
     findings = 0
 
     # ---- Orphaned intents
     threshold = thresholds["intent_orphan_seconds"]
-    intent_dir = coord / "intent"
-    orphans: list[tuple[str, float]] = []
-    if intent_dir.is_dir():
-        for f in sorted(intent_dir.glob("*.json")):
-            age = now - f.stat().st_mtime
-            if age > threshold:
-                orphans.append((f.name, age))
+    intents_observed = True
+    try:
+        orphans = [(row['name'], row['age_seconds']) for row in orphan_intents(coord, schema, now=now)]
+    except Exception:
+        orphans = []
+        intents_observed = False
+        findings += 1
+        warn("Intent observation unavailable; inspect filesystem access and watchdog policy")
     if orphans:
         findings += len(orphans)
         warn(f"ORPHANED INTENTS ({len(orphans)}, threshold {fmt_age(threshold)}):")
         for name, age in orphans:
             warn(f"  {name}: {fmt_age(age)} old")
         click.echo()
-    elif not quiet:
+    elif intents_observed and not quiet:
         info(f"intent/: 0 orphans (threshold {fmt_age(threshold)})")
 
     # ACP lifecycle and process liveness are separate observations.
@@ -111,23 +108,15 @@ def watchdog(project_dir: Path | None, canon_dir: Path | None, quiet: bool) -> N
     # ---- Stale tasks per queue
     active_threshold = thresholds["task_stale_in_active_queue_seconds"]
     review_threshold = thresholds["task_stale_in_review_queue_seconds"]
-    stale_tasks: list[tuple[str, str, float]] = []
-
-    for queue_name, queue_meta in queues.items():
-        if not isinstance(queue_meta, dict):
-            continue
-        if queue_meta.get("kind") != "active":
-            continue
-        d = coord / queue_name
-        if not d.is_dir():
-            continue
-        threshold = review_threshold if queue_name in REVIEW_QUEUES else active_threshold
-        for f in sorted([*d.glob("*.yaml"), *d.glob("*.md")]):
-            if f.stem == "_TEMPLATE":
-                continue
-            age = now - f.stat().st_mtime
-            if age > threshold:
-                stale_tasks.append((queue_name, f.name, age))
+    tasks_observed = True
+    try:
+        stale_tasks = [(row['queue'], row['name'], row['age_seconds'])
+                       for row in inspect_stale_tasks(coord, schema, now=now)]
+    except Exception:
+        stale_tasks = []
+        tasks_observed = False
+        findings += 1
+        warn("Task observation unavailable; inspect filesystem access and watchdog policy")
 
     if stale_tasks:
         findings += len(stale_tasks)
@@ -136,38 +125,14 @@ def watchdog(project_dir: Path | None, canon_dir: Path | None, quiet: bool) -> N
             t = review_threshold if queue in REVIEW_QUEUES else active_threshold
             warn(f"  {queue}/{name}: {fmt_age(age)} old (threshold {fmt_age(t)})")
         click.echo()
-    elif not quiet:
+    elif tasks_observed and not quiet:
         info("active queues: 0 stale tasks")
 
-    # ---- 0185: orphan worktree sweep
-    #
-    # A worktree at <base_path>/<task-id>/ whose task_id is no longer
-    # in any active queue is an orphan — left behind by an aborted
-    # mv, a crashed agent, or pre-cutover state. Report (don't auto-
-    # prune) so the operator sees the count + can run
-    # `greatminds worktree prune` deliberately.
-    orphan_worktrees: list[str] = []
+    # Worktree inspection follows effective queue kinds, including parking queues.
+    orphan_worktrees = []
     worktrees_observed = True
     try:
-        from greatminds.cli import worktree as wt_mod
-        policy = wt_mod.load_worktree_policy(project_dir, schema_document=schema)
-        base = project_dir / policy.base_path
-        if base.is_dir():
-            active_ids: set[str] = set()
-            for q in coord.iterdir():
-                if not q.is_dir() or q.name.startswith("."):
-                    continue
-                if q.name in ("verified", "archive", "stand_done",
-                              "inbox", "intent"):
-                    continue
-                for f in q.iterdir():
-                    if f.suffix in (".yaml", ".md"):
-                        active_ids.add(f.stem)
-                        if len(f.stem) > 4:
-                            active_ids.add(f.stem[:4])
-            for child in sorted(base.iterdir()):
-                if child.is_dir() and child.name not in active_ids:
-                    orphan_worktrees.append(child.name)
+        orphan_worktrees = inspect_orphan_worktrees(project_dir, coord, schema)
     except Exception:
         findings += 1
         worktrees_observed = False
@@ -176,8 +141,8 @@ def watchdog(project_dir: Path | None, canon_dir: Path | None, quiet: bool) -> N
     if orphan_worktrees:
         findings += len(orphan_worktrees)
         warn(f"ORPHAN WORKTREES ({len(orphan_worktrees)}):")
-        for name in orphan_worktrees:
-            warn(f"  {base / name} (no active task — "
+        for row in orphan_worktrees:
+            warn(f"  {row['path']} (no active task — "
                  f"run `greatminds worktree prune`)")
         click.echo()
     elif worktrees_observed and not quiet:

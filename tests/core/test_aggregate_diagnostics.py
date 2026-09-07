@@ -109,3 +109,50 @@ def test_authentication_and_dependency_holds_remain_distinct(tmp_path):
     assert auth[0]['action'] != dependency[0]['action']
     assert 'DO_NOT_LEAK' not in json.dumps(report)
     assert files(tmp_path) == before
+
+
+def test_filesystem_findings_are_shared_with_watchdog_and_bundle(tmp_path, monkeypatch):
+    import os
+    from greatminds.runtime.diagnostic_bundle import collect_bundle
+    store = project(tmp_path)
+    intent = store.runtime/'intent/SECRET_INTENT.json'
+    intent.parent.mkdir(exist_ok=True)
+    intent.write_text('SECRET_BODY')
+    os.utime(intent, (0, 0))
+    tree = tmp_path/'.worktrees/SECRET_ORPHAN'
+    tree.mkdir(parents=True)
+    task = store.runtime/'feature_dev/0001-old.yaml'
+    task.write_text('id: 0001-old\n')
+    os.utime(task, (0, 0))
+    report = diagnose(tmp_path, environment={})
+    codes = {row['code'] for row in report['findings']}
+    assert {'orphan_intent', 'orphan_worktree', 'stale_task'} <= codes
+    monkeypatch.setattr('greatminds.cli.daemon.execution_environment', lambda _: {})
+    result = CliRunner().invoke(cli, ['watchdog', '--project-dir', str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert 'ORPHANED INTENTS (1,' in result.output
+    assert 'ORPHAN WORKTREES (1)' in result.output
+    assert 'STALE TASKS (1)' in result.output
+    bundle = collect_bundle(tmp_path, report=report)
+    assert 'SECRET_' not in json.dumps(bundle)
+    assert {'orphan_intent', 'orphan_worktree', 'stale_task'} <= {r['code'] for r in bundle['report']['findings']}
+
+
+def test_unreadable_task_directory_prevents_all_clear(tmp_path, monkeypatch):
+    from pathlib import Path
+    store = project(tmp_path)
+    blocked = store.runtime/'feature_dev'
+    original = Path.iterdir
+    def iterdir(path):
+        if path == blocked:
+            raise PermissionError('SECRET_PATH_ERROR')
+        return original(path)
+    monkeypatch.setattr(Path, 'iterdir', iterdir)
+    report = diagnose(tmp_path, environment={})
+    assert report['checks']['stale_tasks'] == 'failed'
+    assert 'SECRET_PATH_ERROR' not in json.dumps(report)
+    result = CliRunner().invoke(cli, ['watchdog', '--project-dir', str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert 'Task observation unavailable' in result.output
+    assert 'All clear' not in result.output
+    assert 'active queues: 0 stale tasks' not in result.output

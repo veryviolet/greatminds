@@ -1895,3 +1895,32 @@ exported a readable private bundle successfully for that toy project.
 Full regression after input budgets, timing and diagnostics passed: 1407 passed,
 1 skipped in 307.96s. C5 still needs shared watchdog-specific findings and
 recovery-action consolidation. Other full-plan milestones remain open.
+
+### Shared filesystem health checks (2026-09-07)
+
+Extracted orphan-intent, stale-task and orphan-worktree inspection into shared
+domain functions used by watchdog and run doctor. Bundles retain these finding
+codes and pseudonymized artifact references. Thresholds and queue kinds come
+from the effective schema. Parking queues protect associated worktrees; custom
+terminal queues no longer hide orphans. Explicit verified/archive retention
+policy prevents false orphan reports. Numeric sequence aliases remain supported
+without treating arbitrary four-character slug prefixes as task identities.
+
+Directory enumeration now propagates access failures rather than allowing glob
+to silently report an empty healthy directory. A concurrently disappeared file
+is skipped; a failed component remains visible in doctor and prevents watchdog
+from printing All clear. Inspection remains read-only and never authorizes
+pruning, removes an intent, or mutates workflow state.
+
+Validation: initial 24 existing watchdog/doctor/bundle checks passed in 2.81s;
+32 expanded shared-health/public-help checks passed in 3.82s; final 31 health,
+watchdog, diagnostic and bundle checks passed in 2.95s after retention-policy
+coverage. Cases cover YAML/Markdown thresholds, template/non-file exclusion,
+custom terminal/parking queues, numeric aliases, configured retention, directory
+access failure, cross-surface findings and private artifact names in bundles.
+Strict docs build passed in 1.45s before the final retention clarification.
+
+C5 still requires consolidation of bounded repair actions with their preconditions
+and evidence. The previous full-suite checkpoint (1407 passed, 1 skipped) predates
+this extraction; current validation is the affected suites above. Full-plan
+compatibility, pipeline presets, performance acceptance and retention remain open.

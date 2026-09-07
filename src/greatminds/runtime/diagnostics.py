@@ -145,6 +145,24 @@ def diagnose(project, *, environment=None):
                         reason_codes=sorted({reason['code'] for reason in item.get('reasons', []) if 'code' in reason}))
     else:
         report['checks']['dependencies'] = 'unavailable'
+    if schema is not None:
+        from greatminds.domain.filesystem_health import orphan_intents, stale_tasks, orphan_worktrees
+        filesystem_checks = [
+            ('intents', lambda: orphan_intents(runtime, schema.document), 'orphan_intent',
+             'Inspect the transition intent and journal; do not remove uncertain recovery evidence.'),
+            ('stale_tasks', lambda: stale_tasks(runtime, schema.document), 'stale_task',
+             'Inspect task/run progress and its admission hold; age alone does not authorize retry.'),
+            ('worktrees', lambda: orphan_worktrees(project, runtime, schema.document), 'orphan_worktree',
+             'Inspect the worktree and task history before explicit worktree pruning.'),
+        ]
+        for component, check, code, action in filesystem_checks:
+            for row in inspect(component, check) or []:
+                evidence = {key: row[key] for key in ('age_seconds', 'threshold_seconds', 'task_id') if key in row}
+                evidence['artifact_id'] = row['name']
+                finding(component, code, 'warning', action, **evidence)
+    else:
+        for component in ('intents', 'stale_tasks', 'worktrees'):
+            report['checks'][component] = 'unavailable'
     from greatminds.domain.stand_deployments import DeploymentLedger
     deployments = inspect('deployments', lambda: DeploymentLedger(runtime).snapshot())
     for key, item in sorted((deployments or {}).get('attempts', {}).items()):

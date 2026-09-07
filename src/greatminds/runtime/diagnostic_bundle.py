@@ -21,7 +21,7 @@ STAGES = {'workspace_ready', 'context_ready', 'process_recorded', 'protocol_read
 STATES = set(TRANSITIONS) | set(TERMINAL)
 CODES = set(ACTIONS) | {'inspection_failed', 'mirror_not_current', 'agent_prerequisites_missing',
                       'process_identity_unconfirmed', 'operation_needs_recovery', 'dependency_hold',
-                      'deployment_unresolved', 'transport_failure', 'configuration_error', 'timeout',
+                      'deployment_unresolved', 'orphan_intent', 'stale_task', 'orphan_worktree', 'transport_failure', 'configuration_error', 'timeout',
                       'turn_ended', 'authentication_required', 'permission_required', 'operator_cancelled',
                       'supervisor_restart', 'protocol_error', 'no_progress_backoff'}
 EVENTS = STATES | {'run_claimed', 'claimed', 'run_stage_observed', 'prompt_input_reserved',
@@ -58,7 +58,7 @@ def collect_bundle(project, *, report=None, environment=None, run_limit=100, eve
         findings.append({key: item[key] for key in ('component', 'severity', 'action')} | {
             'code': item['code'] if item['code'] in CODES else 'other_hold',
             'references': {key: ref(evidence[key]) for key in
-                           ('run_id', 'task_id', 'binding_id', 'operation_id', 'agent') if key in evidence}})
+                           ('run_id', 'task_id', 'binding_id', 'operation_id', 'agent', 'artifact_id') if key in evidence}})
     bundle = {'version': 1, 'kind': 'greatminds_local_diagnostics',
               'versions': {'greatminds': version('greatminds'), 'acp_sdk': version('agent-client-protocol'),
                            'python': platform.python_version()},
