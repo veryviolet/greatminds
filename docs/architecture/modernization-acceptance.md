@@ -139,8 +139,39 @@ were inspected. It does not turn fixture coverage into live harness coverage.
    and cursor reconnect on all three. These checks do not establish the remaining
    domain-role or harness scenarios.
 
-After these items, rerun the complete suite and relevant package/host checks,
-inspect every row again, and record the resulting milestone verdicts. Current
-milestone verdict: M0/M1/M4/M6 have substantial completed evidence; M2/M3/M5/M7
-remain unproven as complete while their listed gaps are open. The overall goal
-remains active. No green component test is used to mark the entire plan achieved.
+## Current milestone verdicts, 2026-09-07
+
+The [post-audit local checks](evidence/acceptance-local-audit-2026-09-07.json) cover
+source commit `7017c94`: 1543 Python tests passed without skips. Fresh installed
+wheels on Python 3.11/3.12/3.13 passed all 25 public-command help checks, packaged
+resources, repeated setup with preserved configuration/git hook and generated
+reference matching. The installed 3.13 fixture pipeline completed three roles,
+three daemon-owned checks, six independent tests, merge and restart without new
+work. Strict documentation and six directly reported extension fixture cases
+passed. A temporary negative extension test confirmed runner failure propagation.
+These checks do not claim a full Python suite on 3.11/3.12 or new live inference.
+
+| Milestone | Verdict | Evidence boundary |
+| --- | --- | --- |
+| M0 — baseline | Confirmed | Isolated local suite and canonical-contract checks |
+| M1 — execution contract | Confirmed | Atomic identities, claims, stale rejection and crash fixtures |
+| M2 — common ACP path | Confirmed for tested integrations | Codex, Claude and native Grok pipeline/lifecycle/permission evidence |
+| M3 — unattended mechanics | Confirmed | SYSTEM dependency release, recovery, bounded admission and zero-agent idle/maintenance checks |
+| M4 — domain completion | Confirmed locally | Typed results, automatic evidence, review gates and recovery; no external deployment claim |
+| M5 — role and harness coverage | **Incomplete** | Declared matrix and three-harness interactive proof exist; six installations need access/configuration before full live scenarios |
+| M6 — cutover | Confirmed | Common public ACP paths and fresh package/setup checks; no installed-fleet migration required |
+| M7 — product refinement | Confirmed within stated limits | Local preset, reactive budgets, measured optimization and documented Linux/local scope |
+
+The source audit also checked canonical setup declarations, public command
+registration and update ordering. Queue reconciliation belongs to the daemon,
+visual templates are optional presentation, and Python package updates use PEP 440
+for both preview and action. Supporting source changes and their behavioral
+regressions are recorded in the plan.
+
+Overall modernization is **not complete**. A4/G6/M5 is the remaining unresolved
+requirement: provide Qwen's configured API access, complete Kimi/Cline/Cursor login,
+configure OpenHands' agent/model and choose a supported Gemini access method.
+Then repeat the documented session, model, workspace, permission, restart and
+cancellation scenarios; successful authentication alone will not close this gap.
+No further local implementation gap was found in this audit. The next phase web
+workspace remains deferred until modernization acceptance is complete.

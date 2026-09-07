@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "date": "2026-09-07",
+  "source_commit": "7017c9419220db4f29c026719f368cabe19b9a05",
+  "scope": "Post-audit local regression and installed-package acceptance; live harness access remains incomplete",
+  "full_suite": {
+    "passed": 1543,
+    "failed": 0,
+    "skipped": 0,
+    "seconds": 429.08,
+    "log_sha256": "6cdf36bac7e78664484b944436632760080000b1403edc1479538b4483874786"
+  },
+  "targeted_checks": {
+    "journal_ownership_maintenance_daemon_and_public_cli": 48,
+    "update_schema_reference": 58,
+    "documentation_reference": 14
+  },
+  "artifacts": {
+    "greatminds-2.6.0-py3-none-any.whl": "ed7d398fed747e28369fcf02f7c0ef50eb2d656bac45e31b1c539ca0e49c11b3",
+    "greatminds-2.6.0.tar.gz": "03e818dd9019119eba3dbf6e0b5f9e6e542f7a3a9901ae520a089df52a9a6fbd"
+  },
+  "installed_checks": [
+    {
+      "python": "3.11.15",
+      "all_public_command_help_passed": 25,
+      "base_install_without_ansible": true,
+      "resources_present": true,
+      "repeated_setup_preserves_config_and_hook": true,
+      "execution_valid": true,
+      "native_journal_dispatcher_absent": true,
+      "generated_reference_matches": true,
+      "raw_report_sha256": "fffdb116155938792a1d0855c93d702eedb5645f1d4ff1f8554797a13afd6706"
+    },
+    {
+      "python": "3.12.3",
+      "all_public_command_help_passed": 25,
+      "base_install_without_ansible": true,
+      "resources_present": true,
+      "repeated_setup_preserves_config_and_hook": true,
+      "execution_valid": true,
+      "native_journal_dispatcher_absent": true,
+      "generated_reference_matches": true,
+      "raw_report_sha256": "45a3b27b0100a95a93ef1e166bd83e3550d2b4705548448a775c18156fb6cbaf"
+    },
+    {
+      "python": "3.13.7",
+      "all_public_command_help_passed": 25,
+      "base_install_without_ansible": true,
+      "resources_present": true,
+      "repeated_setup_preserves_config_and_hook": true,
+      "execution_valid": true,
+      "native_journal_dispatcher_absent": true,
+      "generated_reference_matches": true,
+      "raw_report_sha256": "26657d7c903ad50c49d1b461b6e779b8c5854dab81b2a86cb43c819101f1c381"
+    }
+  ],
+  "pipeline": {
+    "verified": true,
+    "agent_invocations": 3,
+    "idle_invocations": 0,
+    "daemon_owned_checks": 3,
+    "independent_test_cases": 6,
+    "restart_unchanged": true,
+    "inference": false,
+    "fixture_sha256": "fe948507b2913009d472bd2bc85fc23560552e16387b73cdb0d520c4ce1a916d",
+    "probe_sha256": "1c6e7facb3ac49eda75fe603efc8b6576b9bdef17e1b1bfd3a615043119e7946",
+    "project_builder_sha256": "a71c1d57ce3a406d04bec3cd1e94074d4188a070191d78a4c5c1cf2db5f2b2c6",
+    "implementation": {
+      "version": "2.6.0",
+      "package_sha256": "af523abc754f5c7228e91d2426457b30bac8ec79ecc11491c0071f9c2136a72e",
+      "python": "3.13.7",
+      "dependencies": {
+        "agent-client-protocol": "0.11.1",
+        "pydantic": "2.13.5",
+        "pydantic-core": "2.46.5",
+        "pyyaml": "6.0.3",
+        "click": "8.5.0",
+        "packaging": "26.3"
+      },
+      "schema_sha256": "7ff6c38d41376e95889f7abc11c02305caf368f64290db02976232e553d5ae94",
+      "installed": true
+    },
+    "raw_report_sha256": "49081a577f5555ce9e639b85ff8e0dca8f86e9c3ed6009446ff49f39ccd16d25"
+  },
+  "documentation": {
+    "strict_mkdocs_passed": true,
+    "generated_reference_current": true
+  },
+  "extension": {
+    "node_version": "22.13.0",
+    "npm_test_exit_code": 0,
+    "npm_runner_reported_file_cases": 1,
+    "direct_node_test_cases_passed": 6,
+    "direct_report_sha256": "75b5865b86918a08db69acfe8757b561b392ebe50c194db9b0ab1b8664d35562",
+    "negative_control": {
+      "scope": "Temporary copy with first test forced to fail; repository file unchanged",
+      "runner_exit_code": 1,
+      "direct_exit_code": 1,
+      "direct_assertion_visible": true
+    }
+  },
+  "milestone_verdicts": {
+    "M0": "confirmed within documented local test scope",
+    "M1": "confirmed",
+    "M2": "confirmed for tested Codex, Claude and native Grok",
+    "M3": "confirmed; no journal-driven agent polling",
+    "M4": "confirmed local domain/evidence/recovery scope",
+    "M5": "incomplete: Qwen, Kimi, Cline, OpenHands, Gemini and Cursor live scenarios need access/configuration",
+    "M6": "confirmed current ACP cutover scope",
+    "M7": "confirmed measured product refinements with documented limitations"
+  },
+  "limitations": [
+    "No whole-plan completion claim: A4/G6/M5 remains open.",
+    "Full Python regression ran on Python 3.13.7; Python 3.11/3.12 checks cover installed CLI/resources/setup/reference, not the full suite.",
+    "The installed pipeline uses a deterministic ACP fixture, not live inference. Its concurrent functional run is not a performance comparison.",
+    "Extension direct tests use a VS Code mock. The separate real extension-host evidence remains scoped to its documented host smoke.",
+    "No external deployment, publication, provider quota campaign, global account configuration or package upgrade was performed."
+  ]
+}

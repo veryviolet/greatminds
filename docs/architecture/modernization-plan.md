@@ -2610,3 +2610,39 @@ acknowledgement, malformed versions stop before installation, and post-install
 verification accepts equivalent normalized versions while rejecting absent/invalid
 results. Behavioral tests cover preview/action agreement and verification without
 performing real package updates. All 58 update/schema/reference tests passed.
+
+### Local completion audit and external dependency boundary (2026-09-07)
+
+After commits 66f5a12 and 7017c94, the full suite passed all 1543 tests with zero
+skips in 429.08 seconds. This supersedes the preliminary 1548-test pass collected
+before audit corrections. The count reflects removing hook-specific tests and
+adding actual daemon ownership and package-version behavior cases; no runtime
+failure was hidden by excluding a current contract test.
+
+A fresh final wheel/sdist was built offline. Base-wheel checks on Python 3.11.15,
+3.12.3 and 3.13.7 passed all 25 public help commands, resources, valid fresh setup,
+repeat setup preserving custom config and executable user git hook, absence of the
+journal wake dispatcher and absence of Ansible. The generated contract reference
+matches all three installed wheels. The installed 3.13 deterministic pipeline
+completed three useful roles, three daemon-owned commands, six independent tests,
+merge/cleanup and restart with no new work. This was functional validation, not
+an added benchmark sample or live inference campaign.
+
+Strict MkDocs and documentation/reference checks passed. npm's Node 22 runner
+reported the test file as one passing wrapper; direct execution reported all six
+extension scenarios passing. A temporary copy with a forced assertion failed in
+both modes, proving that the runner propagates failure. The repository test file
+was unchanged. These are fixture checks, separate from the earlier real VS Code
+extension-host evidence.
+
+Updated the acceptance table against the original milestone definitions. M0/M1,
+M2's three tested integrations, M3/M4/M6 and M7 have evidence within their explicitly
+stated scopes. M5 remains incomplete because A4/G6 requires live scenarios for
+Qwen, Kimi, Cline, OpenHands, Gemini and Cursor after their documented access or
+configuration issues are resolved. No other local implementation gap was found.
+The same external dependency has persisted across the last three goal turns;
+prior turns made useful independent progress, now completed. No model/account
+switch is inferred, no credentials are requested in chat, and the web phase is
+not substituted for the unfinished modernization acceptance.
+
+Evidence and exact limitations: evidence/acceptance-local-audit-2026-09-07.json.
