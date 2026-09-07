@@ -1,6 +1,7 @@
 # Greatminds modernization plan
 
-Date: 2026-09-06. Status: implementation in progress; see Progress below.
+Date: 2026-09-06. Status: complete for the owner-approved Codex/Claude/Grok scope
+(2026-09-07); see the acceptance audit and final Progress entry.
 Baseline and evidence: [initial audit](rehabilitation-audit-2026-09-06.md).
 Current requirement-by-requirement status: [acceptance audit](modernization-acceptance.md).
 
@@ -12,6 +13,20 @@ Preserve project task data. Historical migration checkpoints below record work
 already done, not a requirement to build more migration infrastructure. Continue
 testing crash recovery of actual ACP runs and domain operations; that remains part
 of the product's reliability contract.
+
+## Current delivery scope — owner decision, 2026-09-07
+
+The owner limited this delivery to **Codex, Claude and Grok**. Qwen, Kimi, Cline,
+Gemini, OpenHands and Cursor are deferred integrations, including their outstanding
+access/configuration/credit prerequisites. Their measurements and partial results
+remain available; they are not current release blockers or claimed support.
+The shared ACP contract and role-independent manifests remain extensible.
+
+M5 requires the declared role matrix, a completed mixed pipeline and interactive
+lifecycle evidence for the three selected harnesses. These scenarios are recorded;
+this is not a claim that every domain role has been live-tested on every harness.
+All M0–M7 milestones are accepted within the audit's stated evidence boundaries.
+Earlier Progress entries retain the scope and verdict at the time they were written.
 
 ## Agreed destination
 
@@ -88,7 +103,7 @@ Optional extensions belong behind negotiated capabilities.
 
 Use the existing upstream bridges for [Codex](https://github.com/agentclientprotocol/codex-acp)
 and [Claude](https://github.com/agentclientprotocol/claude-agent-acp), plus one
-native ACP implementation such as Qwen Code or Kimi CLI. Pin tested versions.
+native ACP implementation, Grok. Pin tested versions.
 Run the same tasks through the same client, including permissions, tool events,
 restart, session behavior, and cancellation. Do not assume ACP transfers
 conversation history between different harnesses; rebuild task context when
@@ -96,11 +111,14 @@ changing harnesses.
 
 Deliverable: one mixed-agent pipeline and reproducible compatibility evidence.
 
-### A4. Remaining harnesses
+### A4. Compatibility scope and deferred integrations
 
-Add Qwen, Kimi, Grok, Cline, Gemini, OpenHands, and Cursor to the compatibility
-campaign. For each, verify the actual ACP distribution and version, auth,
-session support, worktree behavior, model options, and cancellation behavior.
+Validate Codex, Claude and Grok through the common client: actual distribution and
+version, auth, session support, worktree behavior, model options and cancellation.
+Record unadvertised optional capabilities explicitly; do not infer support.
+
+Qwen, Kimi, Cline, Gemini, OpenHands and Cursor are deferred by the owner's
+2026-09-07 decision. Resume their existing campaign when that scope is requested.
 Reuse upstream bridges where available. If a bridge must be built, keep it
 outside the core client/scheduler and run the same ACP conformance scenarios.
 The existence of an ACP entrypoint alone does not establish supported status.
@@ -2698,3 +2716,23 @@ the separate 48-case ACP regression suite; no full-suite rerun is implied.
 Evidence: evidence/acp-cline-ready-2026-09-07.json. Remaining external prerequisites
 are Qwen/Kimi/OpenHands/Gemini/Cursor access/configuration and sufficient Cline
 Credits to finish reviewer validation. Overall A4/G6/M5 remains incomplete.
+
+### Current plan accepted for Codex, Claude and Grok, 2026-09-07
+
+The owner explicitly deferred the other harnesses. Updated the active scope,
+A4/G6 and milestone verdicts accordingly, preserving all collected measurements
+and partial results. This scope change resolves the outstanding delivery blocker;
+it does not turn deferred or unverified cells into passing evidence.
+
+Codex/Claude/Grok already completed the common-client mixed pipeline through
+verified, including daemon-owned checks, merge, worktree cleanup and idle restart.
+All three have live permission, restart/recall and cancellation evidence, plus
+public planner/live-developer conversation acceptance. The declared role matrix
+and shared all-role fixtures meet the current M5 requirement with their documented
+limits. The other M0–M7 verdicts retain their inspected local/package/runtime proof.
+
+Modernization is complete for this scope. Further live spending on deferred
+integrations is not required. The local web workspace is the next product phase,
+using the completed daemon and shared domain services as specified above.
+
+Decision and evidence index: evidence/acceptance-scope-2026-09-07.json.

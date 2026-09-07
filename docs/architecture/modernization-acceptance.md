@@ -4,6 +4,9 @@ Audited against [the approved plan](modernization-plan.md), starting at commit
 `7df519a`, on 2026-09-07. This is a delivery audit, not a replacement scope.
 The owner confirmed no production deployment or installed fleet migration is
 required. Project task data and actual crash recovery remain required.
+On 2026-09-07 the owner limited current harness support to Codex, Claude and Grok;
+other integrations are deferred. The verdicts below apply to that explicit scope,
+as recorded in the [scope decision](evidence/acceptance-scope-2026-09-07.json).
 
 “Confirmed” below means the named implementation and relevant behavior evidence
 were inspected. It does not turn fixture coverage into live harness coverage.
@@ -24,7 +27,7 @@ were inspected. It does not turn fixture coverage into live harness coverage.
 | A2: permission callbacks, path policy and explicit waiting | `runtime/permissions.py`, supervisor; pending/answered/denied/expired/stale/crash fixtures and live callback evidence | Confirmed. Filesystem/terminal callbacks are not advertised; unavailable methods fail explicitly |
 | A2: normalized protocol diagnostics with bounded raw evidence | Bounded `run.protocol` negotiation/tool/error/stop facts, private summary export; real supervisor privacy/saturation/crash fixtures and delayed-update RPC-error regression | Confirmed G1: managed-path evidence, with no raw payloads or transcripts |
 | A3: two upstream bridges and a native ACP implementation on one client | Codex + Claude bridges and native Grok; [completed mixed pipeline](evidence/acp-mixed-pipeline-completed-2026-09-06.json), lifecycle/permission evidence | Confirmed tested versions and completed local pipeline; no cross-harness history transfer claimed |
-| A4: Qwen/Kimi/Grok/Cline/Gemini/OpenHands/Cursor distribution, auth, session, worktree, model and cancellation | Per-stage [campaign evidence and role matrix](acp-compatibility.md); fresh explicit auth attempts and pending-permission cancellation on four harnesses | **Open G6:** only initialized/session-created status for several installations; authentication and complete scenarios remain necessary |
+| A4: Codex/Claude/Grok distribution, auth, session, worktree, model and cancellation | Per-stage [campaign evidence and role matrix](acp-compatibility.md); completed mixed pipeline and lifecycle/permission checks on all three | Confirmed for current scope; other integrations deferred by owner, not marked supported |
 | A5: daemon-owned interactive prompts, streamed output, permission, reconnect and interrupt | Conversation FIFO, task-bound claims, shared broker; `test_acp_conversations.py`, `test_chat_tasks.py`, `test_chat_terminal.py` | Confirmed fixture coverage plus public CLI restart/recall/cursor scenarios for planner and live developer on Codex/Claude/Grok/Cline; live coverage remains narrower than all roles/harnesses |
 | A5: common tmux/VS Code surfaces and removal of native dispatch | `runtime/frontends.py`, thin `cli/coordd.py`, extension CLI terminals; launch tests and [real extension host](evidence/vscode-extension-host-2026-09-07.json) | Confirmed managed execution routes through ACP; host smoke does not exercise Quick Picks or live chat |
 
@@ -79,7 +82,7 @@ were inspected. It does not turn fixture coverage into live harness coverage.
    crash uncertainty; retry cannot reset cost. The pinned schema contradicts
    itself about token scope, so these samples cannot support a token budget.
    Cost limits are reactive and allow one bootstrap prompt for a new session;
-   they do not promise a hard spending cap. G6 below remains open.
+   they do not promise a hard spending cap.
 3. **G3 — task timing and comparison: implemented and measured.** Queue wait,
    preparation, accepted progress and result resolution are recorded separately
    from first model activity. Real pipeline and crash/retry fixtures exercise them.
@@ -126,21 +129,18 @@ were inspected. It does not turn fixture coverage into live harness coverage.
    is acknowledged, not converted to passing evidence. The account-limit suite
    additionally exercises the aggregate doctor → scoped resume → repeat diagnosis
    cycle and rejection of stale identities and agent credentials.
-7. **G6 — remaining live coverage.** Revalidate configured authentication before
-   classifying an external blocker, then complete session/worktree/model/cancel
-   scenarios. The declared role-by-harness evidence table is now present. Fresh
-   authentication checks distinguish missing Qwen configuration, Kimi login,
-   OpenHands agent configuration, discontinued Gemini individual access and a
-   Cursor ACP browser-login wait despite cached native status (confirmed in the
-   exact probe process log; the reason cache validation failed remains unknown).
-   Cancellation while
-   permission is pending passed on Claude/Codex/Grok. Public CLI planner/live-developer
-   conversations also passed session recall after daemon restart, duplicate delivery
-   and cursor reconnect on all three. After native login, Cline also passed these
-   conversation and cancellation scenarios, plus explicit model/mode selection
-   and two accepted domain roles; reviewer completion now requires Cline Credits
-   ([evidence](evidence/acp-cline-ready-2026-09-07.json)). These checks do not establish the remaining
-   domain-role or harness scenarios.
+7. **G6 — accepted for the selected three harnesses.** Codex, Claude and Grok
+   have a completed mixed domain pipeline, declared role coverage and live
+   session/worktree/lifecycle/permission evidence. Public planner/live-developer
+   conversations passed recall after daemon restart, duplicate delivery and cursor
+   reconnect on all three. Generic role assignment is separately verified by the
+   all-role subprocess fixtures. This does not claim live domain execution of every
+   role/harness combination or optional protocol extension parity.
+
+   The owner deferred Qwen, Kimi, Cline, Gemini, OpenHands and Cursor. Their recorded
+   access/configuration issues and Cline's insufficient Credits remain prerequisites
+   for a later campaign. Cline's two accepted domain roles and lifecycle checks are
+   retained as partial evidence, not a completed three-role pipeline.
 
 ## Current milestone verdicts, 2026-09-07
 
@@ -161,7 +161,7 @@ These checks do not claim a full Python suite on 3.11/3.12 or new live inference
 | M2 — common ACP path | Confirmed for tested integrations | Codex, Claude and native Grok pipeline/lifecycle/permission evidence; Cline lifecycle plus developer/tester completion |
 | M3 — unattended mechanics | Confirmed | SYSTEM dependency release, recovery, bounded admission and zero-agent idle/maintenance checks |
 | M4 — domain completion | Confirmed locally | Typed results, automatic evidence, review gates and recovery; no external deployment claim |
-| M5 — role and harness coverage | **Incomplete** | Declared matrix and four-harness interactive proof exist; five installations need access/configuration; Cline reviewer completion requires Credits |
+| M5 — role and harness coverage | Confirmed for current scope | Declared matrix, completed Codex/Claude/Grok mixed pipeline and interactive lifecycle proof; other integrations deferred |
 | M6 — cutover | Confirmed | Common public ACP paths and fresh package/setup checks; no installed-fleet migration required |
 | M7 — product refinement | Confirmed within stated limits | Local preset, reactive budgets, measured optimization and documented Linux/local scope |
 
@@ -171,13 +171,9 @@ visual templates are optional presentation, and Python package updates use PEP 4
 for both preview and action. Supporting source changes and their behavioral
 regressions are recorded in the plan.
 
-Overall modernization is **not complete**. A4/G6/M5 is the remaining unresolved
-requirement: provide Qwen's configured API access, complete Kimi/Cursor login,
-configure OpenHands' agent/model and choose a supported Gemini access method.
-Cline login now works, but its domain pipeline stopped at reviewer inference with
-insufficient Credits after developer/tester completion; that balance must be restored
-before the remaining Cline stage can be verified.
-Then repeat the documented session, model, workspace, permission, restart and
-cancellation scenarios; successful authentication alone will not close this gap.
-No further local implementation gap was found in this audit. The next phase web
-workspace remains deferred until modernization acceptance is complete.
+Overall modernization is **complete for the owner-approved Codex/Claude/Grok
+scope**. A4/G6/M5 is accepted on the existing mixed and interactive evidence;
+deferring other harnesses does not erase their prerequisites or imply untested
+compatibility. No deployment, all-role Cartesian live campaign or optional vendor
+extension parity is claimed. The local web workspace can now be developed as the
+next phase on top of the completed daemon/domain contract.

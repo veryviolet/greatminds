@@ -1,5 +1,10 @@
 # ACP compatibility campaign
 
+Current delivery scope (owner decision, 2026-09-07): **Codex, Claude and Grok**.
+The other six integrations are deferred; their recorded results below remain
+partial or blocked measurements, not current support claims. See the
+[acceptance verdict](modernization-acceptance.md).
+
 Measured on 2026-09-06, Linux x86_64, using Greatminds' common `AcpTransport`
 and `agent-client-protocol==0.11.1`. Each executable ran in a fresh temporary
 workspace. Initialization and session probes do not send model prompts. A separate
@@ -354,7 +359,8 @@ and [operator-assisted mixed pipeline](evidence/acp-mixed-pipeline-completed-202
 plus the two accepted [Cline domain stages](evidence/acp-cline-ready-2026-09-07.json).
 P cells derive from [permission approval](evidence/acp-permissions-2026-09-06.json)
 and pending-permission cancellation above. This is deliberately narrower than
-all roles on all harnesses. G6 and overall modernization acceptance remain open.
+all roles on all harnesses. G6 and overall modernization are accepted for the
+owner-selected Codex/Claude/Grok scope; other integrations are deferred.
 
 The offline conversation acceptance case separately exercises all ten agent roles:
 two FIFO user turns share one daemon-owned ACP session, preserve streamed events,
@@ -382,8 +388,8 @@ The subprocess fixture verifies this orchestration and rejects a peer without
 loadSession. Live evidence is specific to synthetic conversations: it does not
 prove domain plan generation, live code editing, mid-turn crash recovery, streaming
 terminal detach, Quick Picks or vendor extensions. C cells therefore remain
-distinct from D cells. G6's other installations still need their recorded access
-or configuration issues resolved before full live scenarios can run.
+distinct from D cells. Deferred installations still need their recorded access
+or configuration issues resolved before their live campaign resumes.
 
 ## Cursor authentication diagnosis, 2026-09-07
 
