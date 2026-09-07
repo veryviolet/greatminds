@@ -11,7 +11,6 @@ from types import SimpleNamespace
 import pytest
 from click.testing import CliRunner
 
-from greatminds import __version__ as GM_VERSION
 from greatminds.cli import update as upd
 
 
@@ -23,6 +22,8 @@ from greatminds.cli import update as upd
 @pytest.fixture
 def fake_pypi(monkeypatch):
     """Mock PyPI fetch to return a configurable latest version."""
+    # Keep update scenarios independent of the version being released.
+    monkeypatch.setattr(upd, "__version__", "2.0.0")
     state = {"latest": "2.99.0"}
 
     def fake_fetch():
@@ -87,7 +88,7 @@ def test_check_when_newer_pypi_version_available(fake_pypi):
 
 
 def test_check_already_up_to_date(fake_pypi):
-    fake_pypi["latest"] = GM_VERSION
+    fake_pypi["latest"] = upd.__version__
     result = _invoke(["--check"])
     assert result.exit_code == 0, result.output
     assert "already up to date" in result.output

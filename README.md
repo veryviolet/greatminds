@@ -169,8 +169,8 @@ The primary setup, launch and daemon entrypoints use ACP. The modernization
 acceptance covers Codex, Claude and Grok; see the
 [acceptance record](docs/architecture/modernization-acceptance.md) for scope and
 reproducible evidence. The [local web workspace](docs/getting-started/local-web.md)
-is implemented and validated in this checkout; PyPI publication is a separate
-release step.
+is included in the 3.0 release. See the
+[upgrade guide](docs/getting-started/upgrading.md) when moving from 2.x.
 
 ## Issues and license
 

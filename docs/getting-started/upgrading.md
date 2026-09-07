@@ -10,6 +10,17 @@ greatminds update --check
 This queries PyPI without changing the package or project. Updates are operator
 initiated; the ACP daemon does not currently send periodic release notifications.
 
+## Moving to 3.0
+
+The 3.0 release uses ACP for every managed executor. Define agent manifests and
+role bindings in `coordination/execution.yaml`, including the installed adapter
+and harness versions. Setup preserves task files and an existing execution
+configuration; it does not choose harnesses or credentials. Verify this contract
+before starting the daemon. Codex, Claude and Grok are the accepted harness scope.
+
+The packaged [web workspace](local-web.md) starts with `greatminds web --port 8765`.
+It has no application authentication and binds to localhost by default.
+
 ## Prepare active work
 
 Inspect runs and stop new dispatch before changing the daemon's environment:

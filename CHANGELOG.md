@@ -4,7 +4,14 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
-## Unreleased
+## 3.0.0 — 2026-09-07
+
+### Upgrade notes
+
+- This is a major release with an ACP-only execution contract. Configure harness
+  manifests and role bindings in `coordination/execution.yaml`; vendor-native
+  driven execution is no longer supported. See the upgrading guide and local
+  web workspace documentation. Harness authentication remains host-managed.
 
 ### Changed
 
@@ -33,6 +40,12 @@ follow [SemVer](https://semver.org/) once 1.0.0 ships.
   templates, not instructions for agent housekeeping.
 
 ### Added
+
+- Local web workspace via `greatminds web --port PORT`: interactive-role tabs,
+  persistent conversations, dashboards, task queues, execution settings and
+  batch-run inspection. The packaged server has no application authentication.
+- Bounded public ACP activity journals and verified command-output previews.
+  Browser controls share daemon permissions, cancellation and dispatch state.
 
 - Durable run identities, exclusive claims, launch gates, bounded process cleanup,
   timeout/cancellation controls, startup/account backoff, no-progress limits and
@@ -70,6 +83,168 @@ follow [SemVer](https://semver.org/) once 1.0.0 ships.
   prompt probe requires renewed authentication; the compatibility matrix records
   authentication/session limitations for the remaining installations. See
   `docs/architecture/acp-compatibility.md` and its versioned evidence files.
+
+## 2.7.8 — 2026-06-29
+
+### Fixed
+
+- `feature_review -> verified` now queues a coordd-owned system production
+  deploy when a stand profile declares `default_for: production_deploy`. The
+  deploy runs from the merged default branch, records a normal stand lease, and
+  auto-releases on success.
+- Stand profiles can now declare `restore_profile`. Releasing, reclaiming, or
+  failing a displacing live profile such as `vite-dev` queues a front-of-line
+  system restore lease, so public upstreams are rebuilt/restored before normal
+  queued validation leases continue.
+
+## 2.7.7 — 2026-06-29
+
+### Fixed
+
+- `feature_live -> feature_review` now uses the latest `implementation` block
+  and its `ready_for_test` flag for readiness, so `LIVE-DEVELOPER` can complete
+  the scenario-C handoff after USER-approved live validation.
+
+## 2.7.6 — 2026-06-29
+
+### Fixed
+
+- `LIVE-DEVELOPER` can now author the required `implementation` block for
+  scenario-C interactive tasks in `feature_live`, including `scope: ui` and
+  `scope: backend`. The ordinary scope-to-role guard still applies outside the
+  interactive live path.
+
+## 2.7.5 — 2026-06-29
+
+### Fixed
+
+- Vite teardown now targets remote stand hosts declared as `STAND_HOST_*`
+  (`STAND_HOST_A`, `STAND_HOST_B`, etc.) in addition to `STAND_HOST`. This
+  closes the remaining lease-release orphan case where cleanup fell back to
+  localhost while the dev server was still bound on the remote node.
+- Generic Vite cleanup now verifies the declared port is free after killing
+  pidfile, `pgrep`, and `fuser` matches, retrying force-kill before returning.
+
+## 2.7.4 — 2026-06-29
+
+### Fixed
+
+- Claude `autoMode.allow` now includes the FSM commands a driven
+  ARCHITECT-REVIEWER must run: `greatminds task mv`, `greatminds worktree`,
+  and `git revert`. Setup propagates these entries into
+  `.claude/settings.local.json`, so a REVIEWER can complete the verified merge
+  path without a manual classifier override.
+- Added `greatminds worktree refresh <task-id>` and made stand deploy refresh
+  a real lease worktree from the current `worktrees.default_branch` before
+  stale-dependency checks and profile loading. In-flight tasks cut before an
+  infra/profile fix landed can now pick up that committed fix without copying
+  files into the worktree or using raw `git rebase`.
+- Non-`vite-dev` deploys now clear the declared Vite dev-server port before
+  dispatching their profile when `PROJECT.env` declares `VITE_DEV_PORT` or
+  `vite_port`. This closes the remaining `vite-dev` -> `full-deploy` port
+  collision where a survived Vite process could block the next packaged UI
+  bind after the new lease was already active.
+
+## 2.7.3 — 2026-06-27
+
+### Fixed
+
+- Stand-free level redrive now runs immediately during coordd startup and then
+  every 60 seconds by default. A daemon that starts after the stand is already
+  free no longer waits five minutes before re-driving parked stand consumers.
+- `coordd` now runs free-stand Vite orphan cleanup on startup and on the
+  stand-free periodic hook. If the stand is `free`, no active lease exists, and
+  `PROJECT.env` declares `VITE_DEV_PORT` or `vite_port`, Greatminds clears that
+  declared port even when no current lease lifecycle event occurs.
+
+## 2.7.2 — 2026-06-27
+
+### Fixed
+
+- Stand-free recovery now has a level-triggered backstop. If the singleton is
+  already `free`, has no active lease, and stand-consumer queues such as
+  `feature_test`, `feature_live`, or `review_sessions` still contain work,
+  `coordd` periodically re-drives only those consumer roles instead of waiting
+  for a fresh `down -> free` or release event.
+- Vite teardown now has a narrow generic cleanup path in addition to
+  profile-tagged `teardown` tasks. For `vite-dev` leases, or fleets that set
+  `VITE_DEV_PORT`, Greatminds clears the pidfile and kills the process holding
+  that TCP port on the configured stand host. This covers orphaned Vite
+  processes left by pre-upgrade or killed leases whose profile had no teardown
+  tags.
+- Deploy-failure auto-promotion is poison-aware. A queued lease matching the
+  just-failed `task` / `profile` / `worktree` is not immediately promoted again;
+  unrelated queued leases can still advance, avoiding the obvious singleton
+  stand loop where one bad lease keeps being re-deployed.
+
+### Note
+
+- Greatminds still cannot deploy uncommitted profile edits from another
+  project. A lease worktree is cut from committed content; local uncommitted
+  fixes must be committed by that project before any Greatminds version can
+  deploy them.
+
+## 2.7.1 — 2026-06-26
+
+### Fixed
+
+- `coordd` now runs the stand-free backlog reconcile directly after its own
+  background auto-deploy thread returns the singleton to `free`. This closes
+  the gap where a failed deploy changed state inside coordd but no reliable
+  watcher event re-drove tasks already parked in `feature_test` or review
+  queues.
+- `stand up`, `stand release`, `stand reclaim`, and deploy-failure paths now
+  emit a small `.stand/available-*.yaml` event when the singleton becomes
+  `free` without promoting a queued lease, giving the daemon an explicit
+  dispatch event for waiting stand consumers.
+- The shipped `vite-dev.yaml` profile now has real `teardown` tasks. Teardown
+  stops the saved Vite pid when available and also clears old orphan processes
+  holding the configured port, including pristine 2.7.0 profiles reseeded by
+  `greatminds migrate` / `greatminds update`.
+- `vite-dev.yaml` now accepts `VITE_DEV_PORT` from `PROJECT.env` in addition to
+  the lower-case `vite_port` extra-var, so cleanup targets the same port as the
+  deployed dev server in common fleet configs.
+
+### Note
+
+- This release corrects the incomplete 2.7.0 implementation of #24, #27, and
+  #28. Version 2.7.0 added supporting infrastructure but did not fully close
+  the real daemon/profile failure modes.
+
+## 2.7.0 — 2026-06-26
+
+### Changed
+
+- Stand deploy failures are now lease-scoped instead of globally downing the
+  singleton stand. A non-zero profile run fails the active lease, records
+  `last_deploy_failure`, runs teardown best-effort, returns the stand to
+  `free`, and promotes queued work when present. This prevents one profile or
+  task failure from blocking unrelated stand work.
+- Driven Claude and generic headless turns now use progress-based timeout
+  handling. Output activity and worktree writes refresh the role heartbeat and
+  keep the turn alive; coordd kills only after the idle progress window or the
+  larger absolute ceiling is exceeded.
+
+### Fixed
+
+- `coordd` treats a `.stand` transition to `free` as a dispatch event and
+  re-scans driven backlog immediately, so tasks parked in `feature_test` or
+  review queues resume after stand recovery without a manual wake.
+- Stand profile teardown is now supported through Ansible tasks tagged
+  `teardown` and is invoked best-effort on release, reclaim, down/up recovery,
+  and deploy failure. This gives profiles a first-class cleanup path for
+  dev-server ports and other long-lived processes.
+- Deploy failure diagnostics now persist the full Ansible output under
+  `.greatminds/.stand/deploy-<lease-id>.log` and surface that path from
+  `greatminds stand status`, avoiding mid-command truncation of the real
+  stderr/stdout cause.
+- Active lease deploys continue to resolve stand profiles from the lease
+  worktree first, preserving validation of in-flight profile fixes before
+  merge.
+
+### Issues
+
+- Fixes #23, #24, #25, #26, #27, #28, and #29.
 
 ## 2.6.0 — 2026-06-18
 
