@@ -111,6 +111,12 @@ class Supervisor:
         current_turn = None
         accept_output = False
         observed_stages = set()
+        protocol_phase = "preflight"
+        accept_tool_evidence = True
+
+        def protocol(kind, **data):
+            return self.store.record_protocol(run_id, owner_id=self.id, kind=kind,
+                                              data={"phase": protocol_phase, **data})
 
         def observe(stage):
             if stage not in observed_stages:
@@ -127,6 +133,7 @@ class Supervisor:
 
         # No raw tool input/output enters the durable metadata snapshot.
         async def event(kind, data):
+            nonlocal accept_tool_evidence
             observe("first_protocol_activity")
             if metrics["prompt_started"]:
                 observe("first_prompt_activity")
@@ -134,6 +141,9 @@ class Supervisor:
                 metrics["pre_prompt_activity"] = True
             if kind == "session_update":
                 metrics["updates"] += 1
+                update = data.get("update", {})
+                if accept_tool_evidence and update.get("sessionUpdate") in {"tool_call", "tool_call_update"}:
+                    accept_tool_evidence = protocol("tool", update=update)
                 metrics["last_activity_at"] = self.store.clock()
                 if conversation is not None and current_turn is not None and accept_output:
                     update = data.get('update', {})
@@ -213,10 +223,13 @@ class Supervisor:
             transport = AcpTransport(agent.argv, workspace=Path(claim.run["workspace"]),
                                      environment=env, callbacks=callbacks, on_spawn=record_spawn)
             self._transports[run_id] = transport
+            protocol_phase = "initialize"
             async with transport:
                 observe("protocol_ready")
                 caps = transport.initialized.agent_capabilities
                 capabilities = caps.model_dump(by_alias=True, warnings=False) if caps else {}
+                protocol("negotiated", protocol_version=transport.initialized.protocol_version,
+                         capabilities=capabilities)
                 for name in agent.required_capabilities:
                     value = capabilities
                     for part in name.split("."):
@@ -224,6 +237,7 @@ class Supervisor:
                     if not value:
                         raise ValueError(f"required ACP capability unavailable: {name}")
                 if agent.auth_method:
+                    protocol_phase = "authenticate"
                     await transport.authenticate(agent.auth_method)
                     metrics["authentication_method"] = agent.auth_method
                 previous = [run for run in self.store.snapshot()["runs"].values()
@@ -237,18 +251,22 @@ class Supervisor:
                     if not getattr(caps, 'load_session', False):
                         reason = 'session_load_unavailable'
                         raise GreatMindsError('conversation resume requires ACP session loading')
+                    protocol_phase = "session_load"
                     session = await transport.open_session(session_id=saved_session)
                     session_id = saved_session
                     metrics['session_strategy'] = 'loaded'
                 elif binding.session == "resume-if-compatible" and compatible and getattr(caps, "load_session", False):
+                    protocol_phase = "session_load"
                     session = await transport.open_session(session_id=compatible["session_id"])
                     session_id = compatible["session_id"]
                     metrics["session_strategy"] = "loaded"
                 else:
+                    protocol_phase = "session_new"
                     session = await transport.open_session()
                     session_id = session.session_id
                     metrics["session_strategy"] = ("new_load_unavailable" if compatible and binding.session != "new"
                                                    else "new_context")
+                protocol_phase = "session_configure"
                 await transport.configure_session(session, model=binding.model, mode=binding.mode)
                 self.store._check_revision(TaskRevision(claim.run["task_id"], claim.run["task_path"],
                                                        claim.run["task_revision"]))
@@ -269,6 +287,7 @@ class Supervisor:
                     reserve(prompt)
                     observe("first_prompt_started")
                     metrics["prompt_started"] = True
+                    protocol_phase = "prompt"
                     result = await transport.prompt(prompt, timeout=binding.timeout_seconds)
                 else:
                     while True:
@@ -290,6 +309,7 @@ class Supervisor:
                         observe("first_prompt_started")
                         accept_output = True
                         metrics["prompt_started"] = True
+                        protocol_phase = "prompt"
                         pending = asyncio.create_task(transport.prompt(
                             turn_prompt, timeout=binding.timeout_seconds))
                         try:
@@ -309,6 +329,7 @@ class Supervisor:
                         current_turn = None
                         if status != 'completed':
                             break
+                protocol("stop", reason=result.stop_reason)
                 metrics["stop_reason"] = result.stop_reason
                 if callbacks.needs_input:
                     target, reason = "waiting_input", "permission_required"
@@ -323,6 +344,7 @@ class Supervisor:
             target, reason = "failed", "input_budget_exceeded"
             metrics["input_budget"] = exc.details
         except RequestError as exc:
+            protocol("error", rpc_code=exc.code, exception="RequestError")
             target = "waiting_auth" if exc.code == -32000 else "failed"
             reason = "authentication_required" if exc.code == -32000 else "protocol_error"
             metrics["error_code"] = exc.code
@@ -330,6 +352,7 @@ class Supervisor:
             self._transition(run_id, "cancelling", reason="operator_cancelled")
             target, reason = "cancelled", "operator_cancelled"
         except TimeoutError:
+            protocol("error", exception="TimeoutError")
             if callbacks.needs_input:
                 target, reason = "waiting_input", "permission_required"
             else:
@@ -337,6 +360,7 @@ class Supervisor:
         except (OSError, ValueError, RuntimeError, GreatMindsError) as exc:
             # Persist the class, not arbitrary stderr or exception text which
             # can contain auth material. Detailed redacted diagnostics follow.
+            protocol("error", exception=type(exc).__name__)
             metrics["error_type"] = type(exc).__name__
             if reason == 'transport_failure':
                 reason = "configuration_error" if isinstance(exc, (ValueError, GreatMindsError)) else "transport_failure"

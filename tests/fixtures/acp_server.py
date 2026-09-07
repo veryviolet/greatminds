@@ -38,8 +38,12 @@ for line in sys.stdin:
     method = message.get("method")
     request_id = message.get("id")
     if method == "initialize":
+        capabilities = {"loadSession": scenario == "resume"}
+        if scenario.startswith("protocol-evidence"):
+            capabilities.update(promptCapabilities={"image": True, "_meta": {"secret": "SECRET_META"}},
+                                _meta={"credential": os.environ.get("GREATMINDS_RUN_TOKEN", "SECRET_TOKEN")})
         result(request_id, {"protocolVersion": 999 if scenario == "bad-version" else 1,
-                            "agentCapabilities": {"loadSession": scenario == "resume"},
+                            "agentCapabilities": capabilities,
                             "authMethods": ([{"id": "fixture-key", "name": "Fixture key"}] if scenario == "auth" else [])})
     elif method == "authenticate":
         if message["params"]["methodId"] == "fixture-key":
@@ -75,6 +79,24 @@ for line in sys.stdin:
                     "sessionId": "test-session", "update": {"sessionUpdate": "agent_message_chunk",
                     "content": {"type": "text", "text": "started"}}}})
             continue
+        elif scenario.startswith("protocol-evidence"):
+            for index in range(40):
+                identifier = f"SECRET_TOOL_ID-{index}"
+                send({"method": "session/update", "params": {"sessionId": "test-session", "update": {
+                    "sessionUpdate": "tool_call", "toolCallId": identifier, "title": "SECRET_TITLE",
+                    "kind": "edit", "status": "in_progress", "rawInput": {"secret": os.environ.get("GREATMINDS_RUN_TOKEN")},
+                    "rawOutput": "SECRET_OUTPUT", "locations": [{"path": "/SECRET_PATH"}],
+                    "content": [{"type": "content", "content": {"type": "text", "text": "SECRET_CONTENT"}}],
+                    "_meta": {"secret": "SECRET_META"}}}})
+                send({"method": "session/update", "params": {"sessionId": "test-session", "update": {
+                    "sessionUpdate": "tool_call_update", "toolCallId": identifier, "status": "completed"}}})
+            send({"method": "session/update", "params": {"sessionId": "test-session", "update": {
+                "sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "SECRET_ASSISTANT"}}}})
+            if scenario.endswith("-error"):
+                send({"id": pending, "error": {"code": -32603, "message": "SECRET_ERROR",
+                                               "data": {"secret": "SECRET_DETAIL"}}})
+            else:
+                result(pending, {"stopReason": "end_turn"})
         elif scenario.startswith("permission"):
             tool = {"toolCallId": "tool-one", "title": "Read a file", "kind": "read"}
             if scenario != "permission":

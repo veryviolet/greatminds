@@ -134,3 +134,19 @@ def test_shutdown_terminates_descendants_in_agent_process_group(tmp_path):
         # A terminated orphan may remain as a zombie until init reaps it.
         assert not stat.exists() or stat.read_text().split(") ", 1)[1].split()[0] == "Z"
     asyncio.run(check())
+
+
+def test_rpc_failure_drains_preceding_delayed_updates_before_returning(tmp_path):
+    from acp import RequestError
+    async def check():
+        observed = []
+        async def slow_sink(kind, data):
+            await asyncio.sleep(.002)
+            observed.append(kind)
+        async with transport(tmp_path, 'protocol-evidence-error', Callbacks(events=slow_sink)) as client:
+            await client.open_session()
+            with pytest.raises(RequestError) as error:
+                await client.prompt('test', timeout=5)
+            assert error.value.code == -32603
+            assert observed == ['session_update'] * 81
+    asyncio.run(check())

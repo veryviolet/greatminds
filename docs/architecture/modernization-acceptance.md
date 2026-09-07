@@ -22,7 +22,7 @@ were inspected. It does not turn fixture coverage into live harness coverage.
 | A1: versioned compatibility deliverable | [Compatibility campaign](acp-compatibility.md), adapter package lock and dated JSON evidence | Present; remaining live combinations are explicitly open under A4 |
 | A2: common SDK stdio lifecycle and request correlation | `runtime/acp_transport.py`, ACP SDK 0.11.1; real subprocess negotiation, ordered updates, disconnect, cancellation and cleanup tests | Confirmed for implemented protocol surface |
 | A2: permission callbacks, path policy and explicit waiting | `runtime/permissions.py`, supervisor; pending/answered/denied/expired/stale/crash fixtures and live callback evidence | Confirmed. Filesystem/terminal callbacks are not advertised; unavailable methods fail explicitly |
-| A2: normalized protocol diagnostics with bounded raw evidence | Supervisor retains lifecycle, timing, numeric error code and update counts; private probes retain raw diagnostics | **Open G1:** ordinary managed runs discard negotiation/tool-update structure. Probe artifacts alone do not satisfy runtime diagnostics |
+| A2: normalized protocol diagnostics with bounded raw evidence | Bounded `run.protocol` negotiation/tool/error/stop facts, private summary export; real supervisor privacy/saturation/crash fixtures and delayed-update RPC-error regression | Confirmed G1: managed-path evidence, with no raw payloads or transcripts |
 | A3: two upstream bridges and a native ACP implementation on one client | Codex + Claude bridges and native Grok; [completed mixed pipeline](evidence/acp-mixed-pipeline-completed-2026-09-06.json), lifecycle/permission evidence | Confirmed tested versions and completed local pipeline; no cross-harness history transfer claimed |
 | A4: Qwen/Kimi/Grok/Cline/Gemini/OpenHands/Cursor distribution, auth, session, worktree, model and cancellation | Per-stage [campaign evidence](acp-compatibility.md); fresh Cline 3.0.61 prompt failure requires renewed authentication | **Open G6:** only initialized/session-created status for several installations; authentication and complete scenarios remain necessary |
 | A5: daemon-owned interactive prompts, streamed output, permission, reconnect and interrupt | Conversation FIFO, task-bound claims, shared broker; `test_acp_conversations.py`, `test_chat_tasks.py`, `test_chat_terminal.py` | Confirmed fixture coverage; live coverage remains explicitly narrower than all roles/harnesses |
@@ -50,7 +50,7 @@ were inspected. It does not turn fixture coverage into live harness coverage.
 
 | Requirement | Inspected implementation/evidence | Result |
 | --- | --- | --- |
-| C1: shared operator state, assignment reasons and controls | `observation.py`, `diagnostics.py`, run/chat commands, dashboard/frontend tests | Confirmed state/identity/control surfaces; richer protocol diagnosis remains G1 |
+| C1: shared operator state, assignment reasons and controls | `observation.py`, `diagnostics.py`, run/chat commands, dashboard/frontend tests | Confirmed state/identity/control surfaces, including G1 managed protocol facts |
 | C2: minimal local and explicit fuller/UI/docs/deployed rosters with independent review | `presets.py`, public setup/preset CLI; [one live Codex task](evidence/acp-local-preset-2026-09-07.json) and [installed wheel](evidence/installed-local-preset-2026-09-07.json) | Confirmed representative fresh repository, one harness, three independent role runs, no stand, real checks and merge. The fixture supplies its plan |
 | C3: explicit initialization/preflight/services/configuration; preserve customizations and hooks | Bootstrap/service/environment tests; installed idempotent setup and interrupted-operation fixtures | Confirmed current cutover scope; no fleet migration or rollback deliverable required |
 | C4: concurrency/time/retry/no-progress/context limits; never switch provider to fit budget | Binding/project/account limits, input reservations and deadline/cancellation tests | Confirmed implemented limits and unknown provider values |
@@ -64,12 +64,13 @@ were inspected. It does not turn fixture coverage into live harness coverage.
 | C8: local operation, evidence, recovery and optional integrations; documented host envelope | Filesystem runtime, base-wheel fixture, installed docs/README corrected to Linux `/proc` + pidfd | Confirmed current host/scope statement; native macOS/Windows daemon support is not claimed |
 | Next phase: local web workspace | Agreed plan explicitly places it after modernization | Deferred as requested; no database migration, distributed scheduler or automatic model selection introduced |
 
-## Open work, in execution order
+## Acceptance work items, in execution order
 
-1. **G1 — managed protocol diagnostics.** Persist a bounded allowlist of negotiated
-   protocol facts, tool-update structure and error codes without raw prompts,
-   credentials or tool arguments. Prove privacy, boundedness, ordering and failure
-   behavior in the actual supervisor path, not only standalone probes.
+1. **G1 — managed protocol diagnostics: implemented and verified.** The normal
+   supervisor records bounded negotiation/tool/error/stop facts, with private
+   bundle summaries. Real subprocess fixtures prove secret exclusion, trace
+   saturation with terminal error preserved, durable recovery, atomic failure and
+   ordered draining of updates before an RPC error. Six items below remain open.
 2. **G2 — reliable usage and budgets.** Use the pinned SDK's documented counter
    meanings. Distinguish context occupancy, cumulative token usage and reported
    cost. Missing/invalid/reset/currency-changing observations must not become zero

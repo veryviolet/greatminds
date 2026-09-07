@@ -173,6 +173,34 @@ class RunStore:
                                 "at": self.clock(), "kind": kind,
                                 "run_id": run_id, "data": copy.deepcopy(data)})
 
+    def record_protocol(self, run_id: str, *, owner_id: str, kind: str, data: dict) -> bool:
+        from .protocol_evidence import normalize, TOOL_EVENT_LIMIT
+        normalized = normalize(kind, data, run_id=run_id)
+        with self._transaction() as state:
+            run = self._run(state, run_id)
+            if run['owner_id'] != owner_id or run['state'] in TERMINAL:
+                _error('protocol observation requires the active supervisor', 3)
+            protocol = run.setdefault('protocol', {'version': 1, 'tool_events': [],
+                                                   'tool_events_truncated': False})
+            if kind == 'tool':
+                events = protocol['tool_events']
+                if len(events) >= TOOL_EVENT_LIMIT:
+                    if not protocol['tool_events_truncated']:
+                        protocol['tool_events_truncated'] = True
+                        self._event(state, 'protocol_trace_truncated', run_id, {'limit': TOOL_EVENT_LIMIT})
+                    return False
+                if events and events[-1]['data'] == normalized:
+                    return True
+            elif protocol.get(kind, {}).get('data') == normalized:
+                return True
+            entry = {'at': self.clock(), 'data': normalized}
+            if kind == 'tool':
+                protocol['tool_events'].append(entry)
+            else:
+                protocol[kind] = entry
+            self._event(state, 'protocol_observed', run_id, {'kind': kind, **normalized})
+        return True
+
     def configure_event_retention(self, max_events: int) -> None:
         if type(max_events) is not int or not 100 <= max_events <= 1000000:
             _error("max_runtime_events must be between 100 and 1000000")

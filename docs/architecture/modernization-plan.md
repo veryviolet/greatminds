@@ -2156,3 +2156,35 @@ Validation: all eight documentation/reference checks passed in 1.44s and strict
 docs in 1.50s; diff whitespace check passed. The previous goal turn was progress:
 atomic event retention and its regression evidence were committed. Next work is
 G1 in the normal supervisor path, followed by the finite open list in the audit.
+
+### G1 — bounded managed protocol diagnostics (2026-09-07)
+
+The supervisor now persists an allowlist of negotiated protocol version/capability
+facts, up to 64 structured tool observations, explicit trace saturation, and the
+last normalized error/stop facts. Phases distinguish preflight, initialize, auth,
+new/load session, config and prompt. Tool references are run-scoped hashes;
+messages, IDs in clear text, paths, titles, raw input/output, server metadata and
+raw exception text never enter this record. Existing permission identities and
+conversation journals retain their separate roles. Bundles revalidate and export
+a compact numeric/enumerated summary. Run-level evidence survives log pruning.
+
+Writes are bounded: after one saturation marker, subsequent tool samples do not
+write the trace, while total received-update metrics and terminal error/stop facts
+continue. Duplicate facts preserve bytes; only the active supervisor may record
+facts, and failed atomic publication cannot publish partial evidence. Diagnostic
+observations remain independent of tool approval and domain completion.
+
+A real delayed-sink fixture exposed a transport ordering defect: RPC failure
+returned after only 1 of 81 preceding session updates had been handled. The common
+client now drains preceding updates with a bounded wait on the RequestError path,
+just as on success. The same regression passes with all 81 updates observed before
+the original numeric RPC error is returned.
+
+Validation: 47 existing supervisor/conversation/bundle checks passed in 62.70s;
+4 focused real-process privacy/saturation/ownership/recovery/publication cases
+passed in 6.46s; 36 protocol/retention/timing/bundle checks passed in 12.31s after
+the error-order fix; 56 protocol/budget/account/startup/timing checks passed in
+26.86s. Strict docs passed in 1.59s. No live provider was invoked. The acceptance
+matrix now closes G1; six explicit items remain, starting with reliable usage
+observations and budgets (G2). The previous goal turn was progress: the acceptance
+audit and concrete host/release-documentation fixes were committed.

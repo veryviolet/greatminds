@@ -947,3 +947,34 @@ identities and idempotency receipts, immutable contracts, command/deployment
 receipts and their evidence, and conversation history remain intact. ACP stderr
 capture and per-command/per-conversation output already have separate bounds.
 The optional systemd service's external journal follows the host's journal policy.
+
+### Managed protocol diagnostics
+
+Each run can retain a `protocol` record independently of the event-log tail:
+
+- `negotiated`: numeric protocol version and an allowlist of capability flags;
+- `tool_events`: at most 64 tool call/update observations with timestamps, phase,
+  run-scoped hashed tool reference, tool kind/status and content/location counts;
+- `tool_events_truncated`: explicit saturation indicator, without pretending that
+  missing tool observations did not occur;
+- `error`: last numeric JSON-RPC code (when present), bounded exception category and
+  the stage that failed;
+- `stop`: last normalized stop reason.
+
+Phases distinguish preflight, initialization, authentication, session creation or
+loading, configuration and prompting. Repeated identical facts do not append new
+records. Once the tool trace fills, the supervisor stops writing further tool
+samples; aggregate update counts still include all received updates, and terminal
+error/stop facts can still be recorded. These observations do not approve tools
+or substitute for typed results and command evidence.
+
+Server `_meta`, tool IDs in clear text, titles, tool arguments/results, locations,
+assistant text and raw exception messages/stderr are excluded from this record.
+The permission broker retains its separately scoped callback identities needed to
+answer approvals. Conversation text remains in the separate conversation journal.
+Diagnostic bundles export a revalidated compact protocol summary, not the tool
+payloads. Run-level protocol records survive event-tail pruning and crash recovery.
+
+The common client drains preceding session updates before returning either a
+successful prompt response or a JSON-RPC error, with a bounded wait. A failed
+observation sink cannot silently report successful processing.

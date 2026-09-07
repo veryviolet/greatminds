@@ -237,6 +237,10 @@ class AcpTransport:
                 response = await asyncio.wait_for(asyncio.shield(turn), timeout)
                 await asyncio.wait_for(self.callbacks.flush_updates(), self.request_timeout)
                 return response
+            except RequestError:
+                # Failed requests can follow useful diagnostics in the same stream.
+                await asyncio.wait_for(self.callbacks.flush_updates(), self.request_timeout)
+                raise
             except (TimeoutError, asyncio.CancelledError):
                 with contextlib.suppress(Exception):
                     await self.cancel()
