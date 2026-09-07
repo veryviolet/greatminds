@@ -248,3 +248,37 @@ This report covers the named local checks. It is a best-effort observation acros
 stores, not an atomic health verdict or live compatibility test. Watchdog-specific
 stale-task/intent/worktree scans and remote provider availability are not implied
 by a `no_findings` result.
+
+## Local diagnostic bundle
+
+```bash
+greatminds run doctor --project-dir "$PWD" --bundle /tmp/greatminds-diagnostics.json
+```
+
+The command writes a private JSON file locally; it performs no upload. Combine
+`--json` with `--bundle` to retain the ordinary machine-readable doctor report
+on stdout. Diagnostic errors still produce a bundle when collection is possible,
+and the command keeps doctor's exit status. Use a new destination filename for
+each export: existing files and symlinks are never replaced. The parent directory
+must exist. Publication is atomic and the file has mode `0600`.
+
+The versioned bundle contains installed Greatminds/ACP SDK/Python versions,
+configuration fingerprints and binding limits, selected diagnostic findings,
+recent run states/timings/metrics and event headers. Raw configuration, environment
+values, executable arguments, task bodies, prompts, command output, result
+payloads and event bodies are excluded. Task, run, binding and operation identifiers
+become salted pseudonyms consistent within one bundle; each export uses a fresh
+salt. The salt/mapping is not exported. Fingerprints, timestamps and states remain
+useful diagnostic metadata; this is not a guarantee that a project is unidentifiable.
+
+Defaults retain up to 100 recent runs, 200 recent events and 200 findings, with
+errors prioritized. Summary counts cover the full report. `limits` and `truncated`
+make the selected windows explicit; an unreadable runtime has unknown truncation
+values. Total serialized export is limited to 5 MiB. Collection records
+unavailable components rather than copying malformed raw files. Missing metrics
+stay null. Version labels describe installed libraries, not a live harness probe.
+
+The bundle and doctor inspection are best-effort observations across stores.
+Collecting a bundle does not pause work, authorize retry or resolve uncertain
+side effects. It includes the named diagnostic checks, not a copy of all project
+history or a proof of live provider compatibility.

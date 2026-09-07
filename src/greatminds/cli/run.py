@@ -31,12 +31,22 @@ def status(project_dir):
 @run.command("doctor")
 @click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path))
 @click.option("--json", "as_json", is_flag=True)
-def doctor(project_dir, as_json):
+@click.option("--bundle", type=click.Path(dir_okay=False, path_type=Path),
+              help="Write a private local diagnostic JSON file; never overwrite an existing path.")
+def doctor(project_dir, as_json, bundle):
     """Aggregate local configuration, run, dependency and recovery findings."""
     from greatminds.runtime.diagnostics import diagnose
     from greatminds.cli.chat import terminal_text
     project = project_dir.resolve() if project_dir else find_project_dir()
     report = diagnose(project)
+    if bundle is not None:
+        from greatminds.runtime.diagnostic_bundle import collect_bundle, write_bundle
+        try:
+            destination = write_bundle(bundle, collect_bundle(project, report=report))
+        except (OSError, ValueError) as exc:
+            raise click.ClickException(f"cannot publish diagnostic bundle ({type(exc).__name__}); check export limits and choose a new path in an existing directory") from exc
+        if not as_json:
+            click.echo(terminal_text(f"Diagnostic bundle: {destination}"))
     if as_json:
         click.echo(json.dumps(report, ensure_ascii=True, sort_keys=True))
     else:

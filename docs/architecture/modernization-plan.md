@@ -1866,3 +1866,32 @@ C5 remains open: add the local diagnostic bundle, integrate watchdog-specific
 stale intent/task/worktree findings, and consolidate bounded recovery actions.
 The aggregate is implemented as a domain report usable by the future web UI;
 no additional frontend state machine or live-provider probe was added.
+
+### Private local diagnostic bundle (2026-09-07)
+
+Added run doctor --bundle PATH. The versioned JSON export contains installed
+library versions, configuration fingerprints/binding limits, selected findings,
+recent run timing/metric/state records and event headers. Identifiers become
+salted references consistent within an export; salt/mapping are not exported.
+Raw configuration/env values, argv, task/prompt bodies, output, result payloads
+and event bodies are excluded. Metadata is still diagnostic information, not a
+guarantee of complete anonymity.
+
+Defaults bound export to 100 runs, 200 events and 200 findings (errors first),
+with truncation flags and full diagnostic summary counts. Unknown fields stay
+null/unavailable. Serialization has a 5 MiB ceiling. Publication uses a private
+0600 temporary file and atomic no-replace link; existing files/symlinks are never
+overwritten. No upload, external message, provider probe or repair is performed.
+
+Validation: initial 14 export/diagnostic/public-help checks passed in 1.63s;
+final 15 passed in 1.84s. Cases cover privacy, reference linkage, bounded windows,
+unknown metrics, malformed runtime, atomic/private no-overwrite publication,
+CLI error reporting and total size limits. Strict MkDocs build passed in 1.49s.
+Built a fresh wheel, installed offline into /tmp/greatminds-diagnostics-installed
+(10 base packages, no Ansible), and passed installed dependency-resume smoke:
+one system resume, zero agent runs and idempotent setup. The installed CLI also
+exported a readable private bundle successfully for that toy project.
+
+Full regression after input budgets, timing and diagnostics passed: 1407 passed,
+1 skipped in 307.96s. C5 still needs shared watchdog-specific findings and
+recovery-action consolidation. Other full-plan milestones remain open.
