@@ -6,7 +6,7 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from greatminds.cli import setup as setup_mod
+import shutil
 from greatminds.cli import stand as stand_mod
 from greatminds.cli import stand_profile_registry as reg
 from greatminds.core.errors import GreatMindsError
@@ -37,10 +37,9 @@ def _write_registry(coord: Path, body: dict) -> None:
     )
 
 
-def test_setup_seeds_project_stand_profile_registry(tmp_path: Path) -> None:
+def test_explicit_packaged_registry_has_expected_profiles(tmp_path: Path) -> None:
     coord = _coord(tmp_path)
-    status = setup_mod._seed_stand_profile_registry(coord, find_canon_dir())
-    assert status == "written"
+    shutil.copyfile(find_canon_dir() / "templates/stand-profiles.yaml", coord / "stand-profiles.yaml")
     registry = reg.load_registry(coord)
     assert set(registry.profiles) == {"smoke-only", "full-deploy", "vite-dev"}
     assert registry.profiles["full-deploy"].default_for == (

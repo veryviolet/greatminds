@@ -24,7 +24,7 @@ from pathlib import Path
 import yaml
 
 from greatminds.cli import task as task_mod
-from greatminds.cli.setup import QUEUES
+from greatminds.runtime.bootstrap import bootstrap
 from greatminds.cli.task import intent_write, task_file_lock
 from greatminds.core.paths import find_canon_dir
 
@@ -138,20 +138,19 @@ def _schema() -> dict:
     ) or {}
 
 
-def test_setup_seeds_every_schema_queue() -> None:
-    """The QUEUES list setup.py creates must cover every product queue
-    declared in schema.queues — a new queue added to the schema without
-    being added here would not be seeded, reviving the #19 class of
-    'first move into an unseeded queue' failures."""
+def test_setup_seeds_every_schema_queue(tmp_path) -> None:
+    """Actual bootstrap creates every declared task queue."""
     schema_queues = {
         name for name in (_schema().get("queues") or {})
         # .stand is a state watch-path, not a claim queue / on-disk
         # task dir that setup seeds with a .gitkeep.
         if not name.startswith(".")
     }
-    missing = schema_queues - set(QUEUES)
+    bootstrap(tmp_path)
+    created = {p.name for p in (tmp_path / ".greatminds").iterdir() if p.is_dir()}
+    missing = schema_queues - created
     assert not missing, (
-        f"setup.QUEUES does not seed schema queues {sorted(missing)}; "
+        f"bootstrap did not create schema queues {sorted(missing)}; "
         "add them so a fresh/migrated project has every queue dir "
         "(GitHub #19 defense-in-depth)."
     )

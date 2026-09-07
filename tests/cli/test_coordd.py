@@ -7,7 +7,7 @@ from greatminds.runtime.bootstrap import bootstrap
 def test_registered_project_runs_acp(tmp_path, monkeypatch):
     root = tmp_path/'project'
     bootstrap(root)
-    monkeypatch.setattr(daemon, 'lookup_project_dir', lambda name: root if name == 'example' else None)
+    daemon.register_project('example', root)
     result = CliRunner().invoke(coordd.coordd, ['--project', 'example', '--once'])
     assert result.exit_code == 0, result.output
     assert (root/'.greatminds/.runtime').is_dir()

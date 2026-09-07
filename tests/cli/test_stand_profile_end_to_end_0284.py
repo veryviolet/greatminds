@@ -32,7 +32,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from greatminds.cli import setup as setup_mod
+import shutil
 from greatminds.cli import stand_executor as se
 from greatminds.cli import stand_profile as sp
 from greatminds.core.paths import find_canon_dir
@@ -42,12 +42,12 @@ from greatminds.core.paths import find_canon_dir
 
 
 def _project_with_seeded_presets(tmp_path: Path) -> Path:
-    """Build a toy project and run the Phase E seeder so the canon
+    """Build a toy project and explicitly copy the selected canon
     presets land in ``coordination/stand-profiles/``. Returns the
     coord dir."""
     coord = tmp_path / "proj" / "coordination"
     coord.mkdir(parents=True)
-    setup_mod._seed_stand_profiles(coord, find_canon_dir())
+    shutil.copytree(find_canon_dir() / "templates/stand-profiles", coord / "stand-profiles")
     (coord / "PROJECT.env").write_text("STAND_HOST=avatar\n", encoding="utf-8")
     return coord
 

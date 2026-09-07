@@ -105,7 +105,7 @@ harness's internal approval defaults. The executable's mode, cached settings, an
 execution boundary remain part of compatibility configuration. Complete permission
 policy parity and negotiated filesystem/terminal callbacks remain pending.
 
-The [supervisor permission probe](../../tools/acp_permission_probe.py) makes the
+The supervisor permission probe (`tools/acp_permission_probe.py` in the source checkout) makes the
 scenario reproducible. It prints a temporary project/runtime location, submits one
 synthetic model request, and waits for an operator. It never approves a request.
 From that project's operator terminal, inspect `greatminds run status`, then inspect
@@ -153,7 +153,7 @@ tests pass in the main checkout; an idle daemon restart changes no runs, results
 or commands. This is operator-assisted evidence for one synthetic local task,
 not an unattended pipeline or a controlled performance comparison.
 
-The [pipeline probe](../../tools/acp_pipeline_probe.py) takes `--config FILE`
+The pipeline probe (`tools/acp_pipeline_probe.py` in the source checkout) takes `--config FILE`
 with three ACP bindings for DEVELOPER, TESTER, and ARCHITECT-REVIEWER. It copies
 the manifests into a fresh temporary Git project, seeds a synthetic local plan,
 and replaces configured commands with the known local unit-test command. It
@@ -206,8 +206,8 @@ directory. Extra environment values are passed only through explicit `--env NAME
 references; their values, assistant text, and arbitrary protocol metadata are excluded
 from stdout. Sensitive values must not be placed in executable arguments.
 
-The [adapter package definition](../../tools/acp_adapters/package.json) and
-[npm lockfile](../../tools/acp_adapters/package-lock.json) pin the Codex and Claude
+The adapter package definition (`tools/acp_adapters/package.json`) and
+npm lockfile (`tools/acp_adapters/package-lock.json`) pin the Codex and Claude
 test adapter installations, including resolved dependencies. Copy those two files
 to a separate writable test directory and run `npm ci --ignore-scripts --no-audit
 --no-fund` there. Select executables from that directory's `node_modules/.bin/`.

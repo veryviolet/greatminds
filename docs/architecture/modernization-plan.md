@@ -1535,3 +1535,40 @@ syntax check skipped**; **65 deployment/ledger/default-ACP checks passed**.
 No deployment, service or live provider was invoked. Execution contract documents
 explicit profile selection. Other unused setup helpers/assets and the outstanding
 B1/M3 policies and milestone acceptance audit remain open.
+
+### Thin ACP setup and current operator documentation (2026-09-07)
+
+Removed all remaining unused setup helpers: native session/hook command
+formatting, env/context force-overwrite generators, native bootstrap copying,
+root-copy migration, implicit stand seeding and duplicated queue/role constants.
+Public setup is now a thin call to the common ACP bootstrap. No task data or
+project files are removed by this code deletion.
+
+Tests now exercise the actual setup command's created directories against the
+effective schema and preservation of user PROJECT.env/PROJECT.md across repeated
+runs. Kept lock/intent creation regression checks. Stand loader/registry/executor
+tests explicitly copy chosen packaged examples as fixtures, instead of relying
+on a dead setup API; packaged profile and metadata invariants remain tested.
+Retired only assertions of obsolete generator/force-overwrite behavior.
+
+Updated docs home, daemon architecture and CLI table from native windows/drivers,
+synthetic wakes and deleted driven-log/restart commands to ACP operation. The
+architecture page distinguishes current explicit retry behavior from unfinished
+backoff policies. Fixed documentation build warnings for source-checkout probe
+paths without implying those scripts are published documentation assets.
+
+Targeted validation: **79 passed, 1 optional Ansible syntax check skipped**.
+`mkdocs build --strict` succeeded without warnings, writing to
+/tmp/greatminds-setup-docs. Full-suite result follows below. Native packaged
+prompts/assets and remaining concept/installation pages still require their own
+cutover audit; docs build success alone does not establish their semantic parity.
+B1/M3 supervision policies and the other full-plan acceptance items remain open.
+
+Full traversal: **1360 passed, 1 skipped, 2 failed in 282.09 seconds**
+(/tmp/greatminds-post-setup-full-suite.txt). Failures were a registry fixture
+mocking lookup without registering the project and a documentation assertion
+requiring the removed native "Default tool" table. Replaced the former with
+real registration in the suite-isolated registry and the latter with explicit
+ACP execution/permission/chat requirements, retaining stand-policy assertions.
+The **15 related startup/documentation checks then passed**. No runtime code was
+changed after the broad traversal; a new all-green full-suite run is not claimed.

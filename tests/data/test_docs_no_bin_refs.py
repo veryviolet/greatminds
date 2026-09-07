@@ -137,8 +137,9 @@ def test_quickstarts_cover_agent_tools_and_stand_registry_contract():
     for required in (
         "Claude Code",
         "OpenAI Codex",
-        "Default tool",
-        "coord.yaml",
+        "coordination/execution.yaml",
+        "permission: ask",
+        "greatminds chat create planner",
         ".greatminds/PROJECT.env",
         "coordination/stand-profiles.yaml",
         "coordination/stand-profiles/",
