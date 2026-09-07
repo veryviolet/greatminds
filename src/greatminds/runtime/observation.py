@@ -66,7 +66,7 @@ def agent_rows(project, *, config=None, state=None):
 def snapshot(project):
     """Best-effort observation across stores; claims revalidate before execution."""
     from .daemon import assignments
-    from .retry_policy import startup_retry
+    from .retry_policy import startup_retry, account_backoff
     from .stand_scheduler import StandScheduler
     from greatminds.domain.stand_deployments import DeploymentLedger
     from greatminds.domain.stand_leases import StandLeaseService
@@ -86,6 +86,8 @@ def snapshot(project):
                               'role': binding.role, 'reason': reason,
                               'retry': startup_retry(result, binding, task, config, schema, store.clock())}
                              for binding, task, reason in assignments(store, config, schema, snapshot=result)]
+    result['accounts'] = {account: account_backoff(result, account, config, store.clock())
+                          for account in sorted({b.account for b in config.bindings})}
     result['agents'] = agent_rows(project, config=config, state=result)
     from greatminds.cli.task import load_task
     result['tasks'] = []

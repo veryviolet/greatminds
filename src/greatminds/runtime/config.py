@@ -151,6 +151,8 @@ class ExecutionConfig:
     account_limits: tuple[tuple[str, int], ...] = ()
     commands: tuple[CommandDefinition, ...] = ()
     stand: StandDeploymentPolicy | None = None
+    account_retry_initial_seconds: int = 5
+    account_retry_max_seconds: int = 60
 
     @property
     def sha256(self) -> str:
@@ -162,7 +164,8 @@ class ExecutionConfig:
 
 def parse_execution_config(document: Any, *, roles: set[str]) -> ExecutionConfig:
     root = _mapping(document, "root", {"version", "agents", "bindings", "max_running",
-                                       "account_limits", "commands", "stand"})
+                                       "account_limits", "commands", "stand",
+                                       "account_retry_initial_seconds", "account_retry_max_seconds"})
     if type(root.get("version")) is not int or root["version"] != 1:
         _fail("version must be 1")
     agents = []
@@ -263,7 +266,9 @@ def parse_execution_config(document: Any, *, roles: set[str]) -> ExecutionConfig
     return ExecutionConfig(tuple(agents), tuple(bindings),
                            _positive(root.get("max_running", 4), "max_running"),
                            tuple((safe_name(k), _positive(v, "account limit"))
-                                 for k, v in sorted(limits.items())), tuple(commands), stand)
+                                 for k, v in sorted(limits.items())), tuple(commands), stand,
+                           _positive(root.get("account_retry_initial_seconds", 5), "account_retry_initial_seconds"),
+                           _positive(root.get("account_retry_max_seconds", 60), "account_retry_max_seconds"))
 
 
 def load_execution_config(path: Path, *, roles: set[str]) -> ExecutionConfig:

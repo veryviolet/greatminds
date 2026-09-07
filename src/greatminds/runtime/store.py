@@ -234,6 +234,9 @@ class RunStore:
                     _error(f"automatic dispatch held: {retry['reason']}")
                 if retry.get('retry_of'):
                     self._event(state, 'startup_retry_dispatch', retry['retry_of'], retry)
+            from .retry_policy import account_backoff
+            if account_backoff(state, binding.account, config, self.clock())['reason'] != 'ready':
+                _error('account_backoff: wait for the shared account retry time')
             self._persist_contract("schema", schema.sha256,
                                    {"text": schema.text, "version": schema.version})
             self._persist_contract("execution", config.sha256, asdict(config))

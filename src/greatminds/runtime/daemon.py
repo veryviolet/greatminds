@@ -19,7 +19,7 @@ from .stand_scheduler import StandScheduler
 from .store import RunStore, TERMINAL, TaskRevision
 from .supervisor import Supervisor
 from .processes import terminate_group
-from .retry_policy import startup_retry
+from .retry_policy import startup_retry, account_backoff
 
 
 async def _domain_reconcile(loop, pool, results):
@@ -36,6 +36,9 @@ def assignments(store, config, schema, *, snapshot=None):
     snapshot = store.snapshot() if snapshot is None else snapshot
     runs = list(snapshot["runs"].values())
     active = [run for run in runs if run["state"] not in TERMINAL]
+    observed_at = store.clock()
+    account_delays = {account: account_backoff(snapshot, account, config, observed_at)
+                      for account in {binding.account for binding in config.bindings}}
     for binding in config.bindings:
         if binding.scheduling != "queue":
             continue
@@ -81,6 +84,8 @@ def assignments(store, config, schema, *, snapshot=None):
                         reason = "human_input_required"
                     else:
                         reason = startup_retry(snapshot, binding, task, config, schema, store.clock())["reason"]
+                if reason == "ready":
+                    reason = account_delays[binding.account]["reason"]
                 if reason == "ready" and len(active) >= config.max_running:
                     reason = "project_capacity"
                 elif reason == "ready" and sum(run["binding_id"] == binding.id for run in active) >= binding.max_running:

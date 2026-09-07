@@ -36,7 +36,8 @@ ACP prompt completion is distinct from a verified workflow transition. Completed
 prompt dispatch have bounded exponential retries under the
 [execution contract](execution-contract.md#bounded-startup-retries).
 `run retry RUN_ID` permits an explicit further attempt after its cause is
-resolved. Account cooldowns and broader no-progress policies remain tracked in the
+resolved. Startup delays are shared by account; provider rate-limit handling
+and broader no-progress policies remain tracked in the
 [modernization plan](modernization-plan.md).
 
 ## Conversations and frontends

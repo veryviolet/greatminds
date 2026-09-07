@@ -1603,3 +1603,33 @@ remain covered by the daemon tests. No live provider was called.
 This advances B1/M3 but does not complete them: shared account/provider cooldown,
 configurable no-progress policy, broader health/retention and resource metrics
 remain required. Post-prompt uncertain work is not automatically replayed.
+
+### Account-wide startup backoff (2026-09-07)
+
+Added project account_retry_initial_seconds (default 5) and
+account_retry_max_seconds (default 60). Recognized pre-prompt startup failures
+form a shared streak across tasks, role bindings and conversations with the same
+configured account. A capped exponential delay gates new tasks and operator
+retries too; other account groups remain independent. Existing active work is
+not cancelled. Durable prompt-start evidence or an active configured session
+resets this connectivity streak, without implying domain progress or approval.
+
+The account verdict is computed once per account in each assignment snapshot,
+exposed in run status, and rechecked under the claim transaction for both queued
+and interactive admission. A delayed conversation retains its queued message.
+No provider-prose parsing, model switching or credential-identity inference is
+introduced. Failure timestamps/counters remain derived from durable outcomes,
+so reopening the store/daemon does not reset backoff.
+
+Validation: 96 policy/configuration/supervisor/observation checks passed;
+44 account/ACP-daemon/conversation integration checks passed in 77.03s;
+30 final policy checks passed after caching per-account observations. Scenarios
+cover multiple bindings/tasks, independent accounts, capped delay, restart,
+explicit retry, interactive message preservation and invalid budgets. ACP
+integration uses local synthetic processes; no live provider was invoked.
+
+Remaining B1/M3 work includes configurable no-progress behavior, provider-reported
+rate-limit handling, operator-resettable account circuit breaking, health/log
+retention and broader budgets/metrics. Account grouping here is project-local;
+it does not claim cross-project credential coordination. Other full-plan
+acceptance requirements remain open.

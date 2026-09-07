@@ -783,5 +783,29 @@ permission, revision and unresolved-operation gates still apply.
 
 An explicit operator retry permits one further attempt but does not reset the
 count for that unchanged revision. This startup policy does not implement
-provider/account cooldowns, automatic post-prompt retries, or configurable
+provider-reported rate-limit handling, automatic post-prompt retries, or configurable
 no-progress-turn budgets; those remain separate modernization requirements.
+
+### Shared account startup backoff
+
+Project-level `account_retry_initial_seconds` (default 5) and
+`account_retry_max_seconds` (default 60) are positive integers. Consecutive
+recognized startup failures across all bindings, tasks and conversations using
+the same `account` produce a shared exponential delay capped at the maximum.
+New tasks and explicit operator retries wait too. Other account identities are
+independent. Account identity is a configured grouping, not an inferred provider
+or credential identity.
+
+The delay is derived from persisted completion times and survives daemon restart.
+A run reaching a configured session/running state, or a durable outcome showing
+prompt start, resets the connectivity failure streak. This demonstrates startup
+recovery only; it does not establish task progress or passing evidence. Existing
+runs are not cancelled, and authentication holds retain their separate policy.
+`run status` exposes `accounts` with failure count, next admission time and source
+run. Queue scheduling and atomic claims enforce the same delay; blocked chat
+admission leaves the user message queued.
+
+This controller handles recognized startup failures. Provider-reported rate
+limits, cross-project account coordination and an operator-resettable circuit
+breaker are not implemented by this delay. Per-revision automatic retry limits
+still bound repeated attempts of one unchanged task.
