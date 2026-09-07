@@ -6,7 +6,7 @@
   "publisher": "veryviolet",
   "license": "Apache-2.0",
   "scripts": {
-    "check": "node --check extension.js && node --check test/extension.test.js",
+    "check": "node --check extension.js && node --check test/extension.test.js && node --check test/host-smoke.js",
     "test": "npm run check && node --test test/*.test.js"
   },
   "engines": {

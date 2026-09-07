@@ -2055,3 +2055,30 @@ matrix record this limitation; Cline live completion requires restored login.
 Next confirmed acceptance gap: the VS Code extension has only mock-API tests;
 code and xvfb-run are available for a real extension-host smoke. B2 retention,
 remaining protocol/harness coverage and the full requirement audit remain open.
+
+### Real VS Code extension host and literal terminal argv (2026-09-07)
+
+Added a real Linux extension-host smoke and isolated launcher, following VS Code's
+extensionDevelopmentPath/extensionTestsPath runner contract. The system editor was
+1.84.0, below the extension's declared ^1.92.0 engine, so an official standalone
+1.92.2 distribution was downloaded to /tmp; no installed editor/profile changed.
+The smoke activated the development extension, exercised real CLI metadata calls,
+observed actual terminal processes/argv for events, coordd and dashboard, and
+confirmed process termination on disposal with zero configured agent runs.
+
+This exposed an existing inconsistency: cockpit commands used shell-interpolated
+CLI strings while chat already used explicit terminal argv. All cockpit commands
+now use shellPath/shellArgs too. A CLI symlink containing spaces and $(literal)
+worked literally in the real host. Existing chat selection and domain ownership
+remain unchanged. Quick-pick interactions and live chat were not exercised in this
+host smoke; their existing separate coverage is not relabeled as host coverage.
+
+Evidence: evidence/vscode-extension-host-2026-09-07.json. Six direct Node unit
+scenarios passed, npm test passed, and six Python scaffold/public-doc checks passed
+in 0.68s. Host activation, CLI backend and three process/cleanup checks passed on
+VS Code 1.92.2. The reusable launcher isolates user data/extensions, disables update
+and telemetry settings, preserves local logs, and bounds/cleans its process group.
+
+C7's real extension-host smoke now exists and passes. Remaining B2 retention,
+protocol/harness coverage and final requirement-by-requirement acceptance are
+still open; this does not mark the full modernization complete.

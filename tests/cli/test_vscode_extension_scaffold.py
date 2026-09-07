@@ -35,7 +35,7 @@ def test_vscode_extension_uses_cli_backend() -> None:
     assert "execFile(cliPath()" in text
     assert "GREATMINDS_PROJECT_DIR" in text
     assert "agent\", \"tools\", \"--json" in text
-    assert "run events --follow" in text
+    assert '"run", "events", "--follow"' in text
     assert "driven-log" not in text
     assert "stand\", \"status" in text
     assert ".greatminds" not in text

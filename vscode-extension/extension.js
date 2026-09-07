@@ -31,14 +31,14 @@ function runGreatminds(args, options = {}) {
   });
 }
 
-function terminal(name, command) {
+function terminal(name, args) {
   const term = vscode.window.createTerminal({
     name,
     cwd: workspaceRoot(),
+    shellPath: cliPath(), shellArgs: args,
     env: { GREATMINDS_PROJECT_DIR: workspaceRoot() }
   });
   term.show();
-  term.sendText(command);
   return term;
 }
 
@@ -130,9 +130,9 @@ function activate(context) {
     status,
     vscode.window.registerTreeDataProvider("greatminds.tools", provider),
     vscode.commands.registerCommand("greatminds.refresh", () => provider.refresh()),
-    vscode.commands.registerCommand("greatminds.openDashboard", () => terminal("greatminds dashboard", `${cliPath()} dashboard`)),
-    vscode.commands.registerCommand("greatminds.openRunEvents", () => terminal("greatminds run events", `${cliPath()} run events --follow`)),
-    vscode.commands.registerCommand("greatminds.openCoordd", () => terminal("greatminds coordd", `${cliPath()} coordd --verbose`)),
+    vscode.commands.registerCommand("greatminds.openDashboard", () => terminal("greatminds dashboard", ["dashboard"])),
+    vscode.commands.registerCommand("greatminds.openRunEvents", () => terminal("greatminds run events", ["run", "events", "--follow"])),
+    vscode.commands.registerCommand("greatminds.openCoordd", () => terminal("greatminds coordd", ["coordd", "--verbose"])),
     vscode.commands.registerCommand("greatminds.newChat", chatCommand(output, async () => {
       const rows = await chatRows("bindings");
       const selected = await vscode.window.showQuickPick(rows.map(row => ({

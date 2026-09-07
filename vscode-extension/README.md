@@ -45,5 +45,26 @@ The test harness runs under Node.js and mocks the VS Code API. It verifies the
 CLI backend invocation, Agent Tools tree rendering, and cockpit terminal
 commands without requiring a graphical VS Code session.
 The ACP tests cover role/task selection, argv handling with spaces, attaching
-without recreation, close requests, and cancelled selection. A real extension-host
-smoke test remains part of the modernization acceptance work.
+without recreation, close requests, and cancelled selection.
+
+A separate Linux smoke runs inside the real Extension Development Host using the
+[official test runner entry point](https://code.visualstudio.com/api/working-with-extensions/testing-extension#advanced-setup-your-own-runner):
+
+```bash
+python tools/vscode_host_smoke.py --code /path/to/supported/code --cli /path/to/greatminds
+```
+
+Run from the repository root with Python, a VS Code version satisfying the package
+engine requirement, and `xvfb-run` installed. The launcher creates a temporary
+workspace/profile and CLI symlink containing spaces and shell metacharacters. It
+loads this development extension, exercises CLI metadata commands, and observes
+actual event-stream, daemon and dashboard terminal processes. Closing each terminal
+must stop its process. The profile disables updates and telemetry; no harness is
+configured. Logs and the JSON result remain in the printed temporary directory.
+The launcher bounds the run and terminates its process group on timeout.
+
+VS Code 1.92.2 passed this smoke on Linux x86_64; see
+[recorded evidence](../docs/architecture/evidence/vscode-extension-host-2026-09-07.json).
+Quick-pick interactions and live ACP chat remain covered by their separate tests,
+not by this host smoke. All cockpit terminals now invoke the configured CLI with
+separate argv, just like chat terminals; CLI paths are never sent as shell text.

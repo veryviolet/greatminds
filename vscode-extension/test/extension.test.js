@@ -130,8 +130,9 @@ test("AgentToolsProvider refresh parses CLI JSON and renders tree item", async (
   }
 });
 
-test("activate registers cockpit commands and opens terminals", async () => {
+test("activate registers cockpit commands and opens CLI processes with literal argv", async () => {
   const harness = loadExtension({
+    configuredCli: "/tmp/cli with spaces $(literal)",
     execImpl(_cmd, args, _options, cb) {
       if (args.join(" ") === "agent tools --json") {
         cb(null, "[]", "");
@@ -156,9 +157,12 @@ test("activate registers cockpit commands and opens terminals", async () => {
     await harness.commands.get("greatminds.openRunEvents")();
     await harness.commands.get("greatminds.openCoordd")();
     assert.equal(harness.terminals.length, 3);
-    assert.equal(harness.terminals[0].sent[0], "greatminds-test dashboard");
-    assert.equal(harness.terminals[1].sent[0], "greatminds-test run events --follow");
-    assert.equal(harness.terminals[2].sent[0], "greatminds-test coordd --verbose");
+    assert.deepEqual(harness.terminals.map(term => term.opts.shellArgs),
+      [["dashboard"], ["run", "events", "--follow"], ["coordd", "--verbose"]]);
+    for (const term of harness.terminals) {
+      assert.equal(term.opts.shellPath, "/tmp/cli with spaces $(literal)");
+      assert.deepEqual(term.sent, []);
+    }
     await harness.commands.get("greatminds.showStandStatus")();
     assert.match(harness.output.lines.join("\n"), /human output/);
   } finally {
