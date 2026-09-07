@@ -20,7 +20,20 @@ class ActivityStore:
     def snapshot(self):
         if not self.path.exists():
             return {'version': 1, 'cursor': 0, 'discarded_through': 0, 'events': []}
-        return json.loads(self.path.read_text())
+        state = json.loads(self.path.read_text())
+        if (not isinstance(state, dict) or state.get('version') != 1
+                or type(state.get('cursor')) is not int
+                or type(state.get('discarded_through')) is not int
+                or not 0 <= state['discarded_through'] <= state['cursor']
+                or not isinstance(state.get('events'), list)):
+            raise ValueError('Invalid activity journal')
+        previous = state['discarded_through']
+        for event in state['events']:
+            if (not isinstance(event, dict) or type(event.get('sequence')) is not int
+                    or not previous < event['sequence'] <= state['cursor']):
+                raise ValueError('Invalid activity sequence')
+            previous = event['sequence']
+        return state
 
     def append(self, update, *, secrets=()):
         kind = update.get('sessionUpdate')

@@ -174,7 +174,12 @@ class WebService:
             except GreatMindsError as exc:
                 item['preview_error'] = str(exc)
             commands.append(item)
-        return {'run': state['runs'][identity], 'activity': ActivityStore(self.runtime, identity).events(after),
+        try:
+            activity = ActivityStore(self.runtime, identity).events(after)
+        except (OSError, ValueError):
+            activity = {'events': [], 'cursor': 0, 'discarded_through': 0,
+                        'unavailable': True}
+        return {'run': state['runs'][identity], 'activity': activity,
                 'events': [e for e in state['events'] if e.get('run_id') == identity],
                 'commands': commands,
                 'results': [r for r in state['results'].values() if r['envelope']['run_id'] == identity]}

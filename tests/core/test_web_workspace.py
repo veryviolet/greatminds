@@ -183,3 +183,15 @@ def test_web_permission_round_trip_uses_daemon_broker(service, http):
     events = json.loads(http(f'/api/conversations/{conv}/events')[2])['events']
     assert 'yes' in ''.join(e.get('text', '') for e in events)
     assert not json.loads(http('/api/state')[2])['permissions']
+
+
+def test_corrupt_activity_does_not_hide_run_state(service, monkeypatch):
+    store = ActivityStore(service.runtime, 'saved-run')
+    store.path.parent.mkdir(parents=True)
+    store.path.write_text('{}')
+    state = {'runs': {'saved-run': {'id': 'saved-run', 'state': 'completed'}},
+             'commands': {}, 'results': {}, 'events': []}
+    monkeypatch.setattr(service.store, 'snapshot', lambda: state)
+    detail = service.run_detail('saved-run')
+    assert detail['run']['state'] == 'completed'
+    assert detail['activity']['unavailable']
