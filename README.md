@@ -19,6 +19,17 @@ and the queue tree under `.greatminds/`. It does not install harnesses, change
 authentication, install plugins or services, or choose a provider for you.
 Repeated setup preserves your execution contract and task data.
 
+Local ACP workflows do not require Ansible or a deployed stand. If you enable
+YAML stand profiles, install the optional dependency in the same environment:
+
+```bash
+python -m pip install 'greatminds[stands]'
+```
+
+This adds the validated Ansible version range; it does not configure hosts or
+authorize deployment. Required stand/evidence gates still apply to tasks that
+declare them.
+
 Add an ACP agent and a role binding to `coordination/execution.yaml`. This is a
 configuration example: replace the executable path and version labels with your
 installed adapter and harness, and complete that harness's authentication first.

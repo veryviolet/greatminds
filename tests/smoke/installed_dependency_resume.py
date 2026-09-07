@@ -6,6 +6,8 @@ Example (from any working directory):
 Creates a synthetic project in the system temporary directory and prints its
 path. No provider process, user service, or real project is used.
 """
+import argparse
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -14,6 +16,30 @@ import sys
 import tempfile
 import yaml
 import greatminds
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--without-stands', action='store_true',
+                    help='also verify a minimal install and the optional-dependency error')
+options = parser.parse_args()
+if options.without_stands:
+    assert importlib.util.find_spec('ansible') is None
+    assert importlib.util.find_spec('inotify_simple') is None
+    from greatminds.cli.stand_executor import _ansible_playbook_path
+    from greatminds.core.errors import GreatMindsError
+    saved_path = os.environ.get('PATH')
+    try:
+        os.environ['PATH'] = ''
+        try:
+            _ansible_playbook_path()
+        except GreatMindsError as exc:
+            assert 'greatminds[stands]' in str(exc)
+        else:
+            raise AssertionError('minimal install unexpectedly resolved Ansible')
+    finally:
+        if saved_path is None:
+            os.environ.pop('PATH', None)
+        else:
+            os.environ['PATH'] = saved_path
 
 project = Path(tempfile.mkdtemp(prefix='greatminds-dependency-wheel-project-'))
 cli = [sys.executable, "-m", "greatminds.cli.main"]

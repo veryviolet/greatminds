@@ -1437,3 +1437,30 @@ Full validation after the dependency cutover: **1379 passed, 1 skipped in
 282.59 seconds** (`/tmp/greatminds-dependency-full-suite.txt`). No collection
 errors or failing tests. The standalone installed-wheel smoke is additional
 validation, outside pytest collection.
+
+### Minimal installation and optional Ansible profiles (2026-09-07)
+
+Moved the existing validated ansible-core range to the `stands` extra and removed
+inotify-simple, which has no remaining runtime imports after the ACP cutover.
+Regenerated uv.lock offline without changing unrelated package versions. YAML
+profile execution retains explicit missing-executable failure and now points to
+`greatminds[stands]` in the running environment. This changes installation cost,
+not deployment authorization or required stand/evidence gates.
+
+Replaced the obsolete first-project guide (native setup --session, vendor plugin
+installation and native configuration instructions) with the implemented ACP
+setup, explicit manifest/auth, daemon/chat, observations and optional service and
+stand workflow. README documents the optional extra. The selectable pipeline
+presets and measured one-harness complete task campaign required by C2 remain
+open; this checkpoint does not claim them complete.
+
+Validation: base wheel built and installed offline into a fresh venv: **10
+packages**, with no ansible or inotify module. The reproducible installed smoke
+script's new `--without-stands` mode verifies absence, the actionable missing
+Ansible error, repeated setup, exactly one SYSTEM dependency resume across two
+daemon starts and zero agent runs. Fixture:
+/tmp/greatminds-dependency-wheel-project-g71n0b3f. A separate fresh `[stands]`
+installation installed **17 packages**, including ansible-core 2.17.14. All
+**18 package/profile tests passed**, including real ansible-playbook syntax check
+with synthetic local inventory and Ansible temporary state under /tmp. No remote
+connection or deployment was performed. uv lock --check --offline passed.

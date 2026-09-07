@@ -1,324 +1,147 @@
-# First Project
+# First local project
 
-Create or enter a repository, then run setup:
-
-```bash
-cd /path/to/project
-greatminds setup --session myproject
-```
-
-`setup` creates editable project configuration under `coordination/`, runtime
-state under `.greatminds/`, and local agent configuration files. It does not
-overwrite an existing `coordination/coord.yaml`; edit that file when you want
-different tools, windows, or launch modes.
-
-## Agent tools and role mapping
-
-List the installed tool capabilities at any time:
+Install Greatminds in a Python 3.11+ environment. Start in the repository you want
+to work on:
 
 ```bash
-greatminds agent tools
-greatminds agent tools --json
+python -m pip install greatminds
+greatminds setup
 ```
 
-The packaged adapters support these tools:
+Setup creates an empty `coordination/execution.yaml` and runtime queues under
+`.greatminds/`. Repeating it preserves your configuration and task data. Harness
+installation, provider login and optional service installation are separate steps.
+Setup does not install vendor plugins, rewrite git hooks or widen permissions.
 
-| Tool | Use it for | Setup requirement |
-| --- | --- | --- |
-| `claude` | Claude Code chat, loop, and driven roles. | Install Claude Code, authenticate it for the OS user that runs the fleet, and keep the `claude` binary reachable from daemon shells. |
-| `codex` | OpenAI Codex chat and driven roles. | Run `codex login` once for the machine account; optionally set `GREATMINDS_CODEX_HOME` when the login is not under `~/.codex`. |
-| `cursor` | Cursor agent chat/loop panes and one-shot driven roles. | Install Cursor CLI / `cursor-agent`, authenticate it for the OS user, and keep it on `PATH`. Greatminds runs `cursor-agent` through a `systemd-run --user` scope in `cursor.slice` by default; tune `GREATMINDS_CURSOR_MEM_HIGH`, `GREATMINDS_CURSOR_MEM_MAX`, `GREATMINDS_CURSOR_CPU`, or `GREATMINDS_CURSOR_SLICE` when needed. |
-| `cline` | Cline CLI chat/loop panes and one-shot driven roles. | Install and configure Cline CLI for the OS user that runs the fleet. |
-| `gemini` | Gemini CLI chat/loop panes and one-shot driven roles. | Install Gemini CLI, authenticate/configure it for the OS user, and keep `gemini` on `PATH`. Driven turns run with `--skip-trust` for unattended workspaces. |
-| `openhands` | OpenHands CLI chat panes and one-shot driven roles. | Install the `openhands` command, run `openhands` or `openhands login` once to create machine settings, and configure its LLM provider before assigning driven roles. `agent-canvas` is a separate OpenHands UI launcher and is not the CLI entrypoint used by the adapter. |
+## Configure one ACP harness
 
-Window modes in `coordination/coord.yaml`:
+Install an ACP harness or upstream adapter and complete its authentication using
+that tool's supported login method. Consult the
+[compatibility matrix](../architecture/acp-compatibility.md) for tested versions
+and limitations. A configured executable is not proof of working authentication
+or protocol compatibility.
 
-| Mode | Meaning |
-| --- | --- |
-| `chat` | A live tmux pane for an operator-facing conversation. |
-| `loop` | A resident watchdog pane that wakes on its own timer. |
-| `staged` | A tmux pane with the start command pre-typed; the operator starts it manually when needed. |
-| `driven` | No live pane; `coordd` starts one driven turn when work lands in the role's queue, inbox, or stand event stream. Claude and Codex use stateful drivers; Cursor, Cline, Gemini, and OpenHands use one-shot headless subprocess drivers. |
-
-Role-to-tool assignment lives in `coordination/coord.yaml`. The default
-template mixes Claude and Codex roles, but it is ordinary project config.
-Change `tool:` per role, then restart the daemon and launch session:
-
-| Role | Default tool | Default mode |
-| --- | --- | --- |
-| `ARCHITECT-PLANNER` | `codex` | `chat` |
-| `MAINTAINER` | `claude` | `loop` |
-| `LIVE-DEVELOPER` | `claude` | `staged` |
-| `ARCHITECT-REVIEWER` | `codex` | `driven` |
-| `DEVELOPER` | `claude` | `driven` |
-| `UI-DEVELOPER` | `claude` | `driven` |
-| `TECHNICAL-WRITER` | `codex` | `driven` |
-| `TESTER` | `claude` | `driven` |
-| `READER` | `claude` | `driven` |
-| `EXPLORER` | `codex` | `driven` |
+Edit `coordination/execution.yaml` using your actual executable and version
+labels. The placeholders below must be replaced before starting a conversation:
 
 ```yaml
-windows:
-  - name: planner
+version: 1
+agents:
+  local-agent:
+    transport: acp
+    argv: [/absolute/path/to/your-acp-agent]
+    adapter_version: your-tested-adapter-version
+    harness_version: your-tested-harness-version
+bindings:
+  planner:
+    agent: local-agent
     role: ARCHITECT-PLANNER
-    tool: codex
-    mode: chat
-  - name: maintainer
-    role: MAINTAINER
-    tool: claude
-    mode: loop
-  - name: dev
-    role: DEVELOPER
-    tool: claude
-    mode: driven
-  - name: reviewer
-    role: ARCHITECT-REVIEWER
-    tool: codex
-    mode: driven
+    scheduling: on-demand
+    permission: ask
 ```
 
-`mode: chat` and `mode: loop` create live panes. `mode: driven` creates no
-agent pane; `coordd` starts one driven turn when queue, inbox, or stand events
-arrive.
+One manifest can serve multiple role bindings. Roles, model selection,
+permissions, workspace, scheduling and account limits are configured separately.
+Use `scheduling: queue` for a role that should receive eligible queued work.
+The current schema retains each role's review and evidence gates; one configured
+harness does not imply that one role can approve every workflow stage.
 
-## Claude local settings
-
-During setup, greatminds writes or extends
-`.claude/settings.local.json`. New files include the Stop hook,
-`autoMode.allow: ["$defaults"]`, and the canonical
-`permissions.allow` entries from the packaged schema under
-`claude_settings.permissions.allow`.
-
-Those allow rules let unattended Claude roles perform the git operations they
-are authorized to run, such as reviewer commit, tag, push, merge, branch,
-checkout, and worktree commands. Without explicit allow rules, Claude Code can
-pause on an approval prompt that a driven or self-loop role cannot answer.
-
-Project operators can add their own `permissions.allow` entries directly in
-`.claude/settings.local.json`. Re-running `greatminds setup` unions the schema
-defaults into the existing list, deduplicates them, and preserves operator-added
-rules. For a valid existing file, setup leaves other top-level settings such as
-custom hooks and `autoMode` untouched.
-
-## Claude marketplace plugins
-
-During setup, greatminds installs curated Claude marketplace plugins for each
-Claude-hosted role from the packaged schema under `plugins.claude_marketplace`.
-For example, the shipped schema can assign plugins such as `playwright`,
-`sentry`, `postman`, or `sourcegraph` to the roles that use them.
-
-The install step runs the equivalent of `claude plugin install <name>` for each
-plugin assigned to that role. It is idempotent: plugins already present in
-`claude plugin list` are preserved, failed installs are reported in the setup
-summary, and setup continues with the remaining plugins.
-
-Setup resolves the `claude` binary from `PATH` first, then checks common npm
-install locations: `~/.local/bin/claude`, `~/.npm-global/bin/claude`, and
-`/usr/local/bin/claude`. This covers non-login shells, SSH launches, and daemon
-contexts where the interactive shell profile that adds npm binaries to `PATH`
-has not been loaded.
-
-If setup reports `claude binary not found in PATH or common locations`, plugin
-installation is skipped for the affected roles and the plugin names are counted
-as failed. Add Claude Code to `PATH`, or install it with
-`npm install -g @anthropic-ai/claude-code`, then run `greatminds setup` again.
-
-The setup summary separates marketplace plugin results into `installed`,
-`pre-existing`, `dedupe-this-run`, and `failed`. `pre-existing` means the plugin
-was already present before setup started; `dedupe-this-run` means another role
-installed it earlier in the same setup run. Failed installs include the plugin
-name in the summary, and setup also prints the first stderr line from the
-underlying `claude plugin install` command.
-
-To add project-local Claude plugins, create role files under
-`coordination/plugins.local/`. Setup merges those files with the packaged
-defaults:
-
-```yaml
-# coordination/plugins.local/tester.yaml
-claude_marketplace: [playwright, sentry, postman, codspeed]
-```
-
-Keep empty lists for roles that should not receive marketplace plugins. Codex
-marketplace lists are currently empty by design; Codex roles use generated
-per-role profile sources plus the single machine Codex login instead of Claude
-marketplace plugin installs. See
-[Codex Profiles](../concepts/codex-profiles.md) for the generated layout and
-launch path.
-
-After setup, verify the installed Claude plugins with:
+Validate the configuration without starting an agent:
 
 ```bash
-claude plugin list
+greatminds project execution
+greatminds daemon doctor --project-dir "$PWD" --json
 ```
 
-## Project environment
+Doctor checks configuration, declared environment references and executable
+availability. Provider login and an actual ACP turn still need verification.
+See the [execution contract](../architecture/execution-contract.md) for model,
+mode, environment reference and capability requirements. Store secrets outside
+the execution manifest and task files.
 
-`.greatminds/PROJECT.env` is the minimal place for machine-local
-project-specific values. It is gitignored, loaded before each agent starts, and
-passed to stand profiles as Ansible extra vars.
+## Start the daemon and a conversation
 
-For a local smoke stand:
+In one terminal:
 
 ```bash
-cat > .greatminds/PROJECT.env <<'EOF'
-STAND_HOST=localhost
-STAND_USER=violet
-EOF
+greatminds coordd --project-dir "$PWD"
 ```
 
-For a remote stand, make `STAND_HOST` an SSH config alias or comma-separated
-aliases, and set `STAND_USER` to the remote account whose PATH should be used
-by the stand playbook:
+In another terminal in the same project:
 
 ```bash
-cat > .greatminds/PROJECT.env <<'EOF'
-STAND_HOST=app-stand
-STAND_USER=deploy
-EOF
+greatminds chat create planner
+# Replace CONVERSATION_ID with the returned ID:
+greatminds chat talk CONVERSATION_ID
 ```
 
-Add product-specific values there as well, such as service URLs, ports,
-database names, deploy paths, or feature flags. Reference them in
-`coordination/PROJECT.md`, MCP configs, skills, and stand profiles.
+The daemon owns the ACP session. The terminal displays streamed responses and
+explicit permission choices. Detaching leaves the turn running; attaching again
+does not resubmit your message. Use `chat interrupt CONVERSATION_ID REQUEST_ID` to request
+cancellation or `chat close CONVERSATION_ID` to close admission and clean up the
+conversation. For an existing workflow task, use
+`chat create BINDING_ID --task TASK_ID` to bind its exact revision.
 
-## Minimal stand profile
-
-A stand is the live environment that agents lease for deployed validation.
-The lease does not deploy by itself; `coordd` prepares the active lease by
-running an Ansible YAML profile from `coordination/stand-profiles/`.
-
-Setup copies reference profiles:
-
-- `smoke-only`: reachability probe, useful first.
-- `full-deploy`: rsync and install pattern for backend-style deployment.
-- `vite-dev`: backend plus a Vite dev server for live UI iteration.
-
-Setup also writes `coordination/stand-profiles.yaml`, the project-owned
-registry of allowed profile names. A lease selects a registry key:
+Tmux and IDE frontends are optional:
 
 ```bash
-greatminds stand lease --task <task-id> --profile full-deploy
+greatminds launch --target tmux
+# Or generate ACP workspace tasks:
+greatminds launch --target vscode
 ```
 
-The selected key is stored in `.greatminds/.stand/state.yaml` as
-`active_lease.profile`.
-The registry entry chooses the YAML file to run:
+On Linux, you can use an optional systemd user service instead of the foreground
+daemon:
 
-```yaml
-profiles:
-  full-deploy:
-    file: full-deploy.yaml
-    purpose: Full deployed product validation on a stand.
-    environment: stand
-    used_for: [tester_validation, explorer_review, reviewer_validation]
-    default_for: [feature_test, explorer, reviewer]
+```bash
+greatminds daemon install --name my-project --project-dir "$PWD"
+greatminds daemon start --project my-project
 ```
 
-`used_for` describes what the profile can safely serve. `default_for` maps
-common role intents to one registry key; each `default_for` token must be
-claimed by at most one profile. The allowed tokens are defined in
-the packaged schema copied to `.greatminds/schema.yaml` under
-`stand_profile_registry`.
+Use a single daemon owner for the project. See the
+[operations runbook](../operations/runbook.md) for environment setup, updates and
+recovery.
 
-Inspect and validate the registry after edits:
+## Observe work and diagnose holds
+
+```bash
+greatminds run status
+greatminds run events --follow
+greatminds wake-check --json
+greatminds watchdog
+```
+
+Run status explains assigned tasks, execution state, authentication/input waits
+and dispatch holds. `run pause` stops new dispatch while existing work may finish;
+`run resume` restores dispatch. `run cancel RUN_ID` requests bounded cancellation.
+An explicit `run retry RUN_ID` authorizes a further attempt after you resolve its
+cause; it does not make uncertain command effects disappear.
+
+The daemon resumes tasks only when declared terminal dependencies, task readiness
+and live-role gates allow it. ACP prompt completion alone does not verify a task.
+Agents submit typed results; the domain service validates the assigned identity,
+revision, decision and evidence before applying a workflow transition.
+
+## Add deployed validation only when needed
+
+Local ACP operation needs neither Ansible nor a remote stand. For YAML stand
+profiles, install the optional dependency in the Greatminds environment:
+
+```bash
+python -m pip install 'greatminds[stands]'
+```
+
+This installs the validated Ansible range. It does not configure hosts, create
+profiles or authorize deployment. Configure project profiles under
+`coordination/stand-profiles/`, register them in `coordination/stand-profiles.yaml`,
+and declare the authorized stand policy in `coordination/execution.yaml`.
 
 ```bash
 greatminds stand profiles list
 greatminds stand profiles doctor
 ```
 
-To add a profile, add a registry entry and a matching YAML file under
-`coordination/stand-profiles/`. For production, add an explicit production
-entry with `environment: production`, `requires_explicit_user_approval: true`,
-and an `allowed_roles` list such as `[ARCHITECT-REVIEWER, MAINTAINER]`.
-Production leases must include an approval marker after the user has approved
-that lease:
-
-```bash
-greatminds stand lease \
-  --task <task-id> \
-  --profile production \
-  --profile-approval USER_APPROVED
-```
-
-The smallest useful `coordination/stand-profiles/smoke-only.yaml` is:
-
-```yaml
----
-- name: register stand node
-  hosts: localhost
-  gather_facts: false
-  tasks:
-    - name: add configured stand host
-      ansible.builtin.add_host:
-        name: "{{ STAND_HOST | default('localhost') }}"
-        groups: stand_nodes
-        ansible_connection: >-
-          {{ 'local' if (STAND_HOST | default('localhost')) == 'localhost'
-             else 'ssh' }}
-
-- name: smoke stand
-  hosts: stand_nodes
-  gather_facts: false
-  tasks:
-    - name: remote shell works
-      ansible.builtin.command: /bin/true
-      changed_when: false
-```
-
-When a task needs live validation, the holder leases a profile:
-
-```bash
-greatminds stand lease \
-  --task <task-id> \
-  --worktree "$(greatminds worktree path <task-id>)" \
-  --profile smoke-only
-```
-
-Use [Stand Operations](../concepts/stand-operations.md) for the complete lease,
-profile, and evidence flow.
-
-## Start the daemon
-
-The daemon is the process that watches inboxes and pushes wake text into idle
-agents:
-
-```bash
-greatminds daemon install
-greatminds daemon start
-greatminds daemon status
-```
-
-The daemon instance name is derived from `coord.yaml: session`. That lets one
-user run several projects on the same machine without a single global service
-name colliding.
-
-## Launch the fleet
-
-```bash
-greatminds launch --target tmux
-tmux a -t myproject
-```
-
-Each window in `coord.yaml` starts the configured role, tool, and mode. Planner
-is the user-facing interactive role. MAINTAINER runs as a self-loop watchdog.
-Worker roles are driven by `coordd`: their panes stay idle between turns, and
-coordd starts one turn when their inbox, queue, or stand-state events change.
-
-## File your first task
-
-The normal product path starts with user feedback or an inbox task, then flows
-through planning, implementation, test or reader review, and final review:
-
-```bash
-greatminds task new \
-  --stream product \
-  --kind feature \
-  --scope backend \
-  --title "Add a small feature"
-```
-
-From there, the planner owns triage and routing. Implementers do not claim from
-`feature_plan/`; they claim only from their own queues.
+Tasks declaring stand requirements still need valid lease and deployment
+evidence. Omitting Ansible does not bypass those gates. See the
+[execution contract](../architecture/execution-contract.md) for the deployment
+ledger, evidence freshness and recovery of uncertain operations.

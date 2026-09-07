@@ -80,7 +80,7 @@ def _lease(host: str = "avatar",
 
 def test_ansible_playbook_path_missing_raises(monkeypatch) -> None:
     """No ``ansible-playbook`` on PATH → actionable error pointing
-    at Phase D + the one-line install recipe."""
+    at the optional stand extra."""
     monkeypatch.setattr(se, "_sibling_ansible_playbook", lambda: None)
     monkeypatch.setattr(se.shutil, "which", lambda _name: None)
     with pytest.raises(GreatMindsError) as exc:
@@ -88,6 +88,7 @@ def test_ansible_playbook_path_missing_raises(monkeypatch) -> None:
     msg = str(exc.value)
     assert "ansible-playbook" in msg
     assert "ansible-core" in msg
+    assert "greatminds[stands]" in msg
 
 
 def test_ansible_playbook_path_returns_resolved(monkeypatch) -> None:
