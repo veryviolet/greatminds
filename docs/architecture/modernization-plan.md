@@ -1513,3 +1513,25 @@ registered cases. Failure restoration and no-launch invalid input checks passed.
 The operations runbook documents precedence and restart semantics. No live
 systemd service or provider was started. Remaining B1/M3 supervision policy,
 legacy asset cleanup and full milestone acceptance work stays open.
+
+### Explicit stand profiles without historical template substitution (2026-09-07)
+
+Removed the hash-based runtime substitution that could select a packaged
+worktree template instead of the named project profile. The loader now selects
+the lease worktree's explicit coordination profile, then the main project
+profile. Source/path evidence retains that choice. Removed the unused stale-hash
+migration table and reseed implementation from setup; no installed legacy fleet
+requires this mechanism. Profile updates are explicit project/worktree edits.
+
+Retired tests solely for historical hash registration/reseed behavior. Retained
+current template invariants for PATH, loopback transport, wheel command behavior
+and .git exclusion/cleanup, plus the worktree precedence and deployment gates.
+A new regression uses an actual historical full-deploy fixture, places a
+competing packaged example in the worktree, repeats setup and proves the explicit
+profile is selected and preserved byte-for-byte in both main/worktree cases.
+
+Validation: **71 profile/template/evidence checks passed, 1 optional Ansible
+syntax check skipped**; **65 deployment/ledger/default-ACP checks passed**.
+No deployment, service or live provider was invoked. Execution contract documents
+explicit profile selection. Other unused setup helpers/assets and the outstanding
+B1/M3 policies and milestone acceptance audit remain open.

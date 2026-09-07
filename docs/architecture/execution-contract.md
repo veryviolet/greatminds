@@ -744,3 +744,15 @@ It refuses to create a second runtime if task data still resides in coordination
 ACP run cancellation, recovery, permission checks and task revision validation
 remain part of the runtime contract. Follow the modernization plan for the current
 implementation status of diagnostics, service configuration and documentation.
+
+### Explicit stand profile selection
+
+When a lease has a worktree, its `coordination/stand-profiles/` profile wins;
+otherwise the main project's selected profile is used. The chosen path and
+source are recorded with deployment evidence. Files under the package's
+`templates/stand-profiles/` are examples, never automatic runtime substitutes.
+To evaluate an updated example, explicitly copy or adapt it into the selected
+project/worktree profile and review that change. Setup preserves existing
+profile bytes; package upgrades do not infer permission to replace a profile
+from its content hash. Existing deployment authorization, safety and evidence
+freshness checks still apply.
