@@ -99,6 +99,9 @@ class RoleBinding:
     account: str = "default"
     max_running: int = 1
     timeout_seconds: int = 1800
+    max_startup_retries: int = 2
+    retry_initial_seconds: int = 5
+    retry_max_seconds: int = 60
 
     @property
     def sha256(self) -> str:
@@ -196,6 +199,9 @@ def parse_execution_config(document: Any, *, roles: set[str]) -> ExecutionConfig
         agent = _string(item.get("agent"), "agent")
         if agent not in agent_ids:
             _fail(f"binding {name}: unknown agent {agent}")
+        retries = item.get("max_startup_retries", 2)
+        if type(retries) is not int or not 0 <= retries <= 20:
+            _fail("max_startup_retries must be an integer between 0 and 20")
         bindings.append(RoleBinding(
             id=name, role=role, agent=agent,
             workspace=_string(item.get("workspace", "."), "workspace"),
@@ -206,7 +212,10 @@ def parse_execution_config(document: Any, *, roles: set[str]) -> ExecutionConfig
             mode=_string(item["mode"], "mode") if "mode" in item else None,
             account=safe_name(item.get("account", "default")),
             max_running=_positive(item.get("max_running", 1), "max_running"),
-            timeout_seconds=_positive(item.get("timeout_seconds", 1800), "timeout_seconds")))
+            timeout_seconds=_positive(item.get("timeout_seconds", 1800), "timeout_seconds"),
+            max_startup_retries=retries,
+            retry_initial_seconds=_positive(item.get("retry_initial_seconds", 5), "retry_initial_seconds"),
+            retry_max_seconds=_positive(item.get("retry_max_seconds", 60), "retry_max_seconds")))
     limits = _mapping(root.get("account_limits", {}), "account_limits")
     commands = []
     for name, raw in _mapping(root.get("commands", {}), "commands").items():

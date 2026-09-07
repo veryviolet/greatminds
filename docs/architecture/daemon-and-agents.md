@@ -32,10 +32,11 @@ The daemon and shared domain services own mechanically decidable operations:
 - Schedule authorized stand operations and reconcile durable deployment records.
 - Recover recorded operations without replaying uncertain non-idempotent effects.
 
-ACP prompt completion is distinct from a verified workflow transition. Unchanged
-revisions do not dispatch repeatedly without authorization. `run retry RUN_ID`
-permits another attempt after its cause is resolved; automatic backoff and
-broader supervision policies remain work tracked in the
+ACP prompt completion is distinct from a verified workflow transition. Completed unchanged revisions remain held. Startup transport failures before
+prompt dispatch have bounded exponential retries under the
+[execution contract](execution-contract.md#bounded-startup-retries).
+`run retry RUN_ID` permits an explicit further attempt after its cause is
+resolved. Account cooldowns and broader no-progress policies remain tracked in the
 [modernization plan](modernization-plan.md).
 
 ## Conversations and frontends

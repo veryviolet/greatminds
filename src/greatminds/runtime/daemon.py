@@ -19,6 +19,7 @@ from .stand_scheduler import StandScheduler
 from .store import RunStore, TERMINAL, TaskRevision
 from .supervisor import Supervisor
 from .processes import terminate_group
+from .retry_policy import startup_retry
 
 
 async def _domain_reconcile(loop, pool, results):
@@ -79,12 +80,12 @@ def assignments(store, config, schema, *, snapshot=None):
                     elif receipts and receipts[-1]["envelope"]["decision"] == "needs_input":
                         reason = "human_input_required"
                     else:
-                        reason = "revision_already_attempted"
-                elif len(active) >= config.max_running:
+                        reason = startup_retry(snapshot, binding, task, config, schema, store.clock())["reason"]
+                if reason == "ready" and len(active) >= config.max_running:
                     reason = "project_capacity"
-                elif sum(run["binding_id"] == binding.id for run in active) >= binding.max_running:
+                elif reason == "ready" and sum(run["binding_id"] == binding.id for run in active) >= binding.max_running:
                     reason = "binding_capacity"
-                elif sum(run["account"] == binding.account for run in active) >= dict(config.account_limits).get(binding.account, config.max_running):
+                elif reason == "ready" and sum(run["account"] == binding.account for run in active) >= dict(config.account_limits).get(binding.account, config.max_running):
                     reason = "account_capacity"
                 yield binding, task, reason
 
@@ -181,7 +182,7 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                         if reason != "ready" or (once and dispatched_once):
                             continue
                         try:
-                            claim = supervisor.claim(task, binding)
+                            claim = supervisor.claim(task, binding, automatic=True)
                         except GreatMindsError as exc:
                             if exc.exit_code == 4:
                                 raise

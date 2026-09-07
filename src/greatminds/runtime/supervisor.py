@@ -84,12 +84,12 @@ class Supervisor:
             # With no recorded PID the launch gate never authorized exec.
             self.store.recover_run(run["id"], previous_owner=run["owner_id"], owner_id=self.id)
 
-    def claim(self, task: TaskRevision, binding: RoleBinding, *, conversation_id=None) -> Claim:
+    def claim(self, task: TaskRevision, binding: RoleBinding, *, conversation_id=None, automatic=False) -> Claim:
         if self._lease is None:
             raise RuntimeError("claim requires the exclusive supervisor lease")
         return self.store.claim(task=task, binding=binding, config=self.config,
                                 schema=self.schema, project=self.project, owner_id=self.id,
-                                conversation_id=conversation_id)
+                                conversation_id=conversation_id, automatic=automatic)
 
     def _transition(self, run_id, target, **kwargs):
         return self.store.transition(run_id, owner_id=self.id, event_id=uuid.uuid4().hex,
@@ -105,7 +105,7 @@ class Supervisor:
         started = time.monotonic()
         self._transition(run_id, "starting")
         agent = self.config.agent(binding.agent)
-        metrics = {"context_bytes": 0, "updates": 0, "stop_reason": None}
+        metrics = {"context_bytes": 0, "updates": 0, "stop_reason": None, "prompt_started": False, "pre_prompt_activity": False}
         current_turn = None
         accept_output = False
 
@@ -117,6 +117,8 @@ class Supervisor:
 
         # No raw tool input/output enters the durable metadata snapshot.
         async def event(kind, data):
+            if not metrics["prompt_started"]:
+                metrics["pre_prompt_activity"] = True
             if kind == "session_update":
                 metrics["updates"] += 1
                 metrics["last_activity_at"] = self.store.clock()
@@ -237,6 +239,7 @@ class Supervisor:
                     conversation.set_session(self.id, session_id)
                 prompt_deadline = time.monotonic() + binding.timeout_seconds
                 if conversation is None:
+                    metrics["prompt_started"] = True
                     result = await transport.prompt(prompt, timeout=binding.timeout_seconds)
                 else:
                     while True:
@@ -254,6 +257,7 @@ class Supervisor:
                         self.store._check_revision(TaskRevision(claim.run['task_id'], claim.run['task_path'],
                                                                claim.run['task_revision']))
                         accept_output = True
+                        metrics["prompt_started"] = True
                         pending = asyncio.create_task(transport.prompt(
                             prompt + '\nUser message:\n' + current_turn['prompt'], timeout=binding.timeout_seconds))
                         try:

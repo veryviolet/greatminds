@@ -1572,3 +1572,34 @@ real registration in the suite-isolated registry and the latter with explicit
 ACP execution/permission/chat requirements, retaining stand-policy assertions.
 The **15 related startup/documentation checks then passed**. No runtime code was
 changed after the broad traversal; a new all-green full-suite run is not claimed.
+
+### Bounded durable ACP startup retries (2026-09-07)
+
+Added per-binding max_startup_retries (0–20, default 2), retry_initial_seconds
+(default 5) and retry_max_seconds (default 60). Only durable failed startup
+transport/timeout outcomes explicitly recording prompt_started=false and
+pre_prompt_activity=false qualify. Missing executables, permissions, protocol or
+configuration errors, auth/input holds, interrupted/unknown outcomes, changed
+contracts and post-prompt failures remain held. Any recorded command or result
+also prevents automatic startup replay. Early session/permission/extension
+activity is treated as insufficient evidence for safe retry.
+
+The shared retry_policy computes exponential delay, next_at and attempt budget
+from persisted runs. Restart does not reset the count/time. Queue assignment
+uses it, automatic claims recheck it atomically alongside existing admission
+gates, and accepted repeats record startup_retry_dispatch. Run status includes
+retry timing/counts. Explicit operator retry permits one attempt without resetting
+the unchanged revision's automatic failure budget. No model/provider fallback or
+message-based error classification was added.
+
+Validation: 83 configuration/supervisor/observation/policy checks passed;
+37 policy/ACP-daemon checks passed; after adding the early-activity exclusion,
+20 final policy checks passed. Controlled-clock scenarios prove 5s/10s delays,
+cap enforcement, zero retry, budget exhaustion and restart persistence. The
+supervisor/daemon integration injects startup TimeoutError and verifies exactly
+three admissions at 1000/1005/1015, then no more. Actual ACP fixture scenarios
+remain covered by the daemon tests. No live provider was called.
+
+This advances B1/M3 but does not complete them: shared account/provider cooldown,
+configurable no-progress policy, broader health/retention and resource metrics
+remain required. Post-prompt uncertain work is not automatically replayed.

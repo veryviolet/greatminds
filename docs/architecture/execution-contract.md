@@ -756,3 +756,32 @@ project/worktree profile and review that change. Setup preserves existing
 profile bytes; package upgrades do not infer permission to replace a profile
 from its content hash. Existing deployment authorization, safety and evidence
 freshness checks still apply.
+
+### Bounded startup retries
+
+Queue bindings accept `max_startup_retries` (0–20, default 2),
+`retry_initial_seconds` (positive integer, default 5) and `retry_max_seconds`
+(positive integer, default 60). The delay doubles after each failed startup and
+is capped at the maximum. Zero retries disables automatic repetition.
+
+Only durable `failed` outcomes explicitly recording `prompt_started: false`
+and `pre_prompt_activity: false` with a startup transport failure or timeout
+qualify. Session updates, permission callbacks or extension notifications before
+the prompt prevent automatic replay. Missing executables,
+permission errors, authentication/input waits, configuration/protocol failures,
+crash-interrupted runs and unknown or post-prompt effects require explicit
+operator action. A recorded command or typed result also prevents automatic
+startup retry. The same task revision and pinned execution/binding/schema
+identities must still match. A contract change does not silently authorize replay.
+
+Retry time and counts are derived from durable run outcomes; restarting the
+daemon does not reset them. The scheduler exposes `retry_backoff` and
+`startup_retry_limit`, and `run status` includes each assignment's retry time and
+budget. Claim admission rechecks the verdict under the store lock and records
+`startup_retry_dispatch` when an automatic retry is admitted. Existing capacity,
+permission, revision and unresolved-operation gates still apply.
+
+An explicit operator retry permits one further attempt but does not reset the
+count for that unchanged revision. This startup policy does not implement
+provider/account cooldowns, automatic post-prompt retries, or configurable
+no-progress-turn budgets; those remain separate modernization requirements.

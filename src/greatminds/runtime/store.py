@@ -181,7 +181,8 @@ class RunStore:
 
     def claim(self, *, task: TaskRevision, binding: RoleBinding,
               config: ExecutionConfig, schema: SchemaSnapshot,
-              project: Path, owner_id: str, conversation_id: str | None = None) -> Claim:
+              project: Path, owner_id: str, conversation_id: str | None = None,
+              automatic: bool = False) -> Claim:
         safe_name(owner_id)
         if binding not in config.bindings or binding.role not in schema.document.get("roles", {}):
             _error("binding is not part of the effective execution contract", 3)
@@ -226,6 +227,13 @@ class RunStore:
             limit = dict(config.account_limits).get(binding.account, config.max_running)
             if sum(run["account"] == binding.account for run in active) >= limit:
                 _error(f"account {binding.account} execution capacity reached")
+            if automatic:
+                from .retry_policy import startup_retry
+                retry = startup_retry(state, binding, task, config, schema, self.clock())
+                if retry['reason'] != 'ready':
+                    _error(f"automatic dispatch held: {retry['reason']}")
+                if retry.get('retry_of'):
+                    self._event(state, 'startup_retry_dispatch', retry['retry_of'], retry)
             self._persist_contract("schema", schema.sha256,
                                    {"text": schema.text, "version": schema.version})
             self._persist_contract("execution", config.sha256, asdict(config))
