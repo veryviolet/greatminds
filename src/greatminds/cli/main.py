@@ -75,6 +75,8 @@ cli.add_command(_agent_mod.agent)
 cli.add_command(_dashboard_mod.dashboard)
 cli.add_command(_project_mod.project)
 cli.add_command(_run_mod.run)
+from . import web as _web_mod
+cli.add_command(_web_mod.web)
 from . import chat as _chat_mod
 cli.add_command(_chat_mod.chat)
 

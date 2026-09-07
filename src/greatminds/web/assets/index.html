@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ru">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Greatminds · Workspace</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<div class="shell">
+ <aside class="sidebar">
+  <a class="brand" href="/" aria-label="Greatminds"><span class="brand-mark">g<span>m</span></span> greatminds<span class="brand-dot">●</span></a>
+  <div class="project-label">РАБОЧЕЕ ПРОСТРАНСТВО</div>
+  <div class="project-card"><div class="project-icon">⌘</div><div><strong id="project-name">Загрузка…</strong><small id="project-path"></small></div></div>
+  <nav aria-label="Основная навигация">
+   <button data-view="overview" class="nav active"><span>▦</span> Обзор <small>01</small></button>
+   <button data-view="tasks" class="nav"><span>☷</span> Задачи <small id="task-count">0</small></button>
+   <button data-view="runs" class="nav"><span>↗</span> Запуски <small id="run-count">0</small></button>
+  </nav>
+  <div class="project-label role-label">ИНТЕРАКТИВНЫЕ РОЛИ</div><div id="role-nav"></div>
+  <div class="sidebar-bottom"><div class="status-line"><i id="connection-dot"></i><span id="connection-text">Подключение…</span></div><small>Локально. Под вашим управлением.</small><span class="version">GREATMINDS / ACP WORKSPACE</span></div>
+ </aside>
+ <div class="workspace">
+  <header class="toolbar"><div class="breadcrumb">Рабочее пространство <span>/</span> <b id="page-name">Обзор</b></div><div class="toolbar-actions"><span class="local-label">↳ LOCAL</span><button id="daemon-button" class="button subtle">Запустить демон</button><button id="pause-button" class="button">Ⅱ Пауза</button><button id="settings-button" class="button" aria-label="Открыть настройки">⚙ <span>Настройки</span></button></div></header>
+  <div id="tabs" class="tabs" role="tablist" aria-label="Рабочие вкладки"></div>
+  <div id="notice" role="status" class="notice hidden"></div>
+  <main id="main" tabindex="-1"><div class="empty">Подключаемся к локальному проекту…</div></main>
+  <footer><span>Greatminds · единый ACP, общая история</span><span id="refresh-time">—</span></footer>
+ </div>
+</div>
+<dialog id="settings-dialog"><form id="settings-form"><div class="dialog-head"><div><span class="eyebrow">РАБОЧЕЕ ПРОСТРАНСТВО</span><h2>Настройки исполнения</h2></div><button type="button" data-close="settings-dialog" class="icon-button" aria-label="Закрыть настройки">×</button></div><div id="settings-content" class="dialog-body"></div><div id="settings-error" class="form-error" role="alert"></div><div class="dialog-footer"><span>Изменения применяются после перезапуска демона.</span><button type="button" data-close="settings-dialog" class="button">Отмена</button><button class="button primary" type="submit">Сохранить настройки</button></div></form></dialog>
+<dialog id="detail-dialog"><div class="dialog-head"><h2 id="detail-title">Задача</h2><button data-close="detail-dialog" class="icon-button" aria-label="Закрыть">×</button></div><div id="detail-body" class="dialog-body"></div></dialog>
+<div id="toast" class="toast hidden" role="alert"></div>
+</body></html>

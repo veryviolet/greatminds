@@ -35,6 +35,14 @@ def test_three_role_pipeline_validates_merges_and_does_not_repeat(use_preset):
     ordered_runs = sorted(state['runs'].values(), key=lambda run: run['sequence'])
     assert [run['queue_observation']['scope'] for run in ordered_runs] == [
         'observed_revision_wait', 'accepted_transition_wait', 'accepted_transition_wait']
+    from greatminds.web.service import WebService
+    web = WebService(root)
+    for run in ordered_runs:
+        detail = web.run_detail(run['id'])
+        assert len(detail['results']) == 1
+        assert detail['activity']['events']
+        assert all('preview' in command and 'preview_error' not in command for command in detail['commands'])
+        assert all('text' in output for command in detail['commands'] for output in command['preview'].values())
     assert len(state['commands']) == 3
     assert all(c['status'] == 'succeeded' for c in state['commands'].values())
     data = yaml.safe_load((root / '.greatminds/verified/0001-clamp.yaml').read_text())

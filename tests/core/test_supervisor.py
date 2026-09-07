@@ -119,6 +119,9 @@ def test_supervised_acp_turn_has_durable_process_and_metrics(tmp_path):
             claim = service.claim(task, config.bindings[0])
             result = await service.execute(claim, binding=config.bindings[0], prompt="do useful work")
             assert result["state"] == "completed"
+            from greatminds.runtime.activity import ActivityStore
+            activity = ActivityStore(store.runtime, result["id"]).events()
+            assert "".join(e.get("text", "") for e in activity["events"]) == "hello"
             assert result["session_id"] == "test-session"
             assert result["outcome"]["updates"] == 1
             assert result["outcome"]["context_bytes"] == len("do useful work")
@@ -354,3 +357,18 @@ def test_launch_gate_eof_does_not_execute_command(tmp_path):
     os.close(write_fd)  # Parent died before durable PID record / launch authorization.
     assert process.wait(timeout=5) == 125
     assert not (tmp_path / "executed").exists()
+
+
+def test_public_activity_write_failure_does_not_change_execution_outcome(tmp_path, monkeypatch):
+    from greatminds.runtime.activity import ActivityStore
+    def unavailable(*args, **kwargs):
+        raise OSError('activity storage unavailable')
+    monkeypatch.setattr(ActivityStore, 'append', unavailable)
+    store, schema, config, task = setup(tmp_path)
+    async def check():
+        async with supervisor(tmp_path, store, schema, config) as service:
+            claim = service.claim(task, config.bindings[0])
+            result = await service.execute(claim, binding=config.bindings[0], prompt='do useful work')
+            assert result['state'] == 'completed'
+            assert result['outcome']['activity_unavailable'] is True
+    asyncio.run(check())

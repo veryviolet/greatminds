@@ -5,6 +5,10 @@ assignment, sessions, process cleanup, validation commands, and workflow
 transitions. Agents perform work that needs reasoning and submit typed results.
 Task files and evidence remain on the filesystem; there is no database service.
 
+The [local web workspace](docs/getting-started/local-web.md) provides role tabs,
+dashboards, settings, and batch-run inspection without application authentication.
+Start it with `greatminds web --project-dir /path/to/project --port 8765`.
+
 ## Quickstart
 
 The managed daemon runs on Linux with Python 3.11+, `/proc` and pidfd support.

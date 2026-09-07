@@ -110,6 +110,9 @@ class Supervisor:
         self._transition(run_id, "starting")
         agent = self.config.agent(binding.agent)
         metrics = {"context_bytes": 0, "updates": 0, "stop_reason": None, "prompt_started": False, "pre_prompt_activity": False}
+        from .activity import ActivityStore, ActivityRecorder
+        activity = ActivityRecorder(ActivityStore(self.store.runtime, run_id),
+            [claim.token, *(self.environment.get(ref, '') for _, ref in agent.environment)])
         current_turn = None
         accept_output = False
         observed_stages = set()
@@ -147,6 +150,12 @@ class Supervisor:
             if kind == "session_update":
                 metrics["updates"] += 1
                 update = data.get("update", {})
+                if (conversation is None and protocol_phase == 'prompt'
+                        and not metrics.get('activity_unavailable')):
+                    try:
+                        activity.record(update)
+                    except (OSError, ValueError, GreatMindsError):
+                        metrics['activity_unavailable'] = True
                 if update.get("sessionUpdate") == "usage_update":
                     self.store.record_usage(run_id, owner_id=self.id, kind="session", data=update)
                     if usage_ready and binding.max_reported_session_cost is not None:
@@ -424,6 +433,11 @@ class Supervisor:
             if reason == 'transport_failure':
                 reason = "configuration_error" if isinstance(exc, (ValueError, GreatMindsError)) else "transport_failure"
         finally:
+            if conversation is None and not metrics.get('activity_unavailable'):
+                try:
+                    activity.finish()
+                except (OSError, ValueError, GreatMindsError):
+                    metrics['activity_unavailable'] = True
             if conversation is not None and current_turn is not None:
                 conversation.finish(self.id, current_turn['id'],
                     status='cancelled' if target == 'cancelled' else 'failed', reason=reason)

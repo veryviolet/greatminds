@@ -51,6 +51,7 @@ nav:
   - Getting Started:
       - Installation: getting-started/installation.md
       - First Project: getting-started/first-project.md
+      - Local Web Workspace: getting-started/local-web.md
       - Upgrading: getting-started/upgrading.md
   - Concepts:
       - Queues: concepts/queues.md
