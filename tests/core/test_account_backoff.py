@@ -125,3 +125,43 @@ def test_interactive_admission_waits_without_consuming_user_message(tmp_path):
     run = store.claim(task=task, binding=binding, config=config, schema=schema,
                       project=root, owner_id='test', conversation_id=conversation.id)
     assert run.run['conversation_id'] == conversation.id
+
+
+def test_connectivity_reset_keeps_original_time_after_crash_recovery(tmp_path):
+    root, store, schema, config, binding, _, now, claim, fail = fixture(tmp_path, max_running=3)
+    fail(claim())
+    now[0] = 1005
+    healthy = store.claim(task=another_task(store), binding=binding, config=config, schema=schema,
+                          project=root, owner_id='test')
+    store.transition(healthy.run['id'], owner_id='test', target='starting', event_id='start')
+    store.transition(healthy.run['id'], owner_id='test', target='running', session_id='session', event_id='ready')
+    assert account_backoff(store.snapshot(), binding.account, config, now[0])['failures'] == 0
+    now[0] = 1006
+    path = store.runtime / 'feature_dev/0003-third.yaml'
+    path.write_text('id: 0003-third\n')
+    newer = store.claim(task=TaskRevision.capture(store.runtime, path), binding=binding,
+                         config=config, schema=schema, project=root, owner_id='test')
+    fail(newer)
+    before = account_backoff(store.snapshot(), binding.account, config, now[0])
+    assert before['failures'] == 1 and before['next_at'] == 1011
+    now[0] = 1007
+    # No synthetic process was launched, so recovery requires no termination.
+    store.recover_run(healthy.run['id'], previous_owner='test', owner_id='restarted')
+    reopened = RunStore(store.runtime, clock=lambda: now[0])
+    assert reopened.snapshot()['runs'][healthy.run['id']]['startup_ready_at'] == 1005
+    assert account_backoff(reopened.snapshot(), binding.account, config, now[0]) == before
+
+
+def test_permission_resume_is_not_a_new_connectivity_reset(tmp_path):
+    root, store, schema, config, binding, _, now, claim, fail = fixture(tmp_path, max_running=3)
+    healthy = claim()
+    store.transition(healthy.run['id'], owner_id='test', target='starting', event_id='start')
+    store.transition(healthy.run['id'], owner_id='test', target='running', session_id='session', event_id='ready')
+    now[0] += 1
+    fail(store.claim(task=another_task(store), binding=binding, config=config, schema=schema,
+                     project=root, owner_id='test'))
+    before = account_backoff(store.snapshot(), binding.account, config, now[0])
+    store.transition(healthy.run['id'], owner_id='test', target='waiting_input', event_id='ask')
+    now[0] += 1
+    store.transition(healthy.run['id'], owner_id='test', target='running', session_id='session', event_id='resume')
+    assert account_backoff(store.snapshot(), binding.account, config, now[0]) == before

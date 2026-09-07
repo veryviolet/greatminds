@@ -338,6 +338,8 @@ class RunStore:
             run.update(state=target, updated_at=self.clock(), reason=reason)
             if session_id is not None:
                 run["session_id"] = session_id
+                if target == "running" and session_id:
+                    run.setdefault("startup_ready_at", run["updated_at"])
             if details is not None:
                 run["outcome"] = copy.deepcopy(details)
             run["event_receipts"][event_id] = digest

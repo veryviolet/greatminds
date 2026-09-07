@@ -1666,3 +1666,16 @@ Remaining supervision/product work includes provider rate-limit handling,
 operator-resettable account circuit breaking, health/retention, richer budgets
 and performance metrics; native assets, remaining docs and the full milestone
 acceptance audit are also still open.
+
+### Stable account recovery evidence (2026-09-07)
+
+Replaced mutable running-state/prompt-outcome inference with startup_ready_at,
+recorded once when a configured ACP session first becomes running. Account
+backoff orders that durable observation alongside startup failures. Permission
+resumes and crash recovery cannot erase a newer failure or resurrect an older
+failure streak by moving the apparent time of a successful connection.
+
+Validation: 87 account/startup/no-progress/runtime contract checks passed in
+21.14s, including store reopen after crash recovery and permission resume after
+a newer account failure. No live provider was invoked. This checkpoint does not
+close the remaining modernization milestones listed above.

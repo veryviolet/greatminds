@@ -796,8 +796,10 @@ independent. Account identity is a configured grouping, not an inferred provider
 or credential identity.
 
 The delay is derived from persisted completion times and survives daemon restart.
-A run reaching a configured session/running state, or a durable outcome showing
-prompt start, resets the connectivity failure streak. This demonstrates startup
+The first transition to a configured session/running state records immutable
+`startup_ready_at`, which resets the connectivity failure streak at that original
+time. Permission resumes and crash recovery do not create a newer reset. A run
+without this marker supplies no reset evidence. This demonstrates startup
 recovery only; it does not establish task progress or passing evidence. Existing
 runs are not cancelled, and authentication holds retain their separate policy.
 `run status` exposes `accounts` with failure count, next admission time and source

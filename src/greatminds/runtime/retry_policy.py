@@ -85,19 +85,28 @@ def retry_admission(snapshot, binding, task, config, schema, now):
 def account_backoff(snapshot, account, config, now):
     """One startup failure streak per account across bindings, tasks and sessions.
 
-    A durable prompt start proves startup recovery. No token stream or successful
+    A durable configured-session marker proves startup recovery. No token stream or successful
     prompt is treated as domain progress by this narrow connectivity controller.
     """
-    runs = sorted((r for r in snapshot['runs'].values() if r['account'] == account),
-                  key=lambda r: (r['updated_at'], r.get('sequence', 0)))
+    observations = []
+    for run in snapshot['runs'].values():
+        if run['account'] != account:
+            continue
+        # Preserve the successful handshake's original time across permission
+        # waits, cancellation and crash recovery. Later state updates are not
+        # new connectivity evidence and cannot erase newer failures.
+        ready_at = run.get('startup_ready_at')
+        if ready_at is not None:
+            observations.append((ready_at, run.get('sequence', 0), 0, run))
+        if startup_failure(run, include_conversations=True):
+            observations.append((run['updated_at'], run.get('sequence', 0), 1, run))
     failures, latest = 0, None
-    for run in runs:
-        if run.get('outcome', {}).get('prompt_started') is True or (
-                run['state'] == 'running' and run.get('session_id')):
-            failures, latest = 0, None
-        elif startup_failure(run, include_conversations=True):
+    for _, _, failed, run in sorted(observations, key=lambda item: item[:3]):
+        if failed:
             failures += 1
             latest = run
+        else:
+            failures, latest = 0, None
     if latest is None:
         return {'reason': 'ready', 'account': account, 'failures': 0}
     delay = min(config.account_retry_max_seconds,
