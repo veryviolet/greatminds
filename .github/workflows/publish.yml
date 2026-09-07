@@ -70,6 +70,11 @@ jobs:
       - name: check generated contract reference
         run: .venv-test/bin/python tools/generate_contract_reference.py --check
 
+      - name: test browser interaction regressions
+        run: |
+          npm ci --prefix tests/web --ignore-scripts --no-audit --no-fund
+          npm test --prefix tests/web
+
       - name: test VS Code extension harness
         run: npm test --prefix vscode-extension
 

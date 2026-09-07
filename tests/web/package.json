@@ -1,0 +1,1 @@
+{"name":"greatminds-web-tests","private":true,"scripts":{"test":"node chat.test.cjs"},"devDependencies":{"jsdom":"26.1.0"}}

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "greatminds"
-version = "3.1.0"
+version = "3.1.1"
 description = "Local ACP agent orchestration with deterministic task workflows, interactive sessions, and verified execution evidence"
 readme = "README.md"
 requires-python = ">=3.11"

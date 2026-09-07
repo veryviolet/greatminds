@@ -49,10 +49,27 @@ writing; a stale browser cannot overwrite a newer saved version. Restart the
 daemon to apply changes. Harness binaries and their credentials are configured
 on the host as before; adding a manifest does not install or authenticate them.
 
+## Chat input and appearance
+
+Press **Enter** to send a message and **Shift+Enter** to insert a newline.
+Ctrl/Cmd+Enter also sends. IME composition and held-key repeats do not submit.
+The composer and existing history nodes stay in place during background updates,
+preserving draft selection and manual scroll position.
+
+Active conversations fetch updates more frequently than the dashboard and append
+incoming text progressively. The activity indicator remains visible during an
+agent turn, including pauses before text arrives; queued turns and permission or
+login waits have distinct labels. The indicator stops when the turn ends. Reduced
+motion preferences disable the text reveal and spinner animation.
+
+Use the toolbar's light/dark theme switch. The first visit follows the system
+color preference; an explicit choice is saved in this browser for the same origin.
+The theme applies to the chat, dashboards, settings, forms and code previews.
+
 ## History and storage
 
 The browser reads the same filesystem state as the CLI and daemon. Viewing a page
-or reconnecting does not launch an agent. Requests are polled every 1.5 seconds;
+or reconnecting does not launch an agent. Dashboard requests are polled every 1.5 seconds; active chat requests every 350 ms;
 conversation event cursors avoid replaying earlier text. The UI renders the last
 50 conversation turns; the existing conversation journal remains on disk.
 

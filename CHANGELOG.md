@@ -4,6 +4,19 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 3.1.1 — 2026-09-07
+
+### Fixed
+
+- Interactive chat sends with Enter and inserts newlines with Shift+Enter;
+  IME composition and key-repeat do not accidentally submit a message.
+- Polling no longer rebuilds the composer or existing conversation history while
+  typing. Draft selection and manual scroll position survive updates.
+- Active responses append progressively with a persistent activity indicator,
+  including pauses before output. Reduced-motion preferences are respected.
+- The web toolbar now switches between dark and light themes and remembers the
+  browser choice; the initial theme follows the system preference.
+
 ## 3.1.0 — 2026-09-07
 
 ### Changed

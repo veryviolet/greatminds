@@ -8,6 +8,14 @@ const queues = {feature_plan:'Планирование',feature_dev:'Разра�
 const terminal = new Set(['completed','failed','cancelled','interrupted']);
 const state = {data:null, view:'overview', binding:null, conversation:null, run:null, draft:{}, chats:new Map(), filter:'', runFilter:'', busy:false, settings:null};
 let toastTimer, refreshing=false, lastMarkup='';
+let chatLoading=false, chatDocumentId=null, chatActive=false;
+const turnNodes=new Map();
+const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
+function setMarkup(node,markup){if(node.innerHTML!==markup)node.innerHTML=markup;}
+function setText(node,text){if(node.textContent!==text)node.textContent=text;}
+function applyTheme(theme){document.documentElement.dataset.theme=theme;const dark=theme==='dark';$('theme-button').textContent=dark?'☀ Светлая':'☾ Тёмная';$('theme-button').setAttribute('aria-label',dark?'Включить светлую тему':'Включить тёмную тему');$('theme-button').setAttribute('aria-pressed',String(dark));}
+let savedTheme;try{savedTheme=localStorage.getItem('greatminds-theme')}catch{}
+applyTheme(['light','dark'].includes(savedTheme)?savedTheme:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));
 function count(n,forms){const last=n%10;return n+' '+forms[n%100>=11&&n%100<=14?2:last===1?0:last>=2&&last<=4?1:2]}
 function short(id){return String(id ?? '').slice(0,8)}
 function when(at){return at ? new Date(at*1000).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '—'}
@@ -63,13 +71,18 @@ function chat(){
  if(!state.conversation || !convs.some(c=>c.id===state.conversation)){state.conversation=convs.filter(c=>!c.closed&&!c.close_requested).at(-1)?.id || convs.at(-1)?.id || null;}
  const runs=state.data.runs.filter(r=>r.conversation_id===state.conversation);
  const options=convs.map((c,i)=>`<option value="${esc(c.id)}" ${c.id===state.conversation?'selected':''}>Диалог ${i+1} · ${count(c.turn_count,['ход','хода','ходов'])}${c.closed?' · закрыт':''}</option>`).join('');
- return permissionPanel(runs.map(r=>r.id))+`<section class="chat-shell"><div class="chat-head"><div class="avatar">${initials(b.role)}</div><div class="row-main"><strong>${esc(roleName(b.role))}</strong><small>${esc(b.agent)}${b.model?' · '+esc(b.model):' · модель по умолчанию'}</small></div><div class="right"><select id="conversation-select" aria-label="Выбрать диалог">${options||'<option>Новый диалог</option>'}</select><button class="button" data-action="new-chat">＋ Новый</button>${state.conversation?'<button class="button" data-action="close-chat">Закрыть</button>':''}</div></div><div id="conversation-status" class="conversation-state">${state.data.daemon.running?'Контекст и история сохраняются между ходами.':'Сообщения будут выполнены после запуска демона.'}</div><div class="messages" id="messages">${empty('С чего начнём?','Опишите задачу, задайте вопрос или продолжите работу.')}</div><form id="composer" class="composer"><textarea id="message-input" placeholder="Напишите ${esc(roleName(b.role).toLowerCase())}…" aria-label="Сообщение агенту" maxlength="65536">${esc(state.draft[b.id]||'')}</textarea><div class="composer-bottom"><span>Ctrl / ⌘ + Enter — отправить</span><div><button type="button" class="button danger hidden" id="interrupt-button" data-action="interrupt">■ Прервать ход</button> <button type="submit" id="send-button" class="button primary" ${state.busy?'disabled':''}>Отправить ↑</button></div></div></form></section>`;
+ return `<div id="chat-permissions">${permissionPanel(runs.map(r=>r.id))}</div><section class="chat-shell"><div class="chat-head"><div class="avatar">${initials(b.role)}</div><div class="row-main"><strong>${esc(roleName(b.role))}</strong><small>${esc(b.agent)}${b.model?' · '+esc(b.model):' · модель по умолчанию'}</small></div><div class="right"><select id="conversation-select" aria-label="Выбрать диалог">${options||'<option>Новый диалог</option>'}</select><button class="button" data-action="new-chat">＋ Новый</button><button id="close-chat-button" class="button ${state.conversation?'':'hidden'}" data-action="close-chat">Закрыть</button></div></div><div id="conversation-status" class="conversation-state">${state.data.daemon.running?'Контекст и история сохраняются между ходами.':'Сообщения будут выполнены после запуска демона.'}</div><div class="messages" id="messages">${empty('С чего начнём?','Опишите задачу, задайте вопрос или продолжите работу.')}</div><form id="composer" class="composer"><textarea id="message-input" placeholder="Напишите ${esc(roleName(b.role).toLowerCase())}…" aria-label="Сообщение агенту" maxlength="65536">${esc(state.draft[b.id]||'')}</textarea><div class="composer-bottom"><span>Enter — отправить · Shift+Enter — новая строка</span><div><button type="button" class="button danger hidden" id="interrupt-button" data-action="interrupt">■ Прервать ход</button> <button type="submit" id="send-button" class="button primary" ${state.busy?'disabled':''}>Отправить ↑</button></div></div></form></section>`;
 }
 function render(force=false){
  if(!state.data)return;
  const focused=document.activeElement?.id;const selection=document.activeElement?.selectionStart;
  const scroll=$('messages');const scrollTop=scroll?.scrollTop;const stick=scroll?scroll.scrollHeight-scroll.scrollTop-scroll.clientHeight<80:true;
  const openDetails=[...document.querySelectorAll('#main details[open]')].map(x=>x.id).filter(Boolean);
+ if(state.view==='chat'){
+  const key='chat:'+state.binding;
+  if(lastMarkup!==key){$('main').innerHTML=chat();lastMarkup=key;chatDocumentId=null;turnNodes.clear();}
+  updateChatChrome();loadChat().catch(e=>toast(e.message));return;
+ }
  const markup=state.view==='overview'?overview():state.view==='tasks'?tasks():state.view==='runs'?runs():chat();
  if(force||markup!==lastMarkup){$('main').innerHTML=markup;lastMarkup=markup;
   if(focused&&$(focused)){ $(focused).focus({preventScroll:true});if(selection!==null&&selection!==undefined&&$(focused).setSelectionRange)$(focused).setSelectionRange(selection,selection);}
@@ -77,23 +90,91 @@ function render(force=false){
  if(state.view==='chat')loadChat(stick,scrollTop).catch(e=>toast(e.message));
  if(state.view==='runs'&&state.run)loadRun(openDetails).catch(e=>toast(e.message));
 }
-async function loadChat(stick=true,scrollTop=0){
- const id=state.conversation;if(!id)return;
- const document=await api('/api/conversations/'+id);
- let cached=state.chats.get(id)||{cursor:0,events:[]};let page;
- do {page=await api(`/api/conversations/${id}/events?after=${cached.cursor}`);cached.events=[...new Map([...cached.events,...page.events].map(e=>[e.sequence,e])).values()].sort((a,b)=>a.sequence-b.sequence);cached.cursor=Math.max(cached.cursor,page.cursor);} while(page.has_more);
- state.chats.set(id,cached);if(state.view!=='chat'||state.conversation!==id||!$('messages'))return;
- const turns=Object.values(document.turns).sort((a,b)=>a.sequence-b.sequence);
- const messages=turns.slice(-50).map(t=>{
-  const output=cached.events.filter(e=>e.turn_id===t.id&&e.kind==='text').map(e=>e.text).join('');
-  return `<article class="message user"><div class="avatar">ВЫ</div><div class="message-content"><div class="message-label">Вы <small>${when(t.queued_at)}</small></div><div class="message-text">${esc(t.prompt)}</div></div></article><article class="message"><div class="avatar">${initials(binding()?.role)}</div><div class="message-content"><div class="message-label">${esc(binding()?.agent)} <small>${esc(statuses[t.status]||t.status)}</small></div><div class="message-text">${esc(output)||'<span class="muted">'+(t.status==='queued'?'В очереди…':t.status==='running'?'Агент работает…':'Нет текстового ответа.')+'</span>'}</div>${t.output_truncated?'<small class="muted">Достигнут лимит сохранённого ответа.</small>':''}${t.reason&&t.reason!=='end_turn'?`<small class="muted">${esc(t.reason==='operator_cancelled'?'Отменено пользователем':t.reason)}</small>`:''}</div></article>`;
- }).join('');
- $('messages').innerHTML=(turns.length>50?'<p class="muted">Последние 50 ходов.</p>':'')+(messages||empty('Диалог готов','Первое сообщение задаст направление работы.'));
- if(stick)$('messages').scrollTop=$('messages').scrollHeight;else $('messages').scrollTop=scrollTop;
- const current=turns.find(t=>['running','queued'].includes(t.status));$('interrupt-button').classList.toggle('hidden',!current);$('interrupt-button').dataset.turn=current?.id||'';
- const closed=document.closed||document.close_requested;$('send-button').disabled=closed||state.busy;$('message-input').disabled=closed;
- $('conversation-status').textContent=closed?'Диалог закрыт. Создайте новый, чтобы продолжить.':current?(current.status==='queued'?'Сообщение в очереди.':'Агент выполняет ход. Можно отправить следующее сообщение в очередь.'):'История сохранена. Можно продолжать.';
- if(current?.status==='queued'&&document.dispatch?.reason)$('conversation-status').textContent+=' '+document.dispatch.reason;
+function updateChatChrome(){
+ const b=binding();if(!b||!$('conversation-select'))return;
+ setText(document.querySelector('.chat-head .avatar'),initials(b.role));
+ setText(document.querySelector('.chat-head .row-main strong'),roleName(b.role));
+ setText(document.querySelector('.chat-head .row-main small'),b.agent+(b.model?' · '+b.model:' · модель по умолчанию'));
+ const convs=state.data.conversations.filter(c=>c.binding_id===b.id);
+ if(!state.conversation||!convs.some(c=>c.id===state.conversation))state.conversation=convs.filter(c=>!c.closed&&!c.close_requested).at(-1)?.id||convs.at(-1)?.id||null;
+ const options=convs.map((c,i)=>`<option value="${esc(c.id)}">Диалог ${i+1} · ${count(c.turn_count,['ход','хода','ходов'])}${c.closed?' · закрыт':''}</option>`).join('')||'<option value="">Новый диалог</option>';
+ setMarkup($('conversation-select'),options);$('conversation-select').value=state.conversation||'';
+ $('close-chat-button').classList.toggle('hidden',!state.conversation);
+ const ids=state.data.runs.filter(r=>r.conversation_id===state.conversation).map(r=>r.id);
+ const open=[...$('chat-permissions').querySelectorAll('details[open]')].map(n=>n.id);
+ setMarkup($('chat-permissions'),permissionPanel(ids));for(const id of open)if($(id))$(id).open=true;
+}
+function atBottom(node){return node.scrollHeight-node.scrollTop-node.clientHeight<80;}
+function appendOutput(row,output,animate){
+ if(row.target===output)return;
+ row.target=output;
+ cancelAnimationFrame(row.frame);
+ if(!animate||reducedMotion.matches||!output.startsWith(row.text.data)){
+  const stick=atBottom($('messages'));row.text.data=output;if(stick)$('messages').scrollTop=$('messages').scrollHeight;return;
+ }
+ const chars=Array.from(output.slice(row.text.data.length));let shown=0;let started=null;
+ function frame(now){
+  if(!row.node.isConnected)return;
+  started??=now;
+  const next=Math.min(chars.length,Math.max(shown,Math.ceil(chars.length*Math.min(1,(now-started)/280))));
+  if(next>shown){const pane=$('messages');const stick=atBottom(pane);row.text.appendData(chars.slice(shown,next).join(''));shown=next;if(stick)pane.scrollTop=pane.scrollHeight;}
+  if(shown<chars.length)row.frame=requestAnimationFrame(frame);
+ }
+ row.frame=requestAnimationFrame(frame);
+}
+function updateTurns(doc,cached){
+ const pane=$('messages');
+ // The caller sets the conversation identity; history nodes survive all polls.
+ const allTurns=Object.values(doc.turns).sort((a,b)=>a.sequence-b.sequence);
+ const turns=allTurns.slice(-50);
+ let limit=pane.querySelector('.history-limit');
+ if(allTurns.length>50&&!limit){limit=document.createElement('p');limit.className='muted history-limit';limit.textContent='Последние 50 ходов.';pane.prepend(limit);}
+ if(allTurns.length<=50)limit?.remove();
+ const live=new Set(turns.map(t=>t.id));const stick=atBottom(pane);
+ for(const [id,row] of turnNodes)if(!live.has(id)){cancelAnimationFrame(row.frame);row.node.remove();turnNodes.delete(id);}
+ if(!turns.length){if(!pane.querySelector('.empty'))pane.innerHTML=empty('Диалог готов','Первое сообщение задаст направление работы.');return;}
+ pane.querySelector('.empty')?.remove();
+ const outputs=new Map();for(const e of cached.events)if(e.kind==='text')outputs.set(e.turn_id,(outputs.get(e.turn_id)||'')+e.text);
+ for(const t of turns){
+  let row=turnNodes.get(t.id);const fresh=!row;
+  if(!row){
+   const node=document.createElement('section');node.className='chat-turn';node.dataset.turn=t.id;
+   node.innerHTML=`<article class="message user"><div class="avatar">ВЫ</div><div class="message-content"><div class="message-label">Вы <small class="queued-at"></small></div><div class="message-text prompt"></div></div></article><article class="message"><div class="avatar">${esc(initials(binding()?.role))}</div><div class="message-content"><div class="message-label">${esc(binding()?.agent)} <small class="turn-status"></small></div><div class="message-text answer"></div><div class="agent-activity hidden" role="status"><span class="activity-spinner" aria-hidden="true"></span><span class="activity-label"></span></div><small class="muted turn-note"></small></div></article>`;
+   const text=document.createTextNode('');node.querySelector('.answer').append(text);
+   row={node,text,target:null,frame:null};turnNodes.set(t.id,row);pane.append(node);
+  }
+  setText(row.node.querySelector('.prompt'),t.prompt);
+  setText(row.node.querySelector('.queued-at'),when(t.queued_at));
+  setText(row.node.querySelector('.turn-status'),statuses[t.status]||t.status);
+  const output=outputs.get(t.id)||'';appendOutput(row,output,!fresh);
+  const active=['running','queued'].includes(t.status);
+  const run=state.data.runs.find(r=>r.conversation_id===state.conversation&&!terminal.has(r.state));
+  const waiting=run?.state==='waiting_input'||run?.state==='waiting_auth';
+  const label=t.status==='queued'?'В очереди…':run?.state==='waiting_input'?'Ожидает вашего решения':run?.state==='waiting_auth'?'Ожидает входа в аккаунт':'Агент работает…';
+  const activity=row.node.querySelector('.agent-activity');activity.classList.toggle('hidden',!active);activity.classList.toggle('waiting',waiting||t.status==='queued');
+  setText(row.node.querySelector('.activity-label'),label);
+  setText(row.node.querySelector('.turn-note'),t.output_truncated?'Достигнут лимит сохранённого ответа.':t.reason&&t.reason!=='end_turn'?(t.reason==='operator_cancelled'?'Отменено пользователем':t.reason):!active&&!output?'Нет текстового ответа.':'');
+ }
+ if(stick)pane.scrollTop=pane.scrollHeight;
+}
+async function loadChat(){
+ const id=state.conversation;if(!id||!$('messages'))return;
+ if(chatDocumentId!==id){for(const row of turnNodes.values())cancelAnimationFrame(row.frame);turnNodes.clear();$('messages').innerHTML=empty('Загружаем диалог…');chatDocumentId=id;}
+ if(chatLoading)return;
+ chatLoading=true;
+ try{
+  const doc=await api('/api/conversations/'+id);
+  let cached=state.chats.get(id)||{cursor:0,events:[]};let page;
+  do {page=await api(`/api/conversations/${id}/events?after=${cached.cursor}`);cached.events=[...new Map([...cached.events,...page.events].map(e=>[e.sequence,e])).values()].sort((a,b)=>a.sequence-b.sequence);cached.cursor=Math.max(cached.cursor,page.cursor);} while(page.has_more);
+  state.chats.set(id,cached);if(state.view!=='chat'||state.conversation!==id||!$('messages'))return;
+  updateTurns(doc,cached);
+  const turns=Object.values(doc.turns);const current=turns.find(t=>['running','queued'].includes(t.status));chatActive=Boolean(current);
+  $('interrupt-button').classList.toggle('hidden',!current);$('interrupt-button').dataset.turn=current?.id||'';
+  const closed=doc.closed||doc.close_requested;$('send-button').disabled=closed||state.busy;$('message-input').disabled=closed;
+  let message=closed?'Диалог закрыт. Создайте новый, чтобы продолжить.':current?(current.status==='queued'?'Сообщение в очереди.':'Агент выполняет ход. Можно отправить следующее сообщение в очередь.'):'История сохранена. Можно продолжать.';
+  if(current?.status==='queued'&&doc.dispatch?.reason)message+=' '+doc.dispatch.reason;
+  setText($('conversation-status'),message);
+ }finally{chatLoading=false;}
 }
 function commandView(c){
  const streams=Object.entries(c.preview||{}).map(([name,output])=>`<small class="muted">${esc(name)}${output.truncated?' · показан фрагмент':''}</small><pre>${esc(output.text)||'Нет вывода.'}</pre>`).join('');
@@ -148,6 +229,7 @@ document.addEventListener('click',async event=>{
   if(t.dataset.run){navigate('runs',null,t.dataset.run);return;}
   if(t.dataset.openConversation){state.conversation=t.dataset.openConversation;navigate('chat',t.dataset.bindingId);return;}
   if(t.dataset.task){const d=await api('/api/tasks/'+t.dataset.task);$('detail-title').textContent=d.id;$('detail-body').innerHTML=`<p>${esc(queues[d.queue]||d.queue)}</p><pre>${esc(d.text)}</pre>`;$('detail-dialog').showModal();return;}
+  if(t.id==='theme-button'){const theme=document.documentElement.dataset.theme==='dark'?'light':'dark';applyTheme(theme);try{localStorage.setItem('greatminds-theme',theme)}catch{}return;}
   if(t.id==='settings-button'){await openSettings();return;}
   if(t.id==='pause-button'){await api('/api/dispatch',{paused:!state.data.paused});await refresh();return;}
   if(t.id==='daemon-button'){t.disabled=true;await api('/api/daemon/'+(state.data.daemon.running?'stop':'start'),{});await refresh();return;}
@@ -178,5 +260,6 @@ document.addEventListener('submit',async event=>{
  if(event.target.id==='composer'){event.preventDefault();await sendMessage();}
  if(event.target.id==='settings-form'){event.preventDefault();const submit=event.target.querySelector('[type=submit]');submit.disabled=true;try{await api('/api/settings', $('use-yaml').checked?{text:$('settings-yaml').value,revision:state.settings.revision}:{document:formDocument(),revision:state.settings.revision});$('settings-dialog').close();toast('Настройки сохранены. Для применения перезапустите демон.');await refresh();}catch(e){$('settings-error').textContent=e.message;}finally{submit.disabled=false;}}
 });
-document.addEventListener('keydown',event=>{if(event.target.id==='message-input'&&event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();sendMessage();}if(event.key==='Enter'&&event.target.matches('tr[data-run]'))navigate('runs',null,event.target.dataset.run);});
+document.addEventListener('keydown',event=>{if(event.target.id==='message-input'&&event.key==='Enter'&&!event.shiftKey&&!event.isComposing&&event.keyCode!==229&&!event.repeat){event.preventDefault();sendMessage();}if(event.key==='Enter'&&event.target.matches('tr[data-run]'))navigate('runs',null,event.target.dataset.run);});
 refresh();setInterval(refresh,1500);
+setInterval(()=>{if(state.view==='chat'&&chatActive)loadChat().catch(e=>toast(e.message));},350);
