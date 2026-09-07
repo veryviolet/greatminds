@@ -906,7 +906,7 @@ this timing contract.
 The checkout includes `tools/daemon_idle_benchmark.py`. Run it with the project
 Python environment to create a temporary fixture, warm up maintenance, and measure
 five complete idle daemon passes. Defaults are 50 open idle conversations and 100
-cancelled historical claims. All journal entries are created through store APIs;
+cancelled claims. All journal entries are created through store APIs;
 the benchmark rejects agent startup and verifies unchanged runtime history.
 `--conversations`, `--history`, and `--repeats` select the synthetic load.
 

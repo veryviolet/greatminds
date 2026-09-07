@@ -2118,3 +2118,12 @@ complete daemon invocation (18 before the one startup policy transaction), rathe
 than one additional read per conversation. The timing sample overlapped the full
 suite and is not used as a new latency comparison. The prior completed goal turn
 was progress: real extension-host acceptance and a committed CLI launch fix.
+
+Full traversal after event retention: 1441 passed, 1 skipped, 1 failure in 363.21s.
+The sole failure was the public-doc wording guard matching the word historical
+in the idle benchmark's fixture description. Rephrased it as cancelled claims;
+all eight affected documentation/reference checks then passed in 0.63s, and strict
+docs passed in 1.51s. The late-added follow-gap test was not part of that already
+collected full run; it passed in the separate 15-case cursor/retention campaign.
+No runtime failure was reported by the full traversal. This records the actual
+verification scopes rather than claiming a second complete full-suite run.
