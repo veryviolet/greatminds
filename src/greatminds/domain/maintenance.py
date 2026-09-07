@@ -148,7 +148,8 @@ class MaintenanceService:
         document = json.loads(path.read_text())
         if hashlib.sha256(document["text"].encode()).hexdigest() != operation["schema_sha256"]:
             raise GreatMindsError("system operation schema identity mismatch", exit_code=4)
-        return yaml.safe_load(document["text"])
+        from greatminds.core.schema import parse_schema_document
+        return parse_schema_document(document["text"])
 
     def apply(self, operation_id):
         from greatminds.cli.task import journal_append

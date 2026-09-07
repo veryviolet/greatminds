@@ -40,7 +40,7 @@ were inspected. It does not turn fixture coverage into live harness coverage.
 | B2: maintainer limited to semantic diagnostic work | Shared schema marks maintainer on demand and forbids polling/recovery loops | Confirmed instructions and scheduling contract |
 | B3: concrete assignment, role/task/gates/results/artifacts and pinned context | `context.py`, `RunStore.contracts`, CLI contract inspection and scoped commands | Confirmed; roles receive their assignment rather than scanning queues |
 | B3: compatible session resume and changed-contract handling | Supervisor session selection and conversation acquire/revision checks; load/mismatch/task-change tests | Confirmed; changed contracts/revisions do not silently consume pending input |
-| B3: prompt size, useful-work time and turns against baseline | Input reservations, run stages, queue observation/accepted-transition waits, preparation attempts, receipt resolution and conversation timing | **Open G3:** durable timing boundaries now have recovery/pipeline coverage; productive distributions and equivalent baseline comparison remain unproven |
+| B3: prompt size, useful-work time and turns against baseline | Input reservations, run stages, queue/accepted-transition waits, preparation/receipt timing; original and installed ACP productive comparisons | Confirmed G3 measurement scope: bytes are not billed tokens; original native median 4.685 s/5 calls, optimized ACP 8.354 s/3 calls. Native latency regression remains a documented limitation |
 | B4: typed results, gates, idempotency and SYSTEM provenance | Result envelopes/service, shared CLI validators; crash-point, duplicate, dynamic-gate and invented-authorship tests | Confirmed; prompt completion alone cannot verify a task |
 | B4: dependency and human-input decisions | Typed blocked/needs_input records, mechanical dependency release; needs-input leaves task unmoved | Confirmed domain behavior; optional protocol extensions are not inferred from prose |
 | B5: worktrees, command execution, evidence, stands and explicit deployment authority | Workspace/command/stand services; real unit commands and merge; profile authorization and evidence freshness tests | Confirmed local fixtures and local live pipeline. This does not claim a live external deployment campaign |
@@ -55,7 +55,7 @@ were inspected. It does not turn fixture coverage into live harness coverage.
 | C3: explicit initialization/preflight/services/configuration; preserve customizations and hooks | Bootstrap/service/environment tests; installed idempotent setup and interrupted-operation fixtures | Confirmed current cutover scope; no fleet migration or rollback deliverable required |
 | C4: concurrency/time/retry/no-progress/context limits; never switch provider to fit budget | Binding/project/account limits, input reservations and deadline/cancellation tests | Confirmed implemented limits and unknown provider values |
 | C4: optional reliable usage budgets, reported/estimated/billed distinction | Bounded SDK-decoded observations, explicit currency/cost limits, durable prompt boundaries and cost continuity; real cancellation and loaded-conversation fixtures | Confirmed G2 for reactive reported session cost. Ambiguous token scope remains unknown and cannot drive an automatic token budget; no billing estimate or hard spending guarantee |
-| C4: complete timing and measured performance improvement | [Idle before/after benchmark](evidence/daemon-idle-2026-09-07.json), stage observations, real pipeline durations | Idle read reduction confirmed. Productive timing/comparison remains G3; no role stage was eliminated |
+| C4: complete timing and measured performance improvement | [Idle benchmark](evidence/daemon-idle-2026-09-07.json), original baseline, [continuous ACP optimization](evidence/continuous-acp-optimization-2026-09-07.json) | Confirmed bounded measurements: ACP median 10.950→8.354 s after import/parse optimization; original native remains faster. No universal speed guarantee; all three useful role stages remain |
 | C5: aggregate stable findings, scoped repair, private bundle and no model turn | Doctor/bundle suites; command resolution from foreign cwd; maintenance/deployment idempotency and injected crashes | Components confirmed. **Open G7:** combine aggregate diagnosis → emitted action → repair → repeat diagnosis on a concrete fault fixture |
 | C6: run-bound authority, stale/wrong-role rejection, explicit trust boundary | Token/revision/role/workspace checks; domain/command/permission tests | Confirmed cooperative shared-filesystem boundary; no OS isolation claim |
 | C7: maintainable service boundaries, package examples and release evidence | Runtime/domain services; source and wheel scenarios; current changelog updated by this audit | Present and exercised; existing CLI validators remain shared during incremental extraction |
@@ -79,8 +79,8 @@ were inspected. It does not turn fixture coverage into live harness coverage.
    crash uncertainty; retry cannot reset cost. The pinned schema contradicts
    itself about token scope, so these samples cannot support a token budget.
    Cost limits are reactive and allow one bootstrap prompt for a new session;
-   they do not promise a hard spending cap. Five items below remain open.
-3. **G3 — task timing and comparison.** Add the missing observable queue/validation/
+   they do not promise a hard spending cap. Four items below remain open.
+3. **G3 — task timing and comparison: implemented and measured.** Add the missing observable queue/validation/
    accepted-progress intervals, keeping unknowable times unknown. Compare an
    equivalent workload before/after; existing mixed-model durations are not a
    controlled performance comparison.
@@ -98,8 +98,14 @@ were inspected. It does not turn fixture coverage into live harness coverage.
    The subsequent [original continuous-daemon comparison](evidence/original-pipeline-2026-09-07.json)
    covers three samples per version with the same prepared task and outcome:
    original median 4.685 s versus ACP 10.597 s, five versus three agent calls.
-   This records a latency regression despite eliminating two idle calls. G3 stays
-   open for measured overhead reduction; profiling samples are not benchmark data.
+   This records a latency regression despite eliminating two idle calls.
+   Profiling then identified repeated pinned-schema parsing and eager SDK imports
+   in command clients. A [six-run before/after campaign](evidence/continuous-acp-optimization-2026-09-07.json)
+   with identical schema/dependencies/fixtures observed ACP median 10.950→8.354 s
+   (23.7% lower), with every gate, command and recovery assertion preserved.
+   This closes the finite measurement/optimization item; the native latency
+   regression remains an explicit limitation. Neither fixture measures inference,
+   billed tokens or model quality. Profiling samples are excluded from benchmarks.
 4. **G4 — account admission for explicit quota signals.** Extend shared admission
    only from unambiguous configured/protocol signals, with bounded recovery and
    operator controls. Do not infer credentials, silently switch providers or parse

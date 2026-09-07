@@ -13,6 +13,7 @@ from typing import Callable
 import yaml
 
 from greatminds.core.errors import GreatMindsError
+from greatminds.core.schema import parse_schema_document
 from greatminds.core.storage import atomic_bytes, atomic_json, durable_move, file_lock, safe_name, task_lock
 from greatminds.core.util import now_iso
 from greatminds.runtime.store import RunStore, TERMINAL, TaskRevision
@@ -232,7 +233,7 @@ class ResultService:
     def _recheck_gates(self, operation: dict, run: dict) -> None:
         from greatminds.cli import task as policy
 
-        contract = yaml.safe_load(self.store.contracts(run["id"])["schema"]["text"])
+        contract = parse_schema_document(self.store.contracts(run["id"])["schema"]["text"])
         candidate = yaml.safe_load(operation["after"])
         source = operation["source"].split("/")[0]
         destination = operation["destination"].split("/")[0]
@@ -268,7 +269,7 @@ class ResultService:
                 validation_id = self.store.begin_result_validation(result_id)
                 validation_started = time.monotonic()
                 try:
-                    contract = yaml.safe_load(self.store.contracts(run["id"])["schema"]["text"])
+                    contract = parse_schema_document(self.store.contracts(run["id"])["schema"]["text"])
                     operation = self._prepare(receipt, run, contract)
                 except (GreatMindsError, yaml.YAMLError) as exc:
                     self.store.finish_result_validation(result_id, attempt_id=validation_id,

@@ -2369,3 +2369,34 @@ profiling finds eager ACP/Pydantic imports in command clients and repeated parsi
 of pinned schema text in result validation. Profiling timings are excluded from
 the comparison. The three probe files and sanitized evidence form a recovery
 checkpoint after the client crash; no runtime change is included here.
+
+### G3 — measured import and schema overhead reduction (2026-09-07)
+
+Command request/status clients no longer import ACP/Pydantic solely to read or
+enqueue durable state. Execution and evidence validation still call the same SDK
+default_environment policy. Pinned result/maintenance schemas now share the existing
+bounded exact-text parse cache with SchemaSnapshot, always returning deep copies.
+File reads and hash verification still precede this cache; paths or claimed hashes
+cannot select stale parsed policy. Task YAML parsing and all live gate checks remain.
+
+Built an isolated candidate wheel from f7b3237 plus these four runtime files, recorded
+their hashes, and used identical installed dependencies/schema/fixture/probe with
+4961016. Six non-overlapping runs alternate candidate/baseline three times. Baseline
+10.950, 10.434, 11.254 s; candidate 8.354, 9.923, 7.825 s. Observed median drops
+10.950→8.354 s (23.7%). Evidence: evidence/continuous-acp-optimization-2026-09-07.json.
+Every sample passes three daemon commands, typed SYSTEM results, six independent
+tests, only the intended merge, worktree cleanup and unchanged completed work on
+restart. Three samples do not establish a general speed guarantee. Profiling and
+test-suite runs were kept outside the timed campaign.
+
+The finite G3 instrumentation/comparison/overhead item is now measured, including
+the unfavorable original baseline: ACP still takes longer than native synthetic
+execution (original median 4.685 s), while eliminating two idle agent turns and
+moving checks/mutations into the daemon. This is a known limitation, not an inference
+or billing comparison and not a reason to remove durability or validation.
+G4 account admission, G5 generated reference, G7 aggregate repair and G6 remaining
+live coverage remain open. Overall modernization is not complete.
+
+Initial schema/command/result/maintenance/productive regression: 76 passed in 24.98s.
+Expanded pinned-contract/timing/real-pipeline/documentation regression: 67 passed
+in 25.31s. This includes corrupted contract rejection after initial reads.

@@ -1,0 +1,466 @@
+{
+  "version": 1,
+  "date": "2026-09-07",
+  "scope": "Continuous productive ACP pipeline before/after deferred SDK import and exact-text schema parse reuse",
+  "inference": false,
+  "execution_order": [
+    "optimized-1",
+    "baseline-4",
+    "optimized-2",
+    "baseline-5",
+    "optimized-3",
+    "baseline-6"
+  ],
+  "implementations": {
+    "baseline": {
+      "version": "2.6.0",
+      "package_sha256": "17075ae4e78a9cebe591b24d77156a901c84949df4b00d9de450ac6ce5a7bf9c",
+      "python": "3.13.7",
+      "dependencies": {
+        "agent-client-protocol": "0.11.1",
+        "pydantic": "2.13.5",
+        "pydantic-core": "2.46.5",
+        "pyyaml": "6.0.3",
+        "click": "8.5.0",
+        "packaging": "26.3"
+      },
+      "schema_sha256": "fbfb3fd8230fe6f62e4b3a093f3e3c1fd1ffbe35498b6c4239e97a3ff16ed4d2",
+      "installed": true,
+      "wheel_sha256": "5fb7bd1a13acaac3fc0eb19f0a1842210c0e468507ed92087ed666c2ca818fd3",
+      "fixture_sha256": "f5ca65e474286a561519f536304f3b73c55680fbbb6923cb21edd9bac63127b4",
+      "probe_sha256": "1c6e7facb3ac49eda75fe603efc8b6576b9bdef17e1b1bfd3a615043119e7946",
+      "project_builder_sha256": "a71c1d57ce3a406d04bec3cd1e94074d4188a070191d78a4c5c1cf2db5f2b2c6",
+      "samples": [
+        {
+          "elapsed_seconds": 10.95044085313566,
+          "verified": true,
+          "daemon_owned_checks": 3,
+          "independent_test_cases": 6,
+          "agent_invocations": 3,
+          "idle_invocations": 0,
+          "restart_unchanged": true,
+          "sample": 4,
+          "raw_report_sha256": "1212d4a8abe5968b15657fd4afc6b5e9158e21a58df6496f0dec44fdf675b147",
+          "roles": [
+            {
+              "role": "DEVELOPER",
+              "stage_offsets_seconds": {
+                "cleanup_complete": 1.94548,
+                "context_ready": 0.126353,
+                "first_prompt_activity": 1.909645,
+                "first_prompt_started": 0.262421,
+                "first_protocol_activity": 1.898436,
+                "process_recorded": 0.140292,
+                "protocol_ready": 0.199398,
+                "session_ready": 0.229835,
+                "workspace_ready": 0.110942
+              },
+              "queue_wait_seconds": 0.02682185173034668,
+              "queue_wait_scope": "observed_revision_wait",
+              "claim_to_transition_seconds": 2.522409439086914
+            },
+            {
+              "role": "TESTER",
+              "stage_offsets_seconds": {
+                "cleanup_complete": 2.21671,
+                "context_ready": 0.139413,
+                "first_prompt_activity": 2.128434,
+                "first_prompt_started": 0.26815,
+                "first_protocol_activity": 2.11531,
+                "process_recorded": 0.153987,
+                "protocol_ready": 0.208233,
+                "session_ready": 0.245639,
+                "workspace_ready": 0.111318
+              },
+              "queue_wait_seconds": 0.43506383895874023,
+              "queue_wait_scope": "accepted_transition_wait",
+              "claim_to_transition_seconds": 3.2422561645507812
+            },
+            {
+              "role": "ARCHITECT-REVIEWER",
+              "stage_offsets_seconds": {
+                "cleanup_complete": 2.249681,
+                "context_ready": 0.139649,
+                "first_prompt_activity": 2.185608,
+                "first_prompt_started": 0.295047,
+                "first_protocol_activity": 2.16183,
+                "process_recorded": 0.171379,
+                "protocol_ready": 0.216757,
+                "session_ready": 0.248194,
+                "workspace_ready": 0.108936
+              },
+              "queue_wait_seconds": 0.43483471870422363,
+              "queue_wait_scope": "accepted_transition_wait",
+              "claim_to_transition_seconds": 3.19478702545166
+            }
+          ]
+        },
+        {
+          "elapsed_seconds": 10.433795216027647,
+          "verified": true,
+          "daemon_owned_checks": 3,
+          "independent_test_cases": 6,
+          "agent_invocations": 3,
+          "idle_invocations": 0,
+          "restart_unchanged": true,
+          "sample": 5,
+          "raw_report_sha256": "63739f4e381ccf11c78cee4691bdc1f57b33ec44cd2e49921f2935e91ca467e4",
+          "roles": [
+            {
+              "role": "DEVELOPER",
+              "stage_offsets_seconds": {
+                "cleanup_complete": 2.253292,
+                "context_ready": 0.131361,
+                "first_prompt_activity": 2.111955,
+                "first_prompt_started": 0.274166,
+                "first_protocol_activity": 2.102776,
+                "process_recorded": 0.147458,
+                "protocol_ready": 0.214036,
+                "session_ready": 0.252923,
+                "workspace_ready": 0.112031
+              },
+              "queue_wait_seconds": 0.038895606994628906,
+              "queue_wait_scope": "observed_revision_wait",
+              "claim_to_transition_seconds": 2.9758169651031494
+            },
+            {
+              "role": "TESTER",
+              "stage_offsets_seconds": {
+                "cleanup_complete": 2.119122,
+                "context_ready": 0.125759,
+                "first_prompt_activity": 2.027557,
+                "first_prompt_started": 0.262306,
+                "first_protocol_activity": 2.014632,
+                "process_recorded": 0.143259,
+                "protocol_ready": 0.187583,
+                "session_ready": 0.218425,
+                "workspace_ready": 0.11091
+              },
+              "queue_wait_seconds": 0.3361032009124756,
+              "queue_wait_scope": "accepted_transition_wait",
+              "claim_to_transition_seconds": 3.019981861114502
+            },
+            {
+              "role": "ARCHITECT-REVIEWER",
+              "stage_offsets_seconds": {
+                "cleanup_complete": 2.135892,
+                "context_ready": 0.146337,
+                "first_prompt_activity": 2.083957,
+                "first_prompt_started": 0.311846,
+                "first_protocol_activity": 2.071378,
+                "process_recorded": 0.174824,
+                "protocol_ready": 0.229321,
+                "session_ready": 0.268244,
+                "workspace_ready": 0.114049
+              },
+              "queue_wait_seconds": 0.38533973693847656,
+              "queue_wait_scope": "accepted_transition_wait",
+              "claim_to_transition_seconds": 2.5973010063171387
+            }
+          ]
+        },
+        {
+          "elapsed_seconds": 11.253819881938398,
+          "verified": true,
+          "daemon_owned_checks": 3,
+          "independent_test_cases": 6,
+          "agent_invocations": 3,
+          "idle_invocations": 0,
+          "restart_unchanged": true,
+          "sample": 6,
+          "raw_report_sha256": "accdd690c7569ad5b0d9a822c7c48940268acd0ebbc325da8eeaac4d185218f6",
+          "roles": [
+            {
+              "role": "DEVELOPER",
+              "stage_offsets_seconds": {
+                "cleanup_complete": 2.14425,
+                "context_ready": 0.13109,
+                "first_prompt_activity": 2.093977,
+                "first_prompt_started": 0.256673,
+                "first_protocol_activity": 2.089302,
+                "process_recorded": 0.144476,
+                "protocol_ready": 0.191259,
+                "session_ready": 0.223257,
+                "workspace_ready": 0.110369
+              },
+              "queue_wait_seconds": 0.031012296676635742,
+              "queue_wait_scope": "observed_revision_wait",
+              "claim_to_transition_seconds": 3.153350591659546
+            },
+            {
+              "role": "TESTER",
+              "stage_offsets_seconds": {
+                "cleanup_complete": 2.188396,
+                "context_ready": 0.120779,
+                "first_prompt_activity": 2.125443,
+                "first_prompt_started": 0.266468,
+                "first_protocol_activity": 2.115483,
+                "process_recorded": 0.144107,
+                "protocol_ready": 0.197489,
+                "session_ready": 0.243214,
+                "workspace_ready": 0.108586
+              },
+              "queue_wait_seconds": 0.3452599048614502,
+              "queue_wait_scope": "accepted_transition_wait",
+              "claim_to_transition_seconds": 3.1394524574279785
+            },
+            {
+              "role": "ARCHITECT-REVIEWER",
+              "stage_offsets_seconds": {
+                "cleanup_complete": 2.302026,
+                "context_ready": 0.144532,
+                "first_prompt_activity": 2.140862,
+                "first_prompt_started": 0.290314,
+                "first_protocol_activity": 2.129325,
+                "process_recorded": 0.15987,
+                "protocol_ready": 0.212497,
+                "session_ready": 0.264151,
+                "workspace_ready": 0.115172
+              },
+              "queue_wait_seconds": 0.3904454708099365,
+              "queue_wait_scope": "accepted_transition_wait",
+              "claim_to_transition_seconds": 3.07598614692688
+            }
+          ]
+        }
+      ],
+      "median_seconds": 10.95044085313566,
+      "source_commit": "4961016641140c0d331d8537de5422b85ebec282"
+    },
+    "optimized": {
+      "version": "2.6.0",
+      "package_sha256": "9beb6f974982a051c167d5fed2a84d0d823a7d9aae8ddc4895a77c9db2983c7f",
+      "python": "3.13.7",
+      "dependencies": {
+        "agent-client-protocol": "0.11.1",
+        "pydantic": "2.13.5",
+        "pydantic-core": "2.46.5",
+        "pyyaml": "6.0.3",
+        "click": "8.5.0",
+        "packaging": "26.3"
+      },
+      "schema_sha256": "fbfb3fd8230fe6f62e4b3a093f3e3c1fd1ffbe35498b6c4239e97a3ff16ed4d2",
+      "installed": true,
+      "wheel_sha256": "f34bdb541e0f4c5ce4253591731af142d979ba739ac0d9bb268978440e586701",
+      "fixture_sha256": "f5ca65e474286a561519f536304f3b73c55680fbbb6923cb21edd9bac63127b4",
+      "probe_sha256": "1c6e7facb3ac49eda75fe603efc8b6576b9bdef17e1b1bfd3a615043119e7946",
+      "project_builder_sha256": "a71c1d57ce3a406d04bec3cd1e94074d4188a070191d78a4c5c1cf2db5f2b2c6",
+      "samples": [
+        {
+          "elapsed_seconds": 8.353822160046548,
+          "verified": true,
+          "daemon_owned_checks": 3,
+          "independent_test_cases": 6,
+          "agent_invocations": 3,
+          "idle_invocations": 0,
+          "restart_unchanged": true,
+          "sample": 1,
+          "raw_report_sha256": "2796ccfe5f4f123a75d0e44f11574c1aca1bd6c66f88b9d8b88d67230d035c9b",
+          "roles": [
+            {
+              "role": "DEVELOPER",
+              "stage_offsets_seconds": {
+                "cleanup_complete": 1.306262,
+                "context_ready": 0.133141,
+                "first_prompt_activity": 1.277358,
+                "first_prompt_started": 0.273119,
+                "first_protocol_activity": 1.265994,
+                "process_recorded": 0.145587,
+                "protocol_ready": 0.202752,
+                "session_ready": 0.239556,
+                "workspace_ready": 0.110955
+              },
+              "queue_wait_seconds": 0.03046703338623047,
+              "queue_wait_scope": "observed_revision_wait",
+              "claim_to_transition_seconds": 1.7489824295043945
+            },
+            {
+              "role": "TESTER",
+              "stage_offsets_seconds": {
+                "cleanup_complete": 1.557853,
+                "context_ready": 0.132693,
+                "first_prompt_activity": 1.515665,
+                "first_prompt_started": 0.296206,
+                "first_protocol_activity": 1.49925,
+                "process_recorded": 0.150991,
+                "protocol_ready": 0.205766,
+                "session_ready": 0.261976,
+                "workspace_ready": 0.112687
+              },
+              "queue_wait_seconds": 0.3625507354736328,
+              "queue_wait_scope": "accepted_transition_wait",
+              "claim_to_transition_seconds": 2.338310956954956
+            },
+            {
+              "role": "ARCHITECT-REVIEWER",
+              "stage_offsets_seconds": {
+                "cleanup_complete": 1.467283,
+                "context_ready": 0.144514,
+                "first_prompt_activity": 1.328253,
+                "first_prompt_started": 0.312865,
+                "first_protocol_activity": 1.313514,
+                "process_recorded": 0.172595,
+                "protocol_ready": 0.227032,
+                "session_ready": 0.268285,
+                "workspace_ready": 0.110358
+              },
+              "queue_wait_seconds": 0.4113941192626953,
+              "queue_wait_scope": "accepted_transition_wait",
+              "claim_to_transition_seconds": 2.270883560180664
+            }
+          ]
+        },
+        {
+          "elapsed_seconds": 9.922573619987816,
+          "verified": true,
+          "daemon_owned_checks": 3,
+          "independent_test_cases": 6,
+          "agent_invocations": 3,
+          "idle_invocations": 0,
+          "restart_unchanged": true,
+          "sample": 2,
+          "raw_report_sha256": "77b3bfd5bdc8c3fe834034fb097ad8bd3898ac9c176370265a363a2daa25b972",
+          "roles": [
+            {
+              "role": "DEVELOPER",
+              "stage_offsets_seconds": {
+                "cleanup_complete": 2.303601,
+                "context_ready": 0.409026,
+                "first_prompt_activity": 2.254315,
+                "first_prompt_started": 0.646199,
+                "first_protocol_activity": 2.249878,
+                "process_recorded": 0.442328,
+                "protocol_ready": 0.495489,
+                "session_ready": 0.525831,
+                "workspace_ready": 0.201233
+              },
+              "queue_wait_seconds": 0.03882408142089844,
+              "queue_wait_scope": "observed_revision_wait",
+              "claim_to_transition_seconds": 3.1662797927856445
+            },
+            {
+              "role": "TESTER",
+              "stage_offsets_seconds": {
+                "cleanup_complete": 1.705836,
+                "context_ready": 0.139028,
+                "first_prompt_activity": 1.508495,
+                "first_prompt_started": 0.280878,
+                "first_protocol_activity": 1.501141,
+                "process_recorded": 0.162231,
+                "protocol_ready": 0.214813,
+                "session_ready": 0.254589,
+                "workspace_ready": 0.109444
+              },
+              "queue_wait_seconds": 0.3890659809112549,
+              "queue_wait_scope": "accepted_transition_wait",
+              "claim_to_transition_seconds": 2.459667682647705
+            },
+            {
+              "role": "ARCHITECT-REVIEWER",
+              "stage_offsets_seconds": {
+                "cleanup_complete": 1.531544,
+                "context_ready": 0.139536,
+                "first_prompt_activity": 1.340467,
+                "first_prompt_started": 0.297006,
+                "first_protocol_activity": 1.326435,
+                "process_recorded": 0.164223,
+                "protocol_ready": 0.213436,
+                "session_ready": 0.251597,
+                "workspace_ready": 0.108288
+              },
+              "queue_wait_seconds": 0.4233531951904297,
+              "queue_wait_scope": "accepted_transition_wait",
+              "claim_to_transition_seconds": 2.3531763553619385
+            }
+          ]
+        },
+        {
+          "elapsed_seconds": 7.8253917009569705,
+          "verified": true,
+          "daemon_owned_checks": 3,
+          "independent_test_cases": 6,
+          "agent_invocations": 3,
+          "idle_invocations": 0,
+          "restart_unchanged": true,
+          "sample": 3,
+          "raw_report_sha256": "0bc05e5a63f3ee6e084fe058eaa51c063b69b7fd66a2e93b7f7a0447054b568c",
+          "roles": [
+            {
+              "role": "DEVELOPER",
+              "stage_offsets_seconds": {
+                "cleanup_complete": 1.720803,
+                "context_ready": 0.13163,
+                "first_prompt_activity": 1.495467,
+                "first_prompt_started": 0.260909,
+                "first_protocol_activity": 1.484361,
+                "process_recorded": 0.144151,
+                "protocol_ready": 0.196864,
+                "session_ready": 0.237075,
+                "workspace_ready": 0.110937
+              },
+              "queue_wait_seconds": 0.044596195220947266,
+              "queue_wait_scope": "observed_revision_wait",
+              "claim_to_transition_seconds": 2.5226900577545166
+            },
+            {
+              "role": "TESTER",
+              "stage_offsets_seconds": {
+                "cleanup_complete": 1.322686,
+                "context_ready": 0.14109,
+                "first_prompt_activity": 1.286424,
+                "first_prompt_started": 0.278088,
+                "first_protocol_activity": 1.273633,
+                "process_recorded": 0.159353,
+                "protocol_ready": 0.209261,
+                "session_ready": 0.245102,
+                "workspace_ready": 0.112634
+              },
+              "queue_wait_seconds": 0.3635718822479248,
+              "queue_wait_scope": "accepted_transition_wait",
+              "claim_to_transition_seconds": 1.6916675567626953
+            },
+            {
+              "role": "ARCHITECT-REVIEWER",
+              "stage_offsets_seconds": {
+                "cleanup_complete": 1.366712,
+                "context_ready": 0.136305,
+                "first_prompt_activity": 1.304839,
+                "first_prompt_started": 0.303007,
+                "first_protocol_activity": 1.297404,
+                "process_recorded": 0.156532,
+                "protocol_ready": 0.206105,
+                "session_ready": 0.268762,
+                "workspace_ready": 0.110441
+              },
+              "queue_wait_seconds": 0.4268021583557129,
+              "queue_wait_scope": "accepted_transition_wait",
+              "claim_to_transition_seconds": 1.7149622440338135
+            }
+          ]
+        }
+      ],
+      "median_seconds": 8.353822160046548,
+      "source_parent_commit": "f7b3237",
+      "changed_runtime_files_sha256": {
+        "src/greatminds/core/schema.py": "8360445ff0e707b83d3dd8ca8989689c9f64c88e4ea8b74bab2562e143437ac2",
+        "src/greatminds/domain/results.py": "3f376fb886e3925be8be60f63b4a352267131c9f3509c29d25291a7c40e1b0f1",
+        "src/greatminds/domain/maintenance.py": "4e61f33e40eaefd8ff286262420a32526b3d158ef04629cbe85b85e879160f29",
+        "src/greatminds/runtime/commands.py": "c1c4805361c14d0019195aae6941f7b5e4eaedf0c1894487a85fbfda99e2f251"
+      }
+    }
+  },
+  "observed_median_reduction_percent": 23.71245804542719,
+  "findings": [
+    "Observed median 10.950 to 8.354 seconds, a 23.7% reduction in this six-sample campaign.",
+    "All samples pass the same real commands, typed-result provenance, six independent tests, intended merge, worktree cleanup and restart checks.",
+    "Exact-text parse caching still reads and verifies pinned contract files before parsing and returns isolated mutable views. SDK default_environment is still used when executing or validating command evidence.",
+    "The ACP pipeline remains slower than the separate original native baseline (4.685-second median), despite eliminating two idle agent calls."
+  ],
+  "limitations": [
+    "Three samples per version on one host; no universal latency guarantee or inference/model-quality measurement.",
+    "Baseline/optimized share dependencies, schema, fixture, project builder and continuous public-daemon probe. No test suite overlapped these six timing samples.",
+    "Timed execution includes startup through completed task/worktree cleanup. Setup, independent final tests and restart checks are outside timing.",
+    "Profiling identified eager SDK imports and repeated schema parsing; profiling samples are excluded.",
+    "No reduced durability, skipped validation, billing/token savings or faster external model response is claimed."
+  ]
+}

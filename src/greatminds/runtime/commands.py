@@ -21,8 +21,6 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from acp.transports import default_environment
-
 from greatminds.core.errors import GreatMindsError
 from greatminds.core.storage import (_ensure_directory, _sync_directory, atomic_bytes,
                                     file_lock, safe_name, task_lock)
@@ -195,6 +193,10 @@ class CommandService:
             return copy.deepcopy(record)
 
     def _environment(self, definition):
+        # Request/status clients only read durable state; load the ACP SDK when
+        # the daemon needs the exact shared environment policy for execution.
+        from acp.transports import default_environment
+
         if any(not self.environment.get(name) for name in definition.required_env):
             raise GreatMindsError("command requires missing environment variables", exit_code=3)
         env = {key: value for key, value in default_environment().items()}

@@ -17,6 +17,9 @@ follow [SemVer](https://semver.org/) once 1.0.0 ships.
   dependencies are optional through `greatminds[stands]`.
 - The supported managed host is Linux with `/proc` and pidfd operations. Service
   installation, tmux, VS Code and deployed stands are optional integrations.
+- Command request/status clients defer ACP SDK loading until execution/evidence
+  validation needs it. Result and maintenance controllers reuse parsed schema
+  text while retaining pinned-file verification and isolated document views.
 
 ### Added
 

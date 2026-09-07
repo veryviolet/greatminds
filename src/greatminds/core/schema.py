@@ -28,6 +28,15 @@ def _parse(text: str) -> dict[str, Any]:
     return doc
 
 
+def parse_schema_document(text: str) -> dict[str, Any]:
+    """Return an isolated view of exact schema text using the bounded parse cache.
+
+    The caller still reads/verifies its source or pinned contract on every access.
+    Content, rather than a path or claimed hash, is the cache key.
+    """
+    return deepcopy(_parse(text))
+
+
 @dataclass(frozen=True)
 class SchemaSnapshot:
     source: Path
@@ -38,7 +47,7 @@ class SchemaSnapshot:
     def document(self) -> dict[str, Any]:
         # Callers may manipulate their view without changing another run's
         # contract or poisoning the shared parse cache.
-        return deepcopy(_parse(self.text))
+        return parse_schema_document(self.text)
 
     @property
     def version(self) -> Any:

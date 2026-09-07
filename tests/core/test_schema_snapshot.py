@@ -6,6 +6,18 @@ from greatminds.core.errors import GreatMindsError
 from greatminds.core.schema import inspect_schema_copy, load_schema_snapshot
 
 
+def test_pinned_schema_cache_uses_contents_and_never_shares_mutable_views():
+    from greatminds.core.schema import parse_schema_document
+    original = "version: 1\nroles: {TESTER: {requires: [tests]}}\n"
+    altered = original.replace("[tests]", "[tests, review]")
+    first = parse_schema_document(original)
+    first["roles"]["TESTER"]["requires"].clear()
+    assert parse_schema_document(original)["roles"]["TESTER"]["requires"] == ["tests"]
+    assert parse_schema_document(altered)["roles"]["TESTER"]["requires"] == ["tests", "review"]
+    with pytest.raises(ValueError, match="mapping"):
+        parse_schema_document("- invalid schema root")
+
+
 def test_snapshot_survives_source_replacement_and_caller_mutation(tmp_path):
     path = tmp_path / "schema.yaml"
     path.write_text("version: 1\nroles:\n  TESTER: {lifecycle: driven}\n")
