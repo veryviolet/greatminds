@@ -1985,3 +1985,33 @@ Full regression checkpoint after shared filesystem health, scoped recovery and
 execution presets: 1429 passed, 1 skipped in 328.45s. No live provider was invoked.
 Implementation checkpoint: 309a60e. Continue with the outstanding acceptance
 items above; this checkpoint does not mark the entire modernization complete.
+
+### Measured idle conversation scheduling overhead (2026-09-07)
+
+The daemon previously reread and scanned all runs for each open conversation.
+It now builds one live-conversation index per pass, skipping that read when no
+conversation journals exist. This is an observation only: each new claim still
+rechecks current capacity and identity under the store lock. Closing active
+conversations continues to request cancellation before acknowledging closure.
+
+Added tools/daemon_idle_benchmark.py: real store APIs create 50 idle conversations
+and 100 cancelled historical claims; warm-up is excluded, five complete daemon
+passes are measured, agent launch is forbidden, and unchanged runtime history is
+asserted. On this host the baseline at 3b3db47 used 67 runtime reads per pass and
+1.105 s median; the updated loop used 18 reads and 1.008 s median (about 9% lower).
+Recorded evidence is evidence/daemon-idle-2026-09-07.json. These are synthetic idle
+passes, not productive task latency or provider performance. No state was pruned.
+
+Validation: 61 conversation/runtime/recovery checks passed in 32.53s. The expanded
+idle/conversation/daemon/account campaign passed 47 checks; its new capacity test
+initially asserted the fixture's project default incorrectly (4 rather than its
+binding limit of 1). After correcting that assertion, the test passed in 5.64s:
+three ready conversations completed with at most one claimed nonterminal run.
+The idle regression checks constant runtime-read growth and unchanged history.
+Strict docs build passed in 1.52s. The earlier full-suite checkpoint remains
+1429 passed, 1 skipped; no new full-suite claim is made for this change.
+
+C4 now has a reproducible measured reduction for one concrete daemon bottleneck.
+Comparative productive-pipeline overhead and the remaining plan acceptance items
+are still open. The previous goal turn was progress: committed presets and a full
+regression checkpoint. This turn changes runtime behavior with measured evidence.

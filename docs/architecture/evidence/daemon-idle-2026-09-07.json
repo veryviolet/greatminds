@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "kind": "synthetic_local_daemon_idle",
+  "baseline_commit": "3b3db47",
+  "command": ".venv/bin/python tools/daemon_idle_benchmark.py",
+  "environment": {
+    "python": "3.13.7",
+    "platform": "Linux x86_64"
+  },
+  "before": {
+    "version": 1,
+    "fixture": {
+      "conversations": 50,
+      "history": 100,
+      "repeats": 5
+    },
+    "samples": [
+      {
+        "seconds": 1.1151672918349504,
+        "runtime_reads": 67
+      },
+      {
+        "seconds": 1.104661880992353,
+        "runtime_reads": 67
+      },
+      {
+        "seconds": 1.0926777028944343,
+        "runtime_reads": 67
+      },
+      {
+        "seconds": 1.0988151510246098,
+        "runtime_reads": 67
+      },
+      {
+        "seconds": 1.1152603379450738,
+        "runtime_reads": 67
+      }
+    ],
+    "median_seconds": 1.104661880992353,
+    "run_count": 100,
+    "result_count": 0
+  },
+  "after": {
+    "version": 1,
+    "fixture": {
+      "conversations": 50,
+      "history": 100,
+      "repeats": 5
+    },
+    "samples": [
+      {
+        "seconds": 1.0079394248314202,
+        "runtime_reads": 18
+      },
+      {
+        "seconds": 1.003099544905126,
+        "runtime_reads": 18
+      },
+      {
+        "seconds": 1.0076461441349238,
+        "runtime_reads": 18
+      },
+      {
+        "seconds": 1.0888651001732796,
+        "runtime_reads": 18
+      },
+      {
+        "seconds": 1.0074203021358699,
+        "runtime_reads": 18
+      }
+    ],
+    "median_seconds": 1.0076461441349238,
+    "run_count": 100,
+    "result_count": 0
+  },
+  "limits": [
+    "Warm-up and fixture construction excluded.",
+    "No model prompt, tool execution or productive task latency measured.",
+    "Timing is host-specific; runtime read counts are structural evidence."
+  ]
+}

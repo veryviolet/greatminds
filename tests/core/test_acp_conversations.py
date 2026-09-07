@@ -262,3 +262,27 @@ def test_close_works_after_contract_change_and_attach_follow_ends(tmp_path):
     result=runner.invoke(cli,[*args,'attach',store.id,'--follow'])
     assert result.exit_code==0,result.output
     assert json.loads(result.output)['closed']
+
+
+def test_multiple_ready_conversations_recheck_capacity_after_shared_observation(tmp_path):
+    first = setup(tmp_path)
+    schema = load_schema_snapshot()
+    config = load_execution_config(tmp_path/'coordination/execution.yaml', roles=set(schema.document['roles']))
+    assert config.bindings[0].max_running == 1
+    chats = [first] + [ConversationStore.create(tmp_path/'.greatminds', binding=config.bindings[0],
+             config_sha256=config.sha256, schema_sha256=schema.sha256, workspace=tmp_path)
+             for _ in range(2)]
+    for chat in chats:
+        chat.enqueue('one prompt', request_id='one')
+    state = asyncio.run(serve(tmp_path, once=True, interval=.2, environment={}))
+    assert len(state['runs']) == 3
+    assert all(run['state'] == 'completed' for run in state['runs'].values())
+    assert all(chat.snapshot()['turns']['one']['status'] == 'completed' for chat in chats)
+    live = set()
+    for event in state['events']:
+        if event['kind'] == 'claimed':
+            live.add(event['run_id'])
+            assert len(live) <= 1
+        elif event['kind'] == 'completed':
+            live.remove(event['run_id'])
+    assert live == set()

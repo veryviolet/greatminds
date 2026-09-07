@@ -900,3 +900,20 @@ first user-visible text, adequate validation or an approved domain result.
 For a multi-message interactive run these are first-occurrence observations,
 not a per-message latency distribution. Unknown token/cost data remains outside
 this timing contract.
+
+### Measuring idle daemon overhead
+
+The checkout includes `tools/daemon_idle_benchmark.py`. Run it with the project
+Python environment to create a temporary fixture, warm up maintenance, and measure
+five complete idle daemon passes. Defaults are 50 open idle conversations and 100
+cancelled historical claims. All journal entries are created through store APIs;
+the benchmark rejects agent startup and verifies unchanged runtime history.
+`--conversations`, `--history`, and `--repeats` select the synthetic load.
+
+The [recorded local comparison](evidence/daemon-idle-2026-09-07.json) measured
+67 runtime reads per pass before conversation indexing and 18 after. The median
+was 1.105 s before and 1.008 s after on this host. This includes daemon startup
+and reconciliation; it excludes fixture construction and warm-up. It is not an
+LLM latency or task-completion benchmark. The daemon now indexes live conversation
+runs from one observation per pass, while every claim still validates current
+capacity and identity under the authoritative lock. No journal data is dropped.

@@ -151,12 +151,18 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                     stand_scheduler.poll()
                     from .interactions import ConversationStore
                     closing = False
-                    for path in sorted((store.directory / 'conversations').glob('*/state.json')):
+                    # One consistent observation for this pass. Claims still recheck
+                    # capacity and conversation identity under the store lock.
+                    conversation_paths = sorted((store.directory / 'conversations').glob('*/state.json'))
+                    live_conversations = {}
+                    for run in (store.snapshot()['runs'].values() if conversation_paths else ()):
+                        if run.get('conversation_id') and run['state'] not in TERMINAL:
+                            live_conversations.setdefault(run['conversation_id'], []).append(run)
+                    for path in conversation_paths:
                         conversation = ConversationStore(store.runtime, path.parent.name)
                         document = conversation.snapshot()
                         if document.get('close_requested') and not document['closed']:
-                            live = [r for r in store.snapshot()['runs'].values()
-                                    if r.get('conversation_id') == conversation.id and r['state'] not in TERMINAL]
+                            live = live_conversations.get(conversation.id, [])
                             if live:
                                 closing = True
                                 for run in live:
@@ -165,8 +171,7 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                             else:
                                 conversation.finish_close(supervisor.id)
                             continue
-                        if document['closed'] or any(r.get('conversation_id') == conversation.id
-                                and r['state'] not in TERMINAL for r in store.snapshot()['runs'].values()):
+                        if document['closed'] or conversation.id in live_conversations:
                             continue
                         binding = next((b for b in config.bindings if b.id == document['binding_id']), None)
                         if binding is None:
