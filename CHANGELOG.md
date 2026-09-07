@@ -21,6 +21,10 @@ follow [SemVer](https://semver.org/) once 1.0.0 ships.
   validation needs it. Result and maintenance controllers reuse parsed schema
   text while retaining pinned-file verification and isolated document views.
 
+- Queue dispatch and dependency release are daemon-owned. The journal replay hook
+  that asked agents to scan queues and rerun mechanical checks has been removed;
+  existing journal and inbox data remain intact.
+
 ### Added
 
 - Durable run identities, exclusive claims, launch gates, bounded process cleanup,

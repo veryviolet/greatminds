@@ -37,7 +37,7 @@ were inspected. It does not turn fixture coverage into live harness coverage.
 | B1: provider/account limits do not cause independent retry storms | Pinned manifest error-code rules, durable project/account holds, atomic claim admission and subsequent conversation prompt checks | Confirmed G4 for explicitly configured ACP application codes: bounded cooldown or operator-resolved quota hold. Generic error prose cannot trigger quota state; no built-in live harness code mapping is claimed |
 | B2: known maintenance, dependency release, impossible dependencies/cycles | Shared dependency verdicts and journaled SYSTEM maintenance; missing/cyclic/changed/live-role fixtures and installed smoke | Confirmed; ordinary dependency release invokes zero agents |
 | B2: dead-holder leases, cleanup, log retention and deduplicated findings | Lease/deployment recovery, `filesystem_health.py`, `event_retention.py`, maintenance finding fingerprints | Confirmed specified local behavior; evidence/task/conversation records are preserved and external systemd logs use host policy |
-| B2: maintainer limited to semantic diagnostic work | Shared schema marks maintainer on demand and forbids polling/recovery loops | Confirmed instructions and scheduling contract |
+| B2: maintainer limited to semantic diagnostic work | Shared schema marks maintainer on demand and forbids polling/recovery loops; public CLI has no journal-to-agent wake dispatcher | Confirmed instructions and scheduling contract; journal records are preserved while SYSTEM releases dependencies without reviewer/inbox wake effects |
 | B3: concrete assignment, role/task/gates/results/artifacts and pinned context | `context.py`, `RunStore.contracts`, CLI contract inspection and scoped commands | Confirmed; roles receive their assignment rather than scanning queues |
 | B3: compatible session resume and changed-contract handling | Supervisor session selection and conversation acquire/revision checks; load/mismatch/task-change tests | Confirmed; changed contracts/revisions do not silently consume pending input |
 | B3: prompt size, useful-work time and turns against baseline | Input reservations, run stages, queue/accepted-transition waits, preparation/receipt timing; original and installed ACP productive comparisons | Confirmed G3 measurement scope: bytes are not billed tokens; original native median 4.685 s/5 calls, optimized ACP 8.354 s/3 calls. Native latency regression remains a documented limitation |
@@ -80,32 +80,20 @@ were inspected. It does not turn fixture coverage into live harness coverage.
    itself about token scope, so these samples cannot support a token budget.
    Cost limits are reactive and allow one bootstrap prompt for a new session;
    they do not promise a hard spending cap. G6 below remains open.
-3. **G3 — task timing and comparison: implemented and measured.** Add the missing observable queue/validation/
-   accepted-progress intervals, keeping unknowable times unknown. Compare an
-   equivalent workload before/after; existing mixed-model durations are not a
-   controlled performance comparison.
-   Initial timing instrumentation now distinguishes first-observed queue waits
-   from waits after accepted transitions, records preparation attempts and result
-   resolution, and timestamps conversational turns. Real three-role pipeline and
-   crash/retry fixtures exercise these records. Controlled productive measurements
-   and comparison remain open; first model activity is still not useful work.
-   A [six-run productive comparison](evidence/productive-pipeline-2026-09-07.json)
-   now covers independently installed 3b3db47/4961016 wheels with identical schema,
-   dependencies and deterministic task fixture: 1145→355 median daemon state reads,
-   17.097→16.567 s observed median wall time. Both are modernization checkpoints;
-   these data do not cover the original pre-modernization pipeline. These data
-   must not be relabeled as an inference or model-quality comparison.
-   The subsequent [original continuous-daemon comparison](evidence/original-pipeline-2026-09-07.json)
-   covers three samples per version with the same prepared task and outcome:
-   original median 4.685 s versus ACP 10.597 s, five versus three agent calls.
-   This records a latency regression despite eliminating two idle calls.
-   Profiling then identified repeated pinned-schema parsing and eager SDK imports
-   in command clients. A [six-run before/after campaign](evidence/continuous-acp-optimization-2026-09-07.json)
-   with identical schema/dependencies/fixtures observed ACP median 10.950→8.354 s
-   (23.7% lower), with every gate, command and recovery assertion preserved.
-   This closes the finite measurement/optimization item; the native latency
-   regression remains an explicit limitation. Neither fixture measures inference,
-   billed tokens or model quality. Profiling samples are excluded from benchmarks.
+3. **G3 — task timing and comparison: implemented and measured.** Queue wait,
+   preparation, accepted progress and result resolution are recorded separately
+   from first model activity. Real pipeline and crash/retry fixtures exercise them.
+   A [productive comparison](evidence/productive-pipeline-2026-09-07.json) on
+   independently installed modernization checkpoints measured 1145→355 median
+   runtime reads and 17.097→16.567 s wall time with identical task fixtures.
+   The [original continuous-daemon comparison](evidence/original-pipeline-2026-09-07.json)
+   measured native median 4.685 s versus ACP 10.597 s, with five versus three
+   agent calls. A subsequent [six-run optimization campaign](evidence/continuous-acp-optimization-2026-09-07.json)
+   measured ACP median 10.950→8.354 s (23.7% lower) after deferring command-client
+   SDK imports and caching verified schema parsing. Gates and recovery assertions
+   remain intact. This closes the finite measurement/optimization item; native
+   latency remains lower. These fixture timings do not measure inference, billing
+   or model quality, and profiling samples are excluded from comparisons.
 4. **G4 — account admission for explicit quota signals: implemented and verified.**
    `account_limit_errors` maps at most 16 nonreserved ACP application codes using
    the reporting run's pinned manifest. Rate-limit cooldowns are 1..86400 seconds;
@@ -142,9 +130,10 @@ were inspected. It does not turn fixture coverage into live harness coverage.
    classifying an external blocker, then complete session/worktree/model/cancel
    scenarios. The declared role-by-harness evidence table is now present. Fresh
    authentication checks distinguish missing Qwen configuration, Kimi/Cline login,
-   OpenHands agent configuration, discontinued Gemini individual access and an
+   OpenHands agent configuration, discontinued Gemini individual access and a
    Cursor ACP browser-login wait despite cached native status (confirmed in the
-   exact probe process log; the reason cache validation failed remains unknown). Cancellation while
+   exact probe process log; the reason cache validation failed remains unknown).
+   Cancellation while
    permission is pending passed on Claude/Codex/Grok. Public CLI planner/live-developer
    conversations also passed session recall after daemon restart, duplicate delivery
    and cursor reconnect on all three. These checks do not establish the remaining

@@ -2572,3 +2572,21 @@ next action from generic timeout diagnosis to completing valid native login, whi
 leaving the reason cache validation failed unknown. Only allowlisted markers and
 source/log fingerprints are recorded in evidence/acp-cursor-auth-diagnosis-2026-09-07.json;
 no authorization URL, token or account identity is retained in repository evidence.
+
+### Acceptance audit — finish removal of journal-driven agent polling (2026-09-07)
+
+The requirement-by-requirement source audit found the unused public notify-journal
+hook still instructed agents to scan queues, run wake-check and continue a tick;
+verified events could wake REVIEWER for mechanical dependency release. The ACP
+scheduler has no callers of this hook and performs those duties itself. Removed
+its CLI registration and module, including its two obsolete hook-specific test
+files. No project journal or inbox files are deleted or migrated.
+
+Added an actual-daemon regression with repeated historical SYSTEM verified events,
+a ready blocked task, a configured reviewer queue binding and an agent launch
+sentinel. SYSTEM releases the task once with unchanged task bytes; both daemon
+passes produce zero runs, zero new inbox messages and no sentinel effect. Existing
+operator inbox text and journal history remain byte-preserved; the second pass is
+idempotent. The public CLI no longer exposes the wake dispatcher. All 48 targeted
+maintenance/daemon/public-interface tests passed. The initial full audit run had
+already collected before this removal and cannot serve as final post-change proof.
