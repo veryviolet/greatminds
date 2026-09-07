@@ -50,6 +50,10 @@ Assigned context includes `cli_argv`: the daemon's Python executable followed by
 `-I -m greatminds.cli.main`. Agents use that invocation for scoped commands and
 result submission. It works without an activated venv or a `greatminds` executable
 on PATH and prevents a project-local Python module from shadowing the CLI.
+The harness must preserve this launch’s scoped environment in its tool subprocesses.
+A separately running shared harness backend can lose that identity; use an attached
+local backend for managed runs. The [Cline compatibility configuration](acp-compatibility.md#cline-after-native-login-2026-09-07)
+records one measured instance and its native setting.
 
 `argv` is an array, never a shell expression. Environment entries map child
 variable names to parent variable names. Secret values are resolved at launch

@@ -2646,3 +2646,55 @@ switch is inferred, no credentials are requested in chat, and the web phase is
 not substituted for the unfinished modernization acceptance.
 
 Evidence and exact limitations: evidence/acceptance-local-audit-2026-09-07.json.
+
+
+### Cline restored: common model selector and native backend, 2026-09-07
+
+The operator completed native Cline login. Cline 3.0.61 then passed the exact
+synthetic response, public planner/live-developer conversations with daemon restart,
+recall, duplicate delivery and cursor reconnect, streaming cancellation, and
+cancellation while permission was pending without executing the write.
+
+The live metadata exposed a client bug: provider and model select options both
+carry category `model`. Selecting the first option rejected the configured model.
+Commit `905e5ec` searches all model-category selectors and requires a unique match;
+ambiguous values fail before selection is sent. Two new regression cases failed
+before the fix; all 48 transport/supervisor/probe tests passed afterward.
+
+The first domain attempt found a separate native backend requirement. Cline's
+ACP session factory can reuse the shared Hub, which lacks the per-run Greatminds
+environment. Scoped contract inspection correctly refused the missing credential.
+The attempt ended at the permission deadline with no accepted result. One-time
+operator approvals and an explicit rejection were consumed; environment inspection
+and root filesystem searching were rejected as outside the synthetic task.
+
+The installed executable and upstream CLI reference expose
+`CLINE_SESSION_BACKEND_MODE=local`. An explicit manifest argv sets it only for the
+launched Cline process, preserving its configured provider/model and scoped run
+identity. No token is put in a prompt, shell argument or configuration file.
+Conversation/restart and both cancellation scenarios also passed with this backend.
+
+The local-backend domain campaign applied DEVELOPER and TESTER results with two
+passing daemon-owned test requests. ARCHITECT-REVIEWER returned `-32603` after
+inspection; one explicit retry confirmed insufficient Cline Credits. No further
+inference was attempted and no provider/model switch or credit purchase was made.
+The first review error is recorded as a protocol error; only the inspected retry
+has a confirmed funding diagnostic. The pipeline is not marked complete.
+
+Independent verification passed six tests in the retained task worktree, confirmed
+only clamp.py changed there, the main branch remained unchanged, the task stayed
+in feature_review, and all recorded agent/command process groups exited. A fresh
+daemon process preserved runs, results and commands without another agent call.
+Twenty-three inspected allow_once responses were consumed in this local-backend
+campaign. The role matrix now gives Cline D for developer/tester and C for the
+two public conversation roles; reviewer and other domain roles remain unverified.
+
+The full Python suite ran 1545 cases: 1544 passed and one documentation wording
+check failed. The wording was corrected without changing the check, and all five
+cases in that file passed. The broader 14 public-documentation/reference checks
+and strict MkDocs build passed. Runtime changes are covered by the full run and
+the separate 48-case ACP regression suite; no full-suite rerun is implied.
+
+Evidence: evidence/acp-cline-ready-2026-09-07.json. Remaining external prerequisites
+are Qwen/Kimi/OpenHands/Gemini/Cursor access/configuration and sufficient Cline
+Credits to finish reviewer validation. Overall A4/G6/M5 remains incomplete.

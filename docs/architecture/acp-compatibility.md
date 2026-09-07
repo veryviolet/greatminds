@@ -241,9 +241,9 @@ cleanup, and the requested restart/load stage was skipped because the initial pr
 failed. No account or model selection was changed.
 
 [Sanitized evidence](evidence/acp-cline-auth-2026-09-07.json) records this failure.
-Cline task execution, resumption and cancellation remain unverified until login is
-restored and the same scenarios pass. Creating an ACP session does not establish
-that the configured provider credentials can execute a prompt.
+This access failure was resolved after the operator completed native
+login; the successful revalidation below supersedes the Cline access blocker.
+Creating an ACP session alone does not establish working provider credentials.
 
 ## One-harness local preset on 2026-09-07
 
@@ -298,7 +298,7 @@ settings were used; no provider or identity was selected implicitly.
 | --- | --- | --- |
 | Qwen 0.19.6 | Only `openai` advertised; explicit authentication returned -32603 | Installed method requires `OPENAI_API_KEY`, absent in the probe environment |
 | Kimi 0.39.1 | Session and explicit `login` returned -32000 | Complete native login; doctor found no local configuration |
-| Cline 3.0.61 | Session created; synthetic prompt returned -32603 without assistant text | Native re-authentication, identified by private stderr |
+| Cline 3.0.61 | Initial prompt required re-authentication; subsequent native login and live probes passed | Resolved; use the local-backend configuration below for managed tasks |
 | OpenHands 1.16.0 | Local session returned -32000 | Configure agent/model: installed local handler maps missing agent specification to this response |
 | Gemini 0.49.0 | Configured `oauth-personal` explicitly rejected | Individual access through this client was discontinued; an applicable supported access method is required |
 | Cursor 2026.06.15-18-00-12-6f5a2cf | Native status reports cached login; explicit `cursor_login` timed out after 30 seconds | Complete a valid Cursor login; the recorded ACP handler waited for browser authentication |
@@ -338,19 +338,20 @@ harness assignment. Generic lifecycle tests do not fill domain-role cells.
 
 | Role | Codex | Claude | Grok | Qwen | Kimi | Cline | OpenHands | Gemini | Cursor |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| ARCHITECT-PLANNER | C | C | C | B | B | B | B | B | B |
-| ARCHITECT-REVIEWER | D | U | D | B | B | B | B | B | B |
-| DEVELOPER | D | P | P | B | B | B | B | B | B |
-| UI-DEVELOPER | U | U | U | B | B | B | B | B | B |
-| LIVE-DEVELOPER | C | C | C | B | B | B | B | B | B |
-| TECHNICAL-WRITER | U | U | U | B | B | B | B | B | B |
-| TESTER | D | D | U | B | B | B | B | B | B |
-| READER | U | U | U | B | B | B | B | B | B |
-| EXPLORER | U | U | U | B | B | B | B | B | B |
-| MAINTAINER | U | U | U | B | B | B | B | B | B |
+| ARCHITECT-PLANNER | C | C | C | B | B | C | B | B | B |
+| ARCHITECT-REVIEWER | D | U | D | B | B | U | B | B | B |
+| DEVELOPER | D | P | P | B | B | D | B | B | B |
+| UI-DEVELOPER | U | U | U | B | B | U | B | B | B |
+| LIVE-DEVELOPER | C | C | C | B | B | C | B | B | B |
+| TECHNICAL-WRITER | U | U | U | B | B | U | B | B | B |
+| TESTER | D | D | U | B | B | D | B | B | B |
+| READER | U | U | U | B | B | U | B | B | B |
+| EXPLORER | U | U | U | B | B | U | B | B | B |
+| MAINTAINER | U | U | U | B | B | U | B | B | B |
 
 D cells derive from the [single-harness local preset](evidence/acp-local-preset-2026-09-07.json)
-and [operator-assisted mixed pipeline](evidence/acp-mixed-pipeline-completed-2026-09-06.json).
+and [operator-assisted mixed pipeline](evidence/acp-mixed-pipeline-completed-2026-09-06.json),
+plus the two accepted [Cline domain stages](evidence/acp-cline-ready-2026-09-07.json).
 P cells derive from [permission approval](evidence/acp-permissions-2026-09-06.json)
 and pending-permission cancellation above. This is deliberately narrower than
 all roles on all harnesses. G6 and overall modernization acceptance remain open.
@@ -398,3 +399,55 @@ reporting cached login is insufficient for this ACP handler. The precise reason
 the cache failed validation remains unknown; credentials, account identities and
 authorization URLs were not exported. A valid completed native login is needed
 before repeating Cursor's session/model/worktree/cancellation scenarios.
+
+## Cline after native login, 2026-09-07
+
+[Fresh Cline 3.0.61 evidence](evidence/acp-cline-ready-2026-09-07.json) confirms
+exact synthetic replies, model `anthropic/claude-sonnet-5` and mode `act` selection,
+streaming cancellation with `cancelled`, and cancellation while a permission is
+pending without executing the requested write. Public CLI ARCHITECT-PLANNER and
+LIVE-DEVELOPER conversations both preserved the token after a daemon restart,
+used the same loaded session, deduplicated delivery, reconnected by event cursor
+and performed no new work on an idle restart. Process cleanup passed.
+
+Cline advertises both provider and model selectors in category `model`. The common
+client previously selected the first entry and rejected the actual model. It now
+finds the unique selector advertising the requested value and rejects ambiguity
+before sending a configuration request. The explicit probe used the already
+configured provider/model; no global account or provider settings changed.
+
+For managed Cline execution, use the native attached local backend explicitly:
+
+```yaml
+agents:
+  cline:
+    transport: acp
+    argv: [env, CLINE_SESSION_BACKEND_MODE=local, cline, --acp]
+    adapter_version: native-3.0.61
+    harness_version: 3.0.61
+```
+
+This is a fragment for `coordination/execution.yaml`; role bindings remain separate.
+`env` is a real executable in the argv array, and this non-secret setting affects
+only the launched process. Provider authentication stays in Cline's native settings.
+The backend option is documented in the [Cline CLI reference](https://github.com/cline/cline/blob/main/docs/cli/cli-reference.mdx)
+and was verified in the installed executable. Its ACP session factory uses the
+backend selected by that environment variable. The default backend can reuse a
+shared Hub whose environment lacks the current Greatminds run credential. In the
+first task attempt, scoped contract inspection was correctly rejected for missing
+credentials; the run reached its permission deadline without an accepted result.
+The local backend preserved the scoped identity. No credential was added to model
+prompts, shell arguments, or configuration files. Local-backend conversation restart
+and both cancellation scenarios were also repeated successfully.
+
+The local-backend domain test completed DEVELOPER and TESTER: both typed handoffs
+were applied, both daemon-owned test requests passed, and all six tests passed
+again independently in the task worktree. The reviewer returned `-32603`; one
+explicit retry returned the native diagnostic “Insufficient balance” for Cline
+Credits. That funding requirement is separate from the now-working login. No
+further model request was sent. This is a **partial pipeline**, not a completed
+review or merge. The task remains in `feature_review`, its worktree is preserved,
+main is unchanged, all recorded agent/command process groups exited, and another
+daemon process performed no additional work. Twenty-three inspected one-time
+approvals were consumed across these domain attempts; no persistent approval was
+granted. The raw balance and account data are excluded from the evidence file.
