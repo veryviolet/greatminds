@@ -235,3 +235,15 @@ footer{padding:14px 16px}
 @keyframes agent-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.activity-spinner{animation:none}}
 @media(max-width:760px){.toolbar{height:auto;min-height:63px}.toolbar-actions{flex-wrap:wrap;justify-content:flex-end}.composer-bottom{gap:8px;flex-wrap:wrap}}
+
+/* Agent Markdown is sanitized before insertion; project text stays literal. */
+.message-text.markdown{white-space:normal;overflow-wrap:anywhere;min-width:0}
+.markdown>:first-child{margin-top:0}.markdown>:last-child{margin-bottom:0}
+.markdown p{margin:.65em 0}.markdown ul,.markdown ol{padding-left:1.7em}
+.markdown li+li{margin-top:.3em}.markdown h1,.markdown h2,.markdown h3{line-height:1.35;margin:1em 0 .5em}
+.markdown pre{max-width:100%;overflow:auto;white-space:pre;padding:14px;border:1px solid var(--line);border-radius:8px}
+.markdown code{font-family:monospace;font-size:.92em}.markdown :not(pre)>code{background:var(--surface-soft);padding:.12em .3em;border-radius:4px}
+.markdown table{display:block;max-width:100%;overflow:auto;border-collapse:collapse;margin:1em 0}
+.markdown th,.markdown td{border:1px solid var(--line);padding:8px 12px;white-space:normal}
+.markdown blockquote{margin:1em 0;padding-left:1em;border-left:3px solid var(--line);color:var(--muted)}
+.markdown a{color:var(--accent);text-decoration:underline}

@@ -30,6 +30,16 @@ class WebService:
         schema = load_schema_snapshot()
         return schema, load_execution_config(self.config_path, roles=set(schema.document['roles']))
 
+    def default_language(self):
+        default = os.environ.get('GREATMINDS_WEB_LANGUAGE')
+        if default is None:
+            path = Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home() / '.config'))) / 'greatminds/web.json'
+            try:
+                default = json.loads(path.read_text()).get('language')
+            except (OSError, ValueError, AttributeError):
+                pass
+        return default if default in {'en', 'ru', 'zh'} else 'en'
+
     def daemon_status(self):
         from greatminds.runtime.background import status
         return status(self.project)
@@ -148,6 +158,22 @@ class WebService:
         return {'id': identity, 'queue': paths[0].parent.name, 'text': paths[0].read_text()}
 
     def action(self, path, body):
+        if path.startswith('/api/stands/'):
+            from .stands import Stands
+            stands = Stands(self)
+            if path == '/api/stands/connections':
+                return stands.save_connections(body)
+            if path == '/api/stands/deployment-output':
+                return stands.deployment_output(body['id'])
+            if path == '/api/stands/file':
+                return stands.save_file(body) if 'text' in body else stands.file(body['name'])
+            if path == '/api/stands/operations':
+                return stands.operations.submit(body)
+        if path == '/api/executor-options':
+            from .capabilities import discover
+            schema = load_schema_snapshot()
+            config = parse_execution_config(body['document'], roles=set(schema.document['roles']))
+            return discover(config, self.project, body['binding_id'], body.get('model') or None)
         if path == '/api/settings':
             return self.save_settings(body)
         if path == '/api/dispatch':

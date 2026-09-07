@@ -71,7 +71,7 @@ against the expected branch and repository. Other task kinds use the configured
 workspace directly. The resolved path and starting Git identity are recorded in
 the run, and supplied to the agent's context and permission policy.
 
-Bindings choose workspace, scheduling, permission, session, model, mode, and
+Bindings choose workspace, scheduling, permission, session, model, mode, reasoning, and
 account independently of the harness. Unknown fields and unsupported values
 fail validation. Workspaces are explicit trusted local paths and must exist
 before a claim can be created.
@@ -367,7 +367,9 @@ The context compiler provides the assigned task, role, available transitions,
 contract identity, and result format. It removes queue-scanning and heartbeat
 instructions from the assignment. Compatible sessions may be loaded when the
 agent advertises that capability; otherwise context is reconstructed in a new
-session and the strategy is recorded. Model/mode settings must be advertised.
+session and the strategy is recorded. Model/mode/reasoning settings must be advertised. Reasoning uses the ACP
+`thought_level` select category and is applied after model selection, using the
+updated options returned by the server.
 
 Operator commands:
 

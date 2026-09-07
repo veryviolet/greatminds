@@ -44,15 +44,22 @@ class Handler(BaseHTTPRequestHandler):
             parsed = urlsplit(self.path)
             path = parsed.path
             assets = {'/': ('index.html', 'text/html; charset=utf-8'),
+                      **{f'/{name}.js': (f'{name}.js', 'text/javascript; charset=utf-8') for name in ('marked', 'purify', 'markdown', 'i18n', 'stands')},
                       '/app.js': ('app.js', 'text/javascript; charset=utf-8'),
                       '/style.css': ('style.css', 'text/css; charset=utf-8')}
             if path in assets:
                 name, mime = assets[path]
-                self.reply(files('greatminds.web').joinpath('assets', name).read_bytes(), mime=mime)
+                content = files('greatminds.web').joinpath('assets', name).read_bytes()
+                if name == 'index.html':
+                    content = content.replace(b'<html lang="en">', ('<html lang="en" data-default-language="' + self.server.service.default_language() + '">').encode())
+                self.reply(content, mime=mime)
                 return
             service = self.server.service
             if path == '/api/state':
                 self.reply(service.overview())
+            elif path == '/api/stands':
+                from .stands import Stands
+                self.reply(Stands(service).snapshot())
             elif path == '/api/settings':
                 self.reply(service.settings())
             else:

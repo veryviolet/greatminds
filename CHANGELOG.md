@@ -4,6 +4,24 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 3.2.0 — 2026-09-07
+
+### Added
+
+- English, Russian and Simplified Chinese web interfaces with a language selector,
+  saved browser preference and configurable per-user default (English initially).
+- ACP model and reasoning discovery in role settings. Choices come from the
+  executor, and model changes refresh the advertised reasoning options.
+- Stands sidebar: machine connection settings, non-interactive SSH checks, Ansible
+  profile/inventory editors, leases, deployment controls and verified log previews.
+- Durable operator stand requests executed by the daemon, independent of the web
+  server. Interrupted requests require review and are never automatically replayed.
+
+### Fixed
+
+- Chat and batch responses render sanitized Markdown, including tables and code,
+  while streaming updates preserve existing answer blocks.
+
 ## 3.1.1 — 2026-09-07
 
 ### Fixed

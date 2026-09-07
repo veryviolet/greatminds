@@ -198,7 +198,8 @@ class AcpTransport:
             raise ValueError("authentication method was not advertised")
         return await asyncio.wait_for(self.connection.authenticate(method_id=method_id), self.request_timeout)
 
-    async def configure_session(self, session, *, model: str | None = None, mode: str | None = None):
+    async def configure_session(self, session, *, model: str | None = None, mode: str | None = None,
+                                reasoning: str | None = None):
         """Apply only advertised selections, with the same policy for every caller."""
         session_id = self.callbacks.session_id
         if session_id is None:
@@ -209,26 +210,31 @@ class AcpTransport:
                 raise ValueError("configured session mode is not advertised")
             await asyncio.wait_for(self.connection.set_session_mode(
                 session_id=session_id, mode_id=mode), self.request_timeout)
-        if model:
-            options = [item for item in session.config_options or []
-                       if item.category == "model" and item.type == "select"]
+        config_options = session.config_options or []
+        for category, value, label in (("model", model, "model"),
+                                       ("thought_level", reasoning, "reasoning")):
+            if value is None:
+                continue
+            options = [item for item in config_options
+                       if item.category == category and item.type == "select"]
             if not options:
-                raise ValueError("agent does not advertise model selection")
-            # Category is not a unique selector ID. A server may put provider
-            # and model selectors in the same category; never pick by order.
-            matching = [option for option in options if model in {
+                raise ValueError(f"agent does not advertise {label} selection")
+            matching = [option for option in options if value in {
                 choice.value for item in option.options
                 for choice in (item.options if hasattr(item, "options") else [item])}]
             if not matching:
-                raise ValueError("configured model is not advertised")
+                raise ValueError(f"configured {label} is not advertised")
             if len(matching) != 1:
-                raise ValueError("configured model matches multiple advertised selectors")
+                raise ValueError(f"configured {label} matches multiple advertised selectors")
             option = matching[0]
             selected = await asyncio.wait_for(self.connection.set_config_option(
-                config_id=option.id, session_id=session_id, value=model), self.request_timeout)
-            if not any(item.id == option.id and item.current_value == model
+                config_id=option.id, session_id=session_id, value=value), self.request_timeout)
+            if not any(item.id == option.id and item.current_value == value
                        for item in selected.config_options):
-                raise ValueError("agent did not confirm the configured model")
+                raise ValueError(f"agent did not confirm the configured {label}")
+            # Changing models can replace reasoning choices. Never reuse stale options.
+            config_options = selected.config_options
+        return config_options
 
     async def prompt(self, text: str, *, timeout: float):
         if self.callbacks.session_id is None:

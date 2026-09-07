@@ -7,6 +7,8 @@ Task files and evidence remain on the filesystem; there is no database service.
 
 The [local web workspace](docs/getting-started/local-web.md) provides role tabs,
 dashboards, settings, and batch-run inspection without application authentication.
+It also provides Markdown chat, ACP model/reasoning selectors, Ansible stand
+controls, and English, Russian and Simplified Chinese interfaces.
 Start it with `greatminds web --project-dir /path/to/project --port 8765`.
 
 ## Quickstart

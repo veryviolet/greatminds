@@ -475,6 +475,7 @@ Required means the Python record has no default. Defaults use JSON notation (tup
 | session | str | "resume-if-compatible" |
 | model | str &#124; None | null |
 | mode | str &#124; None | null |
+| reasoning | str &#124; None | null |
 | account | str | "default" |
 | max_running | int | 1 |
 | timeout_seconds | int | 1800 |
@@ -757,7 +758,7 @@ The check also detects changes to validators and controllers referenced by these
 | src/greatminds/domain/maintenance.py | 4e61f33e40eaefd8ff286262420a32526b3d158ef04629cbe85b85e879160f29 |
 | src/greatminds/domain/results.py | 3f376fb886e3925be8be60f63b4a352267131c9f3509c29d25291a7c40e1b0f1 |
 | src/greatminds/runtime/account_limits.py | 1c4083f6d345e2cada11cff5938ff2f01d3bcaa0184ba72418500f7d138fe790 |
-| src/greatminds/runtime/config.py | 77102ca79ad4feb4d44460db3f95446147b3e17000b3439cb84eca9813df5d17 |
+| src/greatminds/runtime/config.py | 56e416b6feee01726d4d155f3b0cb2cd28cee921f68c90476e21cf27e9260d21 |
 | src/greatminds/runtime/presets.py | 89da0ea85d1c2a22105795870d0d54e51b69e214088c7e1ca07eebd33352fd97 |
 | src/greatminds/runtime/store.py | 05b92658202197d88164d49f6e888b8571ec892e3becd250b58ff975a7c6567d |
 | tools/generate_contract_reference.py | 5018e1629d58c65e917e0701eaf9932df49dad003fe3a7ac58a802a77a96525f |

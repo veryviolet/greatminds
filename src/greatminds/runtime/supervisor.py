@@ -292,7 +292,7 @@ class Supervisor:
                     metrics["session_strategy"] = ("new_load_unavailable" if compatible and binding.session != "new"
                                                    else "new_context")
                 protocol_phase = "session_configure"
-                await transport.configure_session(session, model=binding.model, mode=binding.mode)
+                await transport.configure_session(session, model=binding.model, mode=binding.mode, reasoning=binding.reasoning)
                 self.store._check_revision(TaskRevision(claim.run["task_id"], claim.run["task_path"],
                                                        claim.run["task_revision"]))
                 self._transition(run_id, "running", session_id=session_id)

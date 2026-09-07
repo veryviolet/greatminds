@@ -84,3 +84,77 @@ Older runs without this journal still expose their existing state and evidence.
 Command previews verify the existing daemon-owned output artifacts and display
 up to 8 KiB per stream. Missing or changed artifacts produce an explicit error.
 Reading output does not rerun the command.
+
+## Language
+
+The toolbar offers **English**, **Russian**, and **Simplified Chinese**.
+English is the default. The browser remembers an explicit choice for its origin.
+Only interface labels are translated: prompts, agent responses, project files,
+provider messages and logs keep their original content. Dates use the selected
+locale. Switching languages preserves the chat draft.
+
+To default all local projects to Russian for your user, create
+`~/.config/greatminds/web.json` (or `$XDG_CONFIG_HOME/greatminds/web.json`):
+
+```json
+{"language": "ru"}
+```
+
+Alternatively, launch with `GREATMINDS_WEB_LANGUAGE=ru greatminds web ...`.
+Allowed values are `en`, `ru`, and `zh`. An explicit browser selection takes
+precedence over the host default. Restart the web server after changing its host
+default; changing the interface language does not require a daemon restart.
+
+## Markdown and executor choices
+
+Agent responses, including batch messages, render Markdown: tables, lists,
+headings, links, inline code and fenced code blocks. Streaming reconciles existing
+blocks so completed paragraphs remain stable. HTML is sanitized locally;
+embedded forms, scripts and images cannot execute. No CDN is used.
+
+In each role binding, click **Load models and reasoning**. This explicitly starts
+a temporary ACP connection and opens a session without sending a prompt. The
+installed executor must already be available and authenticated. Models come from
+its advertised `model` selector, and reasoning from `thought_level`; no provider
+model list is hardcoded. Choosing another model refreshes the reasoning options.
+Unsupported reasoning controls are hidden. If discovery is unavailable, the model
+ID can be entered manually; the runtime still validates it against the executor's
+advertised choices and reports unsupported selections. Save and restart the
+daemon to apply `model`, `mode` and `reasoning` binding settings.
+
+## Stands
+
+The **Stands** sidebar page represents the project's existing singleton logical
+stand, which may contain several machines. A separate LLM Stand Keeper is not
+needed: the daemon owns leases, queues and deployment state; Ansible executes
+project-owned playbooks.
+
+- Edit `STAND_HOST` / `STAND_USER`, or named pairs such as `STAND_HOST_GPU` /
+  `STAND_USER_GPU`. A blank suffix selects the unsuffixed pair. Other environment
+  values are preserved and are not exposed by the connection form. Save before
+  checking access. **Check SSH** uses non-interactive SSH and existing known-host
+  records; localhost checks local execution. It does not install dependencies.
+- Use your normal SSH config, keys and project Ansible inventory for access.
+  The page displays their locations and discovers project-local inventory files
+  referenced by `ansible.cfg` in `coordination/` or `.greatminds/`.
+- Inspect/edit the profile registry, registered YAML playbooks, Ansible config
+  and discovered inventory. Saves reject stale revisions. **Validate profiles**
+  runs the existing registry/playbook doctor. Project playbooks remain responsible
+  for machine topology and preparation.
+- Queue a lease, deployment, release, expired-lease reclaim, availability change,
+  or deployment recovery assessment. These invoke the existing CLI/domain
+  operations and retain their task, worktree, role and deployment-evidence checks.
+  Profile approval gates are not bypassed; profiles requiring an explicit approval
+  token must be leased through the CLI.
+- Inspect the active lease, queue, state transitions and operation receipts.
+  Deployment logs are read from verified recorded artifacts, with an 8 KiB preview
+  per stream and known environment credentials redacted.
+
+Operator requests persist in `.greatminds/.stand/operations.json`. They wait when
+the daemon is stopped and continue independently of the web server. A repeated
+HTTP delivery uses the same request ID. If the daemon exits during an operation,
+its uncertain outcome is marked `needs_review` and is **not automatically replayed**.
+Inspect state and the deployment ledger before submitting a new operation. Stopping
+the daemon itself interrupts its active operation; closing the browser or web
+server does not. An operator request is explicit work and is not suspended by the
+batch-dispatch pause control.

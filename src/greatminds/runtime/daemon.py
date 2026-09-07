@@ -17,6 +17,7 @@ from greatminds.domain.stand_deployments import DeploymentLedger
 from greatminds.domain.stand_leases import StandLeaseService
 from .config import load_execution_config
 from .stand_scheduler import StandScheduler
+from .stand_operations import StandOperations
 from .store import RunStore, TERMINAL, TaskRevision
 from .supervisor import Supervisor
 from .processes import terminate_group
@@ -127,6 +128,7 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
             deployments = DeploymentLedger(store.runtime)
             stand_leases = StandLeaseService(store)
             stand_scheduler = StandScheduler(store, config.stand)
+            stand_operations = StandOperations(project, store.runtime)
             dispatched_once = False
             try:
                 while not stop.is_set():
@@ -155,7 +157,10 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                                 await terminate_group(run["process"])
                             store.control_status(run["id"], control["id"], completed=True)
                     await supervisor.commands.poll(supervisor.id)
-                    stand_scheduler.poll()
+                    if not stand_scheduler.busy:
+                        await stand_operations.poll()
+                    if not stand_operations.future:
+                        stand_scheduler.poll()
                     from .interactions import ConversationStore
                     closing = False
                     # One consistent observation for this pass. Claims still recheck
@@ -216,7 +221,7 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                         active[claim.run["id"]] = asyncio.create_task(
                             supervisor.execute(claim, binding=binding))
                     dispatched_once = True
-                    if once and not active and not stand_scheduler.busy and not closing:
+                    if once and not active and not stand_scheduler.busy and not stand_operations.future and not closing:
                         await _domain_reconcile(loop, domain_pool, results)
                         await _domain_reconcile(loop, domain_pool, maintenance)
                         break
@@ -230,6 +235,8 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                         future.cancel()
                 if active:
                     await asyncio.gather(*active.values(), return_exceptions=True)
+                await stand_operations.close()
+                await _domain_reconcile(loop, domain_pool, deployments)
                 await stand_scheduler.close()
                 # Finish any in-progress domain transaction before releasing
                 # the project supervisor lease, including on cancellation.

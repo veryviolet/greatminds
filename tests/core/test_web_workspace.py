@@ -195,3 +195,25 @@ def test_corrupt_activity_does_not_hide_run_state(service, monkeypatch):
     detail = service.run_detail('saved-run')
     assert detail['run']['state'] == 'completed'
     assert detail['activity']['unavailable']
+
+
+def test_new_assets_and_host_language_default(http, service, monkeypatch):
+    monkeypatch.setenv('GREATMINDS_WEB_LANGUAGE', 'zh')
+    assert b'data-default-language="zh"' in http('/')[2]
+    for asset in ('marked', 'purify', 'markdown', 'i18n', 'stands'):
+        assert http('/' + asset + '.js')[0] == 200
+    monkeypatch.setenv('GREATMINDS_WEB_LANGUAGE', 'invalid')
+    assert b'data-default-language="en"' in http('/')[2]
+
+
+def test_web_stand_queue_and_connections_use_existing_state(http, service):
+    data = json.loads(http('/api/stands')[2])
+    assert data['state']['state'] == 'free'
+    assert data['operations'] == {}
+    body = {'connections': {'STAND_HOST': 'localhost'}, 'revision': data['connection_revision']}
+    assert http('/api/stands/connections', body)[0] == 200
+    op = {'request_id': 'check-http', 'action': 'check', 'machine_key': 'STAND_HOST'}
+    assert http('/api/stands/operations', op)[0] == 200
+    assert json.loads(http('/api/stands')[2])['operations']['check-http']['status'] == 'queued'
+    assert not service.daemon_status()['running']
+    assert http('/api/stands/file', {'name': '.greatminds/PROJECT.env'})[0] == 400

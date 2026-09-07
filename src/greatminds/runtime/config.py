@@ -99,6 +99,7 @@ class RoleBinding:
     session: str = "resume-if-compatible"
     model: str | None = None
     mode: str | None = None
+    reasoning: str | None = None
     account: str = "default"
     max_running: int = 1
     timeout_seconds: int = 1800
@@ -236,6 +237,7 @@ def parse_execution_config(document: Any, *, roles: set[str]) -> ExecutionConfig
             session=_choice(item.get("session", "resume-if-compatible"), {"new", "resume-if-compatible"}, "session"),
             model=_string(item["model"], "model") if "model" in item else None,
             mode=_string(item["mode"], "mode") if "mode" in item else None,
+            reasoning=_string(item["reasoning"], "reasoning") if "reasoning" in item else None,
             account=safe_name(item.get("account", "default")),
             max_running=_positive(item.get("max_running", 1), "max_running"),
             timeout_seconds=_positive(item.get("timeout_seconds", 1800), "timeout_seconds"),

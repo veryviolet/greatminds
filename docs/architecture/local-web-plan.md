@@ -10,7 +10,7 @@ Implementation:
 
 1. Package a local HTTP server and static UI; expose `greatminds web --port PORT`.
    Use existing daemon/domain services for state and actions. Support attaching to
-   an existing daemon and optionally starting an owned coordd child.
+   an existing daemon and optionally starting the independent project daemon.
 2. Provide overview/tasks, role-bound conversations, runs with recorded messages,
    tool activity and command evidence, pending one-time permissions, cancellation,
    dispatch pause/resume, and editable validated execution settings.
@@ -44,8 +44,8 @@ Verified with local ACP fixtures (no provider inference):
   duplicate delivery, output redaction across chunks, bounded retention, and
   non-critical activity storage failure.
 - Isolated wheel installation: assets match source, configurable/ephemeral port,
-  invalid YAML can be repaired without exiting the web server, external daemon
-  attachment does not confer stop ownership, SIGTERM stops the owned daemon.
+  invalid YAML can be repaired without exiting the web server, daemon control uses verified project process identity, and stopping the web
+  server leaves the daemon running.
 - Strict MkDocs build, generated contract reference check, JavaScript syntax
   check, and `git diff --check` passed.
 
@@ -61,3 +61,21 @@ access. The remaining suite ran in its normal process namespace: running the
 entire suite outside that namespace initially produced three migration-safety
 failures from unreadable host `/proc` entries; all three passed in the normal
 isolated regression. Every test ran in the appropriate environment.
+
+
+## Operator improvements (3.2.0)
+
+Owner pool 5–9: sanitized streaming Markdown; ACP-advertised model/reasoning
+choices; deterministic stand operations and Ansible controls; English/Russian/
+Simplified Chinese UI. Stand Keeper remains a deterministic daemon responsibility,
+not an additional model role. New users default to English; a per-user host setting
+can default all local projects to Russian. See the local web guide for setup.
+
+
+3.2.0 acceptance: 1553 regression tests passed (one skip), 12 HTTP tests and six
+background lifecycle tests passed, and eight browser DOM tests passed. Real
+installed Codex 1.10.0 and Claude ACP 0.75.1 adapters returned model and reasoning
+choices without prompting (7/6 and 5/6 respectively). A temporary browser workspace
+queued a connection check; after the web server was terminated, the independently
+started daemon consumed and completed the durable request. Temporary services were
+stopped after verification. Strict documentation and wheel builds passed.
