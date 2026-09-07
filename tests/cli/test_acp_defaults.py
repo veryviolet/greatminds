@@ -81,3 +81,17 @@ def test_setup_preserves_existing_runtime_tasks_and_custom_configuration(tmp_pat
     assert result.exit_code == 0, result.output
     assert (config/'PROJECT.md').read_text() == 'user project'
     assert (queue/'0001.md').read_text() == 'user task'
+
+
+def test_schema_and_package_have_no_native_wake_or_permission_defaults():
+    from greatminds.core.schema import load_schema_snapshot
+    schema = load_schema_snapshot().document
+    assert importlib.util.find_spec("greatminds.cli._send_enter") is None
+    assert not {"event_wake", "heartbeat", "claude_settings"} & schema.keys()
+    assert "wake_mechanisms" not in schema["glossary"]
+    assert "self-loop" not in schema["glossary"]["lifecycles"]
+    role = schema["roles"]["MAINTAINER"]
+    assert role["claims_from"] == []
+    assert "diagnose_unknown_infrastructure_failures" in role["responsibilities"]
+    assert "self_loop_wake_seconds" not in role
+    assert "on_self_loop_tick" not in role["event_triggers"]

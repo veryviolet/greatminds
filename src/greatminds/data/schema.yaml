@@ -2,7 +2,7 @@
 #
 # Machine-readable source of truth for queues, roles, transitions, and stand
 # profiles. Read by the greatminds CLI (gate-check, wake-check, watchdog,
-# lint-tokens), by each agent at tick start, and by humans cross-referencing
+# lint-tokens), by the run-context compiler, and by humans cross-referencing
 # COORDINATE.md prose.
 #
 # Invariants in COORDINATE.md must match what's encoded here. If they drift,
@@ -30,7 +30,7 @@ system_transitions:
 glossary:
   roles:
     ARCHITECT-PLANNER: "Intake triage, planning (writes the plan block, sets stand_required), and per-scope routing from feature_plan to feature_dev / feature_ui_dev / feature_docs. Interactive chat partner for the USER. Writes review_sessions but does not claim from it — EXPLORER owns review-session iteration."
-    ARCHITECT-REVIEWER: "Final review with stand-evidence verification (gate_check result in the tests block), commit, and push if policy allows. Owns feature_blocked wake-up: runs greatminds wake-check at the start of each tick."
+    ARCHITECT-REVIEWER: "Final review with stand-evidence verification (gate_check result in the tests block), commit, and push if policy allows. Evaluates semantic blockers; the daemon resumes mechanically ready dependencies."
     DEVELOPER: "Backend / product-code implementation. Claims from feature_dev/ (placed there by ARCHITECT-PLANNER routing scope:backend tasks)."
     UI-DEVELOPER: "UI implementation. Claims from feature_ui_dev/ (placed there by ARCHITECT-PLANNER routing scope:ui tasks), writes the implementation block, hands off to feature_test/."
     LIVE-DEVELOPER: "Interactive, USER-paced developer for a single task on a leased stand (scenario C and ad-hoc live work). Claims from feature_live/, holds a stand lease and deploys to it during the session, chats live with the USER, and on USER approval hands to feature_review/ as a sprint task (REVIEWER no-regression review, no TESTER)."
@@ -39,14 +39,10 @@ glossary:
     READER: "Reads docs as a fresh user; validates clarity and accuracy; routes the result out of feature_docs_review/."
     EXPLORER: "Uses the live system on the stand as a real user (scenario B), whatever the stand's shape. Files bugs as kind:bugfix tasks in feature_inbox/."
     USER: "Writes user_feedback/ or initiates an ARCHITECT-PLANNER chat. Never creates implementation tasks directly."
-    MAINTAINER: "System operator, self-loop watchdog. Handles infrastructure the product pipeline cannot self-heal: agent restart, dead-pid recovery, greatminds CLI + schema.yaml maintenance, cutover orchestration. Receives asks at inbox/maintainer/ from coordd and from product agents when an issue is structural/schema rather than product. Sweeps PROACTIVELY every tick (an empty inbox is NOT 'nothing to do'): reclaims stale stand leases past TTL with a dead/absent holder, restarts dead agents and coordd, and escalates stalled task/queue chains to ARCHITECT-PLANNER. Does NOT claim product queues, triage user_feedback, or write plans."
+    MAINTAINER: "Diagnoses unknown infrastructure failures and proposes repairs when requested. Routine scheduling, startup recovery and dependency sweeps belong to daemon controllers. Does not claim product queues, triage user_feedback or write plans."
   lifecycles:
-    interactive: "Human-paced chat in a tmux pane; the USER drives each turn. coordd never runs its turns. The agent waits for USER input between turns — it does not self-schedule."
-    self-loop: "Runs its own loop in a tmux pane. After each tick it MUST re-arm its next wake (sleep / ScheduleWakeup) for roles.<ROLE>.self_loop_wake_seconds (default 3600s = 1h) so it ticks again on that cadence — a shorter delay is allowed ONLY while actively mid-recovery, then return to the configured cadence; the agent must NOT invent a faster interval. coordd may nudge it (tmux_send_keys) but never runs its turns."
-    driven: "No tmux pane; coordd runs each turn as a managed subprocess on queue / inbox / .stand events, holding the per-role run-lock for the full turn. Claude and Codex use stateful drivers; Cursor, Cline, Gemini, and OpenHands use one-shot headless subprocess drivers. The turn MUST return promptly — NEVER sleep / ScheduleWakeup / loop, or the run-lock never releases and the hang detector flags the turn."
-  wake_mechanisms:
-    tmux_send_keys: "Wake by typing WAKE_TEXT then Enter into the role's tmux pane. The only safe mechanism for interactive / self-loop roles (SIGINT to a live TUI is Ctrl-C → quit); also claude's default."
-    sigint_deepest_descendant: "Wake a loop agent blocked on a bash sleep by sending SIGINT to its deepest descendant (the sleep). Safe only when that descendant is not a live TUI — never for interactive / self-loop."
+    interactive: "Operator-paced work through a daemon-owned ACP conversation. The role does not self-schedule."
+    driven: "Assigned task work through the common ACP client. Binding scheduling controls admission; the daemon owns claims, retries, cancellation and reconciliation."
   queue_kinds:
     active: "Normal hand-off queue: the owner claims tasks and moves them out per the transitions table."
     parking: "Holding queue for tasks waiting on explicit dependencies; re-activated by a wake-up, not claimed in the normal flow."
@@ -55,7 +51,7 @@ glossary:
   queues:
     feature_inbox: "Unplanned product work and bug reports (from EXPLORER)."
     feature_plan: "Planned product work; PLANNER reviews and routes by scope to feature_dev / feature_ui_dev / feature_docs."
-    feature_blocked: "Tasks parked on explicit dependencies; ARCHITECT-REVIEWER runs the wake-up."
+    feature_blocked: "Tasks parked on explicit dependencies; the daemon evaluates readiness and applies permitted system resumes."
     feature_dev: "Backend implementation."
     feature_ui_dev: "UI implementation."
     feature_docs: "Documentation implementation."
@@ -499,43 +495,23 @@ roles:
     event_triggers: {}
   MAINTAINER:
     category: system
-    # MAINTAINER is self-loop — it wakes itself to drain its inbox +
-    # run recovery (no queue-claim, USER-absent operation). It
-    # self-paces a recovery tick; it is not a human-paced chat seat.
-    lifecycle: self-loop
-    # Self-loop cadence (seconds). The recovery watchdog ticks HOURLY —
-    # it is not a busy-poll. Pinned here because the agent otherwise
-    # defaults to its own ~5-min loop; the cadence must live in canon so
-    # it survives fresh sessions and re-bootstraps. A shorter delay is
-    # allowed ONLY while actively mid-recovery, then return to this.
-    self_loop_wake_seconds: 3600
+    lifecycle: interactive
     claims_from: []
     responsibilities:
-      - agent_restart
-      - dead_pid_recovery
-      - schema_yaml_maintenance
-      - cutover_orchestration
+      - diagnose_unknown_infrastructure_failures
+      - propose_repairs_with_explicit_preconditions
+      - explain_unresolved_runtime_and_deployment_outcomes
       - infra_chat_for_user
-      # proactive watchdog sweep each self-loop tick (not reactive-only)
-      - proactive_stall_sweep
     forbidden_actions:
       - claim_product_queues
       - triage_user_feedback
       - write_plan_blocks
+      - schedule_polling_or_recovery_loops
+      - infer_safe_replay_from_missing_process
     event_triggers:
-      on_inbox_dead_pid_ask:
-        - diagnose_pid_state
-        - restart_agent_via_greatminds_restart
-      on_inbox_stand_blocked_ask:
-        - escalate_or_diagnose_infra
-      on_release_cut_ask:
-        - run_release_pipeline
-      # the self-loop tick itself is a trigger — proactively sweep
-      # every tick, before idling, even with an empty inbox.
-      on_self_loop_tick:
-        - reclaim_stale_stand_lease_past_ttl_with_dead_holder
-        - restart_dead_agents_and_coordd_via_greatminds_restart
-        - escalate_stalled_or_stuck_chains_to_planner_via_inbox
+      on_operator_diagnostic_request:
+        - inspect_runtime_status_and_operation_evidence
+        - diagnose_cause_and_propose_bounded_repair
 
 # ---------------------------------------------------------------------------
 # Transitions
@@ -860,7 +836,7 @@ scenarios:
 # Why: a raw relative path breaks from a per-task worktree cwd; the CLI
 # resolves the project root regardless of cwd;
 # and a direct task-yaml edit bypasses FSM validation. Every agent
-# reads this rule from canon at tick start (machine-readable, no prose).
+# can inspect this rule in the pinned run contract.
 # ---------------------------------------------------------------------------
 runtime_access:
   cli_only: true
@@ -871,24 +847,6 @@ runtime_access:
     - greatminds inbox list|show|ack|send
     - greatminds task list|show|mv|append-block
     - greatminds stand status
-
-# ---------------------------------------------------------------------------
-# Heartbeat — in-flight-turn hang detection (driven model)
-#
-# heartbeat is NOT a periodic liveness signal. Between turns a driven
-# pane is idle bash — that is normal, not "stale". heartbeat matters in
-# exactly one situation: coordd dispatched a turn to an agent and holds
-# that role's run-lock. The agent touches .greatminds/heartbeat.<role>
-# as a side effect of every greatminds CLI call, so a progressing turn
-# keeps it fresh. If a turn is in-flight (run-lock held) AND the
-# heartbeat has not advanced for `hang_threshold_seconds`, the turn is
-# hung: coordd escalates to MAINTAINER (it does NOT kill or re-drive —
-# MAINTAINER decides). When no turn is in-flight, heartbeat age is
-# ignored. Liveness of a persistent process is the dead-pid registry
-# scan, not heartbeat.
-# ---------------------------------------------------------------------------
-heartbeat:
-  hang_threshold_seconds: 300   # in-flight turn with no heartbeat progress → escalate MAINTAINER
 
 # ---------------------------------------------------------------------------
 # Watchdog thresholds
@@ -910,21 +868,21 @@ watchdog:
 inbox:
   allowed_kinds: [wake, ask, info]
   # Per-role message inbox: coordd and other roles message YOU here
-  # (wakes, asks, infos). Read it FIRST every tick. It is NOT a task
+  # (wakes, asks, infos). Inspect relevant messages when requested. It is NOT a task
   # queue — `greatminds task list inbox` is wrong (no such queue).
   dir: ".greatminds/inbox/${GREATMINDS_ROLE}/"
   read: "greatminds inbox list"          # role from $GREATMINDS_ROLE
   show: "greatminds inbox show <path>"
   ack: "greatminds inbox ack <path>"     # after acting on the message
-  check_when: "first each tick (wake text: 'check inbox and continue your tick')"
+  check_when: "when referenced by assigned work or an operator request"
 
 # ---------------------------------------------------------------------------
 # Git permissions
 #
 # Closed set of roles that may run `git commit` / `git push` in this
-# project. Enforced by a pre-commit hook (installed by `greatminds setup`)
-# that calls `greatminds check-git-permission commit` and exits non-zero
-# when $GREATMINDS_ROLE is not in the allowed list. Forbidden verbs are
+# project. `greatminds check-git-permission` exposes this policy for
+# explicitly configured hooks. Setup does not install a hook; direct
+# harness shell access is not an OS enforcement boundary. Forbidden verbs are
 # `git` subcommands the project never wants any agent to use (force
 # operations, history rewrites).
 # ---------------------------------------------------------------------------
@@ -1068,35 +1026,6 @@ layout:
   intent_dir: intent/
   inbox_dir: inbox/
   stand_status: stand.status
-
-# ---------------------------------------------------------------------------
-# Event-wake dispatch table
-#
-# coord.yaml's ``tool:`` field per window selects which wake mechanism
-# coordd uses for that role on inbox/queue events. Chat-mode (claude)
-# roles are woken via the tmux-send-keys mechanism that injects a
-# literal keystroke + Enter into the chat-mode pane, identical to
-# operator-typed input.
-#
-# Mechanisms live as functions in cli/coordd.py
-# (sigint_sleeping_descendant, tmux_send_keys_wake). This table maps
-# tool → mechanism name; the dispatcher picks the function by name.
-# ---------------------------------------------------------------------------
-event_wake:
-  # Default wake mechanism per tool (token defs: glossary.wake_mechanisms).
-  # LIFECYCLE WINS: interactive / self-loop roles always use tmux_send_keys
-  # regardless of tool — enforced by coordd._wake_mechanism_for_tool.
-  by_tool:
-    codex:  sigint_deepest_descendant
-    cursor: sigint_deepest_descendant
-    claude: tmux_send_keys
-    cline: tmux_send_keys
-    gemini: tmux_send_keys
-    openhands: tmux_send_keys
-  tmux_send_keys:
-    keys: "check inbox and continue your tick"
-    enter: true
-    rate_limit_seconds: 5
 
 # ---------------------------------------------------------------------------
 # FSM single-source-of-truth tables.
@@ -1331,71 +1260,6 @@ project_env:
         github.com → Settings → Developer settings → Personal access
         tokens. Scope: issues:write on the upstream repo
         (default veryviolet/greatminds).
-
-claude_settings:
-  permissions:
-    allow:
-      # Broad default: allow ALL Bash for every project. Driven /
-      # headless agents (TESTER stand probes, coordd deploys —
-      # sudo/docker/compose/rsync, MAINTAINER recovery) repeatedly
-      # stalled because a needed command wasn't in a narrow allow-list
-      # and a headless turn can't answer a permission prompt. These are
-      # the operator's own dev fleets; agents must never block on Bash.
-      # The specific git/ssh/rsync rules below are redundant under this
-      # but kept as documentation of the original intent.
-      - "Bash"
-      - "Bash(git add:*)"
-      - "Bash(git commit:*)"
-      - "Bash(git tag:*)"
-      - "Bash(git push:*)"
-      - "Bash(git merge:*)"
-      - "Bash(git worktree:*)"
-      - "Bash(git checkout:*)"
-      - "Bash(git branch:*)"
-      # REVIEWER's rollback path (verified → revert) needs git
-      # revert; TESTER's stand probe needs ssh/scp; coordd's
-      # deploy uses rsync. Without these allow rules they had to be
-      # typed manually with the `!` prefix on every invocation.
-      - "Bash(git revert:*)"
-      - "Bash(ssh:*)"
-      - "Bash(scp:*)"
-      - "Bash(rsync:*)"
-  # Classifier auto-mode ceiling. Without explicit auto_mode
-  # entries the classifier blocks `git push origin main` even when
-  # permissions.allow contains `Bash(git push:*)`. These rules raise
-  # the ceiling so REVIEWER's automated cut-and-push pipeline works
-  # without manual `!` prefix on each push.
-  auto_mode:
-    allow:
-      - "$defaults"
-      # NOTE: deliberately NOT a bare "Bash" here — auto_mode is the
-      # classifier's OWN ceiling for USER-present interactive turns, and a
-      # wildcard there is an auto-mode bypass (rightly refused). Driven /
-      # headless agents are gated by permissions.allow (which DOES allow
-      # all Bash), not by this ceiling, so the deploy/probe unblocking
-      # works without widening the interactive classifier gate.
-      - "Bash(git push origin main:*)"
-      - "Bash(git push origin main --follow-tags:*)"
-      - "Bash(git push --follow-tags:*)"
-      # ssh/scp/rsync also need to live in auto_mode.allow, not just
-      # permissions.allow — the classifier's auto-mode ceiling is a
-      # SEPARATE gate. Without the parallel entries a stand probe from
-      # a --permission-mode auto pane is still challenged for USER
-      # session auth on every invocation.
-      - "Bash(ssh:*)"
-      - "Bash(scp:*)"
-      - "Bash(rsync:*)"
-      # MAINTAINER is self-loop (USER-absent) and runs recovery —
-      # agent restart, daemon control, dead-pid
-      # SIGTERM. The classifier's auto-mode ceiling blocked these
-      # without explicit entries, so MAINTAINER's autonomous
-      # recovery stalled waiting for a USER who isn't there. These
-      # patterns unblock the recovery path.
-      - "Bash(greatminds restart:*)"
-      - "Bash(greatminds daemon:*)"
-      - "Bash(greatminds start-agent:*)"
-      - "Bash(kill:*)"
-      - "Bash(systemctl --user:*)"
 
 stand_profile_registry:
   path: coordination/stand-profiles.yaml

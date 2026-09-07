@@ -1735,3 +1735,26 @@ smoke passed: idempotent setup, one deterministic dependency resume, zero agent
 runs and no duplicate replay; base installation has no Ansible dependency.
 Remaining schema prose/event-trigger cleanup, supervision improvements and full
 milestone acceptance remain open.
+
+### Remove native wake machinery and agent polling policy (2026-09-07)
+
+Removed the unused _send_enter module and its native-TUI tests. No production
+module consumed it. Removed unused schema event_wake, heartbeat hang thresholds,
+Claude permission defaults and wake-mechanism glossary. MAINTAINER is now an
+operator-paced diagnostic role for unknown failures and bounded repair proposals;
+it has no self-loop timer, routine restart or lease-sweep duties. Schema glossary
+and inbox guidance no longer require polling at the start of every turn.
+
+Role queue ownership and transition/evidence gates remain in force. This change
+also corrects the schema's obsolete claim that setup installs a git permission
+hook. Direct harness shell access still requires the documented cooperative
+boundary; deleting native defaults does not create OS enforcement.
+
+Strict MkDocs build passed in 1.44s. Affected lifecycle/default configuration,
+compiled context, schema validation and local ACP daemon checks passed; exact
+count recorded below. The packaged COORDINATE reference still contains native
+lifecycle prose and is the next cleanup target. Remaining full-plan acceptance
+requirements are unchanged.
+
+Validation result: 128 passed in 56.72s. Tests used synthetic local ACP agents;
+no real provider or service was invoked.

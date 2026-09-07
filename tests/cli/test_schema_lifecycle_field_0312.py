@@ -1,12 +1,4 @@
-"""Tests for task 0312 (0311 Phase 1a): per-role ``lifecycle``
-field in schema role contracts.
-
-Declares HOW each agent is driven — ``interactive`` (human-paced
-chat), ``self-loop`` (wakes itself), or ``driven`` (woken by
-coordd on queue + inbox events). Orthogonal to coord.yaml's
-``tool``. Phase 2/3 will select launch mechanics as
-f(lifecycle, tool); 1a is the declaration only.
-"""
+"""Role posture is independent of harness and ACP binding scheduling."""
 from __future__ import annotations
 
 import yaml
@@ -14,12 +6,12 @@ import yaml
 from greatminds.core.paths import find_canon_dir
 
 
-VALID_LIFECYCLES = {"interactive", "self-loop", "driven"}
+VALID_LIFECYCLES = {"interactive", "driven"}
 
 # Per the plan's explicit assignments.
 EXPECTED = {
     "ARCHITECT-PLANNER": "interactive",
-    "MAINTAINER": "self-loop",
+    "MAINTAINER": "interactive",
     "DEVELOPER": "driven",
     "UI-DEVELOPER": "driven",
     "TESTER": "driven",
@@ -71,8 +63,8 @@ def test_planner_is_interactive() -> None:
     assert _roles()["ARCHITECT-PLANNER"]["lifecycle"] == "interactive"
 
 
-def test_maintainer_is_self_loop() -> None:
-    assert _roles()["MAINTAINER"]["lifecycle"] == "self-loop"
+def test_maintainer_is_operator_paced() -> None:
+    assert _roles()["MAINTAINER"]["lifecycle"] == "interactive"
 
 
 def test_workers_are_driven() -> None:

@@ -29,7 +29,7 @@ history; the assigned task and pinned contract supply portable context.
 
 The daemon handles queue observation, dependency readiness, admission limits,
 startup backoff and result reconciliation in code. Role metadata such as
-`driven`, `interactive` or `self-loop` in the schema does not select a native
+`driven` or `interactive` in the schema does not select a native
 transport, tmux wake sequence or provider-specific timer loop.
 
 Recognized pre-prompt startup failures can retry within configured budgets.
