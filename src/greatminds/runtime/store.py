@@ -280,6 +280,21 @@ class RunStore:
                 state["paused"] = paused
                 self._event(state, "dispatch_paused" if paused else "dispatch_resumed", None, {})
 
+    def observe_assignments(self, tasks: list[TaskRevision]) -> None:
+        """First daemon observation of currently configured queue candidates."""
+        with self._transaction() as state:
+            previous = state.get('queue_observations', {})
+            current = {}
+            for task in tasks:
+                if not task.path:
+                    continue
+                old = previous.get(task.path)
+                current[task.path] = old if old and old['task_revision'] == task.sha256 else {
+                    'task_revision': task.sha256, 'first_observed_at': self.clock()}
+            if current != previous:
+                state['queue_observations'] = current
+                self._event(state, 'queue_observations_changed', None, {'candidates': len(current)})
+
     def claim(self, *, task: TaskRevision, binding: RoleBinding,
               config: ExecutionConfig, schema: SchemaSnapshot,
               project: Path, owner_id: str, conversation_id: str | None = None,
@@ -359,6 +374,12 @@ class RunStore:
                 "updated_at": self.clock(), "session_id": None, "event_receipts": {},
                 "token_sha256": hashlib.sha256(token.encode()).hexdigest(),
             }
+            observed = state.get('queue_observations', {}).get(task.path)
+            if observed and observed['task_revision'] == task.sha256:
+                from .task_timings import interval
+                run['queue_observation'] = {**observed, 'scope': (
+                    'accepted_transition_wait' if observed.get('source') == 'accepted_transition' else 'observed_revision_wait'),
+                    'wait_seconds': interval(observed['first_observed_at'], run['created_at'])}
             state["runs"][run_id] = run
             self._event(state, "claimed", run_id, {"task_id": task.task_id})
             public = {key: copy.deepcopy(value) for key, value in run.items() if key != "token_sha256"}
@@ -654,6 +675,33 @@ class RunStore:
             self._event(state, "result_received", run["id"], {"result_id": envelope.result_id})
             return copy.deepcopy(receipt)
 
+    def begin_result_validation(self, result_id: str) -> str:
+        with self._transaction() as state:
+            receipt = state['results'][result_id]
+            if receipt['status'] not in {'received', 'applying'}:
+                _error('result is not awaiting validation')
+            previous = receipt.get('validation', {})
+            attempt_id = uuid.uuid4().hex
+            receipt['validation'] = {'attempt_id': attempt_id, 'attempts': previous.get('attempts', 0) + 1,
+                                     'started_at': self.clock(), 'completed_at': None,
+                                     'seconds': None, 'valid': None}
+            self._event(state, 'result_validation_started', receipt['envelope']['run_id'], {'result_id': result_id})
+            return attempt_id
+
+    def finish_result_validation(self, result_id: str, *, attempt_id: str, seconds: float, valid: bool) -> None:
+        from .task_timings import interval
+        if interval(0, seconds) is None or type(valid) is not bool:
+            _error('invalid result validation measurement')
+        with self._transaction() as state:
+            receipt = state['results'][result_id]
+            validation = receipt.get('validation', {})
+            if (receipt['status'] not in {'received', 'applying'} or validation.get('attempt_id') != attempt_id
+                    or validation.get('completed_at') is not None):
+                _error('result validation attempt is no longer pending')
+            validation.update(completed_at=self.clock(), seconds=seconds, valid=valid)
+            self._event(state, 'result_validation_completed', receipt['envelope']['run_id'],
+                        {'result_id': result_id, 'seconds': seconds, 'valid': valid})
+
     def result_status(self, result_id: str, status: str, *, details: dict | None = None) -> dict:
         """Domain-service acknowledgement; never used to bypass validators."""
         allowed = {"received": {"applying", "rejected"},
@@ -667,6 +715,25 @@ class RunStore:
             if status not in allowed.get(receipt["status"], set()):
                 _error(f"illegal result transition {receipt['status']} -> {status}")
             receipt.update(status=status, details=details or {}, updated_at=self.clock())
+            from .task_timings import interval
+            timing = receipt.setdefault('timings', {})
+            if status == 'applying':
+                timing['application_started_at'] = receipt['updated_at']
+            else:
+                timing['resolution_at'] = receipt['updated_at']
+                timing['received_to_resolution_seconds'] = interval(receipt['at'], receipt['updated_at'])
+                timing['application_elapsed_seconds'] = interval(timing.get('application_started_at'), receipt['updated_at'])
+            run = state['runs'][receipt['envelope']['run_id']]
+            if (status == 'applied' and receipt['envelope']['decision'] in {'handoff', 'blocked'} and
+                    details and isinstance(details.get('destination'), str) and
+                    details['destination'] and details['destination'] != run['task_path']):
+                run['domain_progress'] = {'result_id': result_id, 'accepted_transition_at': receipt['updated_at'],
+                    'claim_to_transition_seconds': interval(run['created_at'], receipt['updated_at'])}
+                revision = details.get('destination_revision')
+                if isinstance(revision, str) and len(revision) == 64:
+                    state.setdefault('queue_observations', {})[details['destination']] = {
+                        'task_revision': revision, 'first_observed_at': receipt['updated_at'],
+                        'source': 'accepted_transition'}
             self._event(state, f"result_{status}", receipt["envelope"]["run_id"],
                         {"result_id": result_id, "details": details or {}})
             return copy.deepcopy(receipt)

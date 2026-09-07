@@ -40,7 +40,7 @@ were inspected. It does not turn fixture coverage into live harness coverage.
 | B2: maintainer limited to semantic diagnostic work | Shared schema marks maintainer on demand and forbids polling/recovery loops | Confirmed instructions and scheduling contract |
 | B3: concrete assignment, role/task/gates/results/artifacts and pinned context | `context.py`, `RunStore.contracts`, CLI contract inspection and scoped commands | Confirmed; roles receive their assignment rather than scanning queues |
 | B3: compatible session resume and changed-contract handling | Supervisor session selection and conversation acquire/revision checks; load/mismatch/task-change tests | Confirmed; changed contracts/revisions do not silently consume pending input |
-| B3: prompt size, useful-work time and turns against baseline | Input byte reservations, stage timing, no-progress counters, [local task metrics](evidence/acp-local-preset-2026-09-07.json) | **Open G3:** current task measurements exist, but complete queue/useful-work/validation distributions and productive baseline comparison are not proven |
+| B3: prompt size, useful-work time and turns against baseline | Input reservations, run stages, queue observation/accepted-transition waits, preparation attempts, receipt resolution and conversation timing | **Open G3:** durable timing boundaries now have recovery/pipeline coverage; productive distributions and equivalent baseline comparison remain unproven |
 | B4: typed results, gates, idempotency and SYSTEM provenance | Result envelopes/service, shared CLI validators; crash-point, duplicate, dynamic-gate and invented-authorship tests | Confirmed; prompt completion alone cannot verify a task |
 | B4: dependency and human-input decisions | Typed blocked/needs_input records, mechanical dependency release; needs-input leaves task unmoved | Confirmed domain behavior; optional protocol extensions are not inferred from prose |
 | B5: worktrees, command execution, evidence, stands and explicit deployment authority | Workspace/command/stand services; real unit commands and merge; profile authorization and evidence freshness tests | Confirmed local fixtures and local live pipeline. This does not claim a live external deployment campaign |
@@ -84,6 +84,11 @@ were inspected. It does not turn fixture coverage into live harness coverage.
    accepted-progress intervals, keeping unknowable times unknown. Compare an
    equivalent workload before/after; existing mixed-model durations are not a
    controlled performance comparison.
+   Initial timing instrumentation now distinguishes first-observed queue waits
+   from waits after accepted transitions, records preparation attempts and result
+   resolution, and timestamps conversational turns. Real three-role pipeline and
+   crash/retry fixtures exercise these records. Controlled productive measurements
+   and comparison remain open; first model activity is still not useful work.
 4. **G4 — account admission for explicit quota signals.** Extend shared admission
    only from unambiguous configured/protocol signals, with bounded recovery and
    operator controls. Do not infer credentials, silently switch providers or parse

@@ -190,7 +190,14 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                         conversation.dispatch_status('running')
                         active[claim.run['id']] = asyncio.create_task(supervisor.execute(
                             claim, binding=binding, conversation=conversation, keep_open=not once))
-                    for binding, task, reason in assignments(store, config, schema):
+                    assignment_snapshot = store.snapshot()
+                    candidates = list(assignments(store, config, schema, snapshot=assignment_snapshot))
+                    revisions = {task.path: task.sha256 for _, task, _ in candidates}
+                    observed = {path: entry['task_revision'] for path, entry in
+                                assignment_snapshot.get('queue_observations', {}).items()}
+                    if revisions != observed:
+                        store.observe_assignments([task for _, task, _ in candidates])
+                    for binding, task, reason in candidates:
                         if reason != "ready" or (once and dispatched_once):
                             continue
                         try:

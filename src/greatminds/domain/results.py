@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import shlex
+import time
 from dataclasses import asdict
 from pathlib import Path
 from typing import Callable
@@ -264,12 +265,18 @@ class ResultService:
             if recovered:
                 operation = json.loads(path.read_text())
             else:
+                validation_id = self.store.begin_result_validation(result_id)
+                validation_started = time.monotonic()
                 try:
                     contract = yaml.safe_load(self.store.contracts(run["id"])["schema"]["text"])
                     operation = self._prepare(receipt, run, contract)
                 except (GreatMindsError, yaml.YAMLError) as exc:
+                    self.store.finish_result_validation(result_id, attempt_id=validation_id,
+                        seconds=time.monotonic() - validation_started, valid=False)
                     status = "rejected" if receipt["status"] == "received" else "needs_recovery"
                     return self.store.result_status(result_id, status, details={"error": str(exc)})
+                self.store.finish_result_validation(result_id, attempt_id=validation_id,
+                    seconds=time.monotonic() - validation_started, valid=True)
                 atomic_json(path, operation)
                 self.checkpoint("prepared")
             if (operation.get("version") != 1 or operation.get("result_id") != result_id
@@ -326,5 +333,6 @@ class ResultService:
                 return self.store.result_status(result_id, "needs_recovery", details={"error": str(exc)})
             return self.store.result_status(result_id, "applied", details={
                 "destination": operation["destination"], "decision": operation["decision"],
+                "destination_revision": _digest(operation['destination'].encode() + b'\0' + operation['after'].encode()),
                 "artifacts": operation["artifacts"], "question": operation["question"],
                 "command_evidence": operation.get("command_evidence", [])})

@@ -13,6 +13,7 @@ from greatminds.core.paths import project_runtime_dir
 from .diagnostics import ACTIONS, diagnose
 from .observation import configuration
 from .protocol_evidence import summary as protocol_summary
+from .task_timings import summary as task_timing_summary
 from .store import RunStore, TERMINAL, TRANSITIONS
 
 
@@ -30,7 +31,8 @@ EVENTS = STATES | {'run_claimed', 'claimed', 'run_stage_observed', 'prompt_input
                    'result_received', 'result_applied', 'result_rejected', 'control_requested',
                    'control_completed', 'control_processing', 'dispatch_paused', 'dispatch_resumed',
                    'events_pruned', 'event_retention_configured', 'protocol_observed', 'protocol_trace_truncated',
-                   'usage_observed', 'usage_session_prepared', 'usage_prompt_begin', 'usage_prompt_finish'}
+                   'usage_observed', 'usage_session_prepared', 'usage_prompt_begin', 'usage_prompt_finish',
+                   'queue_observations_changed', 'result_validation_started', 'result_validation_completed'}
 
 
 def number(value):
@@ -89,12 +91,14 @@ def collect_bundle(project, *, report=None, environment=None, run_limit=100, eve
     try:
         state = RunStore(project_runtime_dir(Path(project))).snapshot()
         runs = sorted(state['runs'].values(), key=lambda row: row['sequence'])
+        receipts = {receipt['envelope']['run_id']: receipt for receipt in state['results'].values()}
         rows = []
         for run in runs[-run_limit:]:
             rows.append({'reference': ref(run['id']), 'task_reference': ref(run['task_id']),
                          'binding_reference': ref(run['binding_id']), 'agent_reference': ref(run['agent_id']),
                          'state': run['state'] if run['state'] in STATES else 'unknown',
                          'protocol': protocol_summary(run.get('protocol')),
+                         'task_timings': task_timing_summary(run, receipts.get(run['id'])),
                          'reason': run.get('reason') if run.get('reason') in CODES else 'other',
                          'created_at': number(run.get('created_at')), 'updated_at': number(run.get('updated_at')),
                          'timings': {key: number(value) for key, value in run.get('timings', {}).items() if key in STAGES},

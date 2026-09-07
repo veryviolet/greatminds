@@ -2256,3 +2256,46 @@ queue waits, result validation/application timing and accepted domain progress,
 plus an equivalent productive workload comparison. Existing startup/activity
 metrics cannot establish those intervals, and file timestamps are not treated as
 authoritative queue-entry times.
+
+### G3 — durable task and conversation timing boundaries (2026-09-07)
+
+Added a first-observed revision index for configured queue candidates. Claims keep
+their own wait observation; changed/departed candidates do not leave an unbounded
+index. The daemon reuses the assignment snapshot and writes only when candidate
+revisions change, preserving the idle read optimization. Applied domain results
+record the accepted destination revision and its arrival time atomically, so
+subsequent role claims distinguish accepted_transition_wait from the lower-bound
+observed_revision_wait of externally introduced tasks.
+
+Result preparation records bounded attempt identity/count, wall-clock boundaries
+and monotonic duration. Interrupted preparation remains incomplete, and a retry
+records a new attempt. Recovery of an already prepared operation preserves its
+validation evidence. Receipt application/resolution timing includes recovery
+delay; only accepted handoff/block transitions create domain_progress with
+claim-to-transition time. Rejection, no-change and prompt completion do not
+manufacture progress. Later gate rechecks and shell commands remain distinct from
+preparation validation. Clock regressions, overflow and absent observations yield
+null intervals, not zero or invalid JSON.
+
+Conversation journals now timestamp queued/started/resolved boundaries and expose
+per-message queue wait and start-to-resolution duration. Queued cancellation has
+no execution duration; crash resolution records when interruption was observed.
+Duplicate requests, completion and result application preserve existing bytes.
+Private bundles export only allowlisted numeric timing summaries.
+
+Validation: initial domain/pipeline/run-stage group passed 23 tests in 22.31s;
+12 focused timing cases passed in 2.70s; 54 expanded domain/daemon/idle/pipeline
+checks passed in 49.09s; 59 timing/conversation/budget/idle checks passed in 19.29s;
+25 timing/bundle/protocol checks passed in 5.18s; 79 combined regression checks
+passed in 58.49s. After adding accepted-transition queue origins, 64 timing/domain/
+pipeline/interaction/task/retention checks passed in 28.30s, including the real
+three-role pipeline asserting both queue-wait scopes. Eight documentation checks
+passed in 0.68s. The previous goal turn was progress: G2 cost-budget enforcement
+and a full 1489-pass regression traversal were committed as ebde83f.
+
+G3 remains open for controlled productive distributions and an equivalent workload
+comparison. Measurements must use independently installed versions for both the
+daemon and fixture subprocesses; reusing an editable current install in a baseline
+subprocess would mix implementations. An earlier modernized checkpoint is not
+automatically evidence about the original pre-modernization pipeline. No new
+performance improvement is claimed by this instrumentation checkpoint.

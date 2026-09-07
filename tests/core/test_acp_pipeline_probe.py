@@ -28,6 +28,13 @@ def test_three_role_pipeline_validates_merges_and_does_not_repeat(use_preset):
     state = RunStore(root / '.greatminds').snapshot()
     assert [r['role'] for r in sorted(state['runs'].values(), key=lambda run: run['sequence'])] == roles
     assert all(r['status'] == 'applied' for r in state['results'].values())
+    assert all(r['validation']['valid'] is True and r['validation']['seconds'] >= 0
+               and r['timings']['application_elapsed_seconds'] >= 0 for r in state['results'].values())
+    assert all(r['queue_observation']['wait_seconds'] >= 0 and
+               r['domain_progress']['claim_to_transition_seconds'] >= 0 for r in state['runs'].values())
+    ordered_runs = sorted(state['runs'].values(), key=lambda run: run['sequence'])
+    assert [run['queue_observation']['scope'] for run in ordered_runs] == [
+        'observed_revision_wait', 'accepted_transition_wait', 'accepted_transition_wait']
     assert len(state['commands']) == 3
     assert all(c['status'] == 'succeeded' for c in state['commands'].values())
     data = yaml.safe_load((root / '.greatminds/verified/0001-clamp.yaml').read_text())

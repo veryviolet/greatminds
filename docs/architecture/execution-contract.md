@@ -939,6 +939,45 @@ For a multi-message interactive run these are first-occurrence observations,
 not a per-message latency distribution. Unknown token/cost data remains outside
 this timing contract.
 
+### Queue, validation and accepted transitions
+
+The daemon records the first observation of each currently configured queued task
+revision. A claim copies that observation into `queue_observation`, including
+`wait_seconds`. Scope `observed_revision_wait` is a lower bound: it cannot recover
+time before the daemon saw an externally created or edited task. File modification
+time and user-supplied task dates are not substituted for arrival time. Unchanged
+observations are idempotent; the active candidate index drops absent revisions,
+while run copies survive recovery and event pruning.
+
+An applied domain result also records the destination revision and its acceptance
+time atomically. The next claim has scope `accepted_transition_wait`: its queue
+interval starts when the preceding transition became accepted by the daemon.
+These scopes remain distinguishable in measurements and exports.
+
+Result receipts retain a bounded `validation` record for the latest preparation
+attempt: start/completion timestamps, attempt count, validity and monotonic
+duration. A crash leaves completion/duration unknown. Retrying preparation starts
+a new attempt; recovering an already prepared operation preserves its measurement.
+This measures `_prepare` checks, not every later live gate recheck or validation
+shell command. Declared commands retain their own execution records.
+
+Receipt `timings` records application start, resolution and elapsed wall time.
+Resolution can be applied, rejected or needs-recovery; it is not automatically
+successful completion. These intervals can include a recovery delay. Applied
+handoff/block transitions additionally give the run a `domain_progress` record
+with acceptance time and claim-to-transition duration. Rejected results, no-change
+receipts and mere prompt completion do not invent accepted transitions. This is
+observable domain progress, not a claim about when the model began useful reasoning.
+Duplicate application leaves timestamps unchanged. Missing, non-finite or backward
+clock intervals remain null. Numeric summaries are included in private bundles.
+
+Conversation turns record queued/start/resolution timestamps, queue wait and
+start-to-resolution duration. Cancelled queued messages have no execution duration.
+After a crash, resolution is when interruption was observed, not an inferred time
+of process death. Old turns without observations keep unknown intervals. These
+fields describe wall-clock boundaries and can overlap other phase measurements;
+they must not be blindly summed as independent work durations.
+
 ### Measuring idle daemon overhead
 
 The checkout includes `tools/daemon_idle_benchmark.py`. Run it with the project

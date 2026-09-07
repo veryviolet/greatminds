@@ -8,6 +8,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import time
 import uuid
 from dataclasses import asdict
 from contextlib import contextmanager
@@ -28,11 +29,12 @@ def _fail(message):
 
 
 class ConversationStore:
-    def __init__(self, runtime, conversation_id):
+    def __init__(self, runtime, conversation_id, *, clock=time.time):
         self.id = safe_name(conversation_id)
         self.directory = runtime / '.runtime' / 'conversations' / self.id
         self.path = self.directory / 'state.json'
         self.lock = self.directory / 'conversation.lock'
+        self.clock = clock
 
     @classmethod
     def create(cls, runtime, *, binding, config_sha256, schema_sha256, workspace, task=None):
@@ -70,10 +72,14 @@ class ConversationStore:
             if document != before:
                 atomic_json(self.path, document)
 
-    @staticmethod
-    def _event(document, kind, turn_id, **data):
+    def _event(self, document, kind, turn_id, **data):
         document['events'].append({'sequence': len(document['events']) + 1,
-                                   'kind': kind, 'turn_id': turn_id, **data})
+                                   'kind': kind, 'turn_id': turn_id, 'at': self.clock(), **data})
+
+    def _resolve_timing(self, turn):
+        from .task_timings import interval
+        turn['resolved_at'] = self.clock()
+        turn['started_to_resolution_seconds'] = interval(turn.get('started_at'), turn['resolved_at'])
 
     def enqueue(self, text, *, request_id):
         safe_name(request_id)
@@ -93,6 +99,7 @@ class ConversationStore:
             if sum(t['status'] in {'queued', 'running'} for t in document['turns'].values()) >= MAX_PENDING:
                 _fail('conversation pending turn limit reached')
             turn = {'id': request_id, 'sequence': len(document['turns']) + 1,
+                    'queued_at': self.clock(),
                     'prompt': text, 'prompt_sha256': digest, 'status': 'queued',
                     'output_bytes': 0, 'output_events': 0,
                     'output_truncated': False, 'cancel_requested': False}
@@ -113,6 +120,7 @@ class ConversationStore:
             for turn in document['turns'].values():
                 if turn['status'] == 'running':
                     turn.update(status='interrupted', reason='supervisor_restart')
+                    self._resolve_timing(turn)
                     self._event(document, 'interrupted', turn['id'], reason='supervisor_restart')
             document['owner_id'] = owner_id
 
@@ -140,6 +148,9 @@ class ConversationStore:
                 return None
             turn = min(queued, key=lambda t: t['sequence'])
             turn['status'] = 'running'
+            from .task_timings import interval
+            turn['started_at'] = self.clock()
+            turn['queue_wait_seconds'] = interval(turn.get('queued_at'), turn['started_at'])
             self._event(document, 'started', turn['id'])
             return copy.deepcopy(turn)
 
@@ -180,6 +191,7 @@ class ConversationStore:
             if turn['status'] != 'running':
                 _fail('turn is no longer running')
             turn.update(status=status, reason=reason)
+            self._resolve_timing(turn)
             self._event(document, status, turn_id, reason=reason)
 
     def cancel(self, turn_id):
@@ -189,6 +201,7 @@ class ConversationStore:
                 _fail('unknown turn')
             if turn['status'] == 'queued':
                 turn.update(status='cancelled', reason='operator_cancelled')
+                self._resolve_timing(turn)
                 self._event(document, 'cancelled', turn_id, reason='operator_cancelled')
             elif turn['status'] == 'running' and not turn['cancel_requested']:
                 turn['cancel_requested'] = True
@@ -212,6 +225,7 @@ class ConversationStore:
             for turn in document['turns'].values():
                 if turn['status'] == 'queued':
                     turn.update(status='cancelled', reason='conversation_closed')
+                    self._resolve_timing(turn)
                     self._event(document, 'cancelled', turn['id'], reason='conversation_closed')
                 elif turn['status'] == 'running':
                     turn['cancel_requested'] = True
@@ -227,6 +241,7 @@ class ConversationStore:
             for turn in document['turns'].values():
                 if turn['status'] == 'running':
                     turn.update(status='interrupted', reason='supervisor_restart')
+                    self._resolve_timing(turn)
                     self._event(document, 'interrupted', turn['id'], reason='supervisor_restart')
             document.update(closed=True, owner_id=owner_id, dispatch={'status': 'closed', 'reason': None})
             self._event(document, 'closed', None)
