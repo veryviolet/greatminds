@@ -2015,3 +2015,43 @@ C4 now has a reproducible measured reduction for one concrete daemon bottleneck.
 Comparative productive-pipeline overhead and the remaining plan acceptance items
 are still open. The previous goal turn was progress: committed presets and a full
 regression checkpoint. This turn changes runtime behavior with measured evidence.
+
+### Live one-harness preset and fresh wheel acceptance (2026-09-07)
+
+Extended the reproducible pipeline probe with --local-agent: initialize a fresh
+Git project through the public setup CLI, apply the public local preset, and run
+its explicit synthetic no-stand clamp task. Both the original mixed configuration
+and new setup/preset fixture passed (2 tests in 27.52s).
+
+Real Codex 0.153.4 / codex-acp 1.10.0 completed developer, tester and reviewer with
+one manifest, permission ask and no permission callbacks. Three typed results
+were applied with SYSTEM provenance; three daemon unit-test commands succeeded.
+Only clamp.py changed in the merge, the task worktree was removed, all six tests
+passed independently on the merged code, and restart preserved runs, results and
+commands. Planner remained on demand. Context sizes were 7,887 / 9,347 / 10,419
+bytes; run durations were 45.051 / 46.685 / 32.709 seconds. Detailed allowlisted
+observations are in evidence/acp-local-preset-2026-09-07.json. This task's plan was
+provided as fixture input; interactive planning was not part of the scenario.
+
+Built the current base wheel offline and installed it in a fresh isolated venv
+without the stands extra. Verified module resolution from site-packages. The same
+public setup/preset pipeline passed with the synthetic ACP server, including merge,
+evidence, worktree cleanup and restart; a separate installed smoke confirmed
+idempotent setup, one dependency SYSTEM resume and zero agent runs. The wheel hash
+and assertions are in evidence/installed-local-preset-2026-09-07.json.
+
+C2 now has the requested fresh local repository, one real harness, separate review
+roles and no remote stand, together with independent wheel packaging evidence.
+These scenarios do not prove all roles on all harnesses. Strict documentation
+build passed in 1.50s before the final installed-evidence paragraph.
+
+Also revalidated the currently installed Cline, which now reports 3.0.61 (older
+session evidence was 3.0.50). Session creation succeeded, but the first synthetic
+prompt failed with JSON-RPC -32603; private stderr identified re-authentication
+required. Cleanup completed and restart/load was skipped after initial failure.
+No account/model selection was changed. Sanitized evidence and the compatibility
+matrix record this limitation; Cline live completion requires restored login.
+
+Next confirmed acceptance gap: the VS Code extension has only mock-API tests;
+code and xvfb-run are available for a real extension-host smoke. B2 retention,
+remaining protocol/harness coverage and the full requirement audit remain open.

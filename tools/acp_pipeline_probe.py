@@ -16,7 +16,7 @@ import yaml
 from greatminds.runtime.daemon import serve
 from greatminds.runtime.store import RunStore
 
-def create_project(execution):
+def create_project(execution, *, local_agent=None):
     root=Path(tempfile.mkdtemp(prefix='greatminds-mixed-pipeline-'))
     def git(*args):
         return subprocess.check_output(['git',*args],cwd=root,text=True).strip()
@@ -41,13 +41,21 @@ def create_project(execution):
     config['max_running'] = 1
     config['commands'] = {'unit-tests': {'argv': [sys.executable, '-m', 'unittest', '-v', 'test_clamp'],
         'roles': ['DEVELOPER', 'TESTER', 'ARCHITECT-REVIEWER'], 'timeout_seconds': 30}}
+    if local_agent is not None:
+        subprocess.run([sys.executable, '-I', '-m', 'greatminds.cli.main', 'setup',
+                        '--project-dir', str(root)], check=True, capture_output=True)
+        config['bindings'] = {}
     expected = {'DEVELOPER', 'TESTER', 'ARCHITECT-REVIEWER'}
-    if {item['role'] for item in config['bindings'].values()} != expected or len(config['bindings']) != 3:
+    if local_agent is None and ({item['role'] for item in config['bindings'].values()} != expected or len(config['bindings']) != 3):
         raise ValueError('provide exactly DEVELOPER, TESTER, ARCHITECT-REVIEWER bindings')
     config['bindings'] = {key: {**value, 'workspace': '.', 'scheduling': 'queue'}
                           for key, value in config['bindings'].items()}
-    (root/'coordination').mkdir();(root/'coordination/execution.yaml').write_text(yaml.safe_dump(config))
-    queue=root/'.greatminds/feature_dev';queue.mkdir(parents=True)
+    (root/'coordination').mkdir(exist_ok=True);(root/'coordination/execution.yaml').write_text(yaml.safe_dump(config))
+    if local_agent is not None:
+        subprocess.run([sys.executable, '-I', '-m', 'greatminds.cli.main', 'project', 'preset', 'local',
+                        '--agent', local_agent, '--project-dir', str(root), '--apply'],
+                       check=True, capture_output=True)
+    queue=root/'.greatminds/feature_dev';queue.mkdir(parents=True, exist_ok=True)
     (queue/'0001-clamp.yaml').write_text(yaml.safe_dump({'id':'0001-clamp','stream':'product','kind':'feature','scope':'backend','reporter':'USER','opened_at':'2026-09-06T16:00:00Z','priority':'normal','title':'Implement and independently validate a local numeric clamp function',
      'description':'Synthetic local integration task. Implement clamp(value, lower, upper): return value clipped to inclusive bounds; raise ValueError when lower > upper. Existing unittest cases define the required behavior. No network, deployment, external services or credentials are needed. DEVELOPER: implement clamp.py, run configured unit-tests, submit handoff to feature_test with an implementation block and artifact clamp.py. TESTER: independently inspect and run configured unit-tests, submit handoff to feature_review with a tests block referencing the command_request_id. Use gate_check_result n/a and empty stand_evidence because the plan explicitly requires no stand; record the actual current UTC gate_check_at and HEAD as gate_check_commit/base_commit, list test_clamp.py, ready_for_review true only on passing evidence. REVIEWER: inspect implementation and tests, run configured unit-tests, and approve to verified only if correct; provide review block outcome approved and current HEAD commit plus command_evidence. Do not commit, merge or move task files: the daemon owns those steps. Keep result JSON outside the source worktree.',
      'blocks':[{'kind':'plan','by':'ARCHITECT-PLANNER','at':'2026-09-06T16:00:00Z','base_commit':base,'assignee_role':'DEVELOPER','stand_required':False,'stand_reason':'Pure local Python function; configured unit tests cover behavior.','plan_kind':'full','mode':'A','ready_for_implementation':True}]}))
@@ -72,8 +80,9 @@ async def pipeline(root):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', required=True, type=Path)
+    parser.add_argument('--local-agent', help='initialize through setup and apply the local preset to this named manifest')
     args = parser.parse_args()
-    root, base = create_project(yaml.safe_load(args.config.read_text()))
+    root, base = create_project(yaml.safe_load(args.config.read_text()), local_agent=args.local_agent)
     print(json.dumps({'project': str(root), 'base_commit': base}), flush=True)
     return 0 if asyncio.run(pipeline(root)) else 1
 

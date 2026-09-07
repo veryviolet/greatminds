@@ -7,7 +7,6 @@ import sys
 import yaml
 import pytest
 
-from greatminds.runtime.presets import configure_preset
 
 from greatminds.runtime.daemon import serve
 from greatminds.runtime.store import RunStore
@@ -24,13 +23,7 @@ def test_three_role_pipeline_validates_merges_and_does_not_repeat(use_preset):
         'transport': 'acp', 'argv': [sys.executable, str(repo / 'tests/fixtures/acp_server.py'), 'pipeline'],
         'adapter_version': 'fixture', 'harness_version': 'fixture'}},
         'bindings': {f'role{i}': {'role': role, 'agent': 'fixture', 'timeout_seconds': 40}
-                     for i, role in enumerate(roles)}})
-    if use_preset:
-        path = root / "coordination/execution.yaml"
-        document = yaml.safe_load(path.read_text())
-        document["bindings"] = {}
-        path.write_text(yaml.safe_dump(document))
-        configure_preset(root, "local", "fixture", apply=True)
+                     for i, role in enumerate(roles)}}, local_agent='fixture' if use_preset else None)
     assert asyncio.run(probe.pipeline(root))
     state = RunStore(root / '.greatminds').snapshot()
     assert [r['role'] for r in sorted(state['runs'].values(), key=lambda run: run['sequence'])] == roles

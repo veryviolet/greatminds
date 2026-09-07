@@ -229,3 +229,61 @@ Blocking extension requests and provider-specific optional capabilities must be
 explicitly negotiated or handled before the corresponding workflows can be declared
 supported. A listed command or an accepted initialization response is not a substitute
 for those tests.
+
+## Cline revalidation on 2026-09-07
+
+The executable currently on this host reports Cline **3.0.61**, whereas the earlier
+session-only evidence records 3.0.50. A fresh common-client probe created a session
+and sent a synthetic exact-response request without tools. `session/prompt` returned
+JSON-RPC `-32603` (`Internal error`) with no assistant text. The private stderr
+diagnostic identified required re-authentication. The process exited during bounded
+cleanup, and the requested restart/load stage was skipped because the initial prompt
+failed. No account or model selection was changed.
+
+[Sanitized evidence](evidence/acp-cline-auth-2026-09-07.json) records this failure.
+Cline task execution, resumption and cancellation remain unverified until login is
+restored and the same scenarios pass. Creating an ACP session does not establish
+that the configured provider credentials can execute a prompt.
+
+## One-harness local preset on 2026-09-07
+
+A fresh temporary Git repository completed the local clamp task using ordinary
+`greatminds setup`, `project preset local --agent codex --apply`, and the common
+daemon. The manifest used Codex 0.153.4 with codex-acp 1.10.0. The preset kept
+`permission: ask`; this task generated no permission callbacks. One manifest
+served developer, tester and reviewer in separate runs, while the planner remained
+on demand. The task supplied an explicit synthetic plan with no stand requirement.
+
+[Recorded evidence](evidence/acp-local-preset-2026-09-07.json) confirms three applied
+typed handoffs, three successful daemon command receipts, SYSTEM provenance for
+all resulting decision blocks, a merge changing only `clamp.py`, removal of the
+task worktree, six independently rerun unit tests, and restart without additional
+runs/results/commands. No native transport, deployment or publication was involved.
+
+| Role | Compiled context bytes | Start to first prompt | Run duration |
+| --- | ---: | ---: | ---: |
+| Developer | 7,887 | 2.691 s | 45.051 s |
+| Tester | 9,347 | 1.090 s | 46.685 s |
+| Reviewer | 10,419 | 1.716 s | 32.709 s |
+
+These are observed client byte counts and elapsed durations for this task, not
+provider token counts, billed cost, or proof of useful work at the first activity
+boundary. The source environment was used for live inference; wheel installation
+and interactive planning are separate checks. Reproduce from a checkout with an
+execution YAML containing the named manifest:
+
+```bash
+.venv/bin/python tools/acp_pipeline_probe.py --config /path/to/execution.yaml --local-agent codex
+```
+
+This opt-in command consumes provider usage, creates a new temporary repository,
+and keeps operator permissions explicit. Its validation commands are deliberately
+replaced by the synthetic task's Python unit tests.
+
+A separate [installed-wheel fixture run](evidence/installed-local-preset-2026-09-07.json)
+used a fresh isolated environment with the base wheel and no Ansible extra. The
+module resolved from site-packages. The public setup/preset commands and a synthetic
+ACP server completed the same three-role task, command checks, merge, cleanup and
+restart assertions. A separate installed dependency smoke confirmed idempotent setup
+and one SYSTEM resume with zero agent runs. This packaging evidence is distinct
+from the live Codex result above.

@@ -171,3 +171,9 @@ Tasks declaring stand requirements still need valid lease and deployment
 evidence. Omitting Ansible does not bypass those gates. See the
 [execution contract](../architecture/execution-contract.md) for the deployment
 ledger, evidence freshness and recovery of uncertain operations.
+
+The [local preset acceptance scenario](../architecture/acp-compatibility.md#one-harness-local-preset-on-2026-09-07)
+records a complete small code task with one real ACP harness, separate developer,
+tester and reviewer runs, configured daemon checks and automatic merge. Its plan
+was supplied as fixture input; it does not replace planning and test-design judgment
+for your own project.

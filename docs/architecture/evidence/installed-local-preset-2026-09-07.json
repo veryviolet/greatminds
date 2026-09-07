@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "date": "2026-09-07",
+  "wheel": "greatminds-2.6.0-py3-none-any.whl",
+  "wheel_sha256": "2dda42e790193baa4a7606233aab886ce0e70397af2b3a6459fa163498527650",
+  "source_commit": "b9ef313",
+  "module_from_site_packages": true,
+  "stands_extra_installed": false,
+  "scenario": "fresh_setup_local_preset_synthetic_acp",
+  "roles": [
+    "DEVELOPER",
+    "TESTER",
+    "ARCHITECT-REVIEWER"
+  ],
+  "runs": 3,
+  "applied_results": 3,
+  "successful_commands": 3,
+  "unit_tests": 6,
+  "verified": true,
+  "system_provenance": true,
+  "changed_files": [
+    "clamp.py"
+  ],
+  "worktree_removed": true,
+  "restart_preserved_runs_results_commands": true,
+  "separate_dependency_smoke": {
+    "setup_idempotent": true,
+    "system_resumes": 1,
+    "agent_runs": 0
+  }
+}
