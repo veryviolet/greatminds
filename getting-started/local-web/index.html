@@ -667,6 +667,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#chat-input-and-appearance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chat input and appearance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#history-and-storage" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1581,6 +1592,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#chat-input-and-appearance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chat input and appearance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#history-and-storage" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1654,9 +1676,22 @@ agents and roles are staged until <strong>Save</strong>. Configuration validatio
 writing; a stale browser cannot overwrite a newer saved version. Restart the
 daemon to apply changes. Harness binaries and their credentials are configured
 on the host as before; adding a manifest does not install or authenticate them.</p>
+<h2 id="chat-input-and-appearance">Chat input and appearance<a class="headerlink" href="#chat-input-and-appearance" title="Permanent link">&para;</a></h2>
+<p>Press <strong>Enter</strong> to send a message and <strong>Shift+Enter</strong> to insert a newline.
+Ctrl/Cmd+Enter also sends. IME composition and held-key repeats do not submit.
+The composer and existing history nodes stay in place during background updates,
+preserving draft selection and manual scroll position.</p>
+<p>Active conversations fetch updates more frequently than the dashboard and append
+incoming text progressively. The activity indicator remains visible during an
+agent turn, including pauses before text arrives; queued turns and permission or
+login waits have distinct labels. The indicator stops when the turn ends. Reduced
+motion preferences disable the text reveal and spinner animation.</p>
+<p>Use the toolbar's light/dark theme switch. The first visit follows the system
+color preference; an explicit choice is saved in this browser for the same origin.
+The theme applies to the chat, dashboards, settings, forms and code previews.</p>
 <h2 id="history-and-storage">History and storage<a class="headerlink" href="#history-and-storage" title="Permanent link">&para;</a></h2>
 <p>The browser reads the same filesystem state as the CLI and daemon. Viewing a page
-or reconnecting does not launch an agent. Requests are polled every 1.5 seconds;
+or reconnecting does not launch an agent. Dashboard requests are polled every 1.5 seconds; active chat requests every 350 ms;
 conversation event cursors avoid replaying earlier text. The UI renders the last
 50 conversation turns; the existing conversation journal remains on disk.</p>
 <p>New batch runs retain public ACP message and tool updates in
