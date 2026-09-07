@@ -53,6 +53,8 @@ def http(service):
 def test_local_assets_and_read_only_state_do_not_launch(http, service):
     status, headers, body = http('/')
     assert status == 200 and 'Настройки'.encode() in body
+    assert ('id="app-version">v'+service.version).encode() in body
+    assert json.loads(http('/api/state')[2])['app_version'] == service.version
     assert "script-src 'self'" in headers['Content-Security-Policy']
     assert 'Set-Cookie' not in headers
     assert http('/app.js')[0] == http('/style.css')[0] == 200

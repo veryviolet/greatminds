@@ -7,7 +7,7 @@ const assets=path.resolve(__dirname,'../../src/greatminds/web/assets');
 const html=fs.readFileSync(path.join(assets,'index.html'),'utf8');
 const script=fs.readFileSync(path.join(assets,'app.js'),'utf8');
 const flush=async()=>{for(let i=0;i<5;i++)await new Promise(setImmediate);};
-async function fixture(t,{theme,systemDark=false,reduced=false,capabilities=false}={}){
+async function fixture(t,{theme,systemDark=false,reduced=false,capabilities=false,sharedBindings=false}={}){
  const dom=new JSDOM(html,{url:'http://localhost:8767',runScripts:'outside-only',pretendToBeVisual:true});
  t.after(()=>dom.window.close());const w=dom.window;w.structuredClone=structuredClone;w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
  w.matchMedia=q=>({matches:q.includes('reduced-motion')?reduced:systemDark});
@@ -16,11 +16,11 @@ async function fixture(t,{theme,systemDark=false,reduced=false,capabilities=fals
  const frames=new Map();let next=0;w.requestAnimationFrame=cb=>{frames.set(++next,cb);return next;};w.cancelAnimationFrame=id=>frames.delete(id);
  const doc={id:'c1',closed:false,turns:{t1:{id:'t1',sequence:1,prompt:'Первое сообщение',queued_at:1,status:'completed'},t2:{id:'t2',sequence:2,prompt:'Второе сообщение',queued_at:2,status:'running'}}};
  const events=[{sequence:1,turn_id:'t1',kind:'text',text:'Первый ответ'}];
- const data={project:'/tmp/test',name:'test',tasks:[],runs:[],permissions:[],events:[],agents:[],paused:false,bindings:[{id:'planner',role:'ARCHITECT-PLANNER',agent:'fixture',scheduling:'on-demand'}],conversations:[{id:'c1',binding_id:'planner',turn_count:2}],daemon:{running:true,managed:true}};
+ const data={app_version:'9.8.7',project:'/tmp/test',name:'test',tasks:[],runs:[],permissions:[],events:[],agents:[],paused:false,bindings:[{id:'planner',role:'ARCHITECT-PLANNER',agent:'fixture',scheduling:'on-demand'}],conversations:[{id:'c1',binding_id:'planner',turn_count:2}],daemon:{running:true,managed:true}};
  const posts=[];
  w.fetch=async(url,options={})=>{
   let result;if(options.method==='POST'){posts.push({url,body:JSON.parse(options.body)});result={id:'c1'};}
-  else if(url==='/api/settings')result={document:{version:1,agents:{fixture:{argv:['fixture-acp']}},bindings:{planner:{role:'ARCHITECT-PLANNER',agent:'fixture'}}},roles:['ARCHITECT-PLANNER'],text:'{}',revision:'v1'};
+  else if(url==='/api/settings')result={document:{version:1,agents:{fixture:{argv:['fixture-acp']}},bindings:{planner:{role:'ARCHITECT-PLANNER',agent:'fixture'},...(sharedBindings?{developer:{role:'DEVELOPER',agent:'fixture'}}:{})}},roles:['ARCHITECT-PLANNER'],text:'{}',revision:'v1'};
   else if(url==='/api/state')result=data;
   else if(url==='/api/conversations/c1')result=doc;
   else if(url.startsWith('/api/conversations/c1/events?')){const after=Number(new URL(url,w.location).searchParams.get('after'));result={events:events.filter(e=>e.sequence>after),cursor:events.at(-1)?.sequence||0,has_more:false};}
@@ -88,11 +88,24 @@ test('English is default; Russian and Chinese switch without translating agent t
 test('ACP model combobox refreshes model-specific reasoning and saves selected values',async t=>{
  const f=await fixture(t,{capabilities:true});const d=f.w.document;
  d.getElementById('settings-button').click();await flush();
- assert.equal(f.posts.length,0,'opening settings does not start executors');
- d.querySelector('[data-discover]').click();await flush();
+ assert.equal(f.posts.filter(p=>p.url==='/api/executor-options').length,1,'settings load advertised choices automatically');
  let model=d.querySelector('[data-field=model]');assert.equal(model.tagName,'SELECT');assert.match(model.textContent,/Small.*Large/);assert.ok(d.querySelector('.reasoning-field').classList.contains('hidden'));
  model.value='large';model.dispatchEvent(new f.w.Event('change',{bubbles:true}));await flush();
  const reasoning=d.querySelector('[data-field=reasoning]');assert.equal(reasoning.tagName,'SELECT');assert.ok(!reasoning.closest('label').classList.contains('hidden'));assert.match(reasoning.textContent,/High/);reasoning.value='high';
  d.getElementById('settings-form').dispatchEvent(new f.w.Event('submit',{bubbles:true,cancelable:true}));await flush();
  const saved=f.posts.find(p=>p.url==='/api/settings').body.document.bindings.planner;assert.equal(saved.model,'large');assert.equal(saved.reasoning,'high');
+});
+
+test('roles sharing an executor reuse one ACP discovery and the cache when reopening settings',async t=>{
+ const f=await fixture(t,{capabilities:true,sharedBindings:true});const d=f.w.document;
+ d.getElementById('settings-button').click();await flush();
+ assert.equal(d.querySelectorAll('select[data-field=model]').length,2);
+ assert.equal(f.posts.filter(p=>p.url==='/api/executor-options').length,1);
+ d.getElementById('settings-dialog').close();d.getElementById('settings-button').click();await flush();
+ assert.equal(f.posts.filter(p=>p.url==='/api/executor-options').length,1);
+ d.querySelector('[data-discover]').click();await flush();
+ assert.equal(f.posts.filter(p=>p.url==='/api/executor-options').length,2,'explicit reload refreshes cached options');
+});
+test('product version comes from the server state',async t=>{
+ const f=await fixture(t);assert.equal(f.w.document.getElementById('app-version').textContent,'v9.8.7');
 });

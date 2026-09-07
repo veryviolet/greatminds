@@ -32,7 +32,7 @@ function binding(){return state.data?.bindings.find(b=>b.id===state.binding)}
 function empty(title,description=''){return tr`<div class="empty"><span class="empty-icon">◇</span><strong>${esc(title)}</strong>${description?tr`<br>${esc(description)}`:''}</div>`}
 function heading(title,description,actions=''){return tr`<div class="page-heading"><div><span class="eyebrow">${tr('Ваши агенты. Одно рабочее пространство.')}</span><h1>${esc(title)}</h1><p class="subtitle">${esc(description)}</p></div>${actions}</div>`}
 function renderChrome(){
- const d=state.data; $('project-name').textContent=d.name;$('project-path').textContent=d.project;$('project-path').title=d.project;
+ const d=state.data;if(d.app_version)setText($('app-version'),'v'+d.app_version); $('project-name').textContent=d.name;$('project-path').textContent=d.project;$('project-path').title=d.project;
  $('task-count').textContent=d.tasks.length;$('run-count').textContent=d.runs.length;
  const title=state.view==='chat'?roleName(binding()?.role):({overview:tr('Обзор'),tasks:tr('Задачи'),runs:tr('Запуски'),stands:tr('Стенды')}[state.view]);$('page-name').textContent=title || tr('Диалог');
  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===state.view));
@@ -216,6 +216,7 @@ async function openSettings(staged=null){
  $('settings-content').innerHTML=tr`<p class="subtitle">Исполнители и роли независимы. Интерактивные роли появятся во вкладках; пакетные получают задачи из очередей.</p><div class="form-row"><label class="field">Одновременные запуски<input id="max-running" type="number" min="1" value="${esc(doc.max_running||4)}"></label><label class="field">Лимит событий<input id="max-events" type="number" min="100" value="${esc(doc.max_runtime_events||10000)}"></label></div><section class="binding-settings"><h3>Исполнители</h3><p class="subtitle">${agents.map(a=>esc(a)+' · '+esc((doc.agents[a].argv||[]).join(' '))).join('<br>')||tr('Добавьте первый ACP-исполнитель.')}</p><div class="form-row"><label class="field">Харнес<select id="add-harness"><option value="codex">Codex</option><option value="claude">Claude</option><option value="grok">Grok</option></select></label><label class="field">Имя<input id="add-agent-name" placeholder="codex"></label><div class="field"><span>Новый манифест</span><button type="button" class="button" data-action="add-agent">＋ Добавить</button></div></div><label class="field">Команда запуска ACP — массив аргументов JSON<input id="add-agent-argv" value='["codex-acp"]'></label><div class="form-row"><label class="field">Версия ACP-адаптера<input id="add-adapter-version" placeholder="Установленная версия"></label><label class="field">Версия харнеса<input id="add-harness-version" placeholder="Установленная версия"></label></div></section><h3>Привязки ролей</h3><div id="binding-settings">${Object.entries(doc.bindings||{}).map(([id,b])=>tr`<section class="binding-settings" data-settings-binding="${esc(id)}"><h3>${esc(roleName(b.role))} <small class="muted">/ ${esc(id)}</small></h3><div class="form-row"><label class="field">Исполнитель<select data-field="agent">${agents.map(a=>tr`<option ${a===b.agent?'selected':''}>${esc(a)}</option>`).join('')}</select></label><label class="field model-field">Модель<input data-field="model" placeholder="По умолчанию" value="${esc(b.model||'')}"></label><label class="field reasoning-field hidden">${tr('Уровень рассуждения')}<input data-field="reasoning" value="${esc(b.reasoning||'')}"></label><label class="field">Режим агента<input data-field="mode" placeholder="По умолчанию" value="${esc(b.mode||'')}"></label></div><button type="button" class="button" data-discover="${esc(id)}">Загрузить модели и reasoning</button><p class="subtitle capability-status" role="status"></p><div class="form-row"><label class="field">Работа<select data-field="scheduling"><option value="on-demand" ${b.scheduling!=='queue'?'selected':''}>Интерактивная</option><option value="queue" ${b.scheduling==='queue'?'selected':''}>Из очереди</option></select></label><label class="field">Разрешения<select data-field="permission">${['ask','deny','allow-workspace'].map(v=>tr`<option value="${v}" ${(b.permission||'ask')===v?'selected':''}>${({ask:tr('Спрашивать'),deny:tr('Отклонять'), 'allow-workspace':tr('Внутри рабочего каталога')})[v]}</option>`).join('')}</select></label><label class="field">Таймаут, секунды<input data-field="timeout_seconds" type="number" min="1" value="${esc(b.timeout_seconds||1800)}"></label></div></section>`).join('')||empty(tr('Роли пока не настроены'),tr('Добавьте манифесты и привязки в полном конфиге ниже.'))}<div class="form-row"><label class="field">Новая роль<select id="new-role">${state.settings.roles.filter(r=>!['USER','SYSTEM'].includes(r)).map(r=>tr`<option>${esc(r)}</option>`).join('')}</select></label><label class="field">Исполнитель<select id="new-agent">${agents.map(a=>tr`<option>${esc(a)}</option>`).join('')}</select></label><div class="field"><span>Новая интерактивная вкладка</span><button type="button" class="button" data-action="add-binding" ${!agents.length?'disabled':''}>＋ Добавить роль</button></div></div></div><details id="advanced-settings"><summary>Полный конфиг · исполнители, команды и дополнительные параметры</summary><p class="subtitle">Редактор YAML использует существующий контракт Greatminds. Значения секретов храните в окружении исполнителя.</p><textarea id="settings-yaml" class="settings-yaml" aria-label="Конфигурация YAML">${esc(state.settings.text)}</textarea><label class="field"><span><input type="checkbox" id="use-yaml" ${valid?'':'checked'}> Сохранить содержимое YAML вместо формы</span></label></details>`;
  if(!valid)$('advanced-settings').open=true;
  if(!$('settings-dialog').open)$('settings-dialog').showModal();
+ if(valid)for(const section of document.querySelectorAll('[data-settings-binding]'))discoverOptions(section);
 }
 function formDocument(){
  const original=state.settings.document;const doc=structuredClone(original&&typeof original==='object'&&!Array.isArray(original)?original:{version:1});doc.agents||={};doc.bindings||={};doc.max_running=Number($('max-running').value);doc.max_runtime_events=Number($('max-events').value);
@@ -231,7 +232,7 @@ document.addEventListener('click',async event=>{
   if(t.dataset.openConversation){state.conversation=t.dataset.openConversation;navigate('chat',t.dataset.bindingId);return;}
   if(t.dataset.task){const d=await api('/api/tasks/'+t.dataset.task);$('detail-title').textContent=d.id;$('detail-body').innerHTML=tr`<p>${esc(tr(queues[d.queue]||d.queue))}</p><pre>${esc(d.text)}</pre>`;$('detail-dialog').showModal();return;}
   if(t.id==='theme-button'){const theme=document.documentElement.dataset.theme==='dark'?'light':'dark';applyTheme(theme);try{localStorage.setItem('greatminds-theme',theme)}catch{}return;}
-  if(t.dataset.discover){await discoverOptions(t.closest('[data-settings-binding]'));return;}
+  if(t.dataset.discover){await discoverOptions(t.closest('[data-settings-binding]'),{force:true});return;}
   if(t.id==='settings-button'){await openSettings();return;}
   if(t.id==='pause-button'){await api('/api/dispatch',{paused:!state.data.paused});await refresh();return;}
   if(t.id==='daemon-button'){t.disabled=true;await api('/api/daemon/'+(state.data.daemon.running?'stop':'start'),{});await refresh();return;}
@@ -257,7 +258,7 @@ document.addEventListener('click',async event=>{
  }catch(e){toast(e.message);if(t.disabled)t.disabled=false;}
 });
 document.addEventListener('input',event=>{if(event.target.id==='message-input')state.draft[state.binding]=event.target.value;if(event.target.id==='task-search'){state.filter=event.target.value;render();}});
-document.addEventListener('change',event=>{if(event.target.dataset.field==='model'&&event.target.tagName==='SELECT')discoverOptions(event.target.closest('[data-settings-binding]')).catch(e=>toast(e.message));if(event.target.dataset.field==='agent'){const section=event.target.closest('[data-settings-binding]');section.querySelector('[data-field=model]').value='';section.querySelector('[data-field=reasoning]').value='';discoverOptions(section).catch(e=>toast(e.message));}if(event.target.id==='add-harness'){const h=event.target.value;$('add-agent-name').value=h;$('add-agent-argv').value=JSON.stringify(h==='codex'?['codex-acp']:h==='claude'?['claude-agent-acp']:['grok','--no-auto-update','--permission-mode','default','agent','--no-leader','stdio']);}if(event.target.id==='conversation-select'){state.conversation=event.target.value;render(true);}if(event.target.id==='run-filter'){state.runFilter=event.target.value;render(true);}});
+document.addEventListener('change',event=>{if(event.target.dataset.field==='model'&&event.target.tagName==='SELECT'){const section=event.target.closest('[data-settings-binding]');section.querySelector('[data-field=reasoning]').value='';section.querySelector('.reasoning-field').classList.add('hidden');discoverOptions(section).catch(e=>toast(e.message));}if(event.target.dataset.field==='agent'){const section=event.target.closest('[data-settings-binding]');section.querySelector('[data-field=model]').value='';section.querySelector('[data-field=reasoning]').value='';discoverOptions(section).catch(e=>toast(e.message));}if(event.target.id==='add-harness'){const h=event.target.value;$('add-agent-name').value=h;$('add-agent-argv').value=JSON.stringify(h==='codex'?['codex-acp']:h==='claude'?['claude-agent-acp']:['grok','--no-auto-update','--permission-mode','default','agent','--no-leader','stdio']);}if(event.target.id==='conversation-select'){state.conversation=event.target.value;render(true);}if(event.target.id==='run-filter'){state.runFilter=event.target.value;render(true);}});
 document.addEventListener('submit',async event=>{
  if(event.target.id==='composer'){event.preventDefault();await sendMessage();}
  if(event.target.id==='settings-form'){event.preventDefault();const submit=event.target.querySelector('[type=submit]');submit.disabled=true;try{await api('/api/settings', $('use-yaml').checked?{text:$('settings-yaml').value,revision:state.settings.revision}:{document:formDocument(),revision:state.settings.revision});$('settings-dialog').close();toast(tr('Настройки сохранены. Для применения перезапустите демон.'));await refresh();}catch(e){$('settings-error').textContent=e.message;}finally{submit.disabled=false;}}
@@ -266,15 +267,28 @@ document.addEventListener('keydown',event=>{if(event.target.id==='message-input'
 refresh();setInterval(refresh,1500);
 setInterval(()=>{if(state.view==='chat'&&chatActive)loadChat().catch(e=>toast(e.message));},350);
 
-async function discoverOptions(section){
+const capabilityCache=new Map();
+let capabilityQueue=Promise.resolve();
+function executorOptions(document,bindingId,model,force){
+ const binding=document.bindings[bindingId];
+ const key=JSON.stringify([document.agents[binding.agent],binding.workspace||'.',binding.mode||'',model]);
+ const cached=capabilityCache.get(key);
+ if(!force&&cached&&Date.now()-cached.at<60000)return cached.promise;
+ const promise=capabilityQueue.then(()=>api('/api/executor-options',{document,binding_id:bindingId,model}));
+ capabilityQueue=promise.catch(()=>{});
+ const entry={at:Date.now(),promise};capabilityCache.set(key,entry);
+ promise.catch(()=>{if(capabilityCache.get(key)===entry)capabilityCache.delete(key);});
+ return promise;
+}
+async function discoverOptions(section,{force=false}={}){
  const button=section.querySelector('[data-discover]'),status=section.querySelector('.capability-status');
  button.disabled=true;setText(status,tr('Загружаем возможности ACP…'));
  const agent=section.querySelector('[data-field=agent]').value;
  const selected=section.querySelector('[data-field=model]').value;
  const token=Symbol();section.discoveryToken=token;
  try{
-  const result=await api('/api/executor-options',{document:formDocument(),binding_id:section.dataset.settingsBinding,model:selected});
-  if(!section.isConnected||section.discoveryToken!==token||section.querySelector('[data-field=agent]').value!==agent)return;
+  const result=await executorOptions(formDocument(),section.dataset.settingsBinding,selected,force);
+  if(!section.isConnected||section.discoveryToken!==token||section.querySelector('[data-field=agent]').value!==agent||section.querySelector('[data-field=model]').value!==selected)return;
   for(const field of ['model','reasoning']){
    const input=section.querySelector(tr`[data-field=${field}]`),options=result[field];
    const label=input.closest('label');

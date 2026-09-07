@@ -247,3 +247,5 @@ footer{padding:14px 16px}
 .markdown th,.markdown td{border:1px solid var(--line);padding:8px 12px;white-space:normal}
 .markdown blockquote{margin:1em 0;padding-left:1em;border-left:3px solid var(--line);color:var(--muted)}
 .markdown a{color:var(--accent);text-decoration:underline}
+
+.app-version{display:block;margin:7px 0 0 42px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;letter-spacing:.3px}

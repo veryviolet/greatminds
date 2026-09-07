@@ -4,6 +4,15 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 3.2.1 — 2026-09-07
+
+### Fixed
+
+- Execution settings load ACP model and reasoning choices automatically. Roles
+  sharing an executor reuse discovery results; explicit reload remains available.
+- The product version below the sidebar logo identifies the running web server.
+- The language selector uses the same typography as the navigation toolbar buttons.
+
 ## 3.2.0 — 2026-09-07
 
 ### Added

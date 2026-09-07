@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 import yaml
+from greatminds import __version__
 
 from greatminds.core.errors import GreatMindsError
 from greatminds.core.paths import project_runtime_dir
@@ -21,6 +22,7 @@ from greatminds.runtime.observation import snapshot
 
 class WebService:
     def __init__(self, project):
+        self.version = __version__
         self.project = Path(project).resolve()
         self.runtime = project_runtime_dir(self.project)
         self.store = RunStore(self.runtime)
@@ -93,7 +95,7 @@ class WebService:
             except GreatMindsError:
                 continue
         # Detailed trace/events are loaded only for the selected run.
-        return {'version': 1, 'project': str(self.project), 'name': self.project.name,
+        return {'version': 1, 'app_version': self.version, 'project': str(self.project), 'name': self.project.name,
                 'daemon': self.daemon_status(), 'configuration_error': error,
                 'bindings': bindings, 'conversations': conversations,
                 'paused': state.get('paused', False), 'agents': state.get('agents', []),

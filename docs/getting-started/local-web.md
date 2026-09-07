@@ -65,6 +65,8 @@ motion preferences disable the text reveal and spinner animation.
 Use the toolbar's light/dark theme switch. The first visit follows the system
 color preference; an explicit choice is saved in this browser for the same origin.
 The theme applies to the chat, dashboards, settings, forms and code previews.
+The version below the product logo identifies the running web server. Restart
+the web server after upgrading the package so its backend uses the new version.
 
 ## History and storage
 
@@ -112,8 +114,10 @@ headings, links, inline code and fenced code blocks. Streaming reconciles existi
 blocks so completed paragraphs remain stable. HTML is sanitized locally;
 embedded forms, scripts and images cannot execute. No CDN is used.
 
-In each role binding, click **Load models and reasoning**. This explicitly starts
-a temporary ACP connection and opens a session without sending a prompt. The
+Opening execution settings automatically loads model and reasoning choices.
+Bindings sharing an executor, workspace and model reuse one temporary ACP
+connection; results are cached for one minute. **Load models and reasoning**
+refreshes the choices on demand. Discovery opens a session without sending a prompt. The
 installed executor must already be available and authenticated. Models come from
 its advertised `model` selector, and reasoning from `thought_level`; no provider
 model list is hardcoded. Choosing another model refreshes the reasoning options.
