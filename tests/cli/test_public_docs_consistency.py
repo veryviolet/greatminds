@@ -23,7 +23,7 @@ CYRILLIC = re.compile(r"[А-Яа-яЁё]")
 
 def _help(*args: str) -> str:
     result = CliRunner().invoke(cli, [*args, "--help"], catch_exceptions=False)
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
     return result.output
 
 
@@ -34,7 +34,12 @@ def _command_paths(command: click.Command, prefix: tuple[str, ...] = ()):
             yield from _command_paths(subcommand, (*prefix, name))
 
 
-def test_public_cli_help_has_no_retired_entrypoints_or_stand_request() -> None:
+def test_public_cli_help_has_no_retired_entrypoints_or_stand_request(tmp_path, monkeypatch) -> None:
+    # Parent command groups resolve a project even for nested --help. A clean
+    # release checkout has no operator runtime, so never rely on the caller's cwd.
+    (tmp_path / '.greatminds').mkdir()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv('GREATMINDS_PROJECT_DIR', str(tmp_path))
     surfaces = {
         " ".join(path) if path else "root": _help(*path)
         for path in _command_paths(cli)
