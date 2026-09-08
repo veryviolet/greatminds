@@ -4,6 +4,16 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 3.3.0 — 2026-09-08
+
+- Replace the floating web version label with a compact badge below the brand.
+- Add persistent Compact / Normal / Large interface sizes and host defaults.
+- Add persistent Summary / Kanban dashboard views with shared task cards.
+- Rewrite the README/PyPI presentation around the web workspace and isolated uv
+  installation, and update onboarding, display preferences and upgrade guidance.
+- Require a documentation audit before every release; gate publication on public
+  documentation tests and a strict documentation build.
+
 ## 3.2.1 — 2026-09-07
 
 ### Fixed

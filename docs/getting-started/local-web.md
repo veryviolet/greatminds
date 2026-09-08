@@ -162,3 +162,37 @@ Inspect state and the deployment ledger before submitting a new operation. Stopp
 the daemon itself interrupts its active operation; closing the browser or web
 server does not. An operator request is explicit work and is not suspended by the
 batch-dispatch pause control.
+
+## Display preferences
+
+Use **Settings > Interface size** to choose Compact, Normal or Large. Text,
+buttons and form controls resize together. Changes apply immediately, including
+when the settings dialog is later cancelled; they are browser preferences rather
+than execution configuration. The normal size is the default.
+
+The dashboard has **Summary / Kanban** radio controls. Kanban shows workflow
+queues, including empty stages; scroll horizontally to see further stages and
+click a card to inspect its task. Transitions
+remain controlled by the daemon; cards cannot be dragged between queues.
+Both interface size and dashboard view are saved in this browser.
+
+The version badge below the product name identifies the running web server.
+Restart the web command after upgrading the package.
+
+For a host-wide default for new browser preferences, set
+`~/.config/greatminds/web.json` (or `$XDG_CONFIG_HOME/greatminds/web.json`):
+
+```json
+{"language": "ru", "scale": "large"}
+```
+
+Saved browser choices take precedence over these defaults. Supported scale values
+are `compact`, `normal` and `large`; supported languages are `en`, `ru` and `zh`.
+
+## Workspace preview
+
+The screenshots below use a demonstration project with example task files.
+
+![Summary dashboard](../assets/workspace-summary.jpg)
+
+![Kanban dashboard](../assets/workspace-kanban.jpg)

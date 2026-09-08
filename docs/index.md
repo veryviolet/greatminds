@@ -7,29 +7,28 @@ files, events and evidence remain inspectable on the local filesystem.
 
 ## Start a project
 
+Install Greatminds outside your project's Python environment:
+
 ```bash
-python -m pip install greatminds
-mkdir -p /tmp/greatminds-demo
-cd /tmp/greatminds-demo
+uv tool install --python 3.13 greatminds
+cd /path/to/your/project
 greatminds setup
+greatminds web --port 8765 --no-daemon
 ```
 
-Setup creates an empty `coordination/execution.yaml` and runtime queues under
-`.greatminds/`. It preserves existing project data and configuration. Install and
-authenticate your chosen ACP harness separately, then add a manifest and role
-binding. The [first-project guide](getting-started/first-project.md) walks through
-configuration and a daemon-owned conversation.
+Open `http://127.0.0.1:8765`, configure an installed ACP executor and an interactive
+planner in **Settings**, then start the daemon from the toolbar. Follow the
+[existing-project setup guide](getting-started/uv-project.md) for executor
+installation, authentication and exact settings, including projects on Python 3.8.
 
-```bash
-greatminds project execution
-greatminds daemon doctor --json
-greatminds coordd
-```
+The [web workspace](getting-started/local-web.md) provides role tabs, Markdown chat,
+Summary/Kanban dashboards, batch traces, executor settings and Ansible stand
+operations. Choose a theme, interface size and English, Russian or Chinese.
+The daemon continues working after the web server stops.
 
-Doctor validates configuration and executable/environment prerequisites without
-starting an agent. It does not prove provider authentication or live protocol
-support. The [compatibility matrix](architecture/acp-compatibility.md) records
-verified and unverified harness scenarios.
+The [first-project guide](getting-started/first-project.md) also covers direct
+configuration and CLI conversations. The [compatibility matrix](architecture/acp-compatibility.md)
+records verified and unverified harness scenarios.
 
 ## Work and observe
 

@@ -83,3 +83,18 @@ def test_stand_help_exposes_profile_registry_controls() -> None:
     assert "--profile-approval" in lease_help
     assert "list" in profiles_help
     assert "doctor" in profiles_help
+
+
+def test_readme_links_are_portable_to_pypi_and_local_doc_targets_exist():
+    from urllib.parse import urlparse
+
+    readme = (ROOT / 'README.md').read_text()
+    for target in re.findall(r'\]\(([^)]+)\)', readme):
+        assert target.startswith(('https://', 'http://', '#')), target
+        parsed = urlparse(target)
+        prefix = '/greatminds/'
+        if parsed.netloc == 'veryviolet.github.io' and parsed.path.startswith(prefix):
+            relative = parsed.path[len(prefix):].rstrip('/')
+            page = ROOT / 'docs' / (relative + '.md' if relative else 'index.md')
+            asset = ROOT / 'docs' / relative
+            assert page.is_file() or asset.is_file(), target

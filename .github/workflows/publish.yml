@@ -70,6 +70,12 @@ jobs:
       - name: check generated contract reference
         run: .venv-test/bin/python tools/generate_contract_reference.py --check
 
+      - name: validate public documentation before publication
+        run: |
+          .venv-test/bin/pip install --quiet '.[docs]' pytest
+          .venv-test/bin/python -m pytest tests/data/test_docs_no_bin_refs.py tests/cli/test_public_docs_consistency.py
+          .venv-test/bin/mkdocs build --strict
+
       - name: test browser interaction regressions
         run: |
           npm ci --prefix tests/web --ignore-scripts --no-audit --no-fund

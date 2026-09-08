@@ -1,5 +1,13 @@
 'use strict';
 const translations=[
+["Вид дашборда","Dashboard view","仪表板视图"],
+["Сводка","Summary","概览"],
+["Размер интерфейса","Interface size","界面大小"],
+["Компактный","Compact","紧凑"],
+["Обычный","Normal","标准"],
+["Крупный","Large","大"],
+["Применяется сразу и сохраняется в этом браузере.","Applies immediately and is saved in this browser.","立即应用并保存在此浏览器中。"],
+
  ["Планировщик", "Planner", "规划师"],
  ["Разработка в диалоге", "Interactive development", "交互式开发"],
  ["Разработчик", "Developer", "开发者"],

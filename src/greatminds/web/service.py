@@ -40,7 +40,15 @@ class WebService:
                 default = json.loads(path.read_text()).get('language')
             except (OSError, ValueError, AttributeError):
                 pass
-        return default if default in {'en', 'ru', 'zh'} else 'en'
+        return default if isinstance(default, str) and default in {'en', 'ru', 'zh'} else 'en'
+
+    def default_scale(self):
+        path = Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home() / '.config'))) / 'greatminds/web.json'
+        try:
+            value = json.loads(path.read_text()).get('scale')
+        except (OSError, ValueError, AttributeError):
+            value = None
+        return value if isinstance(value, str) and value in {'compact', 'normal', 'large'} else 'normal'
 
     def daemon_status(self):
         from greatminds.runtime.background import status

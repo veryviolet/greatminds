@@ -7,10 +7,12 @@ const assets=path.resolve(__dirname,'../../src/greatminds/web/assets');
 const html=fs.readFileSync(path.join(assets,'index.html'),'utf8');
 const script=fs.readFileSync(path.join(assets,'app.js'),'utf8');
 const flush=async()=>{for(let i=0;i<5;i++)await new Promise(setImmediate);};
-async function fixture(t,{theme,systemDark=false,reduced=false,capabilities=false,sharedBindings=false}={}){
+async function fixture(t,{theme,systemDark=false,reduced=false,capabilities=false,sharedBindings=false,scale,dashboard}={}){
  const dom=new JSDOM(html,{url:'http://localhost:8767',runScripts:'outside-only',pretendToBeVisual:true});
  t.after(()=>dom.window.close());const w=dom.window;w.structuredClone=structuredClone;w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
  w.matchMedia=q=>({matches:q.includes('reduced-motion')?reduced:systemDark});
+ if(scale)w.localStorage.setItem('greatminds-scale',scale);
+ if(dashboard)w.localStorage.setItem('greatminds-dashboard',dashboard);
  if(theme)w.localStorage.setItem('greatminds-theme',theme);
  const intervals=[];w.setInterval=cb=>{intervals.push(cb);return intervals.length;};
  const frames=new Map();let next=0;w.requestAnimationFrame=cb=>{frames.set(++next,cb);return next;};w.cancelAnimationFrame=id=>frames.delete(id);
@@ -108,4 +110,22 @@ test('roles sharing an executor reuse one ACP discovery and the cache when reope
 });
 test('product version comes from the server state',async t=>{
  const f=await fixture(t);assert.equal(f.w.document.getElementById('app-version').textContent,'v9.8.7');
+});
+test('interface size applies without closing settings or losing a chat draft',async t=>{
+ const f=await fixture(t);const d=f.w.document;const input=d.getElementById('message-input');input.value='Keep this draft';input.dispatchEvent(new f.w.Event('input',{bubbles:true}));
+ d.getElementById('settings-button').click();await flush();const select=d.getElementById('interface-scale');select.value='large';select.dispatchEvent(new f.w.Event('change',{bubbles:true}));
+ assert.equal(d.documentElement.dataset.scale,'large');assert.equal(f.w.localStorage.getItem('greatminds-scale'),'large');assert.equal(d.getElementById('message-input'),input);assert.equal(input.value,'Keep this draft');assert.equal(d.getElementById('settings-dialog').open,true);
+});
+test('dashboard Kanban persists through polling and shows escaped task cards and empty queues',async t=>{
+ const f=await fixture(t);const d=f.w.document;f.data.tasks=[{id:'TASK-1',title:'<script>bad()</script>',queue:'feature_dev'}];await f.poll();
+ d.querySelector('[data-view="overview"]').click();await flush();const radio=d.querySelector('[name="dashboard-mode"][value="kanban"]');radio.click();await flush();
+ assert.equal(f.w.localStorage.getItem('greatminds-dashboard'),'kanban');assert.equal(d.querySelectorAll('.queue').length,7);assert.equal(d.querySelector('[data-task="TASK-1"] strong').textContent,'<script>bad()</script>');assert.equal(d.querySelector('.queue-board script'),null);
+ await f.poll();assert.equal(d.querySelector('[value="kanban"]').checked,true);
+ d.querySelector('[name="dashboard-mode"][value="summary"]').click();await flush();assert.ok(d.querySelector('.stats'));assert.equal(d.querySelector('.queue-board'),null);
+});
+
+test('saved size and dashboard choices restore on the next page load',async t=>{
+ const f=await fixture(t,{scale:'large',dashboard:'kanban'});const d=f.w.document;
+ assert.equal(d.documentElement.dataset.scale,'large');d.querySelector('[data-view="overview"]').click();await flush();assert.equal(d.querySelector('[value="kanban"]').checked,true);
+ const board=d.querySelector('.queue-board');board.scrollLeft=210;f.data.tasks.push({id:'NEW',queue:'feature_dev',title:'New task'});await f.poll();assert.equal(d.querySelector('.queue-board').scrollLeft,210);
 });

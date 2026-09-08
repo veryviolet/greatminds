@@ -219,3 +219,12 @@ def test_web_stand_queue_and_connections_use_existing_state(http, service):
     assert json.loads(http('/api/stands')[2])['operations']['check-http']['status'] == 'queued'
     assert not service.daemon_status()['running']
     assert http('/api/stands/file', {'name': '.greatminds/PROJECT.env'})[0] == 400
+
+
+def test_host_scale_defaults_are_validated_and_injected(http, service, monkeypatch, tmp_path):
+    monkeypatch.setenv('XDG_CONFIG_HOME', str(tmp_path / 'config'))
+    path = tmp_path / 'config/greatminds/web.json'
+    path.parent.mkdir(parents=True)
+    for value, expected in [('large', 'large'), ('compact', 'compact'), ([], 'normal'), ('unknown', 'normal')]:
+        path.write_text(json.dumps({'scale': value}))
+        assert f'data-default-scale="{expected}"'.encode() in http('/')[2]

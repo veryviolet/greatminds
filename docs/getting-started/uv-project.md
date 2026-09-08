@@ -63,8 +63,8 @@ terminal; Ctrl+C closes it. Change `--port` for another local project.
 
 ## 4. Configure the first conversation
 
-The current web UI uses Russian labels; the descriptions below use their English
-meanings.
+The UI defaults to English. Select Russian or Simplified Chinese in the toolbar
+if preferred; the instructions below use English labels.
 
 1. Open **Settings** (the gear button) in the web toolbar.
 2. Choose **Codex**, enter the name `codex`, paste the JSON launch command from

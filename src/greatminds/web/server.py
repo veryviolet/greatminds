@@ -51,7 +51,7 @@ class Handler(BaseHTTPRequestHandler):
                 name, mime = assets[path]
                 content = files('greatminds.web').joinpath('assets', name).read_bytes()
                 if name == 'index.html':
-                    content = content.replace(b'<html lang="en">', ('<html lang="en" data-default-language="' + self.server.service.default_language() + '">').encode())
+                    content = content.replace(b'<html lang="en">', ('<html lang="en" data-default-language="' + self.server.service.default_language() + '" data-default-scale="' + self.server.service.default_scale() + '">').encode())
                     content = content.replace(b'id="app-version">v\xe2\x80\x94', ('id="app-version">v' + self.server.service.version).encode())
                 self.reply(content, mime=mime)
                 return

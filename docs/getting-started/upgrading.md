@@ -49,7 +49,10 @@ For an explicitly registered service project, use `--project PROJECT_NAME`.
 Existing installed services have their units refreshed and receive
 `systemctl --user try-restart`. Inactive services remain inactive. Update skips
 missing service installations; install a service separately when you need one.
-Restart a foreground daemon manually using the updated environment. Harnesses
+For a uv tool installation, use `uv tool upgrade greatminds`. Restart the web
+server after upgrading. Independently managed background daemons also need an
+explicit `greatminds daemon restart` to load runtime changes; check active work
+first. Restart a foreground daemon manually using the updated environment. Harnesses
 and ACP adapters have their own installation and update procedures.
 
 To repeat only the project and installed-service refresh after managing the
