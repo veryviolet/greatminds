@@ -4,6 +4,12 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 3.3.1 — 2026-09-08
+
+- Correct fractional letter spacing after conversion to scalable interface units.
+  Brand, headings, task identifiers and footer keep their intended typography.
+- Recheck the README, screenshots and documentation against the released UI.
+
 ## 3.3.0 — 2026-09-08
 
 - Replace the floating web version label with a compact badge below the brand.
