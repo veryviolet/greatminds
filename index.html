@@ -1610,24 +1610,23 @@ owns sessions, supervises processes, runs configured commands and applies valida
 workflow transitions. Agents perform reasoning and submit typed results. Task
 files, events and evidence remain inspectable on the local filesystem.</p>
 <h2 id="start-a-project">Start a project<a class="headerlink" href="#start-a-project" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>greatminds
-mkdir<span class="w"> </span>-p<span class="w"> </span>/tmp/greatminds-demo
-<span class="nb">cd</span><span class="w"> </span>/tmp/greatminds-demo
+<p>Install Greatminds outside your project's Python environment:</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.13<span class="w"> </span>greatminds
+<span class="nb">cd</span><span class="w"> </span>/path/to/your/project
 greatminds<span class="w"> </span>setup
+greatminds<span class="w"> </span>web<span class="w"> </span>--port<span class="w"> </span><span class="m">8765</span><span class="w"> </span>--no-daemon
 </code></pre></div>
-<p>Setup creates an empty <code>coordination/execution.yaml</code> and runtime queues under
-<code>.greatminds/</code>. It preserves existing project data and configuration. Install and
-authenticate your chosen ACP harness separately, then add a manifest and role
-binding. The <a href="getting-started/first-project/">first-project guide</a> walks through
-configuration and a daemon-owned conversation.</p>
-<div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>project<span class="w"> </span>execution
-greatminds<span class="w"> </span>daemon<span class="w"> </span>doctor<span class="w"> </span>--json
-greatminds<span class="w"> </span>coordd
-</code></pre></div>
-<p>Doctor validates configuration and executable/environment prerequisites without
-starting an agent. It does not prove provider authentication or live protocol
-support. The <a href="architecture/acp-compatibility/">compatibility matrix</a> records
-verified and unverified harness scenarios.</p>
+<p>Open <code>http://127.0.0.1:8765</code>, configure an installed ACP executor and an interactive
+planner in <strong>Settings</strong>, then start the daemon from the toolbar. Follow the
+<a href="getting-started/uv-project/">existing-project setup guide</a> for executor
+installation, authentication and exact settings, including projects on Python 3.8.</p>
+<p>The <a href="getting-started/local-web/">web workspace</a> provides role tabs, Markdown chat,
+Summary/Kanban dashboards, batch traces, executor settings and Ansible stand
+operations. Choose a theme, interface size and English, Russian or Chinese.
+The daemon continues working after the web server stops.</p>
+<p>The <a href="getting-started/first-project/">first-project guide</a> also covers direct
+configuration and CLI conversations. The <a href="architecture/acp-compatibility/">compatibility matrix</a>
+records verified and unverified harness scenarios.</p>
 <h2 id="work-and-observe">Work and observe<a class="headerlink" href="#work-and-observe" title="Permanent link">&para;</a></h2>
 <p>In a second terminal, create a conversation using a configured binding:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>chat<span class="w"> </span>create<span class="w"> </span>planner

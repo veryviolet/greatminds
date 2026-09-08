@@ -1428,6 +1428,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cutting a Release
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -1444,6 +1462,36 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#required-documentation-review-before-every-tag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required documentation review before every tag
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -1504,6 +1552,25 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#required-documentation-review-before-every-tag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required documentation review before every tag
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1532,8 +1599,9 @@ itself, the package release path is:</p>
 <li>Build the package.</li>
 <li>Tag the release.</li>
 <li>Publish through the configured package workflow.</li>
-<li>Upgrade the fleet environment that runs agents.</li>
-<li>Restart daemon and agent processes.</li>
+<li>Upgrade the installed Greatminds tool environment.</li>
+<li>Restart web servers to load updated assets. Check active work before restarting
+   daemons that need runtime changes; do not interrupt working agents blindly.</li>
 </ol>
 <p><code>greatminds.__version__</code> is derived from installed package metadata with
 <code>importlib.metadata.version("greatminds")</code>. Do not edit
@@ -1548,6 +1616,27 @@ greatminds<span class="w"> </span>watchdog
 </code></pre></div>
 <p>Do not publish docs from this task path manually if a docs deploy workflow owns
 GitHub Pages publication.</p>
+<h2 id="required-documentation-review-before-every-tag">Required documentation review before every tag<a class="headerlink" href="#required-documentation-review-before-every-tag" title="Permanent link">&para;</a></h2>
+<p>README.md is also the PyPI project description. Audit it and all public docs
+against the release's implementation before publishing, every time:</p>
+<ul>
+<li>Follow the installation and existing-project onboarding commands. Check runtime
+  requirements, isolated tool environments and project interpreter separation.</li>
+<li>Compare web labels, controls, screenshots and workflows with the current UI.</li>
+<li>Check executor compatibility claims against the recorded acceptance evidence.</li>
+<li>Verify daemon start/stop behavior, configuration examples and upgrade guidance.</li>
+<li>Check links and remove stale version claims. README links must be absolute so
+  they work on PyPI. Record relevant documentation changes in the changelog.</li>
+</ul>
+<p>Run the public documentation tests, generated reference check and strict site build:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/data/test_docs_no_bin_refs.py<span class="w"> </span>tests/cli/test_public_docs_consistency.py
+python<span class="w"> </span>tools/generate_contract_reference.py<span class="w"> </span>--check
+mkdocs<span class="w"> </span>build<span class="w"> </span>--strict
+</code></pre></div>
+<p>The publish workflow runs these checks before uploading packages. They catch
+structural inconsistencies; a full semantic review is still required. After
+publication, compare the PyPI JSON description with README.md and verify the
+published documentation. Cached search previews are not release evidence.</p>
 
 
 

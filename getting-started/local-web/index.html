@@ -721,6 +721,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#display-preferences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Display preferences
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#workspace-preview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workspace preview
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1679,6 +1701,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#display-preferences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Display preferences
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#workspace-preview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workspace preview
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1837,6 +1881,28 @@ Inspect state and the deployment ledger before submitting a new operation. Stopp
 the daemon itself interrupts its active operation; closing the browser or web
 server does not. An operator request is explicit work and is not suspended by the
 batch-dispatch pause control.</p>
+<h2 id="display-preferences">Display preferences<a class="headerlink" href="#display-preferences" title="Permanent link">&para;</a></h2>
+<p>Use <strong>Settings &gt; Interface size</strong> to choose Compact, Normal or Large. Text,
+buttons and form controls resize together. Changes apply immediately, including
+when the settings dialog is later cancelled; they are browser preferences rather
+than execution configuration. The normal size is the default.</p>
+<p>The dashboard has <strong>Summary / Kanban</strong> radio controls. Kanban shows workflow
+queues, including empty stages; scroll horizontally to see further stages and
+click a card to inspect its task. Transitions
+remain controlled by the daemon; cards cannot be dragged between queues.
+Both interface size and dashboard view are saved in this browser.</p>
+<p>The version badge below the product name identifies the running web server.
+Restart the web command after upgrading the package.</p>
+<p>For a host-wide default for new browser preferences, set
+<code>~/.config/greatminds/web.json</code> (or <code>$XDG_CONFIG_HOME/greatminds/web.json</code>):</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="nt">"language"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ru"</span><span class="p">,</span><span class="w"> </span><span class="nt">"scale"</span><span class="p">:</span><span class="w"> </span><span class="s2">"large"</span><span class="p">}</span>
+</code></pre></div>
+<p>Saved browser choices take precedence over these defaults. Supported scale values
+are <code>compact</code>, <code>normal</code> and <code>large</code>; supported languages are <code>en</code>, <code>ru</code> and <code>zh</code>.</p>
+<h2 id="workspace-preview">Workspace preview<a class="headerlink" href="#workspace-preview" title="Permanent link">&para;</a></h2>
+<p>The screenshots below use a demonstration project with example task files.</p>
+<p><img alt="Summary dashboard" src="../../assets/workspace-summary.jpg" /></p>
+<p><img alt="Kanban dashboard" src="../../assets/workspace-kanban.jpg" /></p>
 
 
 
