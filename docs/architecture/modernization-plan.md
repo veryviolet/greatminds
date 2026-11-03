@@ -2,6 +2,10 @@
 
 Date: 2026-09-06. Status: complete for the owner-approved Codex/Claude/Grok scope
 (2026-09-07); see the acceptance audit and final Progress entry.
+This dated plan records the ACP cutover. For the subsequently shipped web
+workspace and planner requests, see the [web guide](../getting-started/local-web.md)
+and [planning recipe](../recipes/planning-a-feature.md).
+
 Baseline and evidence: [initial audit](rehabilitation-audit-2026-09-06.md).
 Current requirement-by-requirement status: [acceptance audit](modernization-acceptance.md).
 

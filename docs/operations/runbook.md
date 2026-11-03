@@ -12,11 +12,18 @@ directly, or touch heartbeat files manually. The CLI validates role ownership,
 schema fields, transition readiness, intent files, journal lines, and heartbeat
 side effects as one operation.
 
+Assigned agents submit typed results with `run submit`; they cannot bypass that
+contract with direct task mutations. Standalone planner conversations use durable
+planning requests, including the `task new`, `plan`, `task append-block` and
+`task mv` convenience commands. The daemon applies accepted requests. See
+[planning a feature](../recipes/planning-a-feature.md). The commands below also
+serve authorized operators outside a managed run.
+
 Common mutation commands:
 
 ```bash
 greatminds task new --stream product --kind feature --scope backend --title "..."
-greatminds task append-block implementation --id TASK_ID --field files=docs/index.md --field ready_for_test=true
+greatminds task append-block implementation --id TASK_ID --field files=src/module.py --field ready_for_test=true
 greatminds task mv TASK_ID feature_test
 greatminds inbox send ARCHITECT-PLANNER --kind ask --task TASK_ID --body "..."
 greatminds stand lease --task TASK_ID --worktree "$(greatminds worktree path TASK_ID)" --profile full-deploy
@@ -196,6 +203,12 @@ deployments and task mutations require their scoped recovery actions. Cancellati
 uses `greatminds run cancel RUN_ID`; the daemon verifies and cleans tracked process
 groups before releasing the run.
 
+Pending planning requests hold their affected tasks until application or
+resolution. Inspect `greatminds run planning-status REQUEST_ID`; after resolving
+the reported conflict, `greatminds run planning-status REQUEST_ID --retry` lets
+the daemon recheck the durable request. Retrying does not bypass revision or
+ownership checks. Conversation cancellation does not undo an accepted request.
+
 ## Retries and Account Admission
 
 Startup retries require evidence that no prompt or earlier protocol activity
@@ -247,7 +260,7 @@ greatminds run doctor --project-dir "$PWD" --json
 
 This read-only report combines schema/mirror inspection, ACP prerequisites,
 current run holds, assignment admission, dependency findings and unresolved
-command/result/maintenance/deployment operations. It reuses the runtime services;
+command/result/planning/maintenance/deployment operations. It reuses the runtime services;
 it does not run a harness, inspect provider login by launching a probe, repair
 state or call systemctl. `daemon doctor` remains the focused prerequisite check.
 

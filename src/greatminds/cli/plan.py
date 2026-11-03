@@ -1,6 +1,6 @@
 """plan — ARCHITECT-PLANNER convenience: triage + plan + route in one go.
 
-Atomic 4-step chain:
+Operator sequence (each mutation is atomic; the sequence is not rolled back):
 
   1. ``append-block triage`` on the inbox task
   2. ``mv`` → ``feature_plan``
@@ -12,6 +12,10 @@ stopped and what to do — never a silent partial failure.
 
 Only ``ARCHITECT-PLANNER`` may run this command (the ``GREATMINDS_ROLE``
 env var is enforced; refusing other roles up-front avoids ambiguity).
+
+In a managed standalone planner conversation, this command queues a durable
+daemon request and waits for its receipt. The daemon applies the same gates and
+records completed steps for recovery. Assigned task runs use ``run submit``.
 """
 
 from __future__ import annotations
@@ -48,7 +52,7 @@ def find_task_queue(coord: Path, task_id: str) -> str | None:
 
 
 @click.command(
-    short_help="ARCHITECT-PLANNER: triage + plan + route in 4 atomic steps",
+    short_help="ARCHITECT-PLANNER: triage, plan and route a task",
     help=__doc__,
 )
 @click.argument("task_id", metavar="ID")
@@ -89,6 +93,20 @@ def plan(task_id, scope, assignee_role, base_commit, plan_kind, mode,
         raise GreatMindsError("--stand-required true requires --stand-reason")
     if not body and not body_file:
         raise GreatMindsError("provide --body or --body-file")
+
+    if os.environ.get('GREATMINDS_RUN_ID'):
+        from greatminds.cli.task import read_body
+        from greatminds.domain.planning import request_from_cli
+        fields = {'base_commit': base_commit, 'assignee_role': assignee_role,
+                  'stand_required': stand_required == 'true', 'plan_kind': plan_kind,
+                  'mode': mode, 'ready_for_implementation': True}
+        if stand_reason.strip():
+            fields['stand_reason'] = stand_reason
+        receipt = request_from_cli('plan', {'task_id': task_id, 'scope': scope, 'fields': fields,
+            'body': body if body is not None else read_body('-' if body_file == '-' else '@' + body_file),
+            'triage': triage, 'stop_at': stop_at, 'audit_only': audit_only})
+        ok(f"plan: {task_id} → {receipt['destination']} ({receipt['id']})")
+        return
 
     coord = find_coord_dir()
     where = find_task_queue(coord, task_id)

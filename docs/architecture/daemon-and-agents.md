@@ -37,9 +37,10 @@ ACP prompt completion is distinct from a verified workflow transition. Completed
 prompt dispatch have bounded exponential retries under the
 [execution contract](execution-contract.md#bounded-startup-retries).
 `run retry RUN_ID` permits an explicit further attempt after its cause is
-resolved. Startup delays are shared by account; provider rate-limit handling
-and broader resource/health policies remain tracked in the
-[modernization plan](modernization-plan.md).
+resolved. Startup delays are shared by account. Explicitly configured ACP error
+codes can also create durable rate-limit or quota holds; reported session cost
+limits can hold admission. See the [runbook](../operations/runbook.md) and
+[execution contract](execution-contract.md) for their scope and recovery.
 
 ## Conversations and frontends
 

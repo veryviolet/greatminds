@@ -76,9 +76,9 @@ def render():
     document = snapshot.document
     examples = validate(document)
     from greatminds.cli import task
-    from greatminds.domain import maintenance, results
+    from greatminds.domain import maintenance, planning, results
     sources = {}
-    for module in (config, store, account_limits, presets, task, maintenance, results):
+    for module in (config, store, account_limits, presets, task, maintenance, planning, results):
         loaded = Path(inspect.getfile(module))
         relative = Path('src') / Path(*module.__name__.split('.')).with_suffix('.py')
         raw = (ROOT / relative).read_bytes()

@@ -1,5 +1,6 @@
 """Small same-origin HTTP transport. No login, cookies, tokens or CORS API."""
 import json
+import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
 from urllib.parse import urlsplit, parse_qs
@@ -30,10 +31,19 @@ class Handler(BaseHTTPRequestHandler):
 
     def reply(self, value, status=200, mime='application/json; charset=utf-8'):
         content = value if isinstance(value, bytes) else json.dumps(value, ensure_ascii=False).encode()
+        etag = '"' + hashlib.sha256(content).hexdigest() + '"' if self.command == 'GET' and status == 200 else None
+        if etag and self.headers.get('If-None-Match') == etag:
+            self.send_response(304)
+            self.send_header('ETag', etag)
+            self.send_header('Cache-Control', 'no-cache')
+            self.end_headers()
+            return
         self.send_response(status)
+        if etag:
+            self.send_header('ETag', etag)
         self.send_header('Content-Type', mime)
         self.send_header('Content-Length', str(len(content)))
-        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Cache-Control', 'no-cache' if isinstance(value, bytes) else 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self'")
         self.end_headers()
@@ -58,6 +68,9 @@ class Handler(BaseHTTPRequestHandler):
             service = self.server.service
             if path == '/api/state':
                 self.reply(service.overview())
+            elif path == '/api/runs':
+                query = parse_qs(parsed.query)
+                self.reply(service.run_page(before=int(query['before'][0]) if 'before' in query else None))
             elif path == '/api/stands':
                 from .stands import Stands
                 self.reply(Stands(service).snapshot())
@@ -72,6 +85,11 @@ class Handler(BaseHTTPRequestHandler):
                     self.reply(service.conversation(parts[2]))
                 elif len(parts) == 4 and parts[:2] == ['api', 'conversations'] and parts[3] == 'events':
                     self.reply(ConversationStore(service.runtime, parts[2]).events(after=after))
+                elif len(parts) == 4 and parts[:2] == ['api', 'conversations'] and parts[3] == 'updates':
+                    query = parse_qs(parsed.query)
+                    self.reply(service.conversation_updates(parts[2],
+                        after=int(query['after'][0]) if 'after' in query else None,
+                        before=int(query['before'][0]) if 'before' in query else None))
                 elif len(parts) == 3 and parts[:2] == ['api', 'runs']:
                     self.reply(service.run_detail(parts[2], after))
                 elif len(parts) == 3 and parts[:2] == ['api', 'tasks']:

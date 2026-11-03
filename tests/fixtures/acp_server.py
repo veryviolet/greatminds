@@ -149,6 +149,20 @@ for line in sys.stdin:
                              "options": [{"optionId": "yes", "name": "Allow once", "kind": "allow_once"},
                                          {"optionId": "no", "name": "Reject", "kind": "reject_once"}]}})
         else:
+            if scenario in {'planner-intake', 'planner-pipeline'}:
+                cli = [sys.executable, '-I', '-m', 'greatminds.cli.main']
+                titles = ['Clamp'] if scenario == 'planner-pipeline' else ['First planned task', 'Second planned task']
+                base = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() if scenario == 'planner-pipeline' else 'abc123'
+                for title in titles:
+                    created = subprocess.check_output([*cli, 'task', 'new', '--stream', 'product',
+                        '--kind', 'feature' if scenario == 'planner-pipeline' else 'research',
+                        '--scope', 'backend', '--title', title], text=True)
+                    task_id = Path(created.strip().split('created ', 1)[1]).stem
+                    args = [*cli, 'plan', task_id, '--scope', 'backend', '--assignee-role', 'DEVELOPER',
+                        '--base-commit', base, '--plan-kind', 'full', '--mode', 'A',
+                        '--stand-required', 'false', '--body', 'Implement and independently verify the requested change.']
+                    subprocess.run(args, check=True, capture_output=True, text=True)
+                    subprocess.run(args, check=True, capture_output=True, text=True)
             if scenario == 'task-chat':
                 context = json.loads(subprocess.check_output(
                     [sys.executable, '-m', 'greatminds.cli.main', 'run', 'contract'], text=True))

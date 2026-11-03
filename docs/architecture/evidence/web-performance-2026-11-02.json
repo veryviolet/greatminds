@@ -1,0 +1,277 @@
+{
+  "date": "2026-11-02",
+  "baseline_commit": "75f5e7771e28d5658ff9564d85df7f5bead93755",
+  "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43",
+  "python": "3.13",
+  "scope": "Synthetic local read paths and real Chromium with intercepted API fixtures. No model inference or live external executor campaign. Browser numbers exclude backend and network latency.",
+  "backend": {
+    "before": {
+      "fixture": {
+        "tasks": 1000,
+        "conversations": 20,
+        "history": 100,
+        "turns": 100,
+        "repeats": 7
+      },
+      "measurements": {
+        "overview": {
+          "median_ms": 646.428,
+          "p95_ms": 684.933,
+          "response_bytes": 131265,
+          "samples_ms": [
+            659.212,
+            684.933,
+            646.428,
+            637.452,
+            610.36,
+            653.443,
+            621.964
+          ],
+          "cold_ms": 659.212,
+          "warm_p95_ms": 684.933
+        },
+        "conversation": {
+          "median_ms": 1.144,
+          "p95_ms": 1.307,
+          "response_bytes": 11290,
+          "samples_ms": [
+            1.19,
+            1.307,
+            1.086,
+            1.062,
+            1.125,
+            1.188,
+            1.144
+          ],
+          "cold_ms": 1.19,
+          "warm_p95_ms": 1.307
+        },
+        "events_tail": {
+          "median_ms": 0.9,
+          "p95_ms": 1.156,
+          "response_bytes": 109,
+          "samples_ms": [
+            1.046,
+            1.156,
+            0.935,
+            0.9,
+            0.865,
+            0.857,
+            0.846
+          ],
+          "cold_ms": 1.046,
+          "warm_p95_ms": 1.156
+        }
+      }
+    },
+    "after": {
+      "fixture": {
+        "tasks": 1000,
+        "conversations": 20,
+        "history": 100,
+        "turns": 100,
+        "repeats": 7
+      },
+      "measurements": {
+        "overview": {
+          "median_ms": 18.529,
+          "p95_ms": 192.361,
+          "cold_ms": 192.361,
+          "response_bytes": 131281,
+          "samples_ms": [
+            192.361,
+            18.881,
+            18.898,
+            18.027,
+            18.208,
+            18.529,
+            17.285
+          ],
+          "warm_p95_ms": 18.898
+        },
+        "conversation": {
+          "median_ms": 1.041,
+          "p95_ms": 1.165,
+          "cold_ms": 1.165,
+          "response_bytes": 11290,
+          "samples_ms": [
+            1.165,
+            1.117,
+            1.07,
+            1.024,
+            1.041,
+            1.041,
+            1.005
+          ],
+          "warm_p95_ms": 1.117
+        },
+        "events_tail": {
+          "median_ms": 0.844,
+          "p95_ms": 0.911,
+          "cold_ms": 0.863,
+          "response_bytes": 109,
+          "samples_ms": [
+            0.863,
+            0.844,
+            0.824,
+            0.822,
+            0.83,
+            0.883,
+            0.911
+          ],
+          "warm_p95_ms": 0.911
+        },
+        "chat_updates_idle": {
+          "median_ms": 0.04,
+          "p95_ms": 1.085,
+          "cold_ms": 1.085,
+          "response_bytes": 163,
+          "samples_ms": [
+            1.085,
+            0.135,
+            0.05,
+            0.04,
+            0.039,
+            0.038,
+            0.036
+          ],
+          "warm_p95_ms": 0.135
+        }
+      }
+    },
+    "scaled_after": {
+      "fixture": {
+        "tasks": 3000,
+        "conversations": 20,
+        "history": 100,
+        "turns": 100,
+        "repeats": 10
+      },
+      "measurements": {
+        "overview": {
+          "median_ms": 48.997,
+          "p95_ms": 575.459,
+          "cold_ms": 575.459,
+          "response_bytes": 299290,
+          "samples_ms": [
+            575.459,
+            46.647,
+            49.458,
+            48.536,
+            52.903,
+            55.42,
+            48.3,
+            44.478,
+            47.816,
+            55.18
+          ],
+          "warm_p95_ms": 55.42
+        },
+        "conversation": {
+          "median_ms": 1.032,
+          "p95_ms": 1.372,
+          "cold_ms": 1.372,
+          "response_bytes": 11290,
+          "samples_ms": [
+            1.372,
+            1.266,
+            1.06,
+            1.01,
+            1.025,
+            1.039,
+            1.065,
+            1.011,
+            0.964,
+            0.96
+          ],
+          "warm_p95_ms": 1.266
+        },
+        "events_tail": {
+          "median_ms": 0.836,
+          "p95_ms": 0.863,
+          "cold_ms": 0.863,
+          "response_bytes": 109,
+          "samples_ms": [
+            0.863,
+            0.837,
+            0.836,
+            0.836,
+            0.834,
+            0.825,
+            0.828,
+            0.838,
+            0.833,
+            0.857
+          ],
+          "warm_p95_ms": 0.857
+        },
+        "chat_updates_idle": {
+          "median_ms": 0.038,
+          "p95_ms": 0.934,
+          "cold_ms": 0.934,
+          "response_bytes": 163,
+          "samples_ms": [
+            0.934,
+            0.053,
+            0.045,
+            0.04,
+            0.039,
+            0.038,
+            0.037,
+            0.037,
+            0.036,
+            0.036
+          ],
+          "warm_p95_ms": 0.053
+        }
+      }
+    }
+  },
+  "browser": {
+    "fixture": {
+      "tasks": 1000,
+      "runs": 1000,
+      "turns": 100
+    },
+    "results": [
+      {
+        "source": "75f5e77",
+        "initial_ms": 347.09360200000003,
+        "kanban_ms": 12.700000001117587,
+        "unchanged_poll_median_ms": 17.899999998509884,
+        "changed_card_ms": 49,
+        "card_preserved": false,
+        "run_view_ms": 106.70000000111759,
+        "rendered_runs": 1000,
+        "chat_open_ms": 330.901116,
+        "chat_idle_median_ms": 13.200000001117587,
+        "api_bytes": 2146619,
+        "api_requests": 25
+      },
+      {
+        "source": "working-tree",
+        "initial_ms": 124.62190700000019,
+        "kanban_ms": 8.599999999627471,
+        "unchanged_poll_median_ms": 4.699999999254942,
+        "changed_card_ms": 22.59999999962747,
+        "card_preserved": true,
+        "run_view_ms": 13.799999998882413,
+        "rendered_runs": 100,
+        "chat_open_ms": 283.4967889999998,
+        "chat_idle_median_ms": 8.799999998882413,
+        "api_bytes": 291887,
+        "api_requests": 18
+      }
+    ]
+  },
+  "method": "Backend includes JSON encoding, 7 samples (10 at 3000 tasks); nearest-rank p95 and separate cold/warm samples. Browser initial/view measurements are single samples; idle medians use 7 repeats. Poll API bytes include older-chat loading only in the new client. OS disk cache is not cleared.",
+  "reproduction": {
+    "backend": ".venv/bin/python tools/web_benchmark.py",
+    "scaled_backend": ".venv/bin/python tools/web_benchmark.py --tasks 3000 --repeats 10",
+    "browser": "node tools/web_browser_benchmark.cjs --baseline 75f5e77 (requires playwright and its Chromium; PLAYWRIGHT_MODULE and PLAYWRIGHT_BROWSERS_PATH may point outside the repository)"
+  },
+  "tool_sha256": {
+    "tools/web_benchmark.py": "ca14a4f7279b424a89078b8ed37e89526247856fb5277b867c550547eff8bc4f",
+    "tools/web_browser_benchmark.cjs": "f85f31908e305cfa7a14ec16cc699dbb3b9f680efee26b2c4d376b4d272d14f4"
+  }
+}

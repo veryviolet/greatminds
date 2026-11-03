@@ -4,6 +4,27 @@ All notable changes to **greatminds** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; versions
 follow [SemVer](https://semver.org/) once 1.0.0 ships.
 
+## 3.4.0 — 2026-11-03
+
+- Review fixes: retain loaded run history as new executions arrive, reconcile
+  overlapping chat windows by journal position, and preserve focused task cards
+  when their order changes. Hold damaged planning operations for explicit
+  recovery, surface them in doctor, and include pending planning in migration checks.
+- Fix standalone planner conversations: task creation, planning, evidence and
+  routing now submit authenticated daemon requests with revision checks,
+  idempotent delivery and durable recovery. Include intake approval discipline
+  in agent context; task-bound runs continue to use typed result submissions.
+- Cache browser read views with file-change validation instead of running full
+  workflow diagnostics for every dashboard poll. Revalidate unchanged responses
+  with ETags, fetch chat/run updates incrementally, and load older history on demand.
+- Preserve dashboard nodes and expanded run details during updates; suspend
+  background polling in hidden tabs and bound cached conversation histories.
+- Add deterministic planning-to-verified integration coverage and reproducible
+  backend/Chromium GUI benchmarks.
+- Audit README and public documentation against the release: refresh screenshots,
+  distinguish assigned results from standalone planning, document upgrade/recovery,
+  and correct setup, launch and delivery-status descriptions.
+
 ## 3.3.1 — 2026-09-08
 
 - Correct fractional letter spacing after conversion to scalable interface units.

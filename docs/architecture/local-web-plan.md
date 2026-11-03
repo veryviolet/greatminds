@@ -79,3 +79,66 @@ choices without prompting (7/6 and 5/6 respectively). A temporary browser worksp
 queued a connection check; after the web server was terminated, the independently
 started daemon consumed and completed the durable request. Temporary services were
 stopped after verification. Strict documentation and wheel builds passed.
+
+## Planning repair and GUI measurements (3.4.0)
+
+Standalone planner chats now submit durable task operations through the daemon.
+The previous managed path could create intake but rejected `plan`/evidence/moves,
+while `run submit` required an assigned task that a standalone chat did not have.
+The repair preserves that assigned-result boundary and the conversation subject.
+See [planning requests](execution-contract.md#standalone-planner-requests) for
+credentials, ownership, revision, deduplication and recovery rules.
+
+Deterministic ACP tests exercise the public CLI from a planner conversation,
+several tasks, repeated delivery and restart, and a full planner → developer →
+tester → reviewer → verified pipeline with three real configured unit-test runs.
+Crash injection covers prepared, written, moved, journaled and committed task
+operations. Wrong-role/revision and conflicting-work cases are rejected. These
+fixtures verify orchestration; they do not evaluate an external model's ability
+to interpret user approval or write a good plan.
+
+The GUI read path no longer runs complete workflow/stand diagnostics on each
+poll. Bounded caches validate file identity and timestamps; authoritative task
+mutation checks are unchanged. ETags avoid repeated state transfers. Chats use
+turn windows and event cursors; run history uses pages while retaining all active
+runs. Selected run traces fetch only new activity. DOM updates retain existing
+cards and expanded details, and hidden tabs stop polling.
+
+[Recorded measurements and reproduction commands](evidence/web-performance-2026-11-02.json)
+compare baseline `75f5e77` with this working tree:
+
+| Measurement | Before | After |
+| --- | ---: | ---: |
+| Backend overview, 1000 tasks, median of 7 | 646.4 ms | 18.5 ms |
+| Backend overview, first read | 659.2 ms | 192.4 ms |
+| Backend overview, warm p95 | 684.9 ms | 18.9 ms |
+| Chromium first overview, single sample | 347.1 ms | 124.6 ms |
+| Chromium idle dashboard poll, median of 7 | 17.9 ms | 4.7 ms |
+| Chromium run view, single sample | 106.7 ms | 13.8 ms |
+| Chromium chat idle update, median of 7 | 13.2 ms | 8.8 ms |
+| API bytes during browser scenario | 2,146,619 | 291,887 |
+
+The backend fixture has 20 conversations, 100 stored runs and 100 turns per
+conversation. The browser fixture has 1000 tasks, 1000 runs and 100 turns; it
+renders the latest 100 runs initially instead of all 1000 and also checks loading
+older chat turns. Changed task cards remain connected to the DOM. Chromium uses
+intercepted APIs: its timings exclude backend/network latency and must not be
+presented as end-to-end production latency or statistically established p95.
+
+At 3000 tasks, backend overview median is 49.0 ms and warm p95 is 55.4 ms;
+the first read is 575.5 ms. Cold reads do not meet a 200 ms state-response target
+at that size. The source remains filesystem-backed, so cold parsing, very large
+journals and active writes can still cost more than an unchanged cached poll.
+No database, frontend framework or executor/model change is required for these
+improvements. The benchmark scripts start no daemon or model; Chromium closes
+its isolated contexts and process on completion.
+
+Verification covered 1595 Python tests (two additional skips), 17 browser DOM
+checks, the VS Code extension tests, generated-reference checks and a strict
+MkDocs build. Socket tests ran with loopback access. Three process-inventory
+checks fail in that host namespace because unrelated `/proc` entries cannot be
+read; the same failures reproduce at baseline `75f5e77`. All eight migration-safety
+tests, including those three, pass in the normal isolated namespace. A final
+process inventory found no remaining processes in the temporary test projects.
+These checks were performed before the 3.4.0 release. They do not by themselves
+prove package publication.

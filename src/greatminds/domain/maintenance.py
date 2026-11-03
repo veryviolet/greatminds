@@ -27,6 +27,9 @@ class MaintenanceService:
         self.checkpoint = checkpoint or (lambda stage: None)
 
     def _busy(self, snapshot, task_id, *, operation_id=None):
+        if any(item['task_id'] == task_id and item['status'] in {'received', 'applying', 'needs_recovery'}
+               for item in snapshot.get('planning', {}).values()):
+            return 'planning_unresolved'
         if any(run["task_id"] == task_id and run["state"] not in TERMINAL for run in snapshot["runs"].values()):
             return "active_run"
         if any(receipt["envelope"]["task_id"] == task_id and receipt["status"] in {"received", "applying", "needs_recovery"}

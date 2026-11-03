@@ -257,3 +257,49 @@ def contract(full_schema):
                             frozen["text"], assigned["schema_sha256"])
     result = schema.document if full_schema else context_document(store, Claim(assigned, token), schema)
     click.echo(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+@run.command('planning')
+@click.option('--action', required=True, type=click.Choice(['create', 'decide']))
+@click.option('--json', 'payload', required=True,
+              help='create: task fields. decide: exact task_id, revision SHA256, and steps [{decision,payload}].')
+@click.option('--request-id', required=True, help='Stable ID for delivery retries within this conversation.')
+def planning(action, payload, request_id):
+    """Queue a planner operation for the daemon; inspect its receipt with planning-status."""
+    from greatminds.domain.planning import PlanningService
+    if len(payload.encode()) > 65536:
+        raise GreatMindsError('planning payload exceeds 64 KiB')
+    try:
+        document = json.loads(payload)
+    except ValueError as exc:
+        raise GreatMindsError('invalid planning JSON') from exc
+    run_id, token = os.environ.get('GREATMINDS_RUN_ID'), os.environ.get('GREATMINDS_RUN_TOKEN')
+    if not run_id or not token:
+        raise GreatMindsError('planning requires a managed planner conversation', exit_code=3)
+    service = PlanningService(RunStore(project_runtime_dir(find_project_dir())))
+    click.echo(json.dumps(service.request(action, document, run_id=run_id, token=token, request_id=request_id)))
+
+
+@run.command('planning-status')
+@click.argument('request_id')
+@click.option('--retry', is_flag=True, help='Operator: resume a needs_recovery operation after inspection.')
+def planning_status(request_id, retry):
+    """Inspect a planning receipt, including completed steps and recovery errors."""
+    from greatminds.domain.planning import PlanningService
+    service = PlanningService(RunStore(project_runtime_dir(find_project_dir())))
+    item = service.get(request_id)
+    run_id, token = os.environ.get('GREATMINDS_RUN_ID'), os.environ.get('GREATMINDS_RUN_TOKEN')
+    if run_id or token:
+        if not run_id or not token or retry:
+            raise GreatMindsError('planning recovery requires the operator', exit_code=3)
+        caller = service._caller(run_id, token, active=False)
+        if caller['conversation_id'] != item['conversation_id']:
+            raise GreatMindsError('planning request belongs to another conversation', exit_code=3)
+    if retry:
+        with service.store._transaction() as state:
+            current = state['planning'][request_id]
+            if current['status'] != 'needs_recovery':
+                raise GreatMindsError('only needs_recovery requests may be resumed', exit_code=4)
+            current['status'] = 'applying'
+        item = service.get(request_id)
+    click.echo(json.dumps(item, ensure_ascii=False, indent=2))

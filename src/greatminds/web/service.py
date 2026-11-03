@@ -17,7 +17,8 @@ from greatminds.runtime.store import RunStore, TaskRevision
 from greatminds.runtime.permissions import PermissionService
 from greatminds.runtime.activity import ActivityStore
 from greatminds.runtime.commands import CommandService
-from greatminds.runtime.observation import snapshot
+from greatminds.runtime.observation import agent_rows
+from .snapshots import ReadCache, task_row
 
 
 class WebService:
@@ -27,10 +28,13 @@ class WebService:
         self.runtime = project_runtime_dir(self.project)
         self.store = RunStore(self.runtime)
         self.config_path = self.project / 'coordination/execution.yaml'
+        self.cache = ReadCache()
 
     def config(self):
         schema = load_schema_snapshot()
-        return schema, load_execution_config(self.config_path, roles=set(schema.document['roles']))
+        config = self.cache.read(('config', schema.sha256), [self.config_path],
+            lambda: load_execution_config(self.config_path, roles=set(schema.document['roles'])))
+        return schema, config
 
     def default_language(self):
         default = os.environ.get('GREATMINDS_WEB_LANGUAGE')
@@ -87,36 +91,97 @@ class WebService:
     def overview(self):
         error = None
         try:
-            state = snapshot(self.project)
+            state = self.cache.read('runtime', [self.store.path], self.store.snapshot)
             schema, config = self.config()
+            tasks = [self.cache.read(('task', str(path)), [path], lambda path=path: task_row(path))
+                     for queue in schema.document['queues'] if not queue.startswith('.')
+                     for path in sorted((self.runtime / queue).glob('*.yaml'))]
+            agents = agent_rows(self.project, config=config, state=state)
             bindings = [{'id': b.id, 'role': b.role, 'agent': b.agent, 'model': b.model,
                          'mode': b.mode, 'scheduling': b.scheduling} for b in config.bindings]
         except GreatMindsError as exc:
             state, bindings, error = self.store.snapshot(), [], str(exc)
+            tasks, agents = [], []
         conversations = []
         for path in sorted((self.runtime / '.runtime/conversations').glob('*/state.json')):
             try:
-                d = ConversationStore(self.runtime, path.parent.name).snapshot()
-                conversations.append({k: d.get(k) for k in
-                    ('id', 'binding_id', 'task', 'closed', 'close_requested', 'dispatch')} |
-                    {'turn_count': len(d['turns'])})
+                def summary():
+                    d = ConversationStore(self.runtime, path.parent.name).snapshot()
+                    return {k: d.get(k) for k in ('id', 'binding_id', 'task', 'closed', 'close_requested', 'dispatch')} | {'turn_count': len(d['turns'])}
+                conversations.append(self.cache.read(('summary', str(path)), [path], summary))
             except GreatMindsError:
                 continue
         # Detailed trace/events are loaded only for the selected run.
+        recent = sorted(state['runs'].values(), key=lambda r: r['sequence'], reverse=True)[:100]
         return {'version': 1, 'app_version': self.version, 'project': str(self.project), 'name': self.project.name,
                 'daemon': self.daemon_status(), 'configuration_error': error,
                 'bindings': bindings, 'conversations': conversations,
-                'paused': state.get('paused', False), 'agents': state.get('agents', []),
-                'tasks': state.get('tasks', []), 'accounts': state.get('accounts', {}),
-                'runs': sorted([{k: r.get(k) for k in ('id', 'role', 'agent_id', 'binding_id',
-                    'task_id', 'conversation_id', 'state', 'reason', 'created_at', 'updated_at', 'sequence')}
-                    for r in state['runs'].values()], key=lambda r: r['sequence'], reverse=True),
+                'paused': state.get('paused', False), 'agents': agents,
+                'tasks': tasks,
+                'run_count': len(state['runs']),
+                'runs_before': recent[-1]['sequence'] if recent else None,
+                'run_totals': {name: sum(r['state'] == name for r in state['runs'].values())
+                               for name in ('completed', 'failed', 'cancelled', 'interrupted')},
+                'runs': self._run_rows([r for r in state['runs'].values()
+                    if r['state'] not in {'completed', 'failed', 'cancelled', 'interrupted'}]
+                    + recent),
                 'permissions': [p for p in state.get('permissions', {}).values() if p['status'] == 'pending'],
                 'events': state.get('events', [])[-40:]}
+
+    @staticmethod
+    def _run_rows(runs):
+        unique = {r['id']: r for r in runs}
+        return [{k: r.get(k) for k in ('id', 'role', 'agent_id', 'binding_id', 'task_id',
+                'conversation_id', 'state', 'reason', 'created_at', 'updated_at', 'sequence')}
+                for r in sorted(unique.values(), key=lambda r: r['sequence'], reverse=True)]
+
+    def run_page(self, *, before=None, limit=100):
+        if before is not None and (type(before) is not int or before < 1):
+            raise GreatMindsError('invalid run cursor', exit_code=2)
+        state = self.cache.read('runtime', [self.store.path], self.store.snapshot)
+        rows = sorted((r for r in state['runs'].values() if before is None or r['sequence'] < before),
+                      key=lambda r: r['sequence'], reverse=True)
+        page = rows[:limit]
+        return {'runs': self._run_rows(page), 'has_more': len(rows) > limit,
+                'before': page[-1]['sequence'] if page else before}
 
     def conversation(self, identity):
         d = ConversationStore(self.runtime, identity).snapshot()
         return {k: d.get(k) for k in ('id', 'binding_id', 'closed', 'close_requested', 'dispatch', 'turns')}
+
+    def conversation_updates(self, identity, *, after=None, before=None, limit=50):
+        if ((after is not None and (type(after) is not int or after < 0))
+                or (before is not None and (type(before) is not int or before < 1))
+                or type(limit) is not int or not 1 <= limit <= 50):
+            raise GreatMindsError('invalid conversation window', exit_code=2)
+        chat = ConversationStore(self.runtime, identity)
+        doc = self.cache.read(('conversation', identity), [chat.path], chat.snapshot)
+        events = doc['events']
+        if after is not None and after > len(events):
+            raise GreatMindsError('conversation cursor is ahead of the journal', exit_code=2)
+        result = {k: doc.get(k) for k in ('id', 'closed', 'close_requested', 'dispatch')}
+        # Metadata describes this snapshot, even if an event page stops earlier.
+        result['snapshot_cursor'] = len(events)
+        if after is None or before is not None:
+            turns = sorted((t for t in doc['turns'].values() if before is None or t['sequence'] < before),
+                           key=lambda t: t['sequence'])[-limit:]
+            first = turns[0]['sequence'] if turns else before or 1
+            if before is None:
+                selected = {t['id'] for t in turns}
+                turns += [t for t in doc['turns'].values() if t['status'] == 'running' and t['id'] not in selected]
+            ids = {t['id'] for t in turns}
+            outputs = {key: '' for key in ids}
+            for event in events:
+                if event['kind'] == 'text' and event['turn_id'] in ids:
+                    outputs[event['turn_id']] += event['text']
+            result.update(turns={t['id']: t for t in turns}, outputs=outputs, events=[],
+                          cursor=len(events), has_more=False, before=first, has_older=first > 1)
+        else:
+            page = events[after:after + 200]
+            ids = {event.get('turn_id') for event in page}
+            result.update(turns={key: doc['turns'][key] for key in ids if key in doc['turns']},
+                          events=page, cursor=after + len(page), has_more=after + len(page) < len(events))
+        return result
 
     def create_conversation(self, body):
         schema, config = self.config()

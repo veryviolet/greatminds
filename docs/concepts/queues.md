@@ -30,15 +30,26 @@ handoff ownership. Only the queue move does that.
 
 ## Mutation rule
 
-Agents mutate task state with the CLI:
+Queue-assigned agents and task-bound conversations submit typed decisions through
+`greatminds run submit`. The daemon checks their assigned task revision, role,
+evidence and transition gates before changing task files. Direct `task mv` and
+`task append-block` writes are rejected for these managed runs.
+
+A standalone planner conversation uses `task new`, `plan`, `task append-block`
+and `task mv` to submit authenticated planning requests. The daemon owns their
+application and recovery; see [planning a feature](../recipes/planning-a-feature.md).
+
+An operator outside a managed run can use the role-scoped task CLI directly:
 
 ```bash
 greatminds task append-block implementation --id TASK_ID --field ready_for_test=true
 greatminds task mv TASK_ID feature_test
 ```
 
-The CLI validates role permissions, required readiness fields, schema shape,
-journal entries, intents, and heartbeat side effects.
+The direct CLI validates role permissions, required readiness fields, schema
+shape, journal entries, intents, and heartbeat side effects. Managed result and
+planning operations share the domain gates and record SYSTEM application
+provenance. Pending operations hold competing task mutations and claims.
 
 Use `greatminds task show`, `greatminds task list`, and
 `greatminds task paths` for state inspection. Do not substitute directory

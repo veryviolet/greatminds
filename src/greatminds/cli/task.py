@@ -552,6 +552,9 @@ def task_file_lock(coord: Path, task_id: str,
     with task_lock(coord, canonical_id, timeout=timeout, poll_interval=poll_interval):
         if (coord / ".runtime" / "state.json").exists():
             from greatminds.runtime.store import RunStore
+            if any(item['task_id'] == canonical_id and item['status'] in {'received', 'applying', 'needs_recovery'}
+                   for item in RunStore(coord).snapshot().get('planning', {}).values()):
+                raise GreatMindsError('task has an unresolved planning operation', exit_code=4)
             if any(item["task_id"] == canonical_id and item["status"] in {"prepared", "needs_recovery"}
                    for item in RunStore(coord).snapshot().get("maintenance", {}).values()):
                 raise GreatMindsError("task has an incomplete system operation; reconcile it first", exit_code=4)
@@ -2162,6 +2165,24 @@ def coerce_value(key: str, v: str) -> Any:
 # ---------------------------------------------------------------------------
 
 
+def validate_intake_fields(stream, kind):
+    # 0258 / 0247 (1.3.0 BREAKING): ``stand`` stream removed.
+    if stream not in ("product", "review_session"):
+        raise GreatMindsError(
+            "--stream must be product|review_session "
+            "(stand stream removed in 1.3.0; use `greatminds stand lease`)"
+        )
+    # Defense in depth: catch a stand-era ``--kind=stand_request`` even if
+    # someone bypasses --stream validation via the library API.
+    if kind == "stand_request":
+        raise GreatMindsError(
+            "--kind=stand_request removed in 1.3.0 (0247 BREAKING); "
+            "use `greatminds stand lease --task <id> --worktree <path> "
+            "--profile <enum>` for the new lease API.",
+            exit_code=2,
+        )
+
+
 def create_task(
     *,
     stream: str,
@@ -2180,28 +2201,10 @@ def create_task(
     seq: str | None = None,
     reason: str | None = None,
 ) -> Path:
-    """Create a new task. Returns the path of the written file.
-
-    Raises :class:`GreatMindsError` on validation / permission failure.
-    """
+    """Create intake, or request daemon-owned intake from a planner conversation."""
+    arguments = dict(locals())
+    validate_intake_fields(stream, kind)
     coord = find_coord_dir()
-
-    # 0258 / 0247 (1.3.0 BREAKING): ``stand`` stream removed.
-    if stream not in ("product", "review_session"):
-        raise GreatMindsError(
-            "--stream must be product|review_session "
-            "(stand stream removed in 1.3.0; use `greatminds stand lease`)"
-        )
-    # Defense in depth: catch a stand-era ``--kind=stand_request`` even if
-    # someone bypasses --stream validation via the library API.
-    if kind == "stand_request":
-        raise GreatMindsError(
-            "--kind=stand_request removed in 1.3.0 (0247 BREAKING); "
-            "use `greatminds stand lease --task <id> --worktree <path> "
-            "--profile <enum>` for the new lease API.",
-            exit_code=2,
-        )
-
     # USER intake is the only flow where the caller is genuinely human and
     # outside the agent fleet — there is no role launcher exporting
     # GREATMINDS_ROLE for them. Schema says ``user_feedback.writers: [USER]``,
@@ -2216,6 +2219,44 @@ def create_task(
             role = caller_role()
     else:
         role = caller_role()
+
+    if os.environ.get("GREATMINDS_RUN_ID") and role == "ARCHITECT-PLANNER":
+        from greatminds.domain.planning import request_from_cli
+        if description:
+            arguments["description"] = read_body(description)
+        receipt = request_from_cli("create", arguments)
+        return coord / receipt["destination"]
+    target_path, data = prepare_new_task(coord=coord, role=role, **arguments)
+    atomic_write_yaml(target_path, data)
+    journal_append(coord, {"t": now_iso(), "actor": role, "task": data["id"],
+                          "from": "_new", "to": target_path.parent.name,
+                          "reason": reason or f"new {stream} task", "intent_id": ""})
+    touch_heartbeat(coord, role)
+    return target_path
+
+
+def prepare_new_task(
+    *,
+    coord: Path,
+    role: str,
+    stream: str,
+    title: str,
+    reporter: str | None = None,
+    priority: str | None = None,
+    kind: str | None = None,
+    scope: str | None = None,
+    hosts: list[str] | None = None,
+    evidence_for: list[str] | None = None,
+    mode: str | None = None,
+    target_functionality: str | None = None,
+    scenarios: list[str] | None = None,
+    description: str | None = None,
+    in_queue: str | None = None,
+    seq: str | None = None,
+    reason: str | None = None,
+) -> tuple[Path, dict]:
+    """Validate intake and reserve an ID; the caller publishes the document."""
+    validate_intake_fields(stream, kind)
 
     # E1: bound title length so an accidental dump doesn't fill the file.
     if len(title) > TITLE_MAX_LEN:
@@ -2272,18 +2313,8 @@ def create_task(
 
     validate_task(data)
 
-    atomic_write_yaml(target_path, data)
-    journal_append(coord, {
-        "t": now_iso(),
-        "actor": role,
-        "task": task_id,
-        "from": "_new",
-        "to": in_q,
-        "reason": reason or f"new {stream} task",
-        "intent_id": "",
-    })
-    touch_heartbeat(coord, role)
-    return target_path
+    return target_path, data
+
 
 
 def move_task(*, task_id: str, to_queue: str, reason: str | None = None) -> str:
@@ -2291,6 +2322,10 @@ def move_task(*, task_id: str, to_queue: str, reason: str | None = None) -> str:
     coord = find_coord_dir()
     role = caller_role()
     if os.environ.get("GREATMINDS_RUN_ID"):
+        if role == 'ARCHITECT-PLANNER':
+            from greatminds.domain.planning import request_from_cli
+            receipt = request_from_cli('move', {'task_id': task_id, 'to_queue': to_queue, 'reason': reason or ''})
+            return receipt['source_queue']
         raise GreatMindsError("assigned runs submit queue decisions through `greatminds run submit`", exit_code=3)
     with task_file_lock(coord, task_id):
         return _do_move(coord, role, task_id, to_queue, reason or "")
@@ -2827,6 +2862,15 @@ def append_block(
     coord = find_coord_dir()
     role = caller_role()
     if os.environ.get("GREATMINDS_RUN_ID"):
+        if role == 'ARCHITECT-PLANNER':
+            from greatminds.domain.planning import request_from_cli
+            values = dict(fields or {}) if not isinstance(fields, list) else {
+                key: coerce_value(key, value) for key, value in (field.split('=', 1) for field in fields)}
+            if body is not None:
+                values[body_field_for(kind)] = read_body(body)
+            values['kind'] = kind
+            receipt = request_from_cli('append', {'task_id': task_id, 'block': values})
+            return coord / receipt['destination']
         raise GreatMindsError("assigned runs submit evidence through `greatminds run submit`", exit_code=3)
 
     with task_file_lock(coord, task_id):

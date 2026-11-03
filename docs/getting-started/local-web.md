@@ -62,6 +62,19 @@ agent turn, including pauses before text arrives; queued turns and permission or
 login waits have distinct labels. The indicator stops when the turn ends. Reduced
 motion preferences disable the text reveal and spinner animation.
 
+Chats initially load the latest 50 turns plus any running turn; **Earlier messages** loads preceding
+turns without replaying the entire journal on every poll. Runs initially show
+the latest 100 executions plus all active runs; **Earlier runs** loads previous
+pages. Counts still include the full history. These windows do not delete data.
+Subsequent reads fetch new events, and hidden browser tabs suspend polling until
+visible again. The daemon continues working independently.
+
+Dashboard read views reuse unchanged task/configuration files and revalidate
+HTTP responses with ETags. File replacement, edits, moves and deletion invalidate
+the relevant cached view, including changes made through another CLI process.
+Workflow decisions always use authoritative domain checks. Task cards and
+expanded run details remain in place when background updates arrive.
+
 Use the toolbar's light/dark theme switch. The first visit follows the system
 color preference; an explicit choice is saved in this browser for the same origin.
 The theme applies to the chat, dashboards, settings, forms and code previews.
@@ -72,8 +85,9 @@ the web server after upgrading the package so its backend uses the new version.
 
 The browser reads the same filesystem state as the CLI and daemon. Viewing a page
 or reconnecting does not launch an agent. Dashboard requests are polled every 1.5 seconds; active chat requests every 350 ms;
-conversation event cursors avoid replaying earlier text. The UI renders the last
-50 conversation turns; the existing conversation journal remains on disk.
+conversation event cursors avoid replaying earlier text. The first chat window
+contains 50 turns, with earlier windows available on demand; the journal remains
+on disk.
 
 New batch runs retain public ACP message and tool updates in
 `.greatminds/.runtime/activity/`. These records are supplementary observations,

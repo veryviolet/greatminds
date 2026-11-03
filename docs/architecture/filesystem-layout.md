@@ -32,6 +32,9 @@ coordination/
     state.json
     contracts/
     command-output/
+    conversations/
+    operations/
+    activity/
 ```
 
 The task file path is meaningful. For example, a product task in
@@ -40,8 +43,8 @@ The task file path is meaningful. For example, a product task in
 
 Per-task implementation code lives outside `.greatminds/`, under
 `.worktrees/<task-id>/`. When a task enters an implementer queue,
-`greatminds task mv` creates a git worktree on `task/<task-id>` and the
-implementer works from that checkout. When REVIEWER moves the task to
+the shared transition service creates a git worktree on `task/<task-id>` and the
+implementer works from that checkout. When the daemon applies ARCHITECT-REVIEWER’s accepted handoff to
 `verified/`, greatminds merges the branch back with `--no-ff`; archiving removes
 the worktree.
 
@@ -50,7 +53,10 @@ the worktree.
 - `journal.ndjson`: append-only transition log.
 - `intent/`: short-lived files written before moves and cleared after moves.
 - `inbox/`: role mailboxes.
-- `.runtime/state.json`: durable run, control, result and command state.
+- `.runtime/state.json`: durable run, control, result, planning and command state.
+- `.runtime/conversations/`: durable conversation turns and streamed events.
+- `.runtime/operations/`: recoverable domain operation journals.
+- `.runtime/activity/`: bounded per-run ACP activity snapshots.
 - `.runtime/contracts/`: frozen content-addressed execution and schema contracts.
 - `.runtime/command-output/`: bounded command output used by execution evidence.
 - `.stand/state.yaml`: singleton stand state, active lease, FIFO queue, and

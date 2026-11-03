@@ -12,6 +12,7 @@ from greatminds.core.errors import GreatMindsError
 from greatminds.core.paths import project_runtime_dir
 from greatminds.core.schema import load_schema_snapshot
 from greatminds.domain.results import ResultService
+from greatminds.domain.planning import PlanningService, PENDING as PLANNING_PENDING
 from greatminds.domain.maintenance import MaintenanceService
 from greatminds.domain.stand_deployments import DeploymentLedger
 from greatminds.domain.stand_leases import StandLeaseService
@@ -63,6 +64,9 @@ def assignments(store, config, schema, *, snapshot=None):
                     reason = "dispatch_paused"
                 elif any(run["task_id"] == task.task_id for run in active):
                     reason = "active_run"
+                elif any(item['task_id'] == task.task_id and item['status'] in PLANNING_PENDING
+                         for item in snapshot.get('planning', {}).values()):
+                    reason = 'planning_unresolved'
                 elif any(receipt["envelope"]["task_id"] == task.task_id
                          and receipt["status"] in {"received", "applying", "needs_recovery"}
                          for receipt in snapshot["results"].values()):
@@ -124,6 +128,7 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                               on_acquired=lambda: publish_presence(project, revision, 'starting')) as supervisor, presence(project, revision=revision):
             active: dict[str, asyncio.Task] = {}
             results = ResultService(store, environment=supervisor.environment)
+            planning = PlanningService(store, environment=supervisor.environment)
             maintenance = MaintenanceService(store, schema, environment=supervisor.environment)
             deployments = DeploymentLedger(store.runtime)
             stand_leases = StandLeaseService(store)
@@ -139,6 +144,7 @@ async def serve(project: Path, *, interval: float = 1, once: bool = False,
                             else:
                                 await supervisor.commands.finish_run(run_id)
                             del active[run_id]
+                    await _domain_reconcile(loop, domain_pool, planning)
                     await _domain_reconcile(loop, domain_pool, results)
                     await _domain_reconcile(loop, domain_pool, maintenance)
                     await _domain_reconcile(loop, domain_pool, deployments)

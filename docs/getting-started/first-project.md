@@ -27,6 +27,10 @@ Setup does not install vendor plugins, rewrite git hooks or widen permissions.
 For the browser workflow, continue with the [step-by-step setup](uv-project.md#4-configure-the-first-conversation).
 The remaining sections describe the CLI workflow.
 
+After discussing a change in a standalone planner conversation, approve filing
+it explicitly. The planner can create and route tasks while the daemon applies
+the requests and manages their lifecycle. See [planning a feature](../recipes/planning-a-feature.md).
+
 ## Configure one ACP harness
 
 Install an ACP harness or upstream adapter and complete its authentication using

@@ -16,7 +16,7 @@ task needs another amendment or review cycle.
 
 Read the source schema when changing the workflow:
 
-[schema.yaml on GitHub](https://github.com/veryviolet/greatminds/blob/main/src/greatminds/data/schema.yaml)
+[schema.yaml on GitHub](https://github.com/veryviolet/greatminds/blob/v3.4.0/src/greatminds/data/schema.yaml)
 
 ```yaml
 --8<-- "src/greatminds/data/schema.yaml"

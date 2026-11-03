@@ -159,12 +159,12 @@ class RunStore:
             run.pop("token_sha256", None)
         return state
 
-    def authorize(self, run_id: str, token: str) -> dict:
+    def authorize(self, run_id: str, token: str, *, active: bool = True) -> dict:
         state = self._read() or {"runs": {}}
         run = self._run(state, run_id)
         if not hmac.compare_digest(run["token_sha256"], hashlib.sha256(token.encode()).hexdigest()):
             _error("invalid run credential", 3)
-        if run["state"] not in {"running", "waiting_input"}:
+        if active and run["state"] not in {"running", "waiting_input"}:
             _error("run is not authorized for domain operations", 3)
         return {key: copy.deepcopy(value) for key, value in run.items() if key != "token_sha256"}
 
@@ -319,6 +319,9 @@ class RunStore:
         agent = config.agent(binding.agent)
         with task_lock(self.runtime, task.task_id), self._transaction() as state:
             self._check_revision(task)
+            if any(item['task_id'] == task.task_id and item['status'] in {'received', 'applying', 'needs_recovery'}
+                   for item in state.get('planning', {}).values()):
+                _error('task has an unresolved planning operation')
             if any(item["task_id"] == task.task_id and item["status"] in {"prepared", "needs_recovery"}
                    for item in state.get("maintenance", {}).values()):
                 _error("task has an unresolved maintenance operation")

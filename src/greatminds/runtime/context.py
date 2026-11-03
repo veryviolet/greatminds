@@ -15,6 +15,9 @@ from .store import Claim, RunStore, TaskRevision
 def context_document(store: RunStore, claim: Claim, schema: SchemaSnapshot) -> dict:
     cli_argv = [sys.executable, "-I", "-m", "greatminds.cli.main"]
     run = claim.run
+    role_contract = schema.document['roles'][run['role']]
+    discipline = schema.document.get('glossary', {}).get('intake_disciplines', {}).get(
+        role_contract.get('intake_discipline'))
     configured_roles = sorted({binding['role'] for binding in store.contracts(run['id'])['execution']['bindings']})
     task = TaskRevision(run["task_id"], run["task_path"], run["task_revision"])
     store._check_revision(task)
@@ -24,6 +27,15 @@ def context_document(store: RunStore, claim: Claim, schema: SchemaSnapshot) -> d
                 'role': run['role'], 'workspace': run['workspace'], 'cli_argv': cli_argv,
                 'responsibilities': role.get('responsibilities', []),
                 'forbidden_actions': role.get('forbidden_actions', []),
+                'intake_discipline': discipline,
+                'planning': ({'instructions':
+                    'Discuss the proposal and obtain user approval according to intake_discipline before writes. '
+                    'Use task new, plan, task append-block and task mv through cli_argv. '
+                    'These commands queue authenticated planning requests and wait for the daemon. '
+                    'You may plan multiple tasks in this conversation. Do not use run submit here. '
+                    'Inspect timed-out requests with run planning-status; never unset run credentials. '
+                    'For explicit request IDs and expected task revisions use run planning --help.'}
+                    if run['role'] == 'ARCHITECT-PLANNER' else None),
                 'configured_commands': [item for item in store.contracts(run['id'])['execution'].get('commands', [])
                                         if run['role'] in item['roles']],
                 'configured_roles': configured_roles, 'task': None, 'allowed_transitions': [], 'result_format': None}
@@ -46,6 +58,7 @@ def context_document(store: RunStore, claim: Claim, schema: SchemaSnapshot) -> d
         "cli_argv": cli_argv,
         "responsibilities": role.get("responsibilities", []),
         "forbidden_actions": role.get("forbidden_actions", []),
+        "intake_discipline": discipline,
         "task": document, "queue": queue, "allowed_transitions": transitions,
         "configured_commands": [item for item in store.contracts(run["id"])["execution"].get("commands", [])
                                 if run["role"] in item["roles"]],

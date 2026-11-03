@@ -753,12 +753,13 @@ The check also detects changes to validators and controllers referenced by these
 
 | Source | SHA-256 |
 | --- | --- |
-| src/greatminds/cli/task.py | c96e5267236816a503979f1b1f77048fc84abf059c7dce3d3dd73c44086fe0d7 |
+| src/greatminds/cli/task.py | fee3ca065c6637a8cee483992e509b693aba6316ba87596d4a1edd782fe8da3b |
 | src/greatminds/data/schema.yaml | 7ff6c38d41376e95889f7abc11c02305caf368f64290db02976232e553d5ae94 |
-| src/greatminds/domain/maintenance.py | 4e61f33e40eaefd8ff286262420a32526b3d158ef04629cbe85b85e879160f29 |
-| src/greatminds/domain/results.py | 3f376fb886e3925be8be60f63b4a352267131c9f3509c29d25291a7c40e1b0f1 |
+| src/greatminds/domain/maintenance.py | c7f0934c422db730706f70575880f1f32dd0750afa7ed440ea19c0f0fa6d8b64 |
+| src/greatminds/domain/planning.py | 37c1f58d8617f068a9fed5db8f919c0fadb268e2e297204a50fefa90546b1d22 |
+| src/greatminds/domain/results.py | d78d70c5d9d3b3add0aacebd5f39f4363136a8b83a4b46f5e2d3458239f0f589 |
 | src/greatminds/runtime/account_limits.py | 1c4083f6d345e2cada11cff5938ff2f01d3bcaa0184ba72418500f7d138fe790 |
 | src/greatminds/runtime/config.py | 56e416b6feee01726d4d155f3b0cb2cd28cee921f68c90476e21cf27e9260d21 |
 | src/greatminds/runtime/presets.py | 89da0ea85d1c2a22105795870d0d54e51b69e214088c7e1ca07eebd33352fd97 |
-| src/greatminds/runtime/store.py | 05b92658202197d88164d49f6e888b8571ec892e3becd250b58ff975a7c6567d |
-| tools/generate_contract_reference.py | 5018e1629d58c65e917e0701eaf9932df49dad003fe3a7ac58a802a77a96525f |
+| src/greatminds/runtime/store.py | 458da92636e0fbe1c6495c9336bcf5f769f8f254f2c5a61a231715091616b9ba |
+| tools/generate_contract_reference.py | 8721e2045632e77fd27433795a2abe0c6268367c1df15e86832cccc3777724b7 |

@@ -20,8 +20,9 @@ STAND_HOST=localhost
 STAND_USER=violet
 ```
 
-`PROJECT.env` is sourced before agents start and passed to stand profiles as
-Ansible extra vars. In a profile, `STAND_HOST` is readable as
+`PROJECT.env` is parsed as literal environment assignments before agents start
+and passed to stand profiles as Ansible extra vars. Shell expansion and commands
+are not evaluated. In a profile, `STAND_HOST` is readable as
 `{{ STAND_HOST }}`, `STAND_USER` as `{{ STAND_USER }}`, and any custom key the
 project adds is available the same way.
 
@@ -84,7 +85,12 @@ greatminds stand profiles list
 greatminds stand profiles doctor
 ```
 
-`coordd` runs the profile with Ansible and injects:
+Automatic deployment also requires an explicit `stand` policy in
+`coordination/execution.yaml` with `authorized: true` and the selected profile
+in `profiles`. Omitting that authorization leaves deployment disabled. See the
+[execution contract](../architecture/execution-contract.md#authorized-acp-daemon-stand-scheduling).
+
+For an authorized deployment, `coordd` runs the profile with Ansible and injects:
 
 - every key from `.greatminds/PROJECT.env`;
 - the active lease id as `lease_id`;

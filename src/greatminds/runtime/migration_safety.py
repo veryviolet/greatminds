@@ -83,6 +83,7 @@ def inspect_execution(project):
             for name, unresolved in (
                 ('commands', {'queued','starting','running','needs_recovery'}),
                 ('results', {'received','applying','needs_recovery'}),
+                ('planning', {'received','applying','needs_recovery'}),
                 ('maintenance', {'prepared','needs_recovery'}),
             ):
                 for key, item in state.get(name, {}).items():

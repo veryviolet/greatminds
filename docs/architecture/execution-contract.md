@@ -261,6 +261,56 @@ not replace source freshness checks. Assigned credentials can inspect only their
 own run's command receipts; an operator without assigned credentials can inspect
 all receipts.
 
+## Standalone planner requests
+
+A standalone `ARCHITECT-PLANNER` conversation has no assigned task revision and
+cannot use `run submit`. It can submit planning requests for several tasks with
+its run credential. Task-bound conversations continue to use the assigned result
+contract. The compiled context includes the schema's resolved intake discipline;
+approval of the proposal is an agent conversation responsibility, not a semantic
+check performed by the daemon.
+
+`task new`, `plan`, `task append-block` and `task mv` use the planning service when
+called from a managed standalone planner. The raw interface is
+`run planning --action create|decide --request-id ID --json JSON`.
+`create` accepts task-creation fields. `decide` accepts `task_id`, `revision`
+(the current SHA256), and one to eight `{decision, payload}` steps using
+`handoff`, `blocked`, `needs_input` or `no_change`. Evidence-only `no_change`
+steps can carry `blocks` in this planning interface. Public assigned results
+retain their existing decision fields.
+
+Admission authenticates the run and checks planner ownership against its pinned
+schema. It reserves the task against claims, commands and other mutations.
+Intake reserves an ID and a validated document; the daemon publishes it.
+Decisions capture the exact task revision and reuse the normal result service's
+evidence, transition, readiness, worktree and recovery checks. SYSTEM provenance
+records the originating planner run. The conversation's assigned subject is never
+replaced, and no synthetic worker runs are created.
+
+Requests are at most 64 KiB with at most 64 unresolved requests per project.
+Receipts live under `planning` in runtime state. Deduplication is scoped to the
+conversation and explicit request ID, or the convenience command's payload hash.
+An exact repeat returns the original receipt, including across run restarts;
+reusing an explicit ID with different contents is rejected. A new request needs
+an active run. Accepted requests survive its completion or interruption and are
+applied by the daemon without spending another model turn.
+
+Planning holds the shared task lock while applying each durable operation. The
+sequence is recoverable, not transactional across all steps: rejection preserves
+completed steps and reports their receipts. An interrupted prepared operation
+resumes from its journal; uncertain external effects or changed files produce
+`needs_recovery`, which holds the task. `run planning-status ID` exposes progress
+and errors. After inspection, an operator outside the managed run may use
+`run planning-status ID --retry` to let the daemon recheck and resume. These
+checks use the existing cooperative shared-filesystem trust boundary.
+
+Pending planning receipts also prevent migration from reporting the project as
+quiet after the originating run ends. Damaged operation records or I/O failures
+hold the affected request as `needs_recovery`; independent requests and daemon
+work continue. Doctor reports these holds with explicit inspection and retry
+commands. Repair the recorded cause before retrying; recovery never assumes a
+damaged journal means the operation did not happen.
+
 ## Lifecycle and result receipts
 
 `greatminds run submit --json '{"decision":"no_change","payload":{"reason":"..."}}'`
@@ -317,8 +367,9 @@ Author/timestamp/provenance fields are assigned by the domain service. Artifact
 paths must identify existing files within the assigned workspace. Invalid
 decisions become `rejected` without partial task changes. An uncertain merge
 or conflicting recovery state becomes `needs_recovery`; it is never treated
-as permission to rerun a possibly completed command. Operator repair for these
-states and further deterministic command/evidence services remain in progress.
+as permission to rerun a possibly completed command. Use the scoped recovery
+actions in the [runbook](../operations/runbook.md); deterministic command
+execution and evidence validation are implemented by shared domain services.
 
 This is a cooperative shared-filesystem deployment. Run credentials prevent
 accidental or invalid submissions through the service, but do not isolate a
@@ -347,11 +398,11 @@ the client cancels the request and reports that input is needed. The transport
 does not persist raw updates or stderr; the supervisor must apply diagnostic
 redaction and retention when connecting its event sink.
 
-`coordd` now selects the common ACP supervisor when the project has
-`coordination/execution.yaml`. Projects without that file still use the existing
-execution path until the migration milestone. `coordd --once` reconciles and
-executes one dispatch batch in an ACP project, then exits. A continuously running
-daemon also processes operator cancellation and retry requests.
+`coordd` uses the common ACP supervisor and requires a valid
+`coordination/execution.yaml`. `coordd --once` runs in the foreground, reconciles
+and executes one dispatch batch, then exits. Normal `coordd` starts or attaches
+to the independent project daemon, which also processes cancellation and retry
+requests. Use `--foreground` for an attached continuous daemon.
 
 The supervisor holds one exclusive project lease. Before exec, a child waits
 on a pipe until its PID, boot identity, and process start time have been saved.
@@ -388,7 +439,8 @@ classify failures from keywords in model output. A successful turn with an
 unchanged task revision is held until an explicit retry, rather than being
 automatically repeated. Typed results now pass through domain application and
 its semantic gates. Worktree preparation at dispatch, deterministic command
-evidence, repair controls, and live harness compatibility remain in progress.
+evidence and scoped repair controls are implemented. Live harness compatibility
+is limited to the versions and scenarios in the [compatibility matrix](acp-compatibility.md).
 
 
 ## Stand state durability and deployment ownership
@@ -578,12 +630,10 @@ adds runtime/worktree ignore entries, and writes a missing runtime schema mirror
 The contract is published last. Repeating the command preserves existing files;
 an edited schema mirror is reported as drifted and does not override the installed
 schema. This path does not launch an agent, install services, change harness trust,
-or generate native harness configuration. It rejects flags from the other setup
-path that it cannot honor and refuses replacement of an existing execution contract.
-
-An existing fleet without an execution contract requires explicit migration before
-this bootstrap can apply. Preparation of that migration and the default setup switch
-are in progress; the option above is the available ACP-specific bootstrap entrypoint.
+or generate native harness configuration. It refuses replacement of an existing
+execution contract. Without `--execution-config`, setup creates an empty explicit
+ACP contract. It refuses a second runtime when task data still lives in
+`coordination/`; inspect and preserve that data before initializing `.greatminds/`.
 
 `runtime.interactions.ConversationStore` backs the `chat` CLI and ACP daemon.
 Each conversation has a private `.runtime/conversations/<id>/state.json` and a
@@ -686,12 +736,14 @@ commands for New ACP Chat, Attach ACP Chat, and Close ACP Chat. Its terminal run
 the same `chat talk` client. The daemon remains the process/session owner when an
 editor terminal closes or reconnects.
 
-Richer non-permission input, real extension-host smoke testing, and live interactive
-harness validation remain outstanding M5 work.
+The interactive client supports user messages and ACP permission choices, not
+arbitrary vendor input extensions. Extension-host smoke and live interactive
+harness checks are recorded in the [acceptance audit](modernization-acceptance.md);
+their scope is narrower than every role/harness combination.
 
 ## ACP launch surfaces
 
-When `coordination/execution.yaml` exists, `greatminds launch --project-dir PATH`
+`greatminds launch --project-dir PATH` requires a valid execution contract and
 uses the ACP frontend. `--target vscode` or `cursor-ide` writes
 `greatminds-acp.code-workspace` with process tasks for coordd, run status, and
 conversation metadata. It preserves unrelated workspace tasks/settings and does
@@ -708,11 +760,10 @@ supervisor's exclusive lease remains responsible for preventing duplicate daemon
 ownership, including when a service already runs coordd.
 
 The frontend uses the current CLI's Python, or an explicit `--venv` whose ACP
-runtime imports are checked before launch. `--config` does not select another
-configuration for an ACP project; use its project directory. A project without
-an execution contract still uses the other launcher while default migration is
-being completed. Generating an ACP workspace does not remove pre-existing fleet
-artifacts; that belongs to the explicit project migration.
+runtime imports are checked before launch. The launch command has no `--config`
+option. Select the project
+with `--project-dir`. Generating an ACP workspace preserves unrelated project
+files; it does not migrate task data or install an executor.
 
 ## ACP defaults and cutover
 
@@ -726,7 +777,7 @@ input into readiness, and PID reuse does not identify a live owned process.
 
 `agent tools --json` lists configured ACP manifests and pinned version labels.
 Its `verification: configured` field does not assert live harness compatibility.
-The VS Code agent list displays the same distinction. Dashboard includes task
+The VS Code agent list displays the same distinction. The CLI dashboard includes task
 queues, assignment reasons, stand state and maintenance findings. These read-only
 views exclude run credential hashes and do not probe harnesses or inspect terminal
 panes. Cross-store observations are best effort; execution admission revalidates
@@ -748,8 +799,9 @@ It refuses to create a second runtime if task data still resides in coordination
 `run cancel`, `run retry` and the `chat` commands to control work and conversations.
 
 ACP run cancellation, recovery, permission checks and task revision validation
-remain part of the runtime contract. Follow the modernization plan for the current
-implementation status of diagnostics, service configuration and documentation.
+remain part of the runtime contract. The [runbook](../operations/runbook.md)
+describes current diagnostics and recovery; the [web guide](../getting-started/local-web.md)
+describes the packaged browser interface.
 
 ### Explicit stand profile selection
 
@@ -789,7 +841,9 @@ permission, revision and unresolved-operation gates still apply.
 
 An explicit operator retry permits one further attempt but does not reset the
 count for that unchanged revision. This startup policy does not implement
-provider-reported rate-limit handling, automatic post-prompt retries, or provider usage/cost budgets; those remain separate modernization requirements.
+automatic post-prompt retries. Configured provider error holds and reported
+session cost budgets are separate admission mechanisms described below and in
+the [runbook](../operations/runbook.md#retries-and-account-admission).
 
 ### Shared account startup backoff
 

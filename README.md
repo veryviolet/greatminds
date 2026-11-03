@@ -17,7 +17,7 @@ reasoning. Configuration, tasks and execution records live in your filesystem.
 
 ![Greatminds web workspace with Summary and Kanban controls](https://veryviolet.github.io/greatminds/assets/workspace-summary.jpg)
 
-*Greatminds 3.3.0, dark theme. Screenshots use a demonstration project.*
+*Greatminds 3.4.0, dark theme. Screenshots use a demonstration project.*
 
 ## Start in your existing project
 
@@ -57,9 +57,10 @@ port when opening multiple projects. Systemd is optional.
 ## In the web workspace
 
 - Interactive role tabs with Markdown, streamed responses and activity indicators.
-  **Enter** sends; **Shift+Enter** inserts a new line.
+  **Enter** sends; **Shift+Enter** inserts a new line. Earlier messages load on demand.
 - A dashboard with **Summary / Kanban** views and clickable task cards.
 - Batch-run history with messages, tools, validation results and permission requests.
+  The latest runs load first; earlier runs remain available in pages.
 - Executor settings with model and reasoning selectors when supplied through ACP.
 - **Stands** with machine access, inventories, Ansible playbooks and operation logs.
 - Light and dark themes, **Compact / Normal / Large** interface sizes, and English,
@@ -75,6 +76,12 @@ For remote access, place it behind your own access controls. See the
 Add queue-scheduled developer, tester and reviewer roles to run a task pipeline.
 An agent response alone does not complete a task: the daemon checks typed results,
 revision, permissions and evidence before applying transitions.
+
+In a standalone planner conversation, discuss the proposal and approve filing it.
+The planner can create and route several tasks through the existing task CLI;
+the daemon applies these requests, records progress and recovers accepted work
+after restart without another model turn. See
+[planning a feature](https://veryviolet.github.io/greatminds/recipes/planning-a-feature/).
 
 Ansible support is optional:
 

@@ -65,7 +65,7 @@ were inspected. It does not turn fixture coverage into live harness coverage.
 | C7: generated mechanical reference from validated contracts | [Generated reference](contract-reference.md), exact-text `--check`, role/queue/validator checks, all presets through execution validation | Confirmed G5: deterministic source fingerprints and drift tests; installed-wheel generation matches on Python 3.11/3.12/3.13; CI/docs/release workflows enforce the check |
 | C7: real extension-host smoke | [VS Code 1.92.2 evidence](evidence/vscode-extension-host-2026-09-07.json), isolated launcher, process argv/cleanup assertions | Confirmed limited host smoke, distinct from mock UI tests |
 | C8: local operation, evidence, recovery and optional integrations; documented host envelope | Filesystem runtime, base-wheel fixture, installed docs/README corrected to Linux `/proc` + pidfd | Confirmed current host/scope statement; native macOS/Windows daemon support is not claimed |
-| Next phase: local web workspace | Agreed plan explicitly places it after modernization | Deferred as requested; no database migration, distributed scheduler or automatic model selection introduced |
+| Local web workspace | [Delivered browser workspace](local-web-plan.md), built on the accepted daemon/domain contract | Available; no database migration, distributed scheduler or automatic model selection introduced |
 
 ## Acceptance work items, in execution order
 
@@ -175,5 +175,6 @@ Overall modernization is **complete for the owner-approved Codex/Claude/Grok
 scope**. A4/G6/M5 is accepted on the existing mixed and interactive evidence;
 deferring other harnesses does not erase their prerequisites or imply untested
 compatibility. No deployment, all-role Cartesian live campaign or optional vendor
-extension parity is claimed. The local web workspace can now be developed as the
-next phase on top of the completed daemon/domain contract.
+extension parity is claimed. The [local web workspace](../getting-started/local-web.md)
+is delivered on top of this daemon/domain contract; its later acceptance and
+performance checks are recorded separately.

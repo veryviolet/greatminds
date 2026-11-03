@@ -10,6 +10,15 @@ greatminds update --check
 This queries PyPI without changing the package or project. Updates are operator
 initiated; the ACP daemon does not currently send periodic release notifications.
 
+## Moving to 3.4
+
+Version 3.4 adds durable requests from standalone planner conversations and
+paged, incremental web reads. Existing projects need no manual task conversion.
+Upgrade the package, then restart the daemon after active work has finished and
+restart the web server to load the new assets. Pending planning requests appear
+in `run doctor`; inspect them with `run planning-status REQUEST_ID` before
+recovery or migration. Existing runs retain their pinned execution contracts.
+
 ## Moving to 3.0
 
 The 3.0 release uses ACP for every managed executor. Define agent manifests and

@@ -11,6 +11,8 @@ day-to-day coordination, use these groups instead of editing files under
 | Acquire, prepare, inspect, or release the singleton stand | `greatminds stand ...` |
 | Converse with a configured role | `greatminds chat ...` |
 | Inspect or control ACP runs | `greatminds run ...` |
+| Submit a structured plan | `greatminds plan TASK_ID ...` |
+| Submit or inspect a standalone conversation’s planning request | `greatminds run planning`, `greatminds run planning-status` |
 | Inspect transition history | `greatminds journal ...` |
 | Inspect ACP binding state, sessions and process identity | `greatminds agent status [ROLE]` |
 | Watch durable ACP run events | `greatminds run events --follow` |

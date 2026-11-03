@@ -15,6 +15,14 @@ def recovery_actions(component, code, evidence, *, project):
                        operator + ['operator has verified account recovery', 'hold identity is still current'], ['--reason'])]
     if not operation:
         return []
+    if component == 'planning' and code == 'operation_needs_recovery':
+        return [
+            action('inspect_planning', ['run', 'planning-status', operation], 'read_only', []),
+            action('retry_planning', ['run', 'planning-status', operation, '--retry'],
+                   'request_daemon_reconciliation', operator + [
+                       'operator has inspected the receipt and resolved the recorded cause',
+                       'daemon rechecks revisions and workflow gates']),
+        ]
     if component == 'commands' and code == 'operation_needs_recovery':
         return [
             action('inspect_command', ['run', 'command-status', operation], 'read_only', []),

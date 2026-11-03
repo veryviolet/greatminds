@@ -40,6 +40,10 @@ greatminds chat create planner
 greatminds chat talk CONVERSATION_ID
 ```
 
+A standalone planner can file and plan tasks through durable requests; the
+daemon applies them without a planner turn for routine lifecycle work. Follow
+[planning a feature](recipes/planning-a-feature.md).
+
 For automatic work, configure queue-scheduled role bindings. The daemon claims
 concrete task revisions and compiles their context. Completion requires valid
 typed results and applicable evidence; a finished ACP prompt is not task approval.

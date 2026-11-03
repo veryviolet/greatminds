@@ -1,5 +1,7 @@
 'use strict';
 const translations=[
+["Ранние запуски","Earlier runs","较早运行"],
+["Ранние сообщения","Earlier messages","较早消息"],
 ["Вид дашборда","Dashboard view","仪表板视图"],
 ["Сводка","Summary","概览"],
 ["Размер интерфейса","Interface size","界面大小"],

@@ -6,9 +6,11 @@ const names = {'ARCHITECT-PLANNER':'Планировщик','LIVE-DEVELOPER':'Р
 const statuses = {needs_review:'Нужен разбор',started:'Начато',command_finished:'Команда завершена',needs_recovery:'Нужно восстановление',resolved:'Последствия разобраны',selected:'Выбрано',running:'Работает',completed:'Завершён',failed:'Ошибка',cancelled:'Отменён',interrupted:'Прерван',waiting_input:'Ждёт решения',waiting_auth:'Нужен вход',starting:'Запускается',claimed:'Назначен',idle:'Готов',paused:'На паузе',queued:'В очереди',succeeded:'Пройдено',received:'Получен',applied:'Применён',rejected:'Отклонён'};
 const queues = {feature_plan:'Планирование',feature_dev:'Разработка',feature_test:'Тестирование',feature_review:'Ревью',verified:'Готово',blocked:'Заблокировано',inbox:'Входящие'};
 const terminal = new Set(['completed','failed','cancelled','interrupted']);
-const state = {data:null, view:'overview', binding:null, conversation:null, run:null, draft:{}, chats:new Map(), filter:'', runFilter:'', busy:false, settings:null};
+const state = {data:null, view:'overview', binding:null, conversation:null, run:null, draft:{}, chats:new Map(), filter:'', runFilter:'', olderRuns:[], olderBefore:null, busy:false, settings:null};
 let toastTimer, refreshing=false, lastMarkup='';
 let chatLoading=false, chatDocumentId=null, chatActive=false;
+let overviewCache=null, overviewEtag=null;
+let runWindowEpoch=0;
 const turnNodes=new Map();
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
 function savedChoice(key,allowed,fallback){try{const value=localStorage.getItem(key);return allowed.includes(value)?value:fallback;}catch{return fallback;}}
@@ -18,6 +20,37 @@ function applyScale(value){interfaceScale=['compact','normal','large'].includes(
 applyScale(interfaceScale);
 function dashboardControls(){return tr`<fieldset class="view-switch"><legend>Вид дашборда</legend>${[['summary',tr('Сводка')],['kanban','Kanban']].map(([value,label])=>`<label><input id="dashboard-${value}" type="radio" name="dashboard-mode" value="${value}" ${dashboardMode===value?'checked':''}>${label}</label>`).join('')}</fieldset>`;}
 function setMarkup(node,markup){if(node.innerHTML!==markup)node.innerHTML=markup;}
+// Patch changed view nodes while preserving focus, expanded details and card identity.
+function patchView(target,markup){
+ const template=document.createElement('template');template.innerHTML=markup;
+ const focused=target.contains(document.activeElement)?document.activeElement:null;
+ const key=node=>node.nodeType===Node.ELEMENT_NODE?(node.id?'id:'+node.id:node.dataset.task?'task:'+node.dataset.task:node.dataset.run?'run:'+node.dataset.run:null):null;
+ function patch(parent,next){
+  let keyed;
+  for(let i=0;i<next.childNodes.length;i++){
+   const desired=next.childNodes[i];let current=parent.childNodes[i];
+   if(!current){parent.append(desired.cloneNode(true));continue;}
+   const identity=key(desired);
+   if(identity&&key(current)!==identity){
+    keyed??=new Map([...parent.childNodes].map(node=>[key(node),node]));
+    const existing=keyed.get(identity);
+    if(!existing){parent.insertBefore(desired.cloneNode(true),current);continue;}
+    parent.insertBefore(existing,current);current=existing;
+   }
+   if(current.nodeType!==desired.nodeType||current.nodeName!==desired.nodeName||
+      (current.id&&current.id!==desired.id)){current.replaceWith(desired.cloneNode(true));continue;}
+   if(current.nodeType===Node.TEXT_NODE){if(current.data!==desired.data)current.data=desired.data;continue;}
+   if(current.nodeType!==Node.ELEMENT_NODE||current.isEqualNode(desired))continue;
+   if(current.id==='run-detail'&&current.dataset.runId===state.run)continue;
+   for(const a of [...current.attributes])if(!desired.hasAttribute(a.name)&&!(current.tagName==='DETAILS'&&a.name==='open'))current.removeAttribute(a.name);
+   for(const a of desired.attributes)if(current.getAttribute(a.name)!==a.value)current.setAttribute(a.name,a.value);
+   patch(current,desired);
+  }
+  while(parent.childNodes.length>next.childNodes.length)parent.lastChild.remove();
+ }
+ patch(target,template.content);
+ if(focused?.isConnected&&document.activeElement!==focused)focused.focus({preventScroll:true});
+}
 function setText(node,text){if(node.textContent!==text)node.textContent=text;}
 function applyTheme(theme){document.documentElement.dataset.theme=theme;const dark=theme==='dark';$('theme-button').textContent=dark?tr('☀ Светлая'):tr('☾ Тёмная');$('theme-button').setAttribute('aria-label',dark?tr('Включить светлую тему'):tr('Включить тёмную тему'));$('theme-button').setAttribute('aria-pressed',String(dark));}
 let savedTheme;try{savedTheme=localStorage.getItem('greatminds-theme')}catch{}
@@ -30,8 +63,13 @@ function roleName(role){return tr(names[role] || role)}
 function initials(role){return (role || 'AG').split('-').map(x=>x[0]).join('').slice(0,2)}
 function toast(text){$('toast').textContent=text;$('toast').classList.remove('hidden');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.add('hidden'),7000)}
 async function api(path, body){
- const response=await fetch(path,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
- const result=await response.json();if(!response.ok)throw new Error(result.error || tr`HTTP ${response.status}`);return result;
+ const headers=body===undefined?{}:{'Content-Type':'application/json'};
+ if(path==='/api/state'&&body===undefined&&overviewEtag)headers['If-None-Match']=overviewEtag;
+ const response=await fetch(path,{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body)});
+ if(response.status===304&&path==='/api/state'&&overviewCache)return overviewCache;
+ const result=await response.json();if(!response.ok)throw new Error(result.error || tr`HTTP ${response.status}`);
+ if(path==='/api/state'&&body===undefined){overviewCache=result;overviewEtag=response.headers?.get('ETag')||null;}
+ return result;
 }
 function interactive(){return (state.data?.bindings || []).filter(b=>b.scheduling==='on-demand')}
 function binding(){return state.data?.bindings.find(b=>b.id===state.binding)}
@@ -39,11 +77,11 @@ function empty(title,description=''){return tr`<div class="empty"><span class="e
 function heading(title,description,actions=''){return tr`<div class="page-heading"><div><span class="eyebrow">${tr('Ваши агенты. Одно рабочее пространство.')}</span><h1>${esc(title)}</h1><p class="subtitle">${esc(description)}</p></div>${actions}</div>`}
 function renderChrome(){
  const d=state.data;if(d.app_version)setText($('app-version'),'v'+d.app_version); $('project-name').textContent=d.name;$('project-path').textContent=d.project;$('project-path').title=d.project;
- $('task-count').textContent=d.tasks.length;$('run-count').textContent=d.runs.length;
+ $('task-count').textContent=d.tasks.length;$('run-count').textContent=d.run_count??d.runs.length;
  const title=state.view==='chat'?roleName(binding()?.role):({overview:tr('Обзор'),tasks:tr('Задачи'),runs:tr('Запуски'),stands:tr('Стенды')}[state.view]);$('page-name').textContent=title || tr('Диалог');
  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===state.view));
- $('role-nav').innerHTML=interactive().map(b=>tr`<button class="nav role-button ${state.binding===b.id&&state.view==='chat'?'active':''}" data-binding="${esc(b.id)}"><span>${initials(b.role)}</span>${esc(roleName(b.role))}</button>`).join('') || tr('<p class="subtitle">Добавьте интерактивные роли в настройках.</p>');
- $('tabs').innerHTML=tr`<button class="tab ${state.view==='overview'?'active':''}" role="tab" aria-selected="${state.view==='overview'}" data-view="overview">▦ Обзор</button>`+interactive().map(b=>tr`<button class="tab ${state.binding===b.id&&state.view==='chat'?'active':''}" role="tab" aria-selected="${state.binding===b.id&&state.view==='chat'}" data-binding="${esc(b.id)}">${esc(roleName(b.role))}<small>${esc(b.agent)}</small></button>`).join('');
+ setMarkup($('role-nav'),interactive().map(b=>tr`<button class="nav role-button ${state.binding===b.id&&state.view==='chat'?'active':''}" data-binding="${esc(b.id)}"><span>${initials(b.role)}</span>${esc(roleName(b.role))}</button>`).join('') || tr('<p class="subtitle">Добавьте интерактивные роли в настройках.</p>'));
+ setMarkup($('tabs'),tr`<button class="tab ${state.view==='overview'?'active':''}" role="tab" aria-selected="${state.view==='overview'}" data-view="overview">▦ Обзор</button>`+interactive().map(b=>tr`<button class="tab ${state.binding===b.id&&state.view==='chat'?'active':''}" role="tab" aria-selected="${state.binding===b.id&&state.view==='chat'}" data-binding="${esc(b.id)}">${esc(roleName(b.role))}<small>${esc(b.agent)}</small></button>`).join(''));
  $('pause-button').textContent=d.paused?tr('▷ Продолжить'):tr('Ⅱ Пауза');$('pause-button').disabled=Boolean(d.configuration_error);
  const ds=d.daemon;const db=$('daemon-button');db.textContent=ds.running?tr('■ Остановить демон'):(ds.starting?tr('Запускается…'):tr('▷ Запустить демон'));db.disabled=(ds.running&&!ds.managed)||(!ds.running&&Boolean(d.configuration_error));
  $('connection-dot').classList.toggle('online',ds.running);$('connection-text').textContent=ds.running?tr('Демон подключён'):tr('Интерфейс подключён · демон остановлен');
@@ -58,7 +96,7 @@ function permissionPanel(runIds=null){
 function overview(){
  if(dashboardMode==='kanban')return heading(tr('Задачи проекта'),tr('Очереди и этапы отражают состояние, которое хранит демон.'))+dashboardControls()+permissionPanel()+taskBoard(state.data.tasks);
  const d=state.data;const active=d.runs.filter(r=>!terminal.has(r.state));const done=d.runs.filter(r=>r.state==='completed');
- const stats=[[tr('Активные запуски'),active.length,'↗',tr('В работе и ожидают решения')],[tr('Задачи в работе'),d.tasks.filter(t=>t.queue!=='verified').length,'☷',tr('В очередях проекта')],[tr('Завершённые запуски'),done.length,'✓',tr('За всю сохранённую историю')],[tr('Ждут решения'),d.permissions.length,'◎',tr('Разрешения инструментов')]];
+ const stats=[[tr('Активные запуски'),active.length,'↗',tr('В работе и ожидают решения')],[tr('Задачи в работе'),d.tasks.filter(t=>t.queue!=='verified').length,'☷',tr('В очередях проекта')],[tr('Завершённые запуски'),d.run_totals?.completed??done.length,'✓',tr('За всю сохранённую историю')],[tr('Ждут решения'),d.permissions.length,'◎',tr('Разрешения инструментов')]];
  return heading(tr('Всё под контролем'),tr('Задачи, исполнители и решения — в одном рабочем пространстве.'),tr`<span class="date-label">${new Date().toLocaleDateString(uiLocale(),{day:'numeric',month:'long',year:'numeric'})}</span>`)+dashboardControls()+permissionPanel()+tr`<div class="stats">${stats.map(([n,v,s,f])=>tr`<div class="stat"><div class="stat-top">${n}<span class="stat-symbol">${s}</span></div><div class="stat-value">${v}</div><div class="stat-foot">${f}</div></div>`).join('')}</div><div class="grid"><div><section class="panel"><div class="panel-head"><h3>Команда исполнителей</h3><small>${count(d.bindings.length,[tr('роль'),tr('роли'),tr('ролей')])} настроено</small></div>${d.agents.map(a=>tr`<div class="agent-row"><div class="avatar ${a.state==='running'?'green':''}">${initials(a.role)}</div><div class="row-main"><strong>${esc(roleName(a.role))}</strong><small>${esc(a.agent_id)} · ${esc(a.task_id?.startsWith('chat-')?tr('Диалог'):a.task_id || a.binding_id)}</small></div>${badge(a.state)}${a.run_id?tr`<button class="text-button" data-run="${esc(a.run_id)}">Открыть ↗</button>`:''}</div>`).join('')||empty(tr('Команда пока не настроена'),tr('Откройте настройки и добавьте исполнителей и роли.'))}</section><section class="panel"><div class="panel-head"><h3>Последние запуски</h3><button class="text-button" data-view="runs">Все запуски →</button></div>${runTable(d.runs.slice(0,5))}</section></div><section class="panel"><div class="panel-head"><h3>Лента событий</h3><small>Последние 12</small></div>${d.events.filter(e=>!/^(run_stage_|protocol_|usage_|prompt_input_|queue_observations_)/.test(e.kind)).slice(-12).reverse().map(e=>tr`<div class="feed-item"><i></i><div><strong>${esc(eventName(e.kind))}</strong><small>${when(e.at)}${e.run_id?' · '+short(e.run_id):''}</small></div></div>`).join('')||empty(tr('Пока тихо'),tr('Новые события появятся здесь автоматически.'))}</section></div>`;
 }
 function eventName(kind){return ({claimed:tr('Задача назначена'),starting:tr('Исполнитель запускается'),running:tr('Исполнитель начал работу'),completed:tr('Запуск завершён'),failed:tr('Ошибка запуска'),permission_requested:tr('Запрошено разрешение'),permission_answered:tr('Решение оператора получено'),permission_consumed:tr('Разрешение передано агенту'),result_received:tr('Результат получен'),result_applied:tr('Результат применён'),result_applying:tr('Применяется результат'),result_validation_started:tr('Проверка результата началась'),result_validation_completed:tr('Результат проверен'),workspace_ready:tr('Рабочая директория готова'),command_succeeded:tr('Проверка пройдена'),cancelled:tr('Запуск отменён'),cancelling:tr('Запуск останавливается'),dispatch_paused:tr('Новые запуски приостановлены'),dispatch_resumed:tr('Новые запуски разрешены'),paused:tr('Выдача задач приостановлена'),resumed:tr('Выдача задач продолжена')}[kind]||kind.replaceAll('_',' '))}
@@ -73,9 +111,21 @@ function taskBoard(rows){
  return groups.length?tr`<div class="queue-board">${groups.map(q=>tr`<section class="queue"><div class="queue-title"><span>${esc(tr(({feature_inbox:'Входящие',feature_blocked:'Заблокировано'})[q]||queues[q]||q))}</span><span>${rows.filter(t=>t.queue===q).length}</span></div>${rows.filter(t=>t.queue===q).map(t=>tr`<button class="task-card" data-task="${esc(t.id)}"><small>${esc(t.id)}</small><strong>${esc(t.title || tr('Без названия'))}</strong>${t.error?badge('failed'):''}</button>`).join('')}</section>`).join('')}</div>`:empty(tr('Задачи не найдены'),tr('Начните с диалога с планировщиком или создайте задачу через CLI.'));
 }
 
+function listedRuns(){return [...new Map([...state.olderRuns,...state.data.runs].map(r=>[r.id,r])).values()].sort((a,b)=>b.sequence-a.sequence);}
+function rememberRuns(rows){state.olderRuns=[...new Map([...state.olderRuns,...rows].map(r=>[r.id,r])).values()];}
+async function refreshRetainedRuns(data){
+ const current=new Set(data.runs.map(r=>r.id));
+ let changed=false;
+ // Old active runs can finish outside the latest window, including while an
+ // earlier page is in flight. Refresh them even when the overview returns 304.
+ for(const run of state.olderRuns.filter(r=>!terminal.has(r.state)&&!current.has(r.id))){
+  const detail=await api('/api/runs/'+run.id+'?after=0');rememberRuns([detail.run]);changed=true;
+ }
+ return changed;
+}
 function runs(){
- const rows=state.data.runs.filter(r=>state.runFilter==='batch'?!r.conversation_id:state.runFilter==='chat'?!!r.conversation_id:true);
- return heading(tr('Запуски и ходы агентов'),tr('Сообщения, инструменты, проверки и результаты каждого запуска.'))+tr`<div class="filter-row"><select id="run-filter" aria-label="Тип запусков"><option value="">Все запуски</option><option value="batch" ${state.runFilter==='batch'?'selected':''}>Пакетные</option><option value="chat" ${state.runFilter==='chat'?'selected':''}>Интерактивные</option></select></div><div class="split"><section class="panel run-list">${rows.map(r=>tr`<button class="run-item ${r.id===state.run?'selected':''}" data-run="${esc(r.id)}"><strong>${esc(roleName(r.role))}</strong><small>${esc(r.agent_id)} · ${esc(r.conversation_id?tr('Диалог'):r.task_id)}</small>${badge(r.state)} <small>${when(r.created_at)} · ${short(r.id)}</small></button>`).join('')||empty(tr('Нет запусков'))}</section><section class="panel" id="run-detail">${empty(state.run?tr('Загружаем ход…'):tr('Выберите запуск'),tr('Здесь появятся его сообщения и события.'))}</section></div>`;
+ const all=listedRuns();const rows=all.filter(r=>state.runFilter==='batch'?!r.conversation_id:state.runFilter==='chat'?!!r.conversation_id:true);
+ return heading(tr('Запуски и ходы агентов'),tr('Сообщения, инструменты, проверки и результаты каждого запуска.'))+tr`<div class="filter-row"><select id="run-filter" aria-label="Тип запусков"><option value="">Все запуски</option><option value="batch" ${state.runFilter==='batch'?'selected':''}>Пакетные</option><option value="chat" ${state.runFilter==='chat'?'selected':''}>Интерактивные</option></select></div><div class="split"><section class="panel run-list">${rows.map(r=>tr`<button class="run-item ${r.id===state.run?'selected':''}" data-run="${esc(r.id)}"><strong>${esc(roleName(r.role))}</strong><small>${esc(r.agent_id)} · ${esc(r.conversation_id?tr('Диалог'):r.task_id)}</small>${badge(r.state)} <small>${when(r.created_at)} · ${short(r.id)}</small></button>`).join('')||empty(tr('Нет запусков'))}</section><section class="panel" id="run-detail">${empty(state.run?tr('Загружаем ход…'):tr('Выберите запуск'),tr('Здесь появятся его сообщения и события.'))}</section></div>`+((state.data.run_count||0)>all.length?tr`<button class="button" data-action="older-runs">Ранние запуски</button>`:'');
 }
 function chat(){
  const b=binding();if(!b)return empty(tr('Роль не настроена'),tr('Откройте настройки исполнения.'));
@@ -98,7 +148,7 @@ function render(force=false){
  }
  if(state.view==='stands'){if(lastMarkup!=='stands'){$('main').innerHTML=stands();lastMarkup='stands';}loadStands().catch(e=>toast(e.message));return;}
  const markup=state.view==='overview'?overview():state.view==='tasks'?tasks():state.view==='runs'?runs():chat();
- if(force||markup!==lastMarkup){$('main').innerHTML=markup;lastMarkup=markup;
+ if(force||markup!==lastMarkup){if(force||!lastMarkup)$('main').innerHTML=markup;else patchView($('main'),markup);lastMarkup=markup;
   const board=document.querySelector('.queue-board');if(board&&boardScroll!==undefined)board.scrollLeft=boardScroll;
   if(focused&&$(focused)){ $(focused).focus({preventScroll:true});if(selection!==null&&selection!==undefined&&$(focused).setSelectionRange)$(focused).setSelectionRange(selection,selection);}
  }
@@ -124,15 +174,15 @@ function appendOutput(row,output,animate){
  if(row.target===output)return;
  row.target=output;
  cancelAnimationFrame(row.frame);
- if(!animate||reducedMotion.matches||!output.startsWith(row.text.data)){
+ if(!animate||reducedMotion.matches||output.length>4096||!output.startsWith(row.text.data)){
   const stick=atBottom($('messages'));row.text.data=output;renderMarkdown(row.answer,output);if(stick)$('messages').scrollTop=$('messages').scrollHeight;return;
  }
- const chars=Array.from(output.slice(row.text.data.length));let shown=0;let started=null;
+ const chars=Array.from(output.slice(row.text.data.length));let shown=0;let started=null;let painted=-Infinity;
  function frame(now){
   if(!row.node.isConnected)return;
   started??=now;
   const next=Math.min(chars.length,Math.max(shown,Math.ceil(chars.length*Math.min(1,(now-started)/280))));
-  if(next>shown){const pane=$('messages');const stick=atBottom(pane);row.text.appendData(chars.slice(shown,next).join(''));shown=next;renderMarkdown(row.answer,row.text.data);if(stick)pane.scrollTop=pane.scrollHeight;}
+  if(next>shown&&(next===chars.length||now-painted>=80)){painted=now;const pane=$('messages');const stick=atBottom(pane);row.text.appendData(chars.slice(shown,next).join(''));shown=next;renderMarkdown(row.answer,row.text.data);if(stick)pane.scrollTop=pane.scrollHeight;}
   if(shown<chars.length)row.frame=requestAnimationFrame(frame);
  }
  row.frame=requestAnimationFrame(frame);
@@ -141,22 +191,22 @@ function updateTurns(doc,cached){
  const pane=$('messages');
  // The caller sets the conversation identity; history nodes survive all polls.
  const allTurns=Object.values(doc.turns).sort((a,b)=>a.sequence-b.sequence);
- const turns=allTurns.slice(-50);
- let limit=pane.querySelector('.history-limit');
- if(allTurns.length>50&&!limit){limit=document.createElement('p');limit.className='muted history-limit';limit.textContent=tr('Последние 50 ходов.');pane.prepend(limit);}
- if(allTurns.length<=50)limit?.remove();
+ const turns=allTurns;
+ let earlier=pane.querySelector('.history-limit');
+ if(cached.hasOlder&&!earlier){earlier=document.createElement('button');earlier.className='button history-limit';earlier.dataset.action='older-chat';earlier.textContent=tr('Ранние сообщения');pane.prepend(earlier);}
+ if(!cached.hasOlder)earlier?.remove();
  const live=new Set(turns.map(t=>t.id));const stick=atBottom(pane);
  for(const [id,row] of turnNodes)if(!live.has(id)){cancelAnimationFrame(row.frame);row.node.remove();turnNodes.delete(id);}
  if(!turns.length){if(!pane.querySelector('.empty'))pane.innerHTML=empty(tr('Диалог готов'),tr('Первое сообщение задаст направление работы.'));return;}
  pane.querySelector('.empty')?.remove();
- const outputs=new Map();for(const e of cached.events)if(e.kind==='text')outputs.set(e.turn_id,(outputs.get(e.turn_id)||'')+e.text);
+ const outputs=cached.outputs;
  for(const t of turns){
   let row=turnNodes.get(t.id);const fresh=!row;
   if(!row){
    const node=document.createElement('section');node.className='chat-turn';node.dataset.turn=t.id;
    node.innerHTML=tr`<article class="message user"><div class="avatar">ВЫ</div><div class="message-content"><div class="message-label">Вы <small class="queued-at"></small></div><div class="message-text prompt"></div></div></article><article class="message"><div class="avatar">${esc(initials(binding()?.role))}</div><div class="message-content"><div class="message-label">${esc(binding()?.agent)} <small class="turn-status"></small></div><div class="message-text answer"></div><div class="agent-activity hidden" role="status"><span class="activity-spinner" aria-hidden="true"></span><span class="activity-label"></span></div><small class="muted turn-note"></small></div></article>`;
    const text=document.createTextNode('');const answer=node.querySelector('.answer');answer.classList.add('markdown');
-   row={node,text,answer,target:null,frame:null};turnNodes.set(t.id,row);pane.append(node);
+   row={node,text,answer,target:null,frame:null};turnNodes.set(t.id,row);const next=turns.slice(turns.indexOf(t)+1).map(turn=>turnNodes.get(turn.id)?.node).find(Boolean);pane.insertBefore(node,next||null);
   }
   setText(row.node.querySelector('.prompt'),t.prompt);
   setText(row.node.querySelector('.queued-at'),when(t.queued_at));
@@ -172,38 +222,86 @@ function updateTurns(doc,cached){
  }
  if(stick)pane.scrollTop=pane.scrollHeight;
 }
+function mergeChatPage(cached,page,history=false){
+ const snapshot=page.snapshot_cursor??page.cursor;
+ for(const [key,turn] of Object.entries(page.turns||{})){
+  const previous=cached.turnCursors.get(key)??-1;
+  if(snapshot>previous||(!history&&snapshot===previous)){
+   cached.doc.turns[key]=turn;cached.turnCursors.set(key,snapshot);
+  }
+ }
+ // Historical windows and incremental polls can overlap and arrive out of order.
+ // Track which journal prefix each full answer already includes, per turn.
+ for(const [key,value] of Object.entries(page.outputs||{}))if(page.cursor>(cached.outputCursors.get(key)??-1)){
+  cached.outputs.set(key,value);cached.outputCursors.set(key,page.cursor);
+ }
+ for(const e of page.events||[])if(e.kind==='text'&&e.sequence>(cached.outputCursors.get(e.turn_id)??-1)){
+  cached.outputs.set(e.turn_id,(cached.outputs.get(e.turn_id)||'')+e.text);
+  cached.outputCursors.set(e.turn_id,e.sequence);
+ }
+}
 async function loadChat(){
  const id=state.conversation;if(!id||!$('messages'))return;
  if(chatDocumentId!==id){for(const row of turnNodes.values())cancelAnimationFrame(row.frame);turnNodes.clear();$('messages').innerHTML=empty(tr('Загружаем диалог…'));chatDocumentId=id;}
  if(chatLoading)return;
  chatLoading=true;
  try{
-  const doc=await api('/api/conversations/'+id);
-  let cached=state.chats.get(id)||{cursor:0,events:[]};let page;
-  do {page=await api(tr`/api/conversations/${id}/events?after=${cached.cursor}`);cached.events=[...new Map([...cached.events,...page.events].map(e=>[e.sequence,e])).values()].sort((a,b)=>a.sequence-b.sequence);cached.cursor=Math.max(cached.cursor,page.cursor);} while(page.has_more);
-  state.chats.set(id,cached);if(state.view!=='chat'||state.conversation!==id||!$('messages'))return;
+  let cached=state.chats.get(id)||{cursor:null,doc:{turns:{}},outputs:new Map(),outputCursors:new Map(),turnCursors:new Map(),hasOlder:false,before:1};let page;
+  do {
+   page=await api('/api/conversations/'+id+'/updates'+(cached.cursor===null?'':'?after='+cached.cursor));
+   Object.assign(cached.doc,{id:page.id,closed:page.closed,close_requested:page.close_requested,dispatch:page.dispatch});
+   mergeChatPage(cached,page);
+   if(page.has_older!==undefined){cached.hasOlder=page.has_older;cached.before=page.before;}
+   cached.cursor=page.cursor;
+  }while(page.has_more);
+  state.chats.set(id,cached);
+  // Keep only a few opened histories; the durable journal remains on the server.
+  while(state.chats.size>4){const oldest=state.chats.keys().next().value;if(oldest===id){state.chats.delete(oldest);state.chats.set(id,cached);}else state.chats.delete(oldest);}
+  if(state.view!=='chat'||state.conversation!==id||!$('messages'))return;
+  const doc=cached.doc;
   updateTurns(doc,cached);
-  const turns=Object.values(doc.turns);const current=turns.find(t=>['running','queued'].includes(t.status));chatActive=Boolean(current);
+  const turns=Object.values(doc.turns);const current=turns.find(t=>t.status==='running')||turns.find(t=>t.status==='queued');chatActive=Boolean(current);
   $('interrupt-button').classList.toggle('hidden',!current);$('interrupt-button').dataset.turn=current?.id||'';
   const closed=doc.closed||doc.close_requested;$('send-button').disabled=closed||state.busy;$('message-input').disabled=closed;
   let message=closed?tr('Диалог закрыт. Создайте новый, чтобы продолжить.'):current?(current.status==='queued'?tr('Сообщение в очереди.'):tr('Агент выполняет ход. Можно отправить следующее сообщение в очередь.')):tr('История сохранена. Можно продолжать.');
   if(current?.status==='queued'&&doc.dispatch?.reason)message+=' '+doc.dispatch.reason;
   setText($('conversation-status'),message);
- }finally{chatLoading=false;}
+ }finally{chatLoading=false;if(state.view==='chat'&&state.conversation&&state.conversation!==id)loadChat().catch(e=>toast(e.message));}
 }
 function commandView(c){
  const streams=Object.entries(c.preview||{}).map(([name,output])=>tr`<small class="muted">${esc(name)}${output.truncated?tr(' · показан фрагмент'):''}</small><pre>${esc(output.text)||tr('Нет вывода.')}</pre>`).join('');
  return tr`<div class="evidence"><strong>${esc(c.command_id)}</strong> ${badge(c.status)}${c.preview_error?tr`<p>${esc(c.preview_error)}</p>`:streams||tr('<p class="muted">Вывод ещё не записан.</p>')}<details id="command-${esc(c.id)}"><summary>Сведения о проверке</summary><pre>${pretty({exit_code:c.exit_code,reason:c.reason,output:c.output})}</pre></details></div>`;
 }
+const runCache=new Map();let runLoading=false;
 async function loadRun(openDetails=[]){
- const id=state.run;const d=await api('/api/runs/'+id);if(state.view!=='runs'||state.run!==id||!$('run-detail'))return;
- const r=d.run;const events=[];for(const event of d.activity.events){const previous=events.at(-1);if(event.kind==='message'&&previous?.kind==='message'){previous.text+=event.text;previous.truncated||=event.truncated;}else events.push({...event});}
- $('run-detail').innerHTML=tr`<div class="panel-head"><div><h3>${esc(roleName(r.role))}</h3><small>${esc(r.agent_id)} · ${short(r.id)}</small></div><div>${badge(r.state)} ${!terminal.has(r.state)?tr`<button class="button danger" data-control="cancel" data-id="${esc(id)}">Прервать</button>`:tr`<button class="button" data-control="retry" data-id="${esc(id)}">Повторить</button>`}</div></div><div class="trace">${permissionPanel([id])}${r.reason&&r.reason!=='turn_ended'?tr`<p class="subtitle">${esc(r.reason)}</p>`:''}${r.conversation_id?tr`<p><button class="text-button" data-open-conversation="${esc(r.conversation_id)}" data-binding-id="${esc(r.binding_id)}">Открыть диалог →</button></p>`:''}${d.activity.discarded_through?tr('<p class="muted">Начало журнала удалено по лимиту хранения.</p>'):''}${events.map(e=>e.kind==='message'?tr`<div class="trace-event"><small>${when(e.at)} · сообщение${e.truncated?tr(' · показан фрагмент'):''}</small><div class="message-text markdown">${markdown(e.text)}</div></div>`:tr`<details id="event-${e.sequence}" class="trace-event"><summary>${esc(e.title||e.tool_kind||tr('Инструмент'))} ${e.status?badge(e.status):''}</summary><pre>${pretty(e)}</pre></details>`).join('')||empty(tr('Текстовых ходов пока нет'),r.conversation_id?tr('Ответы находятся в диалоге.'):(d.activity.unavailable||r.outcome?.activity_unavailable)?tr('Журнал не удалось записать. Состояние запуска и результаты доступны ниже.'):tr('Для запусков до включения журнала доступна техническая сводка ниже.'))}<h3>Проверки и результаты</h3>${d.commands.map(commandView).join('')||tr('<p class="subtitle">Запросов проверок пока нет.</p>')}${d.results.map(x=>tr`<details class="evidence" id="result-${esc(x.id)}"><summary>Результат ${badge(x.status)}</summary><pre>${pretty(x)}</pre></details>`).join('')}<details class="evidence" id="run-metadata"><summary>Состояние, протокол и события</summary><pre>${pretty({run:r,events:d.events})}</pre></details></div>`;
+ if(runLoading)return;runLoading=true;
+ const id=state.run;
+ try{
+ let cached=runCache.get(id)||{cursor:0,events:[]};const d=await api('/api/runs/'+id+'?after='+cached.cursor);if(state.view!=='runs'||state.run!==id||!$('run-detail'))return;
+ cached.events=cached.events.filter(e=>e.sequence>d.activity.discarded_through);
+ for(const e of d.activity.events)if(e.sequence>cached.cursor)cached.events.push(e);
+ cached.cursor=Math.max(cached.cursor,d.activity.cursor||0);runCache.delete(id);runCache.set(id,cached);
+ while(runCache.size>4)runCache.delete(runCache.keys().next().value);
+ const r=d.run;const events=[];for(const event of cached.events){const previous=events.at(-1);if(event.kind==='message'&&previous?.kind==='message'){previous.text+=event.text;previous.truncated||=event.truncated;}else events.push({...event});}
+ patchView($('run-detail'),tr`<div class="panel-head"><div><h3>${esc(roleName(r.role))}</h3><small>${esc(r.agent_id)} · ${short(r.id)}</small></div><div>${badge(r.state)} ${!terminal.has(r.state)?tr`<button class="button danger" data-control="cancel" data-id="${esc(id)}">Прервать</button>`:tr`<button class="button" data-control="retry" data-id="${esc(id)}">Повторить</button>`}</div></div><div class="trace">${permissionPanel([id])}${r.reason&&r.reason!=='turn_ended'?tr`<p class="subtitle">${esc(r.reason)}</p>`:''}${r.conversation_id?tr`<p><button class="text-button" data-open-conversation="${esc(r.conversation_id)}" data-binding-id="${esc(r.binding_id)}">Открыть диалог →</button></p>`:''}${d.activity.discarded_through?tr('<p class="muted">Начало журнала удалено по лимиту хранения.</p>'):''}${events.map(e=>e.kind==='message'?tr`<div class="trace-event"><small>${when(e.at)} · сообщение${e.truncated?tr(' · показан фрагмент'):''}</small><div class="message-text markdown">${markdown(e.text)}</div></div>`:tr`<details id="event-${e.sequence}" class="trace-event"><summary>${esc(e.title||e.tool_kind||tr('Инструмент'))} ${e.status?badge(e.status):''}</summary><pre>${pretty(e)}</pre></details>`).join('')||empty(tr('Текстовых ходов пока нет'),r.conversation_id?tr('Ответы находятся в диалоге.'):(d.activity.unavailable||r.outcome?.activity_unavailable)?tr('Журнал не удалось записать. Состояние запуска и результаты доступны ниже.'):tr('Для запусков до включения журнала доступна техническая сводка ниже.'))}<h3>Проверки и результаты</h3>${d.commands.map(commandView).join('')||tr('<p class="subtitle">Запросов проверок пока нет.</p>')}${d.results.map(x=>tr`<details class="evidence" id="result-${esc(x.id)}"><summary>Результат ${badge(x.status)}</summary><pre>${pretty(x)}</pre></details>`).join('')}<details class="evidence" id="run-metadata"><summary>Состояние, протокол и события</summary><pre>${pretty({run:r,events:d.events})}</pre></details></div>`);
+ $('run-detail').dataset.runId=id;
  for(const identity of openDetails)if($(identity))$(identity).open=true;
+ }finally{runLoading=false;if(state.view==='runs'&&state.run&&state.run!==id)loadRun().catch(e=>toast(e.message));}
 }
 async function refresh(){
  if(refreshing)return;refreshing=true;
- try{state.data=await api('/api/state');renderChrome();render();}
+ try{const next=await api('/api/state');const changed=next!==state.data;
+  if(changed&&state.olderRuns.length&&state.data){
+   rememberRuns(state.data.runs);
+   if(next.runs_before>(state.data.runs[0]?.sequence??0)+1){state.olderBefore=next.runs_before;runWindowEpoch++;}
+  }
+  const retainedChanged=await refreshRetainedRuns(next);
+  state.data=next;renderChrome();
+  if(changed||retainedChanged)render();
+  else if(state.view==='chat')await loadChat();
+  else if(state.view==='runs'&&state.run)await loadRun();
+  else if(state.view==='stands')await loadStands();
+ }
  catch(e){$('connection-dot').classList.remove('online');$('connection-text').textContent=tr('Связь потеряна · переподключаемся');$('notice').textContent=e.message;$('notice').classList.remove('hidden');}
  finally{refreshing=false;}
 }
@@ -252,6 +350,24 @@ document.addEventListener('click',async event=>{
   if(t.id==='daemon-button'){t.disabled=true;await api('/api/daemon/'+(state.data.daemon.running?'stop':'start'),{});await refresh();return;}
   if(t.dataset.permission){t.disabled=true;await api('/api/permissions/'+t.dataset.permission,{option_id:t.dataset.option});await refresh();return;}
   if(t.dataset.control){t.disabled=true;await api('/api/runs/'+t.dataset.id+'/'+t.dataset.control,{});await refresh();return;}
+  if(t.dataset.action==='older-chat'){
+   const id=state.conversation,cached=state.chats.get(id);if(!cached)return;
+   t.disabled=true;try{const page=await api('/api/conversations/'+id+'/updates?before='+cached.before);
+   if(id!==state.conversation)return;
+   const pane=$('messages'),height=pane.scrollHeight,top=pane.scrollTop;
+   mergeChatPage(cached,page,true);
+   cached.hasOlder=page.has_older;cached.before=page.before;
+   updateTurns(cached.doc,cached);pane.scrollTop=top+pane.scrollHeight-height;
+   }finally{t.disabled=false;}return;
+  }
+  if(t.dataset.action==='older-runs'){
+   const window=state.data.runs,epoch=runWindowEpoch;
+   t.disabled=true;try{const page=await api('/api/runs?before='+(state.olderBefore??state.data.runs_before));
+    rememberRuns([...window,...page.runs]);
+    if(epoch===runWindowEpoch)state.olderBefore=state.data.runs_before>(window[0]?.sequence??0)+1?state.data.runs_before:page.before;
+    await refreshRetainedRuns(state.data);
+    render();}finally{t.disabled=false;}return;
+  }
   if(t.dataset.action==='new-chat'){state.conversation=(await api('/api/conversations',{binding_id:state.binding})).id;await refresh();return;}
   if(t.dataset.action==='close-chat'){await api('/api/conversations/'+state.conversation+'/close',{});await refresh();return;}
   if(t.dataset.action==='interrupt'){await api('/api/conversations/'+state.conversation+'/interrupt',{request_id:t.dataset.turn});await refresh();return;}
@@ -278,8 +394,9 @@ document.addEventListener('submit',async event=>{
  if(event.target.id==='settings-form'){event.preventDefault();const submit=event.target.querySelector('[type=submit]');submit.disabled=true;try{await api('/api/settings', $('use-yaml').checked?{text:$('settings-yaml').value,revision:state.settings.revision}:{document:formDocument(),revision:state.settings.revision});$('settings-dialog').close();toast(tr('Настройки сохранены. Для применения перезапустите демон.'));await refresh();}catch(e){$('settings-error').textContent=e.message;}finally{submit.disabled=false;}}
 });
 document.addEventListener('keydown',event=>{if(event.target.id==='message-input'&&event.key==='Enter'&&!event.shiftKey&&!event.isComposing&&event.keyCode!==229&&!event.repeat){event.preventDefault();sendMessage();}if(event.key==='Enter'&&event.target.matches('tr[data-run]'))navigate('runs',null,event.target.dataset.run);});
-refresh();setInterval(refresh,1500);
-setInterval(()=>{if(state.view==='chat'&&chatActive)loadChat().catch(e=>toast(e.message));},350);
+refresh();setInterval(()=>{if(!document.hidden)return refresh();},1500);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
+setInterval(()=>{if(!document.hidden&&state.view==='chat'&&chatActive)loadChat().catch(e=>toast(e.message));},350);
 
 const capabilityCache=new Map();
 let capabilityQueue=Promise.resolve();

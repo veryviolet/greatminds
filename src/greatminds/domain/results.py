@@ -73,7 +73,10 @@ class ResultService:
         envelope = receipt["envelope"]
         payload = envelope["payload"]
         decision = envelope["decision"]
-        if set(payload) - (DECISION_PAYLOAD_FIELDS[decision] | {"command_evidence"}):
+        allowed = DECISION_PAYLOAD_FIELDS[decision] | {"command_evidence"}
+        if receipt.get('planning') and decision == 'no_change':
+            allowed = allowed | {'blocks'}
+        if set(payload) - allowed:
             raise GreatMindsError("unknown fields in decision payload", exit_code=2)
         revision = TaskRevision(run["task_id"], run["task_path"], run["task_revision"])
         self.store._check_revision(revision)
@@ -262,78 +265,88 @@ class ResultService:
             if not self._can_apply(run):
                 return receipt  # Do not mutate the assignment while its process is working.
             path = self.store.directory / "operations" / f"{result_id}.json"
-            recovered = path.exists()
-            if recovered:
-                operation = json.loads(path.read_text())
-            else:
-                validation_id = self.store.begin_result_validation(result_id)
-                validation_started = time.monotonic()
-                try:
-                    contract = parse_schema_document(self.store.contracts(run["id"])["schema"]["text"])
-                    operation = self._prepare(receipt, run, contract)
-                except (GreatMindsError, yaml.YAMLError) as exc:
+            return self.apply_operation(result_id, receipt, run, path, self.store.result_status)
+
+    def apply_operation(self, result_id, receipt, run, path, finish, *, track_validation=True):
+        """Apply a scoped operation under its task lock using a durable receipt.
+
+        The caller authenticates and reserves the task. Planning requests use the
+        same validators and recovery journal without inventing an agent run.
+        """
+        recovered = path.exists()
+        if recovered:
+            operation = json.loads(path.read_text())
+        else:
+            validation_id = self.store.begin_result_validation(result_id) if track_validation else None
+            validation_started = time.monotonic()
+            try:
+                contract = parse_schema_document(self.store.contracts(run["id"])["schema"]["text"])
+                operation = self._prepare(receipt, run, contract)
+            except (GreatMindsError, yaml.YAMLError) as exc:
+                if track_validation:
                     self.store.finish_result_validation(result_id, attempt_id=validation_id,
                         seconds=time.monotonic() - validation_started, valid=False)
-                    status = "rejected" if receipt["status"] == "received" else "needs_recovery"
-                    return self.store.result_status(result_id, status, details={"error": str(exc)})
+                status = "rejected" if receipt["status"] == "received" else "needs_recovery"
+                return finish(result_id, status, details={"error": str(exc)})
+            if track_validation:
                 self.store.finish_result_validation(result_id, attempt_id=validation_id,
                     seconds=time.monotonic() - validation_started, valid=True)
+            atomic_json(path, operation)
+            self.checkpoint("prepared")
+        if (operation.get("version") != 1 or operation.get("result_id") != result_id
+                or operation.get("run_id") != run["id"] or operation.get("task_id") != run["task_id"]
+                or operation.get("source") != run["task_path"]):
+            raise GreatMindsError("operation identity does not match its result", exit_code=4)
+        destination_parts = Path(operation["destination"]).parts
+        if (len(destination_parts) != 2 or destination_parts[1] != f"{run['task_id']}.yaml"
+                or destination_parts[0].startswith(".")):
+            raise GreatMindsError("invalid operation destination", exit_code=4)
+        safe_name(destination_parts[0])
+        if receipt["status"] == "received":
+            finish(result_id, "applying")
+        source, destination = self.store.runtime / operation["source"], self.store.runtime / operation["destination"]
+        try:
+            if operation["phase"] != "committed":
+                if source.exists():
+                    if _digest(source.read_bytes()) not in {operation["before_sha256"], operation["after_sha256"]}:
+                        raise GreatMindsError("task changed before result recovery", exit_code=4)
+                    if source != destination and destination.exists():
+                        raise GreatMindsError("destination already contains a task", exit_code=4)
+                    # Live dependencies/stand gates can change while a
+                    # prepared operation is waiting for crash recovery.
+                    self._recheck_gates(operation, run)
+                elif not destination.is_file() or _digest(destination.read_bytes()) != operation["after_sha256"]:
+                    raise GreatMindsError("task missing before result recovery", exit_code=4)
+                for artifact in operation["artifacts"]:
+                    if not Path(artifact["path"]).is_file() or _digest(Path(artifact["path"]).read_bytes()) != artifact["sha256"]:
+                        raise GreatMindsError("artifact changed before result application", exit_code=4)
+                self._actions(path, operation, "pre", recovered=recovered)
+                after = operation["after"].encode()
+                if _digest(after) != operation["after_sha256"]:
+                    raise GreatMindsError("operation content hash mismatch", exit_code=4)
+                if source.exists():
+                    current = _digest(source.read_bytes())
+                    if current == operation["before_sha256"]:
+                        if current != operation["after_sha256"]:
+                            atomic_bytes(source, after)
+                        self.checkpoint("task_written")
+                    elif current != operation["after_sha256"]:
+                        raise GreatMindsError("task changed during result application", exit_code=4)
+                    if source != destination:
+                        durable_move(source, destination)
+                    self.checkpoint("task_moved")
+                elif not destination.is_file() or _digest(destination.read_bytes()) != operation["after_sha256"]:
+                    raise GreatMindsError("task missing after interrupted result application", exit_code=4)
+                self._journal(operation)
+                self.checkpoint("journaled")
+                self._actions(path, operation, "post", recovered=recovered)
+                operation["phase"] = "committed"
                 atomic_json(path, operation)
-                self.checkpoint("prepared")
-            if (operation.get("version") != 1 or operation.get("result_id") != result_id
-                    or operation.get("run_id") != run["id"] or operation.get("task_id") != run["task_id"]
-                    or operation.get("source") != run["task_path"]):
-                raise GreatMindsError("operation identity does not match its result", exit_code=4)
-            destination_parts = Path(operation["destination"]).parts
-            if (len(destination_parts) != 2 or destination_parts[1] != f"{run['task_id']}.yaml"
-                    or destination_parts[0].startswith(".")):
-                raise GreatMindsError("invalid operation destination", exit_code=4)
-            safe_name(destination_parts[0])
-            if receipt["status"] == "received":
-                self.store.result_status(result_id, "applying")
-            source, destination = self.store.runtime / operation["source"], self.store.runtime / operation["destination"]
-            try:
-                if operation["phase"] != "committed":
-                    if source.exists():
-                        if _digest(source.read_bytes()) not in {operation["before_sha256"], operation["after_sha256"]}:
-                            raise GreatMindsError("task changed before result recovery", exit_code=4)
-                        if source != destination and destination.exists():
-                            raise GreatMindsError("destination already contains a task", exit_code=4)
-                        # Live dependencies/stand gates can change while a
-                        # prepared operation is waiting for crash recovery.
-                        self._recheck_gates(operation, run)
-                    elif not destination.is_file() or _digest(destination.read_bytes()) != operation["after_sha256"]:
-                        raise GreatMindsError("task missing before result recovery", exit_code=4)
-                    for artifact in operation["artifacts"]:
-                        if not Path(artifact["path"]).is_file() or _digest(Path(artifact["path"]).read_bytes()) != artifact["sha256"]:
-                            raise GreatMindsError("artifact changed before result application", exit_code=4)
-                    self._actions(path, operation, "pre", recovered=recovered)
-                    after = operation["after"].encode()
-                    if _digest(after) != operation["after_sha256"]:
-                        raise GreatMindsError("operation content hash mismatch", exit_code=4)
-                    if source.exists():
-                        current = _digest(source.read_bytes())
-                        if current == operation["before_sha256"]:
-                            if current != operation["after_sha256"]:
-                                atomic_bytes(source, after)
-                            self.checkpoint("task_written")
-                        elif current != operation["after_sha256"]:
-                            raise GreatMindsError("task changed during result application", exit_code=4)
-                        if source != destination:
-                            durable_move(source, destination)
-                        self.checkpoint("task_moved")
-                    elif not destination.is_file() or _digest(destination.read_bytes()) != operation["after_sha256"]:
-                        raise GreatMindsError("task missing after interrupted result application", exit_code=4)
-                    self._journal(operation)
-                    self.checkpoint("journaled")
-                    self._actions(path, operation, "post", recovered=recovered)
-                    operation["phase"] = "committed"
-                    atomic_json(path, operation)
-                    self.checkpoint("committed")
-            except GreatMindsError as exc:
-                return self.store.result_status(result_id, "needs_recovery", details={"error": str(exc)})
-            return self.store.result_status(result_id, "applied", details={
-                "destination": operation["destination"], "decision": operation["decision"],
-                "destination_revision": _digest(operation['destination'].encode() + b'\0' + operation['after'].encode()),
-                "artifacts": operation["artifacts"], "question": operation["question"],
-                "command_evidence": operation.get("command_evidence", [])})
+                self.checkpoint("committed")
+        except GreatMindsError as exc:
+            return finish(result_id, "needs_recovery", details={"error": str(exc)})
+        return finish(result_id, "applied", details={
+            "destination": operation["destination"], "decision": operation["decision"],
+            "destination_revision": _digest(operation['destination'].encode() + b'\0' + operation['after'].encode()),
+            "artifacts": operation["artifacts"], "question": operation["question"],
+            "command_evidence": operation.get("command_evidence", [])})

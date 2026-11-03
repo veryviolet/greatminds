@@ -78,6 +78,28 @@ def test_browser_write_boundary_and_invalid_payloads(http, service):
     assert http('/api/conversations/invalid.name')[0] == 400
 
 
+def test_conditional_reads_and_incremental_chat_endpoint(http, service):
+    status, headers, _ = http('/api/state')
+    assert status == 200
+    conditional = {'If-None-Match': headers['ETag']}
+    assert http('/api/state', headers=conditional)[::2] == (304, b'')
+    service.store.set_paused(True)
+    assert http('/api/state', headers=conditional)[0] == 200
+    chat = service.create_conversation({'binding_id': 'planner'})['id']
+    from greatminds.runtime.interactions import ConversationStore
+    journal = ConversationStore(service.runtime, chat)
+    journal.enqueue('First', request_id='first')
+    initial = json.loads(http(f'/api/conversations/{chat}/updates')[2])
+    assert list(initial['turns']) == ['first'] and initial['cursor'] == 1
+    idle = json.loads(http(f'/api/conversations/{chat}/updates?after=1')[2])
+    assert idle['turns'] == {} and idle['events'] == []
+    journal.enqueue('Second', request_id='second')
+    update = json.loads(http(f'/api/conversations/{chat}/updates?after=1')[2])
+    assert list(update['turns']) == ['second'] and update['cursor'] == 2
+    assert http('/api/runs?before=invalid')[0] == 400
+    assert http(f'/api/conversations/{chat}/updates?after=999')[0] == 400
+
+
 def test_settings_validate_and_reject_stale_writes(http, service):
     original = service.settings()
     bad = {'text': 'version: 1\nagents: nope\n', 'revision': original['revision']}

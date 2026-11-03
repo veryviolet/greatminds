@@ -126,7 +126,7 @@ def diagnose(project, *, environment=None):
                 elif status not in TERMINAL and row['pid'] is not None and row['alive'] is not True:
                     finding('agents', 'process_identity_unconfirmed', 'warning',
                             'Inspect supervisor recovery and process evidence; do not infer safe replay from a PID.', **evidence)
-        for collection in ('results', 'commands', 'maintenance'):
+        for collection in ('results', 'commands', 'maintenance', 'planning'):
             def pending_operations():
                 items = state.get(collection, {})
                 if not isinstance(items, dict) or any(not isinstance(item, dict) for item in items.values()):
