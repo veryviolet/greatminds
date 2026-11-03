@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -31,10 +31,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -1627,6 +1627,28 @@
     <span class="md-ellipsis">
       
         permission
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-run-planning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        planning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-run-planning-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        planning-status
       
     </span>
   </a>
@@ -3369,6 +3391,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#greatminds-run-planning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        planning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#greatminds-run-planning-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        planning-status
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#greatminds-run-repair" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3917,6 +3961,14 @@ day-to-day coordination, use these groups instead of editing files under
 <td><code>greatminds run ...</code></td>
 </tr>
 <tr>
+<td>Submit a structured plan</td>
+<td><code>greatminds plan TASK_ID ...</code></td>
+</tr>
+<tr>
+<td>Submit or inspect a standalone conversation’s planning request</td>
+<td><code>greatminds run planning</code>, <code>greatminds run planning-status</code></td>
+</tr>
+<tr>
 <td>Inspect transition history</td>
 <td><code>greatminds journal ...</code></td>
 </tr>
@@ -4409,7 +4461,7 @@ Unknown fields are preserved verbatim under their original key.</p>
 </code></pre></div>
 <h3 id="greatminds-plan">greatminds plan<a class="headerlink" href="#greatminds-plan" title="Permanent link">&para;</a></h3>
 <p>plan — ARCHITECT-PLANNER convenience: triage + plan + route in one go.</p>
-<p>Atomic 4-step chain:</p>
+<p>Operator sequence (each mutation is atomic; the sequence is not rolled back):</p>
 <ol>
 <li><code>append-block triage</code> on the inbox task</li>
 <li><code>mv</code> → <code>feature_plan</code></li>
@@ -4420,6 +4472,9 @@ Unknown fields are preserved verbatim under their original key.</p>
 stopped and what to do — never a silent partial failure.</p>
 <p>Only <code>ARCHITECT-PLANNER</code> may run this command (the <code>GREATMINDS_ROLE</code>
 env var is enforced; refusing other roles up-front avoids ambiguity).</p>
+<p>In a managed standalone planner conversation, this command queues a durable
+daemon request and waits for its receipt. The daemon applies the same gates and
+records completed steps for recovery. Assigned task runs use <code>run submit</code>.</p>
 <p><strong>Usage:</strong></p>
 <div class="highlight"><pre><span></span><code>greatminds plan [OPTIONS] ID
 </code></pre></div>
@@ -4641,6 +4696,29 @@ when the bug is upstream.</p>
 <p><strong>Options:</strong></p>
 <div class="highlight"><pre><span></span><code>  --option TEXT  Choose an option ID from this exact live request
   -h, --help     Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-run-planning">greatminds run planning<a class="headerlink" href="#greatminds-run-planning" title="Permanent link">&para;</a></h4>
+<p>Queue a planner operation for the daemon; inspect its receipt with planning-status.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds run planning [OPTIONS]
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --action [create|decide]  [required]
+  --json TEXT               create: task fields. decide: exact task_id,
+                            revision SHA256, and steps [{decision,payload}].
+                            [required]
+  --request-id TEXT         Stable ID for delivery retries within this
+                            conversation.  [required]
+  -h, --help                Show this message and exit.
+</code></pre></div>
+<h4 id="greatminds-run-planning-status">greatminds run planning-status<a class="headerlink" href="#greatminds-run-planning-status" title="Permanent link">&para;</a></h4>
+<p>Inspect a planning receipt, including completed steps and recovery errors.</p>
+<p><strong>Usage:</strong></p>
+<div class="highlight"><pre><span></span><code>greatminds run planning-status [OPTIONS] REQUEST_ID
+</code></pre></div>
+<p><strong>Options:</strong></p>
+<div class="highlight"><pre><span></span><code>  --retry     Operator: resume a needs_recovery operation after inspection.
+  -h, --help  Show this message and exit.
 </code></pre></div>
 <h4 id="greatminds-run-repair">greatminds run repair<a class="headerlink" href="#greatminds-run-repair" title="Permanent link">&para;</a></h4>
 <p>Request bounded reconciliation of an incomplete system operation.</p>
@@ -5180,10 +5258,10 @@ isolated tree.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

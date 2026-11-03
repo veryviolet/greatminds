@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -31,10 +31,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -1666,9 +1666,10 @@ Cancellation is bounded and can escalate to process-group termination.</p>
 prompt dispatch have bounded exponential retries under the
 <a href="../execution-contract/#bounded-startup-retries">execution contract</a>.
 <code>run retry RUN_ID</code> permits an explicit further attempt after its cause is
-resolved. Startup delays are shared by account; provider rate-limit handling
-and broader resource/health policies remain tracked in the
-<a href="../modernization-plan/">modernization plan</a>.</p>
+resolved. Startup delays are shared by account. Explicitly configured ACP error
+codes can also create durable rate-limit or quota holds; reported session cost
+limits can hold admission. See the <a href="../../operations/runbook/">runbook</a> and
+<a href="../execution-contract/">execution contract</a> for their scope and recovery.</p>
 <h2 id="conversations-and-frontends">Conversations and frontends<a class="headerlink" href="#conversations-and-frontends" title="Permanent link">&para;</a></h2>
 <p><code>greatminds chat create BINDING_ID</code> creates a daemon-owned conversation. <code>chat talk</code>
 handles user messages, streamed output and permission choices. Reconnecting reads
@@ -1747,10 +1748,10 @@ turn or a cloud service.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

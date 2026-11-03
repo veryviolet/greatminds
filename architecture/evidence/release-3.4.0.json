@@ -1,0 +1,125 @@
+{
+  "release": "3.4.0",
+  "date": "2026-11-03",
+  "scope": [
+    "existing-project onboarding and interpreter separation",
+    "CLI flags and UI labels",
+    "daemon lifecycle and deterministic planning application",
+    "stand authorization and literal environment parsing",
+    "executor scope against dated compatibility evidence",
+    "version claims, screenshots and README links"
+  ],
+  "historical_documents": "Dated modernization progress and compatibility experiments retain their original evidence boundaries; current guides describe the released behavior.",
+  "documentation_sha256": {
+    "README.md": "9cfeba0921e0882f72cedba7243d412609dd461615b10830fc1f8a4443fc1b71",
+    "CHANGELOG.md": "7a6961848501fe766d7f458f49aabffcbf702769f47cd5917ba43ee39f2f4619",
+    "docs/README.md": "1c2cdd7db692bc9108d8df328f601cc692a220832bc8f8d07dbc287d1a82f20b",
+    "docs/architecture/acp-compatibility.md": "b86b3e7358525f08c7297437b7e5557a2c155ffe3c992ae11ff9c89990d51c4d",
+    "docs/architecture/contract-reference.md": "5f12a8365619ac4d4f29e48b2f3e206b0e78f7c4bd7302e7b3005d8f297dfdcd",
+    "docs/architecture/daemon-and-agents.md": "3db5c08b7ef07ab038de85329365436bd735ec02f9ca452d3afab4cd5424b99e",
+    "docs/architecture/execution-contract.md": "c16397386b0e0f81eaf171616f0f40416e1556f1b7d6bc9fe6f15421345d7cc9",
+    "docs/architecture/filesystem-layout.md": "57f1f0cbb0c9200b3e58284a3b22f1d8f5edad8a7d47dba7e5abb4669a4b4dfd",
+    "docs/architecture/lifecycle.md": "283f849d8322a649fbb5c7ef4e2d431871eb7873f5b58c5a3585ca3aa60f602c",
+    "docs/architecture/local-web-plan.md": "f9132cd5a78b92f9442585b4eab35ae5fb3be13cd11313c2f118a33dcc513279",
+    "docs/architecture/modernization-acceptance.md": "724f7cd24ce93d2ed3d2a9bc6394a0d7299d4a688127eb7e47ffcb05be05f8fb",
+    "docs/architecture/modernization-plan.md": "4b8cb593550812ff0f1ef28b5f77c905f7c6ce29f0485b3b438e3f65947c2876",
+    "docs/architecture/overview.md": "db7b5a1572cfc1717a4515776ba9982c7ac03480c3c3f2daad48a349be47a68f",
+    "docs/architecture/rehabilitation-audit-2026-09-06.md": "28659cdf427da12b14fbbb67d9619d41678405937a309e5eac1ae104df6d253f",
+    "docs/architecture/transitions.md": "b210d4d0855fa51f63e7515e1931a885ec93141d94b05063412bdb59c6c0afc5",
+    "docs/changelog.md": "a3e767e5686911bb2a5e8c70f2507ed19256b34956c538254aecd7a43af7cd3b",
+    "docs/cli-reference/index.md": "ce3c4e17457587f21f2ef3f96c30259b4b3ff6a5b5d519a4919b4ded8b443b3f",
+    "docs/concepts/codex-profiles.md": "2fbf42a1421d1c6972d2e8e0d8dbc97e7466a143680b84eaec235be3c099f1e6",
+    "docs/concepts/inbox.md": "0b9410114c38777f03db11b4c6c053d01f367ca4240cfaecb95bfe91925a92df",
+    "docs/concepts/queues.md": "cd8e193248d92b7318651843dd703cce44b76c7ceaaf6719a020328207cb60ab",
+    "docs/concepts/roles.md": "229ffd398680c4121e2f23e1fef2297f80e332423a67213adb33f04db45a6cb1",
+    "docs/concepts/scenarios.md": "23387a52384a3285893b3f89a3199420231f9dbe6333c1bf06aa10aaa32fc570",
+    "docs/concepts/stand-gate.md": "550b8cc3c7c68f3fe14de5606220940a2373695cebd0ab5f2dd955c0161d807f",
+    "docs/concepts/stand-operations.md": "9a24aabd34df6a0b8a39a9ae3cc20e4c010ea4a991295ca6b9b9d6fd1bd39b5c",
+    "docs/getting-started/first-project.md": "39ff1a020d438324ed8dc5f930d9b11b62bac024eb646b7deccf2aa2d2cc15cb",
+    "docs/getting-started/installation.md": "698608035a3b63ade985703bc67c9b23bd94f9d5f0acbd231c22e7844ea11bd0",
+    "docs/getting-started/local-web.md": "8e7e883372e72f9e6c54d7dfb1654b6fdbbf96c96c3461f170f0ab35a5a0ebba",
+    "docs/getting-started/upgrading.md": "2e742ab22f43a7a744cbe473c608029d18af36cd7de13a09954b76d9273b25ef",
+    "docs/getting-started/uv-project.md": "2788d6c3febcc66444d8acc51bc82e658abc3102ab38057c91cf2e29fa7037c8",
+    "docs/index.md": "66823a60e8028b9cae61bdcce90022ff1a659c902d0e501bd4dd5b3b2e8899d8",
+    "docs/operations/daemon-lifecycle.md": "0ffd983c6ea274da33fad7ec1854d4f494dfcc90955b097297bbb2c789c5025f",
+    "docs/operations/runbook.md": "b61d9bdf10e68274742249c9640d8021c998dd93d77c1976faa6d31d33156d17",
+    "docs/recipes/cutting-a-release.md": "98a27f97c1e1aad2d3149d9ccfc9b7df9698d28e551e7fa46c037aa8bc952296",
+    "docs/recipes/e2e-testing.md": "6761a0377676a338d54fb7c77fdb8a2a10b6fe7eefce4a77b4bf24125abb42cc",
+    "docs/recipes/filing-a-bug.md": "494ed837d58445687b482306a0d5535358e8cd24808cdbc157009443f6e8dbf9",
+    "docs/recipes/planning-a-feature.md": "b35f78bec76f0c2b01ac23b7efbc7d314cb49a9dfbb58cb699db365334b0624f"
+  },
+  "screenshots": {
+    "source": "current packaged web assets rendered in Chromium with intercepted demonstration API data; no executor or web server started",
+    "files": {
+      "docs/assets/workspace-kanban.jpg": "b59a33a35351b11ef079508800661d47d69e59fac833d2e01be6d01d50d102a1",
+      "docs/assets/workspace-summary.jpg": "a30ef38757e2a4c534cbc762e3bf1ebdb62d0f90dd91e948bebd6f72785357fa"
+    }
+  },
+  "readme_links": [
+    {
+      "url": "https://docs.astral.sh/uv/",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/veryviolet/greatminds/blob/main/LICENSE",
+      "status": 200
+    },
+    {
+      "url": "https://github.com/veryviolet/greatminds/issues",
+      "status": 200
+    },
+    {
+      "url": "https://veryviolet.github.io/greatminds/",
+      "status": 200
+    },
+    {
+      "url": "https://veryviolet.github.io/greatminds/architecture/acp-compatibility/",
+      "status": 200
+    },
+    {
+      "url": "https://veryviolet.github.io/greatminds/architecture/execution-contract/",
+      "status": 200
+    },
+    {
+      "url": "https://veryviolet.github.io/greatminds/assets/workspace-summary.jpg",
+      "status": 200
+    },
+    {
+      "url": "https://veryviolet.github.io/greatminds/getting-started/local-web/",
+      "status": 200
+    },
+    {
+      "url": "https://veryviolet.github.io/greatminds/getting-started/upgrading/",
+      "status": 200
+    },
+    {
+      "url": "https://veryviolet.github.io/greatminds/getting-started/uv-project/",
+      "status": 200
+    },
+    {
+      "url": "https://veryviolet.github.io/greatminds/recipes/cutting-a-release/",
+      "status": 200
+    },
+    {
+      "url": "https://veryviolet.github.io/greatminds/recipes/planning-a-feature/",
+      "status": 200
+    }
+  ],
+  "validation": {
+    "clean_wheel_version": "3.4.0",
+    "clean_wheel_regressions_passed": 52,
+    "root_cli_help_groups": 26,
+    "repeated_setup_preserves_project_files": true,
+    "browser_regressions_passed": 25,
+    "vscode_harness_tests_passed": 1,
+    "public_documentation_tests_passed": 9,
+    "generated_reference": "passed",
+    "strict_site_build": "passed",
+    "python_suite": {
+      "passed": 1602,
+      "skipped": 2,
+      "execution": "1594 passed and 2 skipped with loopback access; all 8 migration-safety tests passed separately in the isolated /proc namespace. The unrestricted-host /proc limitation also reproduces at baseline 75f5e77."
+    }
+  },
+  "publication": "Pre-tag audit; verify PyPI description and deployed documentation after workflow completion."
+}

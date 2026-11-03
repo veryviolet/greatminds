@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -31,10 +31,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -1616,12 +1616,21 @@ then moves the task either to <code>archive/</code> when the work has been rever
 <p>Inline flags such as <code>ready_for_implementation: true</code> are evidence. They do not
 handoff ownership. Only the queue move does that.</p>
 <h2 id="mutation-rule">Mutation rule<a class="headerlink" href="#mutation-rule" title="Permanent link">&para;</a></h2>
-<p>Agents mutate task state with the CLI:</p>
+<p>Queue-assigned agents and task-bound conversations submit typed decisions through
+<code>greatminds run submit</code>. The daemon checks their assigned task revision, role,
+evidence and transition gates before changing task files. Direct <code>task mv</code> and
+<code>task append-block</code> writes are rejected for these managed runs.</p>
+<p>A standalone planner conversation uses <code>task new</code>, <code>plan</code>, <code>task append-block</code>
+and <code>task mv</code> to submit authenticated planning requests. The daemon owns their
+application and recovery; see <a href="../../recipes/planning-a-feature/">planning a feature</a>.</p>
+<p>An operator outside a managed run can use the role-scoped task CLI directly:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>task<span class="w"> </span>append-block<span class="w"> </span>implementation<span class="w"> </span>--id<span class="w"> </span>TASK_ID<span class="w"> </span>--field<span class="w"> </span><span class="nv">ready_for_test</span><span class="o">=</span><span class="nb">true</span>
 greatminds<span class="w"> </span>task<span class="w"> </span>mv<span class="w"> </span>TASK_ID<span class="w"> </span>feature_test
 </code></pre></div>
-<p>The CLI validates role permissions, required readiness fields, schema shape,
-journal entries, intents, and heartbeat side effects.</p>
+<p>The direct CLI validates role permissions, required readiness fields, schema
+shape, journal entries, intents, and heartbeat side effects. Managed result and
+planning operations share the domain gates and record SYSTEM application
+provenance. Pending operations hold competing task mutations and claims.</p>
 <p>Use <code>greatminds task show</code>, <code>greatminds task list</code>, and
 <code>greatminds task paths</code> for state inspection. Do not substitute directory
 listings for CLI checks when deciding ownership or readiness.</p>
@@ -1676,10 +1685,10 @@ listings for CLI checks when deciding ownership or readiness.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

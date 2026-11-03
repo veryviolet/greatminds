@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -31,10 +31,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -1841,9 +1841,15 @@ move task files with <code>mv</code>, edit inbox files by hand, append journal l
 directly, or touch heartbeat files manually. The CLI validates role ownership,
 schema fields, transition readiness, intent files, journal lines, and heartbeat
 side effects as one operation.</p>
+<p>Assigned agents submit typed results with <code>run submit</code>; they cannot bypass that
+contract with direct task mutations. Standalone planner conversations use durable
+planning requests, including the <code>task new</code>, <code>plan</code>, <code>task append-block</code> and
+<code>task mv</code> convenience commands. The daemon applies accepted requests. See
+<a href="../../recipes/planning-a-feature/">planning a feature</a>. The commands below also
+serve authorized operators outside a managed run.</p>
 <p>Common mutation commands:</p>
 <div class="highlight"><pre><span></span><code>greatminds<span class="w"> </span>task<span class="w"> </span>new<span class="w"> </span>--stream<span class="w"> </span>product<span class="w"> </span>--kind<span class="w"> </span>feature<span class="w"> </span>--scope<span class="w"> </span>backend<span class="w"> </span>--title<span class="w"> </span><span class="s2">"..."</span>
-greatminds<span class="w"> </span>task<span class="w"> </span>append-block<span class="w"> </span>implementation<span class="w"> </span>--id<span class="w"> </span>TASK_ID<span class="w"> </span>--field<span class="w"> </span><span class="nv">files</span><span class="o">=</span>docs/index.md<span class="w"> </span>--field<span class="w"> </span><span class="nv">ready_for_test</span><span class="o">=</span><span class="nb">true</span>
+greatminds<span class="w"> </span>task<span class="w"> </span>append-block<span class="w"> </span>implementation<span class="w"> </span>--id<span class="w"> </span>TASK_ID<span class="w"> </span>--field<span class="w"> </span><span class="nv">files</span><span class="o">=</span>src/module.py<span class="w"> </span>--field<span class="w"> </span><span class="nv">ready_for_test</span><span class="o">=</span><span class="nb">true</span>
 greatminds<span class="w"> </span>task<span class="w"> </span>mv<span class="w"> </span>TASK_ID<span class="w"> </span>feature_test
 greatminds<span class="w"> </span>inbox<span class="w"> </span>send<span class="w"> </span>ARCHITECT-PLANNER<span class="w"> </span>--kind<span class="w"> </span>ask<span class="w"> </span>--task<span class="w"> </span>TASK_ID<span class="w"> </span>--body<span class="w"> </span><span class="s2">"..."</span>
 greatminds<span class="w"> </span>stand<span class="w"> </span>lease<span class="w"> </span>--task<span class="w"> </span>TASK_ID<span class="w"> </span>--worktree<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>greatminds<span class="w"> </span>worktree<span class="w"> </span>path<span class="w"> </span>TASK_ID<span class="k">)</span><span class="s2">"</span><span class="w"> </span>--profile<span class="w"> </span>full-deploy
@@ -1969,6 +1975,11 @@ greatminds<span class="w"> </span>run<span class="w"> </span>doctor<span class="
 deployments and task mutations require their scoped recovery actions. Cancellation
 uses <code>greatminds run cancel RUN_ID</code>; the daemon verifies and cleans tracked process
 groups before releasing the run.</p>
+<p>Pending planning requests hold their affected tasks until application or
+resolution. Inspect <code>greatminds run planning-status REQUEST_ID</code>; after resolving
+the reported conflict, <code>greatminds run planning-status REQUEST_ID --retry</code> lets
+the daemon recheck the durable request. Retrying does not bypass revision or
+ownership checks. Conversation cancellation does not undo an accepted request.</p>
 <h2 id="retries-and-account-admission">Retries and Account Admission<a class="headerlink" href="#retries-and-account-admission" title="Permanent link">&para;</a></h2>
 <p>Startup retries require evidence that no prompt or earlier protocol activity
 started. They have a finite attempt budget and shared account backoff. Post-prompt
@@ -2007,7 +2018,7 @@ greatminds<span class="w"> </span>run<span class="w"> </span>doctor<span class="
 </code></pre></div>
 <p>This read-only report combines schema/mirror inspection, ACP prerequisites,
 current run holds, assignment admission, dependency findings and unresolved
-command/result/maintenance/deployment operations. It reuses the runtime services;
+command/result/planning/maintenance/deployment operations. It reuses the runtime services;
 it does not run a harness, inspect provider login by launching a probe, repair
 state or call systemctl. <code>daemon doctor</code> remains the focused prerequisite check.</p>
 <p>JSON version 1 includes <code>checks</code>, <code>findings</code>, <code>summary</code> and <code>status</code>. Each finding
@@ -2141,10 +2152,10 @@ recovery descriptors containing local project paths and raw operation IDs.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

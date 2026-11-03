@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -31,10 +31,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -682,6 +682,17 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#moving-to-34" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Moving to 3.4
+      
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#moving-to-30" class="md-nav__link">
@@ -1592,6 +1603,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#moving-to-34" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Moving to 3.4
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#moving-to-30" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1662,6 +1684,13 @@ Inspect the available release first:</p>
 </code></pre></div>
 <p>This queries PyPI without changing the package or project. Updates are operator
 initiated; the ACP daemon does not currently send periodic release notifications.</p>
+<h2 id="moving-to-34">Moving to 3.4<a class="headerlink" href="#moving-to-34" title="Permanent link">&para;</a></h2>
+<p>Version 3.4 adds durable requests from standalone planner conversations and
+paged, incremental web reads. Existing projects need no manual task conversion.
+Upgrade the package, then restart the daemon after active work has finished and
+restart the web server to load the new assets. Pending planning requests appear
+in <code>run doctor</code>; inspect them with <code>run planning-status REQUEST_ID</code> before
+recovery or migration. Existing runs retain their pinned execution contracts.</p>
 <h2 id="moving-to-30">Moving to 3.0<a class="headerlink" href="#moving-to-30" title="Permanent link">&para;</a></h2>
 <p>The 3.0 release uses ACP for every managed executor. Define agent manifests and
 role bindings in <code>coordination/execution.yaml</code>, including the installed adapter
@@ -1765,10 +1794,10 @@ their pinned contracts.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

@@ -19,7 +19,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -27,10 +27,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -1545,6 +1545,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#standalone-planner-requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standalone planner requests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#lifecycle-and-result-receipts" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2042,6 +2053,49 @@ before returning text. Previews are not persisted into receipt metadata and do
 not replace source freshness checks. Assigned credentials can inspect only their
 own run's command receipts; an operator without assigned credentials can inspect
 all receipts.</p>
+<h2 id="standalone-planner-requests">Standalone planner requests<a class="headerlink" href="#standalone-planner-requests" title="Permanent link">&para;</a></h2>
+<p>A standalone <code>ARCHITECT-PLANNER</code> conversation has no assigned task revision and
+cannot use <code>run submit</code>. It can submit planning requests for several tasks with
+its run credential. Task-bound conversations continue to use the assigned result
+contract. The compiled context includes the schema's resolved intake discipline;
+approval of the proposal is an agent conversation responsibility, not a semantic
+check performed by the daemon.</p>
+<p><code>task new</code>, <code>plan</code>, <code>task append-block</code> and <code>task mv</code> use the planning service when
+called from a managed standalone planner. The raw interface is
+<code>run planning --action create|decide --request-id ID --json JSON</code>.
+<code>create</code> accepts task-creation fields. <code>decide</code> accepts <code>task_id</code>, <code>revision</code>
+(the current SHA256), and one to eight <code>{decision, payload}</code> steps using
+<code>handoff</code>, <code>blocked</code>, <code>needs_input</code> or <code>no_change</code>. Evidence-only <code>no_change</code>
+steps can carry <code>blocks</code> in this planning interface. Public assigned results
+retain their existing decision fields.</p>
+<p>Admission authenticates the run and checks planner ownership against its pinned
+schema. It reserves the task against claims, commands and other mutations.
+Intake reserves an ID and a validated document; the daemon publishes it.
+Decisions capture the exact task revision and reuse the normal result service's
+evidence, transition, readiness, worktree and recovery checks. SYSTEM provenance
+records the originating planner run. The conversation's assigned subject is never
+replaced, and no synthetic worker runs are created.</p>
+<p>Requests are at most 64 KiB with at most 64 unresolved requests per project.
+Receipts live under <code>planning</code> in runtime state. Deduplication is scoped to the
+conversation and explicit request ID, or the convenience command's payload hash.
+An exact repeat returns the original receipt, including across run restarts;
+reusing an explicit ID with different contents is rejected. A new request needs
+an active run. Accepted requests survive its completion or interruption and are
+applied by the daemon without spending another model turn.</p>
+<p>Planning holds the shared task lock while applying each durable operation. The
+sequence is recoverable, not transactional across all steps: rejection preserves
+completed steps and reports their receipts. An interrupted prepared operation
+resumes from its journal; uncertain external effects or changed files produce
+<code>needs_recovery</code>, which holds the task. <code>run planning-status ID</code> exposes progress
+and errors. After inspection, an operator outside the managed run may use
+<code>run planning-status ID --retry</code> to let the daemon recheck and resume. These
+checks use the existing cooperative shared-filesystem trust boundary.</p>
+<p>Pending planning receipts also prevent migration from reporting the project as
+quiet after the originating run ends. Damaged operation records or I/O failures
+hold the affected request as <code>needs_recovery</code>; independent requests and daemon
+work continue. Doctor reports these holds with explicit inspection and retry
+commands. Repair the recorded cause before retrying; recovery never assumes a
+damaged journal means the operation did not happen.</p>
 <h2 id="lifecycle-and-result-receipts">Lifecycle and result receipts<a class="headerlink" href="#lifecycle-and-result-receipts" title="Permanent link">&para;</a></h2>
 <p><code>greatminds run submit --json '{"decision":"no_change","payload":{"reason":"..."}}'</code>
 accepts an inline decision (up to 65536 bytes). Pass JSON as one literal shell
@@ -2092,8 +2146,9 @@ incomplete, including when the task is addressed through a short ID.</p>
 paths must identify existing files within the assigned workspace. Invalid
 decisions become <code>rejected</code> without partial task changes. An uncertain merge
 or conflicting recovery state becomes <code>needs_recovery</code>; it is never treated
-as permission to rerun a possibly completed command. Operator repair for these
-states and further deterministic command/evidence services remain in progress.</p>
+as permission to rerun a possibly completed command. Use the scoped recovery
+actions in the <a href="../../operations/runbook/">runbook</a>; deterministic command
+execution and evidence validation are implemented by shared domain services.</p>
 <p>This is a cooperative shared-filesystem deployment. Run credentials prevent
 accidental or invalid submissions through the service, but do not isolate a
 process that can read or rewrite the authoritative store. Strong isolation
@@ -2116,11 +2171,11 @@ deadline and validation against the offered option IDs. Without a handler,
 the client cancels the request and reports that input is needed. The transport
 does not persist raw updates or stderr; the supervisor must apply diagnostic
 redaction and retention when connecting its event sink.</p>
-<p><code>coordd</code> now selects the common ACP supervisor when the project has
-<code>coordination/execution.yaml</code>. Projects without that file still use the existing
-execution path until the migration milestone. <code>coordd --once</code> reconciles and
-executes one dispatch batch in an ACP project, then exits. A continuously running
-daemon also processes operator cancellation and retry requests.</p>
+<p><code>coordd</code> uses the common ACP supervisor and requires a valid
+<code>coordination/execution.yaml</code>. <code>coordd --once</code> runs in the foreground, reconciles
+and executes one dispatch batch, then exits. Normal <code>coordd</code> starts or attaches
+to the independent project daemon, which also processes cancellation and retry
+requests. Use <code>--foreground</code> for an attached continuous daemon.</p>
 <p>The supervisor holds one exclusive project lease. Before exec, a child waits
 on a pipe until its PID, boot identity, and process start time have been saved.
 EOF at this gate means the supervisor died before authorizing launch. Restart
@@ -2154,7 +2209,8 @@ classify failures from keywords in model output. A successful turn with an
 unchanged task revision is held until an explicit retry, rather than being
 automatically repeated. Typed results now pass through domain application and
 its semantic gates. Worktree preparation at dispatch, deterministic command
-evidence, repair controls, and live harness compatibility remain in progress.</p>
+evidence and scoped repair controls are implemented. Live harness compatibility
+is limited to the versions and scenarios in the <a href="../acp-compatibility/">compatibility matrix</a>.</p>
 <h2 id="stand-state-durability-and-deployment-ownership">Stand state durability and deployment ownership<a class="headerlink" href="#stand-state-durability-and-deployment-ownership" title="Permanent link">&para;</a></h2>
 <p>Stand state uses a stable <code>.stand/state.lock</code> and an atomic, fsynced replacement
 of <code>.stand/state.yaml</code>. Concurrent readers see complete snapshots. An exception
@@ -2307,11 +2363,10 @@ adds runtime/worktree ignore entries, and writes a missing runtime schema mirror
 The contract is published last. Repeating the command preserves existing files;
 an edited schema mirror is reported as drifted and does not override the installed
 schema. This path does not launch an agent, install services, change harness trust,
-or generate native harness configuration. It rejects flags from the other setup
-path that it cannot honor and refuses replacement of an existing execution contract.</p>
-<p>An existing fleet without an execution contract requires explicit migration before
-this bootstrap can apply. Preparation of that migration and the default setup switch
-are in progress; the option above is the available ACP-specific bootstrap entrypoint.</p>
+or generate native harness configuration. It refuses replacement of an existing
+execution contract. Without <code>--execution-config</code>, setup creates an empty explicit
+ACP contract. It refuses a second runtime when task data still lives in
+<code>coordination/</code>; inspect and preserve that data before initializing <code>.greatminds/</code>.</p>
 <p><code>runtime.interactions.ConversationStore</code> backs the <code>chat</code> CLI and ACP daemon.
 Each conversation has a private <code>.runtime/conversations/&lt;id&gt;/state.json</code> and a
 stable lock. The binding, execution/schema hashes, and workspace are pinned at
@@ -2400,10 +2455,12 @@ launching agents or including message contents. The VS Code extension uses these
 commands for New ACP Chat, Attach ACP Chat, and Close ACP Chat. Its terminal runs
 the same <code>chat talk</code> client. The daemon remains the process/session owner when an
 editor terminal closes or reconnects.</p>
-<p>Richer non-permission input, real extension-host smoke testing, and live interactive
-harness validation remain outstanding M5 work.</p>
+<p>The interactive client supports user messages and ACP permission choices, not
+arbitrary vendor input extensions. Extension-host smoke and live interactive
+harness checks are recorded in the <a href="../modernization-acceptance/">acceptance audit</a>;
+their scope is narrower than every role/harness combination.</p>
 <h2 id="acp-launch-surfaces">ACP launch surfaces<a class="headerlink" href="#acp-launch-surfaces" title="Permanent link">&para;</a></h2>
-<p>When <code>coordination/execution.yaml</code> exists, <code>greatminds launch --project-dir PATH</code>
+<p><code>greatminds launch --project-dir PATH</code> requires a valid execution contract and
 uses the ACP frontend. <code>--target vscode</code> or <code>cursor-ide</code> writes
 <code>greatminds-acp.code-workspace</code> with process tasks for coordd, run status, and
 conversation metadata. It preserves unrelated workspace tasks/settings and does
@@ -2418,11 +2475,10 @@ this path; stop the daemon and close its session explicitly when needed. The
 supervisor's exclusive lease remains responsible for preventing duplicate daemon
 ownership, including when a service already runs coordd.</p>
 <p>The frontend uses the current CLI's Python, or an explicit <code>--venv</code> whose ACP
-runtime imports are checked before launch. <code>--config</code> does not select another
-configuration for an ACP project; use its project directory. A project without
-an execution contract still uses the other launcher while default migration is
-being completed. Generating an ACP workspace does not remove pre-existing fleet
-artifacts; that belongs to the explicit project migration.</p>
+runtime imports are checked before launch. The launch command has no <code>--config</code>
+option. Select the project
+with <code>--project-dir</code>. Generating an ACP workspace preserves unrelated project
+files; it does not migrate task data or install an executor.</p>
 <h2 id="acp-defaults-and-cutover">ACP defaults and cutover<a class="headerlink" href="#acp-defaults-and-cutover" title="Permanent link">&para;</a></h2>
 <p>Operator observations use the same ACP run model across <code>run status</code>,
 <code>agent status --json</code> and <code>dashboard --json</code>. Configured bindings without runs
@@ -2433,7 +2489,7 @@ separate fields. A live PID does not turn waiting for authentication or human
 input into readiness, and PID reuse does not identify a live owned process.</p>
 <p><code>agent tools --json</code> lists configured ACP manifests and pinned version labels.
 Its <code>verification: configured</code> field does not assert live harness compatibility.
-The VS Code agent list displays the same distinction. Dashboard includes task
+The VS Code agent list displays the same distinction. The CLI dashboard includes task
 queues, assignment reasons, stand state and maintenance findings. These read-only
 views exclude run credential hashes and do not probe harnesses or inspect terminal
 panes. Cross-store observations are best effort; execution admission revalidates
@@ -2451,8 +2507,9 @@ It refuses to create a second runtime if task data still resides in coordination
 <code>launch</code> exposes daemon/operator frontends. Use <code>run pause</code>, <code>run resume</code>,
 <code>run cancel</code>, <code>run retry</code> and the <code>chat</code> commands to control work and conversations.</p>
 <p>ACP run cancellation, recovery, permission checks and task revision validation
-remain part of the runtime contract. Follow the modernization plan for the current
-implementation status of diagnostics, service configuration and documentation.</p>
+remain part of the runtime contract. The <a href="../../operations/runbook/">runbook</a>
+describes current diagnostics and recovery; the <a href="../../getting-started/local-web/">web guide</a>
+describes the packaged browser interface.</p>
 <h3 id="explicit-stand-profile-selection">Explicit stand profile selection<a class="headerlink" href="#explicit-stand-profile-selection" title="Permanent link">&para;</a></h3>
 <p>When a lease has a worktree, its <code>coordination/stand-profiles/</code> profile wins;
 otherwise the main project's selected profile is used. The chosen path and
@@ -2485,7 +2542,9 @@ budget. Claim admission rechecks the verdict under the store lock and records
 permission, revision and unresolved-operation gates still apply.</p>
 <p>An explicit operator retry permits one further attempt but does not reset the
 count for that unchanged revision. This startup policy does not implement
-provider-reported rate-limit handling, automatic post-prompt retries, or provider usage/cost budgets; those remain separate modernization requirements.</p>
+automatic post-prompt retries. Configured provider error holds and reported
+session cost budgets are separate admission mechanisms described below and in
+the <a href="../../operations/runbook/#retries-and-account-admission">runbook</a>.</p>
 <h3 id="shared-account-startup-backoff">Shared account startup backoff<a class="headerlink" href="#shared-account-startup-backoff" title="Permanent link">&para;</a></h3>
 <p>Project-level <code>account_retry_initial_seconds</code> (default 5) and
 <code>account_retry_max_seconds</code> (default 60) are positive integers. Consecutive
@@ -2829,10 +2888,10 @@ observation sink cannot silently report successful processing.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

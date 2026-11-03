@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -31,10 +31,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -1796,6 +1796,17 @@ incoming text progressively. The activity indicator remains visible during an
 agent turn, including pauses before text arrives; queued turns and permission or
 login waits have distinct labels. The indicator stops when the turn ends. Reduced
 motion preferences disable the text reveal and spinner animation.</p>
+<p>Chats initially load the latest 50 turns plus any running turn; <strong>Earlier messages</strong> loads preceding
+turns without replaying the entire journal on every poll. Runs initially show
+the latest 100 executions plus all active runs; <strong>Earlier runs</strong> loads previous
+pages. Counts still include the full history. These windows do not delete data.
+Subsequent reads fetch new events, and hidden browser tabs suspend polling until
+visible again. The daemon continues working independently.</p>
+<p>Dashboard read views reuse unchanged task/configuration files and revalidate
+HTTP responses with ETags. File replacement, edits, moves and deletion invalidate
+the relevant cached view, including changes made through another CLI process.
+Workflow decisions always use authoritative domain checks. Task cards and
+expanded run details remain in place when background updates arrive.</p>
 <p>Use the toolbar's light/dark theme switch. The first visit follows the system
 color preference; an explicit choice is saved in this browser for the same origin.
 The theme applies to the chat, dashboards, settings, forms and code previews.
@@ -1804,8 +1815,9 @@ the web server after upgrading the package so its backend uses the new version.<
 <h2 id="history-and-storage">History and storage<a class="headerlink" href="#history-and-storage" title="Permanent link">&para;</a></h2>
 <p>The browser reads the same filesystem state as the CLI and daemon. Viewing a page
 or reconnecting does not launch an agent. Dashboard requests are polled every 1.5 seconds; active chat requests every 350 ms;
-conversation event cursors avoid replaying earlier text. The UI renders the last
-50 conversation turns; the existing conversation journal remains on disk.</p>
+conversation event cursors avoid replaying earlier text. The first chat window
+contains 50 turns, with earlier windows available on demand; the journal remains
+on disk.</p>
 <p>New batch runs retain public ACP message and tool updates in
 <code>.greatminds/.runtime/activity/</code>. These records are supplementary observations,
 not workflow authority or proof that a task passed. Each run keeps at most 512
@@ -1954,10 +1966,10 @@ are <code>compact</code>, <code>normal</code> and <code>large</code>; supported 
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>
